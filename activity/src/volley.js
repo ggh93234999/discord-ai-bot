@@ -8,7 +8,7 @@ export function mountVolley(root, { env, back }) {
       <header><button class="back">← 選單</button><h2>圓球排球</h2><span class="watch"></span></header>
       <div class="status">連線中…</div>
       <div class="cwrap"><canvas></canvas></div>
-      <div class="pad"><button data-k="l">◀</button><button data-k="j">⤒ 跳</button><button data-k="r">▶</button></div>
+      <div class="pad"><button data-k="l">◀</button><button data-k="j">⤒ 跳</button><button data-k="p">💥 殺</button><button data-k="r">▶</button></div>
       <div class="actions"><button class="resign" hidden>認輸</button><button class="again" hidden>再來一局（左右互換）</button></div>
     </div>`;
   const $ = (s) => root.querySelector(s);
@@ -17,7 +17,7 @@ export function mountVolley(root, { env, back }) {
   $(".back").addEventListener("click", back);
 
   let st = null, ws = null, closed = false, retry = 0, k = 0;
-  const keys = { l: false, r: false, j: false };
+  const keys = { l: false, r: false, j: false, p: false };
   let sent = "";
 
   const sendKeys = () => {
@@ -39,7 +39,7 @@ export function mountVolley(root, { env, back }) {
   }
 
   // 鍵盤
-  const map = { ArrowLeft: "l", KeyA: "l", ArrowRight: "r", KeyD: "r", ArrowUp: "j", KeyW: "j", Space: "j" };
+  const map = { ArrowLeft: "l", KeyA: "l", ArrowRight: "r", KeyD: "r", ArrowUp: "j", KeyW: "j", Space: "j", ArrowDown: "p", KeyS: "p", Enter: "p" };
   const onKey = (down) => (e) => { const a = map[e.code]; if (!a) return; e.preventDefault(); keys[a] = down; sendKeys(); };
   const kd = onKey(true), ku = onKey(false);
   window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
@@ -50,7 +50,7 @@ export function mountVolley(root, { env, back }) {
     b.addEventListener("pointerdown", set(true));
     for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, set(false));
   });
-  const blur = () => { keys.l = keys.r = keys.j = false; sendKeys(); };
+  const blur = () => { keys.l = keys.r = keys.j = keys.p = false; sendKeys(); };
   window.addEventListener("blur", blur);
 
   function resize() {
@@ -114,7 +114,7 @@ export function mountVolley(root, { env, back }) {
     let t;
     if (st.winner) t = st.winner === st.you ? "🎉 你贏了！" : (st.you === "s" ? `${side(st.winner)}獲勝` : "😢 對手贏了");
     else if (!st.players.b || !st.players.w) t = `${me}　等另一位玩家加入…（請朋友也點開 Activity）`;
-    else t = `${me}　先得 15 分獲勝　←→ 移動、空白鍵/↑ 跳`;
+    else t = `${me}　先得 15 分獲勝　←→ 移動、空白/↑ 跳、↓/Enter 空中殺球`;
     statusEl.textContent = t;
     resignBtn.hidden = !(st.you !== "s" && !st.winner && st.players.b && st.players.w);
     againBtn.hidden = !(st.you !== "s" && st.winner);

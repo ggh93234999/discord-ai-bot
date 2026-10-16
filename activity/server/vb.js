@@ -58,6 +58,10 @@ export function stepVb(vb, input) {
       if (vn < 0) { b.vx -= 2.15 * vn * nx; b.vy -= 2.15 * vn * ny; }
       const s = Math.hypot(b.vx, b.vy);
       if (s > MAXV) { b.vx *= MAXV / s; b.vy *= MAXV / s; }
+      // 殺球：在空中按殺球鍵打到球，球會往對面場地斜下方高速砸去
+      if (input[role] && input[role].p && p.y < GROUND - 4) {
+        b.vx = (role === "b" ? 1 : -1) * 13; b.vy = 7;
+      }
     }
   }
   if (b.y >= GROUND - BR) {

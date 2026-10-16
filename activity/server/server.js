@@ -121,7 +121,7 @@ wss.on("connection", (ws) => {
     if (!room) return;
     const role = roleOf(room, ws);
     if (m.t === "in") {
-      if (room.game === "vb" && role !== "s") room.input[role] = { l: !!m.l, r: !!m.r, j: !!m.j };
+      if (room.game === "vb" && role !== "s") room.input[role] = { l: !!m.l, r: !!m.r, j: !!m.j, p: !!m.p };
     } else if (m.t === "move") {
       if (room.game === "vb") return;
       if (role === "s" || room.winner || room.turn !== role) return;
