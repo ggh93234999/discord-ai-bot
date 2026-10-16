@@ -1,31 +1,39 @@
-// 五子棋房間伺服器：一個 Discord Activity instance（instanceId）= 一個房間。
-// 先進房間的是黑棋，第二個是白棋，其他人旁觀。棋盤只存在記憶體，重啟會清掉。
+// 雙人棋類房間伺服器（五子棋 gomoku、四連棋 c4）。
+// 一個 Discord Activity instance（instanceId）+ 遊戲種類 = 一個房間。
+// 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
 import { WebSocketServer } from "ws";
 
 const PORT = Number(process.env.PORT || 3101);
-const SIZE = 15;
+const GOMOKU = 15;
+const C4_W = 7, C4_H = 6;
 const rooms = new Map();
 
-function newRoom() {
-  return { board: ".".repeat(SIZE * SIZE), turn: "b", winner: null, line: null, last: null, moves: 0,
+function freshBoard(game) {
+  return game === "c4" ? ".".repeat(C4_W * C4_H) : ".".repeat(GOMOKU * GOMOKU);
+}
+
+function newRoom(game) {
+  return { game, board: freshBoard(game), turn: "b", winner: null, line: null, last: null, moves: 0,
            players: { b: null, w: null }, clients: new Set(), emptySince: null };
 }
 
-function getRoom(id) {
-  if (!rooms.has(id)) rooms.set(id, newRoom());
-  return rooms.get(id);
+function getRoom(game, id) {
+  const key = `${game}:${id}`;
+  if (!rooms.has(key)) rooms.set(key, newRoom(game));
+  return rooms.get(key);
 }
 
-function checkWin(board, x, y, c) {
+// 從 (x,y) 往四個方向數連線，len 個以上就算贏，回傳連線座標
+function checkWin(get, w, h, x, y, c, len) {
   for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) {
     const line = [[x, y]];
     for (const s of [1, -1]) {
       let nx = x + dx * s, ny = y + dy * s;
-      while (nx >= 0 && ny >= 0 && nx < SIZE && ny < SIZE && board[ny * SIZE + nx] === c) {
+      while (nx >= 0 && ny >= 0 && nx < w && ny < h && get(nx, ny) === c) {
         line.push([nx, ny]); nx += dx * s; ny += dy * s;
       }
     }
-    if (line.length >= 5) return line;
+    if (line.length >= len) return line;
   }
   return null;
 }
@@ -41,7 +49,7 @@ function send(ws, obj) { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); 
 function broadcast(room) {
   for (const ws of room.clients) {
     send(ws, {
-      t: "state", you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
+      t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
       line: room.line, last: room.last, moves: room.moves,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
     });
@@ -51,6 +59,36 @@ function broadcast(room) {
 function assignSeat(room, ws) {
   if (!room.players.b) room.players.b = ws;
   else if (!room.players.w) room.players.w = ws;
+}
+
+function place(room, role, m) {
+  if (room.game === "gomoku") {
+    const x = Number(m.x), y = Number(m.y);
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= GOMOKU || y >= GOMOKU) return false;
+    const i = y * GOMOKU + x;
+    if (room.board[i] !== ".") return false;
+    room.board = room.board.slice(0, i) + role + room.board.slice(i + 1);
+    room.last = [x, y];
+    room.moves++;
+    const line = checkWin((a, b) => room.board[b * GOMOKU + a], GOMOKU, GOMOKU, x, y, role, 5);
+    if (line) { room.winner = role; room.line = line; }
+    else if (room.moves >= GOMOKU * GOMOKU) room.winner = "d";
+    return true;
+  }
+  // c4：只收「哪一欄」，棋子自己掉到最底下
+  const c = Number(m.c);
+  if (!Number.isInteger(c) || c < 0 || c >= C4_W) return false;
+  let r = -1;
+  for (let row = C4_H - 1; row >= 0; row--) if (room.board[row * C4_W + c] === ".") { r = row; break; }
+  if (r < 0) return false;
+  const i = r * C4_W + c;
+  room.board = room.board.slice(0, i) + role + room.board.slice(i + 1);
+  room.last = [c, r];
+  room.moves++;
+  const line = checkWin((a, b) => room.board[b * C4_W + a], C4_W, C4_H, c, r, role, 4);
+  if (line) { room.winner = role; room.line = line; }
+  else if (room.moves >= C4_W * C4_H) room.winner = "d";
+  return true;
 }
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1", path: "/ws", maxPayload: 4096 });
@@ -65,8 +103,9 @@ wss.on("connection", (ws) => {
     try { m = JSON.parse(raw.toString()); } catch { return; }
     if (m.t === "join") {
       if (ws.room) return;
+      const game = m.game === "c4" ? "c4" : "gomoku";
       const id = String(m.room || "default").slice(0, 80);
-      const room = getRoom(id);
+      const room = getRoom(game, id);
       ws.room = room;
       room.clients.add(ws);
       room.emptySince = null;
@@ -78,25 +117,16 @@ wss.on("connection", (ws) => {
     if (!room) return;
     const role = roleOf(room, ws);
     if (m.t === "move") {
-      const x = Number(m.x), y = Number(m.y);
       if (role === "s" || room.winner || room.turn !== role) return;
-      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= SIZE || y >= SIZE) return;
       if (!room.players.b || !room.players.w) return;     // 要兩個人都到了才能下
-      const i = y * SIZE + x;
-      if (room.board[i] !== ".") return;
-      room.board = room.board.slice(0, i) + role + room.board.slice(i + 1);
-      room.last = [x, y];
-      room.moves++;
-      const line = checkWin(room.board, x, y, role);
-      if (line) { room.winner = role; room.line = line; }
-      else if (room.moves >= SIZE * SIZE) { room.winner = "d"; }
-      else room.turn = role === "b" ? "w" : "b";
+      if (!place(room, role, m)) return;
+      if (!room.winner) room.turn = role === "b" ? "w" : "b";
       broadcast(room);
     } else if (m.t === "again") {
       if (role === "s" || !room.winner) return;
-      // 重新開局，黑白互換
+      // 重新開局，先後手互換
       const { b, w } = room.players;
-      Object.assign(room, newRoomState(room));
+      Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0 });
       room.players = { b: w, w: b };
       broadcast(room);
     } else if (m.t === "resign") {
@@ -119,11 +149,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-function newRoomState(room) {
-  const fresh = newRoom();
-  return { board: fresh.board, turn: "b", winner: null, line: null, last: null, moves: 0 };
-}
-
 // 心跳：斷線的連線清掉；沒人的房間 10 分鐘後刪除
 setInterval(() => {
   for (const ws of wss.clients) {
@@ -136,4 +161,4 @@ setInterval(() => {
   }
 }, 25000);
 
-console.log(`gomoku server listening on 127.0.0.1:${PORT}/ws`);
+console.log(`board game server listening on 127.0.0.1:${PORT}/ws`);

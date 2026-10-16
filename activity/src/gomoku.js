@@ -9,6 +9,7 @@ function wsUrl(inDiscord) {
   return u.toString();
 }
 
+export { wsUrl };
 export function mountGomoku(root, { env, back }) {
   root.innerHTML = `
     <div class="game gomoku">
