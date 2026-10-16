@@ -2,6 +2,7 @@
 // 一個 Discord Activity instance（instanceId）+ 遊戲種類 = 一個房間。
 // 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
 import { WebSocketServer } from "ws";
+import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 
 const PORT = Number(process.env.PORT || 3101);
 const GOMOKU = 15;
@@ -9,12 +10,14 @@ const C4_W = 7, C4_H = 6;
 const rooms = new Map();
 
 function freshBoard(game) {
+  if (game === "vb") return "";
   return game === "c4" ? ".".repeat(C4_W * C4_H) : ".".repeat(GOMOKU * GOMOKU);
 }
 
 function newRoom(game) {
   return { game, board: freshBoard(game), turn: "b", winner: null, line: null, last: null, moves: 0,
-           players: { b: null, w: null }, clients: new Set(), emptySince: null };
+           players: { b: null, w: null }, clients: new Set(), emptySince: null,
+           vb: game === "vb" ? createVb() : null, input: { b: {}, w: {} } };
 }
 
 function getRoom(game, id) {
@@ -52,6 +55,7 @@ function broadcast(room) {
       t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
       line: room.line, last: room.last, moves: room.moves,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
+      vb: room.vb ? snapshotVb(room.vb) : undefined,
     });
   }
 }
@@ -103,7 +107,7 @@ wss.on("connection", (ws) => {
     try { m = JSON.parse(raw.toString()); } catch { return; }
     if (m.t === "join") {
       if (ws.room) return;
-      const game = m.game === "c4" ? "c4" : "gomoku";
+      const game = ["c4", "vb"].includes(m.game) ? m.game : "gomoku";
       const id = String(m.room || "default").slice(0, 80);
       const room = getRoom(game, id);
       ws.room = room;
@@ -116,7 +120,10 @@ wss.on("connection", (ws) => {
     const room = ws.room;
     if (!room) return;
     const role = roleOf(room, ws);
-    if (m.t === "move") {
+    if (m.t === "in") {
+      if (room.game === "vb" && role !== "s") room.input[role] = { l: !!m.l, r: !!m.r, j: !!m.j };
+    } else if (m.t === "move") {
+      if (room.game === "vb") return;
       if (role === "s" || room.winner || room.turn !== role) return;
       if (!room.players.b || !room.players.w) return;     // 要兩個人都到了才能下
       if (!place(room, role, m)) return;
@@ -128,6 +135,7 @@ wss.on("connection", (ws) => {
       const { b, w } = room.players;
       Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0 });
       room.players = { b: w, w: b };
+      if (room.game === "vb") { room.vb = createVb(); room.input = { b: {}, w: {} }; }
       broadcast(room);
     } else if (m.t === "resign") {
       if (role === "s" || room.winner) return;
@@ -141,13 +149,23 @@ wss.on("connection", (ws) => {
     const room = ws.room;
     if (!room) return;
     room.clients.delete(ws);
-    for (const c of ["b", "w"]) if (room.players[c] === ws) room.players[c] = null;
+    for (const c of ["b", "w"]) if (room.players[c] === ws) { room.players[c] = null; room.input[c] = {}; }
     // 有旁觀者就遞補空位
     for (const w of room.clients) if (roleOf(room, w) === "s") assignSeat(room, w);
     if (room.clients.size === 0) room.emptySince = Date.now();
     broadcast(room);
   });
 });
+
+// 排球：每個 tick 推進有兩位玩家的房間
+setInterval(() => {
+  for (const room of rooms.values()) {
+    if (room.game !== "vb" || room.winner || !room.players.b || !room.players.w) continue;
+    const scorer = stepVb(room.vb, room.input);
+    if (scorer && room.vb.score[scorer] >= WIN) room.winner = scorer;
+    broadcast(room);
+  }
+}, 1000 / 60);
 
 // 心跳：斷線的連線清掉；沒人的房間 10 分鐘後刪除
 setInterval(() => {

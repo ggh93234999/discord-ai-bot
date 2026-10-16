@@ -3,6 +3,7 @@ import "./style.css";
 import { mountWordle } from "./wordle.js";
 import { mountGomoku } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";
+import { mountVolley } from "./volley.js";
 
 // ---------- Discord SDK（在 Discord 裡才啟動；一般瀏覽器開也能玩）
 const clientId = import.meta.env.VITE_CLIENT_ID;
@@ -23,6 +24,7 @@ const GAMES = [
   { id: "wordle", icon: "🟩", name: "Wordle", desc: "單人猜字，6 次機會", mount: mountWordle },
   { id: "gomoku", icon: "⚫", name: "五子棋", desc: "兩人對戰，先連五子獲勝", mount: mountGomoku },
   { id: "c4", icon: "🔴", name: "四連棋", desc: "兩人對戰，棋子往下掉，先連四顆獲勝", mount: mountConnect4 },
+  { id: "vb", icon: "🏐", name: "圓球排球", desc: "兩人即時對戰，先得 15 分獲勝", mount: mountVolley },
 ];
 
 function showMenu() {
