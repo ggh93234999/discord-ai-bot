@@ -146,3 +146,11 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 - `/發錢 對象 金額`（give）：機器人擁有者專用，直接發代幣。
 - `/老虎機 賭注 [格數]`：3 格（單排）、9 格（3×3，8 條連線）、16 格（4×4，任一方向連續 3 格一樣算一條，16 格多 🍉⭐ 兩種符號）。多格版可同時中很多條，各版本理論回報率都調在約 95%。
 - `/賽馬 [等待秒數]`（horserace）：開一場賽馬，6 匹馬從 12 匹固定名單隨機出賽，每匹有速度／耐力／爆發數值（存 `horses.json`）、當天狀態和歷史戰績（出賽、勝場、近 5 場名次）。賠率 = 0.95 ÷ 勝率，勝率由能力＋狀態算出，所以強馬賠少、冷門賠多。按按鈕選馬、填賭注；每人一注，截止後播放跑道動畫並結算。機器人在比賽中途重啟，這場的賭注會損失。
+
+## Discord Activity 小遊戲（`activity/`）
+在語音頻道打開的內嵌遊戲視窗（Discord Embedded App SDK），目前有 Wordle（單人）和五子棋（兩人，WebSocket 同步）。
+- 前端：`activity/`（Vite 打包，`npm install && npm run build`，產物在 `activity/dist/`）。把 `VITE_CLIENT_ID` 寫進 `activity/.env`（Application ID，不是密鑰）。
+- 後端：`activity/server/`（Node + ws，五子棋房間，預設 `127.0.0.1:3101`，用 `node server.js` 或 systemd 常駐）。
+- 對外：需要公開 HTTPS 網址。Developer Portal → Activities → URL Mappings 把 `/` 指到你放 `dist/` 的目錄；WebSocket 路徑 `/ws` 要轉到後端（Apache 用 `ProxyPass /你的路徑/ws http://127.0.0.1:3101/ws upgrade=websocket`）。
+- 機器人端：Discord 開啟 Activities 後會自動建立入口指令 `/launch`；整批同步指令時必須把它一起帶上（`bot.py` 的 `sync_commands` 已處理）。
+- 沒發佈的 Activity 只有擁有者和開發團隊成員能開。

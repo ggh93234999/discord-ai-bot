@@ -205,8 +205,23 @@ class Bot(discord.Client):
         self.http_session = aiohttp.ClientSession()
         economy.start_voice_loop()  # 掛語音也賺代幣
         aliases.add_english_aliases(self.tree)  # 每個中文指令再加一個英文名字的版本
-        synced = await self.tree.sync()
-        log.info("已同步斜線指令：%s", ", ".join("/" + c.name for c in synced))
+        await self.sync_commands()
+
+    async def sync_commands(self):
+        """同步斜線指令。Discord Activity 的入口指令（/launch，type 4）是 Discord 自己建的，
+        整批覆蓋時一定要把它一起帶上，否則會被拒絕或被刪掉。"""
+        try:
+            app_id = self.application_id
+            payload = [c.to_dict(self.tree) for c in self.tree._get_all_commands(guild=None)]
+            existing = await self.http.get_global_commands(app_id)
+            for c in existing:
+                if c.get("type") == 4:  # PRIMARY_ENTRY_POINT
+                    payload.append({k: c[k] for k in ("id", "name", "description", "type", "handler", "contexts",
+                                                      "integration_types", "default_member_permissions") if k in c})
+            data = await self.http.bulk_upsert_global_commands(app_id, payload)
+            log.info("已同步斜線指令：%s", ", ".join("/" + c["name"] for c in data))
+        except Exception:
+            log.exception("同步斜線指令失敗（機器人照常運作，指令維持上次的狀態）")
 
     async def close(self):
         if self.http_session:
