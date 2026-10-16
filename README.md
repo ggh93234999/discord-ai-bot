@@ -4,6 +4,59 @@
 機器人本體跑在 Linux 伺服器上（systemd 服務 `discord-bot`），連到你設定的模型 API（`LLM_BASE_URL`）。
 Discord 機器人只需要「往外連」Discord，不用開任何連接埠。
 
+## 快速開始（自己架一隻）
+
+### 1. 需要什麼
+- Python 3.11 以上
+- 系統要裝 `ffmpeg`（放音樂用）和 `node`（yt-dlp 解 YouTube 用）。Ubuntu／Debian：`sudo apt install ffmpeg nodejs`
+- 一個 **OpenAI 相容的模型 API**：本機的 Ollama、LiteLLM、vLLM，或 OpenAI、DeepSeek 等線上服務都行
+- 一個 Discord 機器人帳號（下一步）
+
+### 2. 建立 Discord 機器人並拿到 token
+1. 到 [Discord Developer Portal](https://discord.com/developers/applications) → **New Application**，取名字。
+2. 左邊 **Bot** 頁 → **Reset Token** → 複製出現的 token（只會顯示一次）。**這就是 `DISCORD_TOKEN`，等同機器人的密碼，不要貼到任何公開的地方。**
+3. 同一頁往下找到 **Privileged Gateway Intents**，打開 **Message Content Intent**（沒開機器人讀不到訊息內容）。
+4. 左邊 **General Information** 複製 **Application ID**（也就是 client id）。
+5. 邀請機器人進你的伺服器：把下面「邀請連結」裡的 `YOUR_CLIENT_ID` 換成剛才的 Application ID，用瀏覽器打開、選伺服器、同意。
+
+### 3. 安裝與設定
+```bash
+git clone https://github.com/ggh93234999/discord-ai-bot.git
+cd discord-ai-bot
+python3 -m venv .venv
+source .venv/bin/activate          # Windows：.venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env               # Windows：copy .env.example .env
+```
+然後用文字編輯器打開 `.env`，**把金鑰填在這裡**（這個檔案已被 `.gitignore` 擋住，不會被 git 上傳；千萬不要把它傳給別人或貼到聊天室）：
+
+| 變數 | 填什麼 |
+|---|---|
+| `DISCORD_TOKEN` | 上一步複製的機器人 token |
+| `LLM_BASE_URL` | 模型 API 位址，要含 `/v1`。Ollama：`http://localhost:11434/v1`；LiteLLM：`http://localhost:4000/v1`；OpenAI：`https://api.openai.com/v1` |
+| `LLM_API_KEY` | 模型 API 的金鑰。Ollama 不檢查，隨便填一個非空字串（例如 `ollama`）即可 |
+| `LLM_MODEL` | 模型名稱，要跟 API 那邊的名稱一樣，例如 `qwen3:8b`、`gpt-4o-mini` |
+| `DEEPSEEK_API_KEY` | 選填，只有想用 `/餘額` 查 DeepSeek 餘額才需要 |
+| `ADMIN_USER_IDS` | 選填，除了機器人擁有者以外，還有誰能用 `/模型` 切模型（Discord 使用者 ID，逗號分隔） |
+
+其他選填設定都有預設值，說明寫在 `.env.example` 裡。
+
+### 4. 啟動
+```bash
+python bot.py
+```
+看到「已同步斜線指令」就成功了。到 Discord 打 `/` 就能看到指令（第一次可能要等一兩分鐘，或按 Ctrl+R 重新整理）。
+語音和聊天都在這一個程式裡，**不需要對外開任何連接埠**，機器人只是主動連出去 Discord 和你的模型 API。
+
+要長期運作的話，可以用 systemd：參考 `discord-bot.service.example`，改掉使用者和路徑後放到 `/etc/systemd/system/`，再 `sudo systemctl enable --now discord-bot`。
+
+### 5. 常見問題
+- **機器人在線上但不回話**：多半是 **Message Content Intent** 沒開（步驟 2-3），或 `LLM_BASE_URL` 連不到（看終端機的錯誤訊息）。
+- **指令沒出現**：重新整理 Discord（Ctrl+R）；確認邀請連結有包含 `applications.commands`。
+- **放音樂沒聲音／失敗**：確認系統有 `ffmpeg`，機器人有「連線」和「說話」權限；YouTube 常改版，`pip install -U yt-dlp` 通常就會好。
+- **token 外洩了**：馬上回 Developer Portal 重新 **Reset Token**，舊的就失效，再把新的填進 `.env`。
+
 ## 什麼時候會回
 
 - 私訊機器人
@@ -21,7 +74,7 @@ Discord 機器人只需要「往外連」Discord，不用開任何連接埠。
   查的時候會先出現「🔎 搜尋：…」，查完那則訊息會變成答案。
 - **放音樂（YouTube）**：先進語音頻道，再用 `/播放 歌名或網址`，或直接說「@大笨bot 放周杰倫的晴天」「放點讀書的音樂」「下一首」。
   可以貼單首網址或整個播放清單（最多 50 首）。佇列播完 3 分鐘、或語音頻道沒人 1 分鐘，會自己離開。
-  yt-dlp 每週一早上 5:17 自動更新（`update-ytdlp.sh`，log 在 `~/.cache/update-ytdlp.log`），YouTube 改版時通常更新就會好。
+  yt-dlp 建議定期更新（可參考 `update-ytdlp.sh.example` 設成每週的 crontab），YouTube 改版時通常更新就會好。
 - **開頻道**（要叫它開的人本身要有「管理頻道」權限；機器人也要有「管理頻道」，臨時語音房再加「移動成員」）
   - `/開頻道 名稱 類型 [分類] [私人]`，或直接說「@大笨bot 幫我開一個叫 xxx 的語音頻道」
   - `/改頻道 [頻道] [新名稱] [分類]`：改名或搬到別的分類，也可以直接說「把大笨bot 語音頻道移到語音頻道分類」
