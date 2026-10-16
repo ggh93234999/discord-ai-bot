@@ -1,0 +1,10 @@
+#!/bin/bash
+# 每週自動更新 yt-dlp（YouTube 常改機制，舊版會抓不到），有更新才重開機器人
+# 用法：改下面的 PY 路徑，再用 crontab 每週跑一次
+PY=/path/to/venv/bin/python
+before=$($PY -c "import yt_dlp;print(yt_dlp.version.__version__)")
+$PY -m pip install -q -U "yt-dlp[default]"
+after=$($PY -c "import yt_dlp;print(yt_dlp.version.__version__)")
+echo "$(date '+%F %T') yt-dlp $before -> $after"
+[ "$before" != "$after" ] && sudo -n systemctl restart discord-bot
+exit 0

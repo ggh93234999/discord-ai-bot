@@ -1,0 +1,20 @@
+# 金鑰與執行時資料（絕對不要上傳）
+.env
+*.tmp
+__pycache__/
+*.pyc
+
+# 機器人執行時產生的資料：聊天紀錄、錢包、播放紀錄等
+state.json
+action_log.json
+play_history.json
+music_settings.json
+wallet.json
+horses.json
+
+# 舊版備份（裡面有 env 備份）
+_old_claude_api/
+
+# 只在自己伺服器用的部署檔（含使用者名稱與路徑）
+update-ytdlp.sh
+discord-bot.service

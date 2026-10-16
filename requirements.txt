@@ -1,0 +1,7 @@
+discord.py[voice]>=2.4
+aiohttp>=3.9
+ddgs
+trafilatura
+pillow
+yt-dlp[default]
+# 另外需要系統裝 ffmpeg 和 node（yt-dlp 解 YouTube 用）

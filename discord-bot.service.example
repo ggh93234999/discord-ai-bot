@@ -1,0 +1,18 @@
+[Unit]
+Description=Discord AI bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# 改成你的使用者和路徑
+User=YOUR_USER
+Group=YOUR_USER
+WorkingDirectory=/path/to/discord-bot
+EnvironmentFile=/path/to/discord-bot/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/path/to/venv/bin/python /path/to/discord-bot/bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
