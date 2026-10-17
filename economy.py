@@ -105,11 +105,11 @@ def slot_spin() -> tuple[list[str], int, str]:
     return reels, 0, "沒中"
 
 
-# ---- 多格老虎機：9 格（3×3，8 條連線）、16 格（4×4，每個方向任意連續 3 格一樣算一條）
-GRID_SYMBOLS = {3: ["🍒", "🍋", "🔔", "💎"], 4: ["🍒", "🍋", "🔔", "🍇", "⭐", "💎"]}
+# ---- 多格老虎機：9 格（3×3，8 條連線，3 格一樣）、16 格（4×4，10 條連線，4 格一樣）
+GRID_SYMBOLS = {3: ["🍒", "🍋", "🔔", "💎"], 4: ["🍒", "🍋", "💎"]}
 GRID_PAY = {
     3: {"🍒": 1.2, "🍋": 1.6, "🔔": 2, "💎": 2.8},   # 只有 4 種圖案，約 41% 的把數會賺錢
-    4: {"🍒": 1.2, "🍋": 1.2, "🔔": 1.3, "🍇": 1.4, "⭐": 1.5, "💎": 1.9},   # 6 種圖案，約 47% 的把數會賺錢
+    4: {"🍒": 2, "🍋": 2.5, "💎": 3.2},   # 3 種圖案、4 格一樣才算一條線
 }
 GRID_SCALE = {3: 1.0, 4: 1.0}
 PAIR_PAY_3X3 = 0.0   # 3×3：每一橫排左邊兩格一樣（第三格不同）退 0.4 倍，讓常有小回饋   # 調到理論回報率約 95%
@@ -121,17 +121,10 @@ def grid_lines(n: int) -> list[list[tuple[int, int]]]:
         L += [[(r, c) for c in range(3)] for r in range(3)]
         L += [[(r, c) for r in range(3)] for c in range(3)]
         L += [[(i, i) for i in range(3)], [(i, 2 - i) for i in range(3)]]
-    else:
-        for r in range(4):
-            for c in range(2):
-                L.append([(r, c + k) for k in range(3)])
-        for c in range(4):
-            for r in range(2):
-                L.append([(r + k, c) for k in range(3)])
-        for r in range(2):
-            for c in range(2):
-                L.append([(r + k, c + k) for k in range(3)])
-                L.append([(r + k, c + 2 - k) for k in range(3)])
+    else:   # 4×4：整排、整欄 4 格一樣才算，加兩條對角線，共 10 條
+        L += [[(r, c) for c in range(4)] for r in range(4)]
+        L += [[(r, c) for r in range(4)] for c in range(4)]
+        L += [[(i, i) for i in range(4)], [(i, 3 - i) for i in range(4)]]
     return L
 
 
@@ -570,7 +563,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             "slots": mk("🎰 老虎機　`/老虎機 賭注 [格數]`", "按下去的瞬間用真亂數決定結果，動畫只是演出。\n倍率是「**含本金**拿回幾倍」：賭 100、中 1.2 倍 → 拿回 120。", red, [
                 ("3 格（單排）", f"三個一樣拿回：\n{table(SLOT_TRIPLE)}\n只有兩個一樣：**退回賭注**　其他：輸"),
                 ("9 格（3×3）　約 41% 的把數會賺", f"4 種圖案。橫 3 條 + 直 3 條 + 斜 2 條，共 **8 條線**，一條線三個一樣就中。\n一條線拿回：\n{table(GRID_PAY[3], 4)}\n同一把可以中好幾條，倍率**加起來**。"),
-                ("16 格（4×4）　約 47% 的把數會賺", f"6 種圖案。**任何方向連續 3 格**一樣都算一條線。\n一條線拿回：\n{table(GRID_PAY[4], 4)}\n同樣可以同時中很多條。"),
+                ("16 格（4×4）　約 32% 的把數會賺", f"3 種圖案。橫 4 排 + 直 4 欄 + 斜 2 條，共 **10 條線**，一條線 **4 格全部一樣**才算中。\n一條線拿回：\n{table(GRID_PAY[4], 3)}\n同樣可以同時中好幾條，倍率加起來。"),
             ], "各版本長期回報率約 94～95%"),
             "bj": mk("🃏 21點　`/21點 賭注`", "點數比莊家大，但不能超過 21。", green, [
                 ("點數", "A 算 1 或 11　J / Q / K 算 10　其他照牌面"),
