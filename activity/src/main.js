@@ -5,6 +5,7 @@ import { mountConnect4 } from "./connect4.js";
 import { mountReversi } from "./reversi.js";
 import { mountSlots } from "./slots.js";
 import { mountCasino } from "./casino.js";
+import { mountBoard } from "./chessui.js";
 import { mountPoker } from "./poker.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountDown } from "./stairs.js";
@@ -39,6 +40,8 @@ const GAMES = [
   { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
   { id: "c4", cat: "board", icon: "🔴", name: "四連棋", players: "2 人", desc: "棋子往下掉，先連四顆", mount: mountConnect4 },
   { id: "rv", cat: "board", icon: "⚪", name: "黑白棋", players: "2 人", desc: "夾住對方的棋就翻面", mount: mountReversi },
+  { id: "chess", cat: "board", icon: "♞", name: "西洋棋", players: "2 人", desc: "完整規則：王車易位、吃過路兵、升變", mount: mountBoard("chess") },
+  { id: "xq", cat: "board", icon: "帥", name: "象棋", players: "2 人", desc: "楚河漢界，將死或困斃對方", mount: mountBoard("xq") },
   { id: "down", cat: "action", icon: "🪜", name: "小朋友下樓梯", players: "1–4 人", desc: "往下踩樓梯別被刺扎到", mount: mountDown },
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },

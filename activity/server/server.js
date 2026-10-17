@@ -9,6 +9,8 @@ import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
 import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow } from "./casino.js";
+import * as chessEng from "./chess.js";
+import * as xqEng from "./xq.js";
 import { handlePoker, pokerClose } from "./poker.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
@@ -40,14 +42,16 @@ function rvStart() {
   return a.join("");
 }
 
+const ENG = { chess: chessEng, xq: xqEng };      // 西洋棋、象棋：規則在 chess.js / xq.js
 function freshBoard(game) {
+  if (ENG[game]) return ENG[game].init().sq.join("");
   if (game === "vb" || game === "pika") return "";
   if (game === "rv") return rvStart();
   return game === "c4" ? ".".repeat(C4_W * C4_H) : ".".repeat(GOMOKU * GOMOKU);
 }
 
 function newRoom(game) {
-  return { game, board: freshBoard(game), turn: "b", winner: null, line: null, last: null, moves: 0,
+  return { game, cs: ENG[game] ? ENG[game].init() : null, board: freshBoard(game), turn: "b", winner: null, line: null, last: null, moves: 0,
            players: { b: null, w: null }, clients: new Set(), emptySince: null,
            vb: game === "vb" ? createVb() : null,
            pika: game === "pika" ? createPika() : null,
@@ -89,6 +93,8 @@ function broadcast(room) {
     send(ws, {
       t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
       line: room.line, last: room.last, moves: room.moves, passed: room.passed || null,
+      check: room.check ?? -1, reason: room.reason || "",
+      legal: ENG[room.game] && !room.winner && roleOf(room, ws) === room.turn && room.players.b && room.players.w ? ENG[room.game].moves(room.cs).map((x) => [x.f, x.t]) : undefined,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
       speed: room.speed, ping: room.ping, ...wagerView(room),
       vb: room.vb ? snapshotVb(room.vb) : undefined,
@@ -108,6 +114,20 @@ function assignSeat(room, ws) {
 const rebroadcast = (room) => () => broadcast(room);
 
 function place(room, role, m) {
+  const eng = ENG[room.game];
+  if (eng) {
+    const f = Number(m.f), t = Number(m.to);
+    if (!Number.isInteger(f) || !Number.isInteger(t)) return false;
+    const cands = eng.moves(room.cs).filter((x) => x.f === f && x.t === t);
+    if (!cands.length) return false;
+    const mv = cands.find((x) => x.p === String(m.p || "q")) || cands[0];     // 升變預設升后
+    room.cs = eng.apply(room.cs, mv);
+    room.board = room.cs.sq.join(""); room.last = [f, t]; room.moves++;
+    const o = eng.outcome(room.cs);
+    room.check = o.check; room.reason = o.reason; room.line = null;
+    if (o.over) room.winner = o.winner;
+    return true;
+  }
   if (room.game === "rv") {
     const x = Number(m.x), y = Number(m.y);
     if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= RV || y >= RV) return false;
@@ -230,7 +250,7 @@ wss.on("connection", (ws, req) => {
     if (ws.multi) { handleMulti(ws, m); return; }
     if (m.t === "join") {
       if (ws.room) return;
-      const game = ["c4", "rv", "vb", "pika"].includes(m.game) ? m.game : "gomoku";
+      const game = ["c4", "rv", "vb", "pika", "chess", "xq"].includes(m.game) ? m.game : "gomoku";
       const id = String(m.room || "default").slice(0, 80);
       const room = getRoom(game, id);
       ws.room = room;
@@ -261,7 +281,7 @@ wss.on("connection", (ws, req) => {
       room.wager = null; room.wresult = null; room.offer = null;
       // 重新開局，先後手互換
       const { b, w } = room.players;
-      Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0, passed: null });
+      Object.assign(room, { board: freshBoard(room.game), cs: ENG[room.game] ? ENG[room.game].init() : null, check: -1, reason: "", turn: "b", winner: null, line: null, last: null, moves: 0, passed: null });
       room.players = { b: w, w: b };
       room.ping = { b: room.ping.w, w: room.ping.b };
       room.acc = 0;
