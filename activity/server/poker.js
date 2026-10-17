@@ -87,22 +87,38 @@ function equity(hole, board, nOpp, iters = 120) {
   }
   return win / iters;
 }
+// 電腦個性：agg 加注傾向、loose 入池鬆緊（負數＝更愛跟）、bluff 詐唬率、size 下注尺寸、slow 強牌慢打率
+const PERSONA = {
+  "阿發": { tag: "愛衝", agg: 1.7, loose: -0.10, bluff: 0.20, size: 1.3, slow: 0 },
+  "小明": { tag: "穩健", agg: 0.8, loose: 0.05, bluff: 0.03, size: 0.8, slow: 0.1 },
+  "老王": { tag: "老狐狸", agg: 1.0, loose: 0, bluff: 0.10, size: 1.0, slow: 0.35 },
+  "花花": { tag: "跟注機", agg: 0.5, loose: -0.16, bluff: 0.02, size: 0.7, slow: 0 },
+  "阿牛": { tag: "超緊", agg: 1.0, loose: 0.13, bluff: 0.0, size: 1.0, slow: 0.1 },
+  "小美": { tag: "心機", agg: 1.2, loose: -0.03, bluff: 0.15, size: 1.1, slow: 0.2 },
+  "大鵰": { tag: "全下狂", agg: 2.2, loose: -0.12, bluff: 0.30, size: 2.0, slow: 0 },
+  "豆豆": { tag: "新手", agg: 0.9, loose: -0.06, bluff: 0.08, size: 1.0, slow: 0 },
+};
+const DEFAULT_PERSONA = { tag: "", agg: 1, loose: 0, bluff: 0.07, size: 1, slow: 0 };
+const personaOf = (s) => PERSONA[String(s.name || "").replace(/^🤖/, "")] || DEFAULT_PERSONA;
 function botDecide(t, s) {
   const toCall = Math.max(0, t.curBet - s.bet), pot = t.potTotal();
+  const P = personaOf(s);
   const opps = t.seats.filter((x) => x && x !== s && x.inHand && !x.folded).length;
   const e = equity(s.hole, t.board, Math.max(1, opps), t.board.length ? 140 : 100);
   const odds = toCall / (pot + toCall || 1), r = Math.random();
   const stackLeft = s.chips;
-  const raiseTo = (frac) => Math.min(s.bet + stackLeft, t.curBet + Math.max(t.minRaise, Math.round((pot * frac) / 10) * 10));
+  const raiseTo = (frac) => Math.min(s.bet + stackLeft, t.curBet + Math.max(t.minRaise, Math.round((pot * frac * P.size) / 10) * 10));
   if (toCall === 0) {
-    if (e > 0.72 && r < 0.8) return { a: "raise", amt: raiseTo(0.7) };
-    if (e > 0.55 && r < 0.45) return { a: "raise", amt: raiseTo(0.45) };
-    if (e < 0.35 && r < 0.07) return { a: "raise", amt: raiseTo(0.5) };       // 偶爾詐唬
+    if (e > 0.85 && r < P.slow) return { a: "check" };                                  // 強牌慢打，誘敵
+    if (e > 0.72 && r < Math.min(0.95, 0.8 * P.agg)) return { a: "raise", amt: raiseTo(0.7) };
+    if (e > 0.55 + P.loose / 2 && r < Math.min(0.9, 0.45 * P.agg)) return { a: "raise", amt: raiseTo(0.45) };
+    if (e < 0.35 && r < P.bluff) return { a: "raise", amt: raiseTo(0.5) };            // 詐唬
     return { a: "check" };
   }
-  if (e > 0.78 && r < 0.55) return { a: "raise", amt: raiseTo(0.8) };
-  if (e > odds + 0.05 && (e > 0.35 || toCall <= BB * 2)) return { a: "call" };
-  if (r < 0.05 && toCall <= BB * 3) return { a: "call" };
+  if (e > 0.78 - (P.agg - 1) * 0.05 && r < Math.min(0.95, 0.55 * P.agg) && !(r < P.slow)) return { a: "raise", amt: raiseTo(0.8) };
+  if (e < 0.5 && r < P.bluff * 0.5) return { a: "raise", amt: raiseTo(0.8) };         // 衝動型的恐嚇加注
+  if (e > odds + 0.05 + P.loose && (e > 0.35 + P.loose || toCall <= BB * 2)) return { a: "call" };
+  if (r < 0.05 + Math.max(0, -P.loose) * 0.4 && toCall <= BB * 3) return { a: "call" };
   return { a: "fold" };
 }
 
@@ -134,7 +150,7 @@ function view(t, ws) {
     toAct: t.toAct, deadline: t.deadline, nextAt: t.phase === "result" ? t.nextAt : 0, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
     watchers: [...t.members].filter((w) => w.pspec).length, result: t.result,
     seats: t.seats.map((s, i) => s && ({
-      i, name: s.name, chips: s.chips, bet: s.bet, total: s.total, bot: s.bot, folded: s.folded, allin: s.allin, inHand: s.inHand, away: s.bot ? false : !s.ws,
+      i, name: s.name, tag: s.bot ? personaOf(s).tag : undefined, chips: s.chips, bet: s.bet, total: s.total, bot: s.bot, folded: s.folded, allin: s.allin, inHand: s.inHand, away: s.bot ? false : !s.ws,
       last: s.last, hole: s.inHand && (s.ws === ws || (showAll && !s.folded)) ? s.hole : s.inHand ? [-1, -1] : [], hand: showAll && !s.folded && s.score != null ? HAND_NAMES[handCat(s.score)] : undefined,
     })),
   };

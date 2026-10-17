@@ -350,3 +350,4 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .poker .pcard.su0{color:#111}.poker .pcard.su1{color:#d32f2f;background:#fdecec}.poker .pcard.su2{color:#1565c0;background:#e6effb}.poker .pcard.su3{color:#2e7d32;background:#e8f6e8}
 .poker .rn{width:84px;padding:4px 6px;border-radius:6px;border:1px solid #666;background:#1b1e26;color:#fff;font-size:15px;text-align:center}
 .poker .prow.amt{gap:6px;font-size:13px}
+.poker .ptag{font-size:10px;color:#ffab91;line-height:1.1}
