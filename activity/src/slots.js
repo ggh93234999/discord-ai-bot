@@ -130,6 +130,7 @@ export function mountSlots(root, { env, back }) {
         });
         statusEl.textContent = "確認身分中…";
         const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+        console.log("token resp", r.status);
         const j = await r.json().catch(() => ({}));
         if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用賭注模式"; return; }
         if (!r.ok || !j.token) { statusEl.textContent = "登入失敗，請再試一次（" + (j.error || r.status) + "）"; return; }
@@ -138,7 +139,7 @@ export function mountSlots(root, { env, back }) {
       wantReal = true;
       send({ t: "bauth", token: session.token });
     } catch (e) {
-      statusEl.textContent = "授權沒有完成，賭注模式未開啟";
+      statusEl.textContent = "授權沒有完成：" + ((e && (e.message || e.code)) || JSON.stringify(e) || "未知錯誤");
     }
   }
   function onAuthed(m) {
