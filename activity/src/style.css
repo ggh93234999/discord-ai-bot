@@ -351,3 +351,5 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .poker .rn{width:84px;padding:4px 6px;border-radius:6px;border:1px solid #666;background:#1b1e26;color:#fff;font-size:15px;text-align:center}
 .poker .prow.amt{gap:6px;font-size:13px}
 .poker .ptag{font-size:10px;color:#ffab91;line-height:1.1}
+body.pk-myturn{background:#16296b !important;transition:background .25s}
+body.pk-myturn .game.poker{background:#16296b}

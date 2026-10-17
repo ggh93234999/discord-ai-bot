@@ -105,6 +105,7 @@ export function mountPoker(opts = {}) {
       else if (!me) t = "還沒入座　" + t;
       if (st.toAct >= 0 && st.seats[st.toAct]) t += st.toAct === st.you ? `　輪到你（${left}s）` : `　輪到 ${st.seats[st.toAct].name}${left && !st.seats[st.toAct].bot ? `（${left}s）` : ""}`;
       statusEl.textContent = t;
+      document.body.classList.toggle("pk-myturn", !spectate && st.toAct >= 0 && st.toAct === st.you && st.phase !== "result");   // 輪到你：整個背景換色
       // 螢幕上的大計時器：輪到人類行動時倒數；結算時倒數下一手
       const nowS = Date.now() - st.at;
       let sec = 0, kind = "";
@@ -168,7 +169,7 @@ export function mountPoker(opts = {}) {
     }
 
     timer = setInterval(tickStatus, 250);
-    function cleanup() { closed = true; clearInterval(timer); try { ws.close(); } catch {} }
+    function cleanup() { closed = true; document.body.classList.remove("pk-myturn"); clearInterval(timer); try { ws.close(); } catch {} }
     connect();
     return cleanup;
   };
