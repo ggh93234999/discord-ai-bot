@@ -237,6 +237,12 @@ export function mountCasino(game, opts = {}) {
       renderHorse(); draw();
     }
     const serverNow = () => Date.now() + skew;
+    const bar5 = (v) => { const n = Math.max(0, Math.min(5, Math.round((v - 40) / 11))); return "▰".repeat(n) + "▱".repeat(5 - n); };
+    function horseInfo(i) {
+      const f = hs.info && hs.info[i]; if (!f) return "";
+      const rec = f.races ? `${f.races} 戰 ${f.wins} 勝（${Math.floor(f.wins * 100 / f.races)}%）` : "新馬，還沒有戰績";
+      return `<div class="hd">勝率約 <b>${hs.probs ? hs.probs[i] : "?"}%</b>　速度 ${bar5(f.spd)} ${f.spd}　耐力 ${bar5(f.sta)} ${f.sta}　爆發 ${bar5(f.bst)} ${f.bst}<br>戰績 ${rec}　近 5 場：${f.last.length ? f.last.join("、") : "—"}</div>`;
+    }
     function renderHorse() {
       if (!hs) return;
       const mine = myBet(), tot = hs.bets.reduce((a, b) => a + b.bet, 0);
@@ -252,7 +258,7 @@ export function mountCasino(game, opts = {}) {
         hsig.main = msig;
         if (hs.phase === "bet") {
           main.innerHTML = `<div class="hlist">${hs.names.map((n, i) =>
-            `<button class="hrow ${horseSel === i ? "sel" : ""} ${mine && mine.idx === i ? "mine" : ""}" data-i="${i}"><b>${i + 1}</b><span>${esc(n)}</span><em>${hs.forms[i]}${per[i] ? `　👥${per[i]}` : ""}</em><i>${hs.odds[i]}x</i></button>`).join("")}</div>`;
+            `<button class="hrow ${horseSel === i ? "sel" : ""} ${mine && mine.idx === i ? "mine" : ""}" data-i="${i}"><b>${i + 1}</b><span>${esc(n)}</span><em>${hs.forms[i]}${per[i] ? `　👥${per[i]}` : ""}</em><i>${hs.odds[i]}x</i>${horseInfo(i)}</button>`).join("")}</div>`;
           main.querySelectorAll(".hrow").forEach((r) => r.addEventListener("click", () => { if (busy || myBet() || hs.phase !== "bet") return; horseSel = Number(r.dataset.i); renderHorse(); draw(); }));
         } else {
           main.innerHTML = `<div class="track">${hs.names.map((n, i) => `<div class="lane ${mine && mine.idx === i ? "mine" : ""}"><span class="ln">${i + 1} ${esc(n)}</span><span class="hz">🐎</span><span class="fin">🏁</span></div>`).join("")}</div>`;

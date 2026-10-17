@@ -142,10 +142,26 @@ const HORSE_POOL = ["赤兔", "烏騅", "的盧", "絕影", "爪黃飛電", "踏
 const FORMS = [["🔥 絕佳", 7], ["😀 良好", 3], ["😐 普通", 0], ["😓 欠佳", -4], ["🤕 低迷", -8]];
 const FORM_W = [10, 30, 35, 18, 7];
 function pickWeighted(w) { let r = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; } return w.length - 1; }
+// ---- 馬匹的固定能力值與戰績：第一次出場前定下，之後不變；戰績每場累計並存檔（伺服器重啟不歸零）。
+// 能力值第一次會沿用機器人 /賽馬 的 horses.json（同一匹馬同樣的強弱），戰績則是活動這邊自己的。
+const HFILE = fileURLToPath(new URL("./horses.json", import.meta.url));
+const horses = (() => {
+  let d = {};
+  try { d = JSON.parse(fs.readFileSync(HFILE, "utf8")); } catch {
+    try { const bot = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../../horses.json", import.meta.url)), "utf8")); for (const n of HORSE_POOL) if (bot[n]) d[n] = { spd: bot[n].spd, sta: bot[n].sta, bst: bot[n].bst }; } catch {}
+  }
+  for (const n of HORSE_POOL) d[n] = { spd: 55 + rnd(41), sta: 55 + rnd(41), bst: 55 + rnd(41), races: 0, wins: 0, top3: 0, last: [], ...(d[n] || {}) };
+  try { fs.writeFileSync(HFILE, JSON.stringify(d, null, 1)); } catch {}
+  return d;
+})();
+function recordRace(names, order) {
+  order.forEach((idx, k) => { const h = horses[names[idx]]; h.races++; if (k === 0) h.wins++; if (k < 3) h.top3++; h.last = [...h.last, k + 1].slice(-5); });
+  try { fs.writeFileSync(HFILE, JSON.stringify(horses, null, 1)); } catch (e) { console.log("馬匹戰績寫入失敗", e.message); }
+}
 function newRaceCard() {
   const names = shuffle([...HORSE_POOL]).slice(0, 6);
   const forms = names.map(() => FORMS[pickWeighted(FORM_W)]);
-  const str = names.map((_, i) => 0.4 * (55 + rnd(41)) + 0.3 * (55 + rnd(41)) + 0.3 * (55 + rnd(41)) + forms[i][1]);
+  const str = names.map((n, i) => 0.4 * horses[n].spd + 0.3 * horses[n].sta + 0.3 * horses[n].bst + forms[i][1]);
   const m = Math.max(...str), ex = str.map((x) => Math.exp((x - m) / 14)), tot = ex.reduce((a, b) => a + b, 0);
   const probs = ex.map((x) => x / tot);
   return { names, forms: forms.map((f) => f[0]), probs, odds: probs.map((p) => Math.max(1.1, Math.round(0.95 / p * 10) / 10)) };
@@ -161,7 +177,8 @@ function horseNew(room) {
 }
 function horseView(room) {
   const h = room.h, c = h.card;
-  return { t: "hstate", phase: h.phase, id: h.id, no: h.no, names: c.names, forms: c.forms, odds: c.odds, now: Date.now(), closeAt: h.closeAt,
+  return { t: "hstate", phase: h.phase, id: h.id, no: h.no, names: c.names, forms: c.forms, odds: c.odds, probs: c.probs.map((p) => Math.round(p * 1000) / 10),
+    info: c.names.map((n) => { const x = horses[n]; return { spd: x.spd, sta: x.sta, bst: x.bst, races: x.races, wins: x.wins, last: x.last }; }), now: Date.now(), closeAt: h.closeAt,
     startAt: h.startAt, times: h.times, order: h.order, win: h.win, resultAt: h.resultAt,
     bets: h.bets.map((b) => ({ id: b.ws.cid, name: b.name, idx: b.idx, bet: b.bet, real: b.real, back: b.back })) };
 }
@@ -173,6 +190,7 @@ async function refundAll(room) {
 }
 async function horseSettle(room) {
   const h = room.h; h.phase = "result"; h.resultAt = Date.now() + RESULT_MS;
+  recordRace(h.card.names, h.order);
   for (const b of h.bets) b.back = b.idx === h.win ? Math.floor(b.bet * h.card.odds[b.idx]) : 0;
   pushHorse(room);
   for (const b of h.bets) {

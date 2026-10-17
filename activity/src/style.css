@@ -288,3 +288,4 @@ html,body{overflow-y:auto}
 .volrow{display:flex;gap:14px;justify-content:center;align-items:center;font-size:12px;color:#cfd8dc;padding:2px 8px;flex-wrap:wrap}
 .volrow input{width:90px;vertical-align:middle}
 .pinball .pvol{font-size:12px;color:#cfd8dc}.pinball .pvol input{width:80px;vertical-align:middle}.pinball .pad button.plunge{background:#b26a00;width:96px}
+.casino .hrow .hd{grid-column:1/-1;font-size:11px;line-height:1.5;opacity:.85;font-weight:400}.casino .hrow .hd b{color:#ffd54a}
