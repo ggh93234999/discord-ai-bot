@@ -259,6 +259,9 @@ class BlackjackView(discord.ui.View):
 
 HORSES_FILE = Path(__file__).parent / "horses.json"
 HORSE_POOL = ["赤兔", "烏騅", "的盧", "絕影", "爪黃飛電", "踏雪", "照夜玉獅子", "追風", "驊騮", "飛黃"]
+# 賭博類斜線指令暫時下架：程式都還在，把 GAMBLING_ENABLED 改成 True 再重啟機器人就會回來
+GAMBLING_ENABLED = False
+GAMBLING_COMMANDS = ("賽馬", "擲硬幣", "骰子", "老虎機", "21點")
 HORSE_EDGE = 0.95                          # 賠率 = 0.95 / 機率（莊家抽 5%）
 HORSES_PER_RACE = 6
 STRENGTH_TEMP = 14.0                       # 越小，強弱差距越大

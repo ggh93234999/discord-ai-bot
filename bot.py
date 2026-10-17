@@ -237,6 +237,9 @@ channels.setup(client, client.tree, state, save_state)
 models.setup(client, client.tree, state, save_state, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, TZ)
 extras.setup(client, client.tree, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
 economy.setup(client, client.tree)
+if not economy.GAMBLING_ENABLED:      # 賭博類指令暫時下架（英文別名是之後從現有指令產生的，所以不會留下）
+    for _n in economy.GAMBLING_COMMANDS:
+        client.tree.remove_command(_n)
 
 
 @client.event
