@@ -2,6 +2,7 @@
 // 一個 Discord Activity instance（instanceId）+ 遊戲種類 = 一個房間。
 // 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
 import { WebSocketServer } from "ws";
+import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
@@ -112,6 +113,20 @@ wss.on("connection", (ws) => {
     let m;
     try { m = JSON.parse(raw.toString()); } catch { return; }
     if (m.t === "ping") { send(ws, { t: "pong", ts: m.ts }); return; }
+    // 老虎機練習模式：每條連線一份練習幣，不碰真代幣
+    if (m.t === "slotjoin") { ws.practice = ws.practice ?? 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
+    if (m.t === "slotreset") { ws.practice = 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
+    if (m.t === "spin") {
+      const kind = Number(m.kind), bet = Number(m.bet);
+      if (!SLOT_KINDS[kind] || !Number.isInteger(bet) || bet < 1 || bet > 1000) return;
+      if (Date.now() - (ws.lastSpin || 0) < 500) return;
+      if ((ws.practice ?? 1000) < bet) return send(ws, { t: "slotinit", balance: ws.practice ?? 0, broke: true });
+      ws.lastSpin = Date.now();
+      ws.practice = (ws.practice ?? 1000) - bet;
+      const r = slotSpin(kind), back = Math.floor(bet * r.mult);
+      ws.practice += back;
+      return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
+    }
     if (m.t === "join") {
       if (ws.room) return;
       const game = ["c4", "vb", "pika"].includes(m.game) ? m.game : "gomoku";

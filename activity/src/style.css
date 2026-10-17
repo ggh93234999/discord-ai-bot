@@ -56,3 +56,30 @@ canvas { max-width:100%; border-radius:6px; touch-action:manipulation; cursor:po
 .side.w { background:#e8e8e8; color:#111; }
 .side:not(.b):not(.w) { border:1px solid var(--line); opacity:.8; }
 .cwrap:fullscreen, .cwrap:-webkit-full-screen { align-items:center; background:#000; }
+
+/* ---- 老虎機 ---- */
+.slots { align-items:center; }
+.slots .modebar { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:2px 0 6px; font-size:13px; }
+.slots .mode { padding:4px 10px; border-radius:999px; background:#2b2f3a; color:#9aa3b5; }
+.slots .mode.on { background:#2f6f4f; color:#fff; font-weight:700; }
+.slots .kinds, .slots .bets { display:flex; gap:6px; justify-content:center; }
+.slots .kinds button, .slots .bets button { padding:6px 12px; border:0; border-radius:8px; background:#3b4252; color:#fff; font-size:14px; cursor:pointer; }
+.slots .kinds button.sel, .slots .bets button.sel { background:#e0a526; color:#1b1b1b; font-weight:700; }
+.slots .mute { margin-left:auto; border:0; background:transparent; font-size:20px; cursor:pointer; }
+.slots .machine { margin:12px 0 4px; padding:12px; border-radius:16px; background:linear-gradient(#7a1f2b,#4a0f19); box-shadow:0 0 0 3px #e0a526 inset, 0 6px 20px rgba(0,0,0,.5); }
+.slots .reels { display:flex; gap:6px; }
+.slots .reel { width:var(--cell); height:calc(var(--cell) * var(--rows)); overflow:hidden; border-radius:8px; background:#fff8e8; box-shadow:inset 0 6px 8px rgba(0,0,0,.25), inset 0 -6px 8px rgba(0,0,0,.25); }
+.slots .strip { will-change:transform; }
+.slots .strip.blur { animation:slotspin .12s linear infinite; filter:blur(1.5px); }
+@keyframes slotspin { from { transform:translateY(0); } to { transform:translateY(calc(var(--cell) * -1)); } }
+.slots .sym { height:var(--cell); display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell) * 0.62); line-height:1; }
+.slots .sym.win { background:radial-gradient(circle,#fff3a0,#ffd54a); animation:slotwin .5s ease-in-out infinite alternate; border-radius:8px; }
+@keyframes slotwin { from { transform:scale(1); } to { transform:scale(1.12); } }
+.slots .reels.flash { animation:slotflash .6s ease-out 2; }
+@keyframes slotflash { 0%,100% { filter:none; } 50% { filter:brightness(1.4); } }
+.slots .hint { font-size:13px; color:#9aa3b5; margin:4px 0 8px; text-align:center; }
+.slots .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center; }
+.slots .bal { font-size:15px; } .slots .bal b { color:#ffd54a; }
+.slots .spin { padding:10px 26px; font-size:18px; font-weight:800; border:0; border-radius:10px; background:#d33; color:#fff; cursor:pointer; }
+.slots .spin:disabled { opacity:.5; cursor:default; }
+.slots .reset { margin-top:8px; padding:8px 18px; border:0; border-radius:8px; background:#3b4252; color:#fff; cursor:pointer; }
