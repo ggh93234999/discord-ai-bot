@@ -2,8 +2,9 @@
 // 操作：← / Z 左擋板，→ / M 右擋板，↓ / 空白鍵 按住蓄力、放開發射；手機用下方三顆按鈕。
 const W = 400, H = 740, R = 8, G = 820, DT = 1 / 240;
 const LS = "pinhigh", VK = "pinvol";
-const FL = { L: 70, rest: 0.49, act: -0.52, w: 17, th: 6 };           // 擋板長度、休息角度、擊球角度（弧度）、轉速、半徑
+const FL = { L: 62, rest: 0.49, act: -0.52, w: 17, th: 6 };           // 擋板長度、休息角度、擊球角度（弧度）、轉速、半徑
 const PIV = { l: [125, 625], r: [275, 625] };
+const GATE = [350, 232, 380, 205];
 const WALLS = [[20, 200, 20, 560], [20, 560, 125, 625], [350, 560, 275, 625], [350, 230, 350, 670], [380, 200, 380, 670], [350, 670, 380, 670]];
 const SLINGS = [[60, 470, 108, 548], [338, 470, 292, 548]];             // 彈力片
 const BUMPERS = [{ x: 140, y: 250, r: 22 }, { x: 260, y: 250, r: 22 }, { x: 200, y: 335, r: 22 }];
@@ -100,6 +101,8 @@ export function mountPinball(root, { env, back }) {
       return;
     }
     if (state !== "play") return;
+    ball.stuck = Math.hypot(ball.vx, ball.vy) < 25 ? (ball.stuck || 0) + DT : 0;
+    if (ball.stuck > 1) { ball.vx += (Math.random() < 0.5 ? -1 : 1) * 160; ball.vy -= 120; ball.stuck = 0; }     // 卡住不動就輕輕震一下
     ball.vy += G * DT;
     const sp = Math.hypot(ball.vx, ball.vy); if (sp > 1500) { ball.vx *= 1500 / sp; ball.vy *= 1500 / sp; }
     ball.x += ball.vx * DT; ball.y += ball.vy * DT;
@@ -112,6 +115,8 @@ export function mountPinball(root, { env, back }) {
       if (vn < 0) { ball.vx -= 1.5 * vn * nx; ball.vy -= 1.5 * vn * ny; }
     }
     for (const w of WALLS) hitSeg(ball, w[0], w[1], w[2], w[3], 2, 0.45, 0, null);
+    if (ball.vy > 0) hitSeg(ball, 350, 232, 380, 205, 2, 0.3, 0, null);       // 單向閘門：往上射出去的球會穿過，掉下來的球會被擋到場內
+    if (ball.x > 352 && ball.y > 630 && Math.hypot(ball.vx, ball.vy) < 80) { ball.x = 365; ball.y = 648; ball.vx = ball.vy = 0; state = "ready"; charge = 0; text(); return; }   // 球掉回發射道就重新發射
     for (let i = 0; i < SLINGS.length; i++) { const s = SLINGS[i]; if (hitSeg(ball, s[0], s[1], s[2], s[3], 3, 0.9, 260, null)) { add(10); flash["s" + i] = 6; beep(300, 0.05); } }
     BUMPERS.forEach((c, i) => { if (hitCircle(ball, c, 0.9, 330)) { add(100); flash["b" + i] = 8; beep(520 + i * 120, 0.09, "triangle"); } });
     for (const k of ["l", "r"]) {
@@ -146,6 +151,7 @@ export function mountPinball(root, { env, back }) {
     glowStroke("#3fa7ff", 3);
     ctx.beginPath(); ctx.arc(200, 200, 180, Math.PI, 0); ctx.stroke();
     for (const w of WALLS) { ctx.beginPath(); ctx.moveTo(w[0], w[1]); ctx.lineTo(w[2], w[3]); ctx.stroke(); }
+    glowStroke("#7cc4ff", 2); ctx.beginPath(); ctx.moveTo(GATE[0], GATE[1]); ctx.lineTo(GATE[2], GATE[3]); ctx.stroke(); glowStroke("#3fa7ff", 3);
     SLINGS.forEach((s, i) => { glowStroke(flash["s" + i] ? "#fff" : "#ff5ca8", 5); ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(s[2], s[3]); ctx.stroke(); });
     BUMPERS.forEach((c, i) => {
       const f = flash["b" + i] > 0;
