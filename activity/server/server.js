@@ -7,6 +7,7 @@ import { handleApi, getSession, botInfo, botSettle } from "./bet.js";
 import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
+import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -170,6 +171,12 @@ wss.on("connection", (ws) => {
       ws.practice += back;
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
+    if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
+      if (ws.room || ws.multi) return;
+      joinMulti(ws, m.game, String(m.room || "default"));
+      return;
+    }
+    if (ws.multi) { handleMulti(ws, m); return; }
     if (m.t === "join") {
       if (ws.room) return;
       const game = ["c4", "vb", "pika"].includes(m.game) ? m.game : "gomoku";
@@ -240,6 +247,7 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
     if (!room) return;
     room.clients.delete(ws);
@@ -283,6 +291,9 @@ setInterval(() => {
     broadcast(room);
   }
 }, 1000 / 25);
+
+// 小朋友上下樓梯：60 tick/秒
+setInterval(tickMulti, 1000 / 60);
 
 // 心跳：斷線的連線清掉；沒人的房間 10 分鐘後刪除
 setInterval(() => {
