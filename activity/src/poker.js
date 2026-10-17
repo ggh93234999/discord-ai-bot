@@ -8,7 +8,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const card = (c, small) => {
   if (c < 0) return `<span class="pcard back${small ? " sm" : ""}"></span>`;
   const r = (c % 13) + 2, s = Math.floor(c / 13);
-  return `<span class="pcard${RED[s] ? " red" : ""}${small ? " sm" : ""}"><b>${RK[r] || r}</b><i>${SUITS[s]}</i></span>`;
+  return `<span class="pcard su${s}${small ? " sm" : ""}"><b>${RK[r] || r}</b><i>${SUITS[s]}</i></span>`;
 };
 const PHASE = { wait: "等玩家", preflop: "翻牌前", flop: "翻牌", turn: "轉牌", river: "河牌", result: "結算" };
 // 6 個座位在橢圓桌上的位置（百分比），第 0 個是自己（下方），順時針

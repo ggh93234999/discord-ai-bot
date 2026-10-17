@@ -376,3 +376,10 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .poker .ptimer.urgent{background:#b71c1c;color:#fff;animation:ptpulse .5s infinite alternate}
 @keyframes ptpulse{to{transform:scale(1.12)}}
 .poker .pnamebar{text-align:center;font-size:13px;margin:2px 0}.poker .pnm{width:140px;padding:3px 8px;border-radius:6px;border:1px solid #555;background:#1b1e26;color:#fff}
+/* 四色牌：黑桃黑、紅心紅、方塊藍、梅花綠 */
+.poker .pcard.su0{color:#111}.poker .pcard.su1{color:#d32f2f}.poker .pcard.su2{color:#1565c0}.poker .pcard.su3{color:#2e7d32;background:#eaf7ea}
+.poker .pcard.su2{background:#eaf1fb}.poker .pcard.su1{background:#fdecec}
+/* 四色牌＋加大花色符號：黑桃黑、紅心紅、方塊藍、梅花綠 */
+.poker .pcard b{font-size:14px;font-weight:700}.poker .pcard i{font-size:21px;line-height:1.05}
+.poker .pcard.sm b{font-size:10px}.poker .pcard.sm i{font-size:15px}
+.poker .pcard.su0{color:#111}.poker .pcard.su1{color:#d32f2f;background:#fdecec}.poker .pcard.su2{color:#1565c0;background:#e6effb}.poker .pcard.su3{color:#2e7d32;background:#e8f6e8}
