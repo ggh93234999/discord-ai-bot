@@ -4,6 +4,8 @@
 //   賭注模式：要用 Discord 授權確認身分，動用機器人錢包裡的真代幣（只能在 Discord 裡開 Activity 時使用）。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { createWatch } from "./watch.js";
+import { addBetInput } from "./betinput.js";
 
 const KINDS = [
   { id: 1, name: "3 格", rows: 1, cols: 3, syms: ["🍒", "🍋", "💎"], hint: "三個一樣拿 2～3.2 倍，兩個一樣退錢" },
@@ -40,6 +42,8 @@ export function mountSlots(root, { env, back }) {
   const gameEl = $(".slots"), confirmEl = $(".confirm");
   $(".back").addEventListener("click", back);
   attachRules(root, "slots");
+  const watch = createWatch(gameEl);
+  let you = null;
 
   let kind = KINDS[1], bet = 50, ws = null, closed = false, retry = 0, busy = false, pending = false, muted = false;
   let cell = 64, last = null;
@@ -64,12 +68,14 @@ export function mountSlots(root, { env, back }) {
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
     ws.onopen = () => {
-      retry = 0; send({ t: "slotjoin" });
+      retry = 0; send({ t: "slotjoin" }); send({ t: "cjoin", game: "slots", room: env.instanceId });
       if (session) send({ t: "bauth", token: session.token });
     };
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
-      if (m.t === "slotinit") onInit(m);
+      if (m.t === "cinit") { you = m.you; watch.setYou(you); }
+      else if (m.t === "cwho") watch.update(m.list);
+      else if (m.t === "slotinit") onInit(m);
       else if (m.t === "slot") play(m);
       else if (m.t === "bauthed") onAuthed(m);
     };
@@ -97,7 +103,7 @@ export function mountSlots(root, { env, back }) {
   function showBalance() {
     const b = cur();
     balEl.textContent = b == null ? "--" : b.toLocaleString();
-    resetBtn.hidden = real() || !(practiceBal != null && practiceBal < Math.min(...BETS));
+    resetBtn.hidden = real() || !(practiceBal != null && practiceBal < 1);
   }
 
   const modeBtns = root.querySelectorAll(".mode");
@@ -167,9 +173,11 @@ export function mountSlots(root, { env, back }) {
     b.addEventListener("click", () => { if (!busy) { bet = n; mark(); } });
     betsEl.appendChild(b);
   });
+  const bi = addBetInput(betsEl, { getBet: () => bet, setBet: (n) => { bet = n; mark(); }, getBal: () => cur(), locked: () => busy });
   function mark() {
     kindsEl.querySelectorAll("button").forEach((b) => b.classList.toggle("sel", Number(b.dataset.id) === kind.id));
-    betsEl.querySelectorAll("button").forEach((b) => b.classList.toggle("sel", Number(b.dataset.bet) === bet));
+    betsEl.querySelectorAll("button[data-bet]").forEach((b) => b.classList.toggle("sel", Number(b.dataset.bet) === bet));
+    bi.refresh(BETS);
     $(".hint").textContent = kind.hint;
   }
   const rnd = (syms) => syms[Math.floor(Math.random() * syms.length)];

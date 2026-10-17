@@ -45,7 +45,10 @@ async function bot(path, body) {
   });
   return r.json();
 }
-export const botInfo = (uid) => bot("/wallet/info", { gid: GUILD_ID, uid });
+// 機器人還沒更新前，settle 單筆上限是 1000；更新後 /wallet/info 會回報 max_bet
+export let maxBet = 1000;
+export const betLimit = () => maxBet;
+export const botInfo = async (uid) => { const r = await bot("/wallet/info", { gid: GUILD_ID, uid }); if (r && r.max_bet) maxBet = r.max_bet; return r; };
 export const botSettle = (uid, name, bet, back, why) => bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet, back, why });
 // 派彩：優先用機器人的 /wallet/pay；機器人還沒更新（沒有這個介面）時，改用 settle 湊出同樣的淨額（押 1 拿回 amount+1）
 export async function botPay(uid, name, amount, why) {
@@ -53,7 +56,10 @@ export async function botPay(uid, name, amount, why) {
     const r = await bot("/wallet/pay", { gid: GUILD_ID, uid, name, amount, why });
     if (r && (r.ok || r.error === "no_guild" || r.error === "bad_amount")) return r;
   } catch {}
-  return bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet: 1, back: amount + 1, why });
+  // 備援：settle 規定 back ≤ bet×100，所以押 b、拿回 amount+b，淨額剛好是 amount（要玩家至少有 b 個代幣）
+  const b = Math.max(1, Math.ceil(amount / 99));
+  if (b > 1000) return { ok: false, error: "bad_amount" };
+  return bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet: b, back: amount + b, why });
 }
 
 // ---- HTTP：POST /api/token { code } → { token, name }

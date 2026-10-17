@@ -543,6 +543,8 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "forbidden"}, status=403)
             return await handler(request)
 
+        API_MAX_BET = 1_000_000   # Activity 單筆賭注上限（自訂金額用）
+
         async def parse(request):
             try:
                 d = await request.json()
@@ -557,7 +559,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             gid, uid, _ = p
             if not guild_ok(gid):
                 return web.json_response({"ok": False, "error": "no_guild"})
-            return web.json_response({"ok": True, "balance": balance(gid, uid)})
+            return web.json_response({"ok": True, "balance": balance(gid, uid), "max_bet": API_MAX_BET})
 
         async def settle(request):
             p = await parse(request)
@@ -568,7 +570,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 bet, back = int(d["bet"]), int(d["back"])
             except Exception:
                 return web.json_response({"ok": False, "error": "bad_request"}, status=400)
-            if not (1 <= bet <= 1000) or back < 0 or back > bet * 100:
+            if not (1 <= bet <= API_MAX_BET) or back < 0 or back > bet * 100:
                 return web.json_response({"ok": False, "error": "bad_amount"}, status=400)
             if not guild_ok(gid):
                 return web.json_response({"ok": False, "error": "no_guild"})
@@ -590,7 +592,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 amount = int(d["amount"])
             except Exception:
                 return web.json_response({"ok": False, "error": "bad_request"}, status=400)
-            if not (1 <= amount <= 2000):
+            if not (1 <= amount <= API_MAX_BET * 100):
                 return web.json_response({"ok": False, "error": "bad_amount"}, status=400)
             if not guild_ok(gid):
                 return web.json_response({"ok": False, "error": "no_guild"})

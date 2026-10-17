@@ -3,12 +3,12 @@
 // 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
 import http from "node:http";
 import { WebSocketServer } from "ws";
-import { handleApi, getSession, botInfo, botSettle } from "./bet.js";
+import { handleApi, getSession, botInfo, botSettle, betLimit } from "./bet.js";
 import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
-import { handleCasino, casinoClose } from "./casino.js";
+import { handleCasino, casinoClose, casinoFeed, recoverCasinoEscrow } from "./casino.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -153,13 +153,14 @@ function place(room, role, m) {
   return true;
 }
 
-const REAL_BETS = [10, 50, 100, 500];
+
 const httpServer = http.createServer((req, res) => {
   if (req.url.startsWith("/api/")) return handleApi(req, res).catch(() => { try { res.writeHead(500); res.end(); } catch {} });
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ server: httpServer, path: "/ws", maxPayload: 4096 });
 recoverEscrow().catch((e) => console.log("escrow 還原失敗", e.message));
+recoverCasinoEscrow().catch((e) => console.log("賭場 escrow 還原失敗", e.message));
 httpServer.listen(PORT, "127.0.0.1");
 
 wss.on("connection", (ws) => {
@@ -188,7 +189,7 @@ wss.on("connection", (ws) => {
     if (m.t === "spin" && m.real) {
       const u = ws.user, kind = Number(m.kind), bet = Number(m.bet);
       if (!u) return send(ws, { t: "bauthed", ok: false });
-      if (!SLOT_KINDS[kind] || !REAL_BETS.includes(bet)) return;
+      if (!SLOT_KINDS[kind] || !Number.isInteger(bet) || bet < 1 || bet > betLimit()) return;
       if (ws.spinning || Date.now() - (ws.lastSpin || 0) < 800) return;
       ws.spinning = true; ws.lastSpin = Date.now();
       (async () => {
@@ -196,7 +197,7 @@ wss.on("connection", (ws) => {
           const r = slotSpin(kind), back = Math.floor(bet * r.mult);     // 結果先由伺服器決定，再去結算
           const st = await botSettle(u.uid, u.name, bet, back);
           if (!st.ok) send(ws, { t: "slotinit", real: true, balance: st.balance ?? null, broke: st.error === "insufficient", error: st.error });
-          else send(ws, { t: "slot", real: true, kind, bet, back, balance: st.balance, ...r });
+          else { send(ws, { t: "slot", real: true, kind, bet, back, balance: st.balance, ...r }); casinoFeed(ws, { g: "slots", real: true, kind, bet, back, grid: r.grid, nwin: r.wins.length }); }
         } catch { send(ws, { t: "slotinit", real: true, error: "bot_down", balance: null }); }
         finally { ws.spinning = false; }
       })();
@@ -204,13 +205,14 @@ wss.on("connection", (ws) => {
     }
     if (m.t === "spin") {
       const kind = Number(m.kind), bet = Number(m.bet);
-      if (!SLOT_KINDS[kind] || !Number.isInteger(bet) || bet < 1 || bet > 1000) return;
+      if (!SLOT_KINDS[kind] || !Number.isInteger(bet) || bet < 1 || bet > 1_000_000) return;
       if (Date.now() - (ws.lastSpin || 0) < 500) return;
       if ((ws.practice ?? 1000) < bet) return send(ws, { t: "slotinit", balance: ws.practice ?? 0, broke: true });
       ws.lastSpin = Date.now();
       ws.practice = (ws.practice ?? 1000) - bet;
       const r = slotSpin(kind), back = Math.floor(bet * r.mult);
       ws.practice += back;
+      casinoFeed(ws, { g: "slots", real: false, kind, bet, back, grid: r.grid, nwin: r.wins.length });
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
     if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse)$/.test(m.t)) { handleCasino(ws, m); return; }

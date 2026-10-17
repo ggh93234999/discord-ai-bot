@@ -4,7 +4,7 @@
 // 託管中的賭注會記在 escrow.json，伺服器如果在比賽途中重啟，啟動時會把賭注全額退回。
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { botSettle, botPay, botInfo } from "./bet.js";
+import { botSettle, botPay, botInfo, betLimit } from "./bet.js";
 
 export const WAGERS = [10, 50, 100, 500];
 export const GRACE_MS = 30000;      // 賭注比賽中斷線，給 30 秒回來，沒回來就算輸
@@ -53,7 +53,7 @@ export function canWager(room) { return room.game === "gomoku" || room.game === 
 export function makeOffer(room, ws, role, amount) {
   if (!canWager(room) || role === "s") return "not_player";
   if (!ws.user) return "need_login";
-  if (!WAGERS.includes(amount)) return "bad_amount";
+  if (!Number.isInteger(amount) || amount < 1 || amount > betLimit()) return "bad_amount";
   if (room.wager || room.busy) return "already";
   if (!fresh(room)) return "not_fresh";
   if (!room.players.b || !room.players.w) return "need_opponent";

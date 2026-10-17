@@ -37,7 +37,7 @@ export async function ensureSession(env, say) {
 // getWs()：目前的 WebSocket；getSt()：最新的房間狀態
 export function createWager(root, { env, getWs, getSt }) {
   const el = root.querySelector(".wager");
-  let note = "", authed = false, loggingIn = false;
+  let note = "", authed = false, loggingIn = false, customAmt = "";
   const send = (o) => { const ws = getWs(); if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
   const say = (t) => { note = t; update(); };
 
@@ -101,6 +101,10 @@ export function createWager(root, { env, getWs, getSt }) {
       } else {
         el.append(line("💰 對賭：選金額，對手同意後開始"));
         for (const n of AMOUNTS) el.append(btn(String(n), () => send({ t: "woffer", amount: n })));
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.min = "1"; inp.placeholder = "自訂金額"; inp.className = "betin"; inp.value = customAmt;
+        inp.addEventListener("input", () => { customAmt = inp.value; });
+        el.append(inp, btn("提出", () => { const n = Math.floor(Number(inp.value)); if (n >= 1) send({ t: "woffer", amount: n }); }));
       }
     }
     if (note) el.append(line(note));

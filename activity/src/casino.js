@@ -1,21 +1,27 @@
-// 賭場小遊戲：擲硬幣、骰子、21 點、賽馬。結果由伺服器決定，這裡只負責選項與演出。
+// 賭場小遊戲：擲硬幣、骰子、21 點、賽馬（賽馬是全房一起押）。結果由伺服器決定，這裡只負責選項與演出。
 // 模式和老虎機一樣：練習模式（練習幣）／賭注模式（Discord 授權後動用機器人錢包的真代幣）。
+// 每個遊戲下方有「👀 同房玩家」旁觀面板。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { createWatch } from "./watch.js";
+import { addBetInput } from "./betinput.js";
 
 const BETS = [10, 50, 100, 500];
 const ERR = {
   insufficient: "代幣不夠，選小一點的賭注", bot_down: "機器人暫時連不上，稍後再試", need_login: "要先登入才能用賭注模式",
-  no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", error: "發生錯誤，再試一次",
+  no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
+  error: "發生錯誤，再試一次",
 };
 const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬" };
 const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
   dice: "你和莊家各擲兩顆骰子比點數，大的贏（拿回 2 倍），一樣退錢",
   bj: "點數最接近 21 不爆牌就贏；贏拿 2 倍，Blackjack 拿 2.5 倍，平手退錢",
-  horse: "選一匹馬下注，賠率 = 中了拿回的倍數（含本金）；每次開跑馬匹狀態都不同",
+  horse: "全房一起押：下注時間內選馬下注，時間到大家一起看比賽，押中拿 賭注×賠率",
 };
 const dieFace = (n) => "⚀⚁⚂⚃⚄⚅"[n - 1];
+const money = (n) => n.toLocaleString();
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 export function mountCasino(game) {
   return function (root, { env, back }) {
@@ -45,10 +51,12 @@ export function mountCasino(game) {
     const gameEl = $(".casino"), confirmEl = $(".confirm"), betsEl = $(".bets");
     $(".back").addEventListener("click", back);
     attachRules(root, game);
+    const watch = createWatch(gameEl);
 
-    let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false;
+    let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false, you = null;
     let mode = "practice", session = env.session || null, practiceBal = null, realBal = null;
-    let pick = "heads", horseCard = null, horseIdx = -1, inHand = false, raced = false;
+    let pick = "heads", inHand = false;
+    let hs = null, skew = 0, horseSel = -1, raf = 0, tickTimer = 0;     // 賽馬狀態
     const timers = [];
     const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
     const real = () => mode === "real";
@@ -57,13 +65,16 @@ export function mountCasino(game) {
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
       ws.onopen = () => {
-        retry = 0; send({ t: "cjoin" });
+        retry = 0; send({ t: "cjoin", game, room: env.instanceId });
         if (session) send({ t: "bauth", token: session.token });
       };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.t === "cinit") { practiceBal = m.balance; showBalance(); statusEl.textContent = "選賭注，開始吧"; if (game === "horse" && !horseCard) send({ t: "chorse", a: "card" }); }
+        if (m.t === "cinit") { practiceBal = m.balance; you = m.you; watch.setYou(you); showBalance(); statusEl.textContent = game === "horse" ? "選一匹馬，下注吧" : "選賭注，開始吧"; }
+        else if (m.t === "cwho") watch.update(m.list);
         else if (m.t === "cres") onRes(m);
+        else if (m.t === "hstate") onHorse(m);
+        else if (m.t === "cbal") { if (m.balance != null) { if (m.real) realBal = m.balance; else practiceBal = m.balance; showBalance(); } if (m.payfail) statusEl.textContent = "派彩失敗，請聯絡管理員"; }
         else if (m.t === "cerr") onErr(m);
         else if (m.t === "bauthed") onAuthed(m);
       };
@@ -75,7 +86,8 @@ export function mountCasino(game) {
     function showBalance() {
       const b = cur();
       balEl.textContent = b == null ? "--" : b.toLocaleString();
-      resetBtn.hidden = real() || !(practiceBal != null && practiceBal < Math.min(...BETS) && !inHand);
+      resetBtn.hidden = real() || !(practiceBal != null && practiceBal < 1 && !inHand);
+      if (typeof markBets === "function") markBets();
     }
     function setBal(m) { if (m.balance == null) return; if (m.real) realBal = m.balance; else practiceBal = m.balance; showBalance(); }
     function onErr(m) {
@@ -90,7 +102,7 @@ export function mountCasino(game) {
       modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m));
       gameEl.classList.toggle("realmode", m === "real");
       $(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";
-      showBalance();
+      showBalance(); draw();
       statusEl.textContent = m === "real" ? `賭注模式：${session ? session.name : ""}，用的是真代幣！` : "練習模式：選賭注，開始吧";
     }
     function askConfirm(text, onYes) {
@@ -99,7 +111,7 @@ export function mountCasino(game) {
       $(".cno").onclick = () => { confirmEl.hidden = true; statusEl.textContent = "已取消"; };
     }
     modeBtns.forEach((b) => b.addEventListener("click", () => {
-      if (busy || inHand) return;
+      if (busy || inHand || myBet()) return;
       if (b.dataset.m === "practice") { setMode("practice"); return; }
       if (real()) return;
       if (!env.inDiscord || !env.sdk) { statusEl.textContent = "賭注模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
@@ -134,21 +146,21 @@ export function mountCasino(game) {
 
     BETS.forEach((v) => {
       const b = document.createElement("button"); b.textContent = v; b.dataset.v = v;
-      b.addEventListener("click", () => { if (busy || inHand) return; bet = v; markBets(); });
+      b.addEventListener("click", () => { if (busy || inHand || myBet()) return; bet = v; markBets(); draw(); });
       betsEl.append(b);
     });
-    const markBets = () => betsEl.querySelectorAll("button").forEach((b) => b.classList.toggle("sel", Number(b.dataset.v) === bet));
+    const bi = addBetInput(betsEl, { getBet: () => bet, setBet: (n) => { bet = n; markBets(); draw(); }, getBal: () => cur(), locked: () => busy || inHand || !!myBet() });
+    const markBets = () => { betsEl.querySelectorAll("button[data-v]").forEach((b) => b.classList.toggle("sel", Number(b.dataset.v) === bet)); bi.refresh(BETS); };
     markBets();
     resetBtn.addEventListener("click", () => send({ t: "creset" }));
 
     const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = "spin " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); return b; };
-    const money = (n) => n.toLocaleString();
     function resultLine(m) {
       const net = m.back - m.bet;
       return m.back > m.bet ? `🎉 +${money(net)}（拿回 ${money(m.back)}）` : m.back === m.bet ? `🤝 退回 ${money(m.bet)}` : `😢 -${money(m.bet)}`;
     }
 
-    // ---- 畫面
+    // ---- 控制鈕
     function draw() {
       ctl.innerHTML = "";
       if (game === "coin") {
@@ -160,14 +172,15 @@ export function mountCasino(game) {
         ctl.append(row, btn("🪙 擲！", "", () => play({ g: "coin", pick })));
       } else if (game === "dice") ctl.append(btn("🎲 擲骰", "", () => play({ g: "dice" })));
       else if (game === "bj") {
-        if (!inHand) ctl.append(btn("🃏 發牌", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); send({ t: "cbj", a: "deal", bet, real: real() }); }));
+        if (!inHand) ctl.append(btn("🃏 發牌", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); draw(); send({ t: "cbj", a: "deal", bet, real: real() }); }));
         else ctl.append(btn("➕ 要牌", "", () => send({ t: "cbj", a: "hit" })), btn("✋ 停牌", "alt", () => send({ t: "cbj", a: "stand" })));
       } else if (game === "horse") {
-        if (raced) { ctl.append(btn("🏇 下一場", "", () => { if (!horseCard) { statusEl.textContent = "馬匹準備中…"; return; } raced = false; stage.innerHTML = ""; horseIdx = -1; statusEl.textContent = "選一匹馬"; draw(); })); return; }
-        horseList();
-        ctl.append(btn("🏁 開跑", "", startRace), btn("🔄 換一批馬", "alt", () => { if (!busy) { horseCard = null; horseIdx = -1; stage.innerHTML = ""; send({ t: "chorse", a: "card" }); } }));
+        const canBet = hs && hs.phase === "bet" && !myBet();
+        const label = !hs ? "連線中…" : myBet() ? `✅ 已下注 ${myBet().bet} 押 ${myBet().idx + 1} 號` : hs.phase === "bet" ? (horseSel < 0 ? "先點一匹馬" : `💰 下注 ${bet} 押 ${horseSel + 1} 號`) : hs.phase === "run" ? "比賽進行中…" : "下一場即將開始…";
+        const b = btn(label, "", () => { if (canBet && horseSel >= 0) { busy = true; draw(); send({ t: "chorse", a: "bet", id: hs.id, idx: horseSel, bet, real: real() }); } });
+        b.disabled = !(canBet && horseSel >= 0) || busy; ctl.append(b);
       }
-      ctl.querySelectorAll(".spin").forEach((b) => (b.disabled = busy && !inHand));
+      ctl.querySelectorAll(".spin").forEach((b) => { if (game !== "horse") b.disabled = busy && !inHand; });
     }
     function play(o) { if (busy) return; busy = true; draw(); statusEl.textContent = "…"; send({ t: "cplay", bet, real: real(), ...o }); }
 
@@ -177,12 +190,6 @@ export function mountCasino(game) {
       if (m.g === "coin") coinAnim(m);
       else if (m.g === "dice") diceAnim(m);
       else if (m.g === "bj") bjShow(m);
-      else if (m.g === "horse") {
-        if (m.card) {
-          horseCard = m; horseIdx = -1;
-          if (!raced) horseList();   // 剛跑完時保留結果畫面，按「下一場」才換馬
-        } else raceAnim(m);
-      }
     }
     function coinAnim(m) {
       stage.innerHTML = `<div class="coin flip">🪙</div>`;
@@ -216,45 +223,64 @@ export function mountCasino(game) {
       stage.innerHTML = html; showBalance(); draw();
     }
 
-    // ---- 賽馬
-    function horseList() {
-      if (!horseCard) { stage.innerHTML = ""; return; }
-      if (stage.querySelector(".track")) return;
-      stage.innerHTML = `<div class="hlist">${horseCard.names.map((n, i) =>
-        `<button class="hrow ${horseIdx === i ? "sel" : ""}" data-i="${i}"><b>${i + 1}</b><span>${n}</span><em>${horseCard.forms[i]}</em><i>賠率 ${horseCard.odds[i]}</i></button>`).join("")}</div>`;
-      stage.querySelectorAll(".hrow").forEach((r) => r.addEventListener("click", () => { if (busy) return; horseIdx = Number(r.dataset.i); horseList(); }));
+    // ---- 賽馬（全房一起押）
+    const myBet = () => (hs && you ? hs.bets.find((b) => b.id === you) : null);
+    function onHorse(m) {
+      const newRound = !hs || hs.id !== m.id;
+      hs = m; skew = m.now - Date.now(); busy = false;
+      if (newRound) { horseSel = -1; stage.innerHTML = ""; }
+      renderHorse(); draw();
     }
-    function startRace() {
-      if (busy) return;
-      if (!horseCard || horseIdx < 0) { statusEl.textContent = "先點一匹馬再開跑"; return; }
-      busy = true; draw(); statusEl.textContent = "…";
-      send({ t: "chorse", a: "bet", id: horseCard.id, idx: horseIdx, bet, real: real() });
+    const serverNow = () => Date.now() + skew;
+    function renderHorse() {
+      if (!hs) return;
+      cancelAnimationFrame(raf); clearInterval(tickTimer);
+      const mine = myBet(), tot = hs.bets.reduce((a, b) => a + b.bet, 0);
+      const per = hs.names.map((_, i) => hs.bets.filter((b) => b.idx === i).length);
+      const head = hs.phase === "bet" ? `第 ${hs.no} 場　<b class="cd">--</b> 秒後截止下注` : hs.phase === "run" ? `第 ${hs.no} 場　🏇 比賽進行中！` : `第 ${hs.no} 場　🏆 ${esc(hs.names[hs.win])} 奪冠！`;
+      let html = `<div class="hhead">${head}</div>`;
+      if (hs.phase === "bet") {
+        html += `<div class="hlist">${hs.names.map((n, i) =>
+          `<button class="hrow ${horseSel === i ? "sel" : ""} ${mine && mine.idx === i ? "mine" : ""}" data-i="${i}"><b>${i + 1}</b><span>${esc(n)}</span><em>${hs.forms[i]}${per[i] ? `　👥${per[i]}` : ""}</em><i>賠率 ${hs.odds[i]}</i></button>`).join("")}</div>`;
+      } else {
+        html += `<div class="track">${hs.names.map((n, i) => `<div class="lane ${mine && mine.idx === i ? "mine" : ""}"><span class="ln">${i + 1} ${esc(n)}</span><span class="hz" data-i="${i}" style="left:0">🐎</span><span class="fin">🏁</span></div>`).join("")}</div>`;
+      }
+      html += `<div class="hbets"><h4>本場下注${hs.bets.length ? `（${hs.bets.length} 人，共 ${money(tot)}）` : ""}</h4>${hs.bets.length ? hs.bets.map((b) => {
+        const res = hs.phase === "result" ? (b.back > 0 ? `<b class="w">+${money(b.back - b.bet)}</b>` : `<b class="l">-${money(b.bet)}</b>`) : "";
+        return `<div class="hb ${b.id === you ? "me" : ""}"><span>${b.real ? "💰" : "🎮"} ${esc(b.name)}${b.id === you ? "（你）" : ""}</span><span>押 ${b.idx + 1} 號 ${esc(hs.names[b.idx])}　${money(b.bet)}</span>${res}</div>`;
+      }).join("") : `<div class="mempty">還沒有人下注。你可以當第一個，或等朋友下注後旁觀比賽。</div>`}</div>`;
+      stage.innerHTML = html;
+      stage.querySelectorAll(".hrow").forEach((r) => r.addEventListener("click", () => { if (busy || myBet() || hs.phase !== "bet") return; horseSel = Number(r.dataset.i); renderHorse(); draw(); }));
+      if (hs.phase === "bet") {
+        const cd = stage.querySelector(".cd");
+        const tick = () => { const s = Math.max(0, Math.ceil((hs.closeAt - serverNow()) / 1000)); cd.textContent = s; if (!hs.bets.length && s === 0) cd.textContent = "等人下注"; };
+        tick(); tickTimer = setInterval(tick, 250);
+        statusEl.textContent = mine ? "已下注，等開跑" : "選馬、選賭注，按下注";
+      } else animateRace();
     }
-    function raceAnim(m) {
-      const names = horseCard.names;
-      stage.innerHTML = `<div class="track">${names.map((n, i) => `<div class="lane ${i === m.idx ? "mine" : ""}"><span class="ln">${i + 1} ${n}</span><span class="hz" data-i="${i}" style="left:0">🐎</span><span class="fin">🏁</span></div>`).join("")}</div>`;
-      const hz = [...stage.querySelectorAll(".hz")], start = performance.now(), W = () => stage.querySelector(".lane").clientWidth - 90;
-      const seed = names.map(() => Math.random() * 6);
-      statusEl.textContent = "🏇 開跑！";
-      (function frame() {
-        if (closed) return;
-        const t = performance.now() - start; let all = true;
+    function animateRace() {
+      const hz = [...stage.querySelectorAll(".hz")], lane = stage.querySelector(".lane");
+      const width = () => lane.clientWidth - 90;
+      const frame = () => {
+        if (closed || !hs || hs.phase === "bet") return;
+        const t = serverNow() - hs.startAt; let all = true;
         hz.forEach((h, i) => {
-          const p = Math.min(1, t / m.times[i]), wob = p < 1 ? Math.sin(t / 180 + seed[i]) * 0.02 : 0;
-          h.style.left = Math.max(0, Math.min(1, p * p * 0.35 + p * 0.65 + wob)) * W() + "px";
+          const p = Math.max(0, Math.min(1, t / hs.times[i])), wob = p > 0 && p < 1 ? Math.sin(t / 180 + i * 1.7) * 0.02 : 0;
+          h.style.left = Math.max(0, Math.min(1, p * p * 0.35 + p * 0.65 + wob)) * width() + "px";
           if (p < 1) all = false;
         });
-        if (!all) requestAnimationFrame(frame);
-        else {
-          const win = m.win;
-          stage.insertAdjacentHTML("beforeend", `<div class="cresult ${m.back ? "win" : "lose"}">🏆 ${win + 1} 號 ${names[win]} 奪冠！你押 ${m.idx + 1} 號（賠率 ${m.odds[m.idx]}）　${resultLine(m)}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`);
-          statusEl.textContent = "再來一場？"; busy = false; horseCard = null; horseIdx = -1; raced = true;
-          send({ t: "chorse", a: "card" }); draw();
-        }
-      })();
+        if (!all) raf = requestAnimationFrame(frame);
+      };
+      frame();
+      const mine = myBet();
+      if (hs.phase === "run") statusEl.textContent = "🏇 開跑！";
+      else statusEl.textContent = mine ? (mine.back > 0 ? `🎉 押中了！+${money(mine.back - mine.bet)}` : `😢 沒押中 -${money(mine.bet)}`) : `🏆 ${hs.names[hs.win]} 奪冠`;
     }
+    const onResize = () => { if (hs && hs.phase !== "bet") renderHorse(); };
+    window.addEventListener("resize", onResize);
+
     connect();
     draw();
-    return () => { closed = true; timers.forEach(clearTimeout); try { ws.close(); } catch {} };
+    return () => { closed = true; window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); try { ws.close(); } catch {} };
   };
 }
