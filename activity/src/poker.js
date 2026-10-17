@@ -12,7 +12,7 @@ const card = (c, small) => {
 };
 const PHASE = { wait: "等玩家", preflop: "翻牌前", flop: "翻牌", turn: "轉牌", river: "河牌", result: "結算" };
 // 6 個座位在橢圓桌上的位置（百分比），第 0 個是自己（下方），順時針
-const POS = [[50, 92], [10, 70], [10, 24], [50, 6], [90, 24], [90, 70]];
+const POS = [[50, 90], [9, 68], [9, 24], [50, 8], [91, 24], [91, 68]];
 
 function getPid() {
   try { let p = localStorage.getItem("pokerpid"); if (!p) { p = Math.random().toString(36).slice(2, 10); localStorage.setItem("pokerpid", p); } return p; } catch { return Math.random().toString(36).slice(2, 10); }
