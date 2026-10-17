@@ -226,7 +226,7 @@ function horseNew(room) {
 }
 function horseView(room) {
   const h = room.h, c = h.card;
-  return { t: "hstate", phase: h.phase, id: h.id, no: h.no, names: c.names, forms: c.forms, odds: c.odds, probs: c.probs.map((p) => Math.round(p * 1000) / 10),
+  return { t: "hstate", phase: h.phase, id: h.id, no: h.no, names: c.names, forms: c.forms, odds: c.odds,
     info: c.names.map((n) => { const x = horses[n]; return { spd: x.spd, sta: x.sta, bst: x.bst, races: x.races, wins: x.wins, last: x.last, ...(TRAITS[n] || {}) }; }), now: Date.now(), closeAt: h.closeAt,
     startAt: h.startAt, times: h.times, order: h.order, win: h.win, resultAt: h.resultAt,
     bets: h.bets.map((b) => ({ id: b.ws.cid, name: b.name, idx: b.idx, bet: b.bet, real: b.real, back: b.back })) };

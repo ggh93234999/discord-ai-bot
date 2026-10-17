@@ -245,7 +245,7 @@ export function mountCasino(game, opts = {}) {
     function horseInfo(i) {
       const f = hs.info && hs.info[i]; if (!f) return "";
       const rec = f.races ? `${f.races} 戰 ${f.wins} 勝（${Math.floor(f.wins * 100 / f.races)}%）` : "新馬，還沒有戰績";
-      return `<div class="hd"><span class="coat" style="background:${f.coat || "#999"}"></span><b>${esc(f.style || "")}</b>　${esc(f.blurb || "")}<br>勝率約 <b>${hs.probs ? hs.probs[i] : "?"}%</b>　速度 ${bar5(f.spd)} ${f.spd}　耐力 ${bar5(f.sta)} ${f.sta}　爆發 ${bar5(f.bst)} ${f.bst}<br>戰績 ${rec}　近 5 場：${f.last.length ? f.last.join("、") : "—"}</div>`;
+      return `<div class="hd"><span class="coat" style="background:${f.coat || "#999"}"></span><b>${esc(f.style || "")}</b>　${esc(f.blurb || "")}<br>速度 ${bar5(f.spd)} ${f.spd}　耐力 ${bar5(f.sta)} ${f.sta}　爆發 ${bar5(f.bst)} ${f.bst}<br>戰績 ${rec}　近 5 場：${f.last.length ? f.last.join("、") : "—"}</div>`;
     }
     function renderHorse() {
       if (!hs) return;
