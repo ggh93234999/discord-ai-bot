@@ -1,6 +1,6 @@
 // 觀眾席：棋類與皮卡丘排球可以先當觀眾（不佔座位、不會直接下場），想玩再按「上場對戰」；打完或沒開局時也能「回觀眾席」。
-// 「進房先當觀眾」的選擇會記在瀏覽器裡，之後進任何雙人遊戲都先在觀眾席。
-export function specFirst() { try { return localStorage.getItem("specfirst") === "1"; } catch { return false; } }
+// 預設進房就是觀眾席；取消勾選「進房先當觀眾」後，之後進雙人遊戲會直接入座。選擇記在瀏覽器裡。
+export function specFirst() { try { return localStorage.getItem("specfirst") !== "0"; } catch { return true; } }     // 預設先當觀眾
 function setSpecFirst(v) { try { localStorage.setItem("specfirst", v ? "1" : "0"); } catch {} }
 
 export function createSeat(root, { getWs, getSt }) {
