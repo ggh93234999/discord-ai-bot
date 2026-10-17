@@ -3,7 +3,7 @@
 import { wsUrl } from "./gomoku.js";
 
 const KINDS = [
-  { id: 1, name: "3 格", rows: 1, cols: 3, syms: ["🍒", "🍋", "🔔", "🍇", "🍀", "💎"], hint: "三個一樣大賠，兩個一樣退錢" },
+  { id: 1, name: "3 格", rows: 1, cols: 3, syms: ["🍒", "🍋", "💎"], hint: "三個一樣拿 2～3.2 倍，兩個一樣退錢" },
   { id: 3, name: "3×3", rows: 3, cols: 3, syms: ["🍒", "🍋", "🔔", "💎"], hint: "8 條線，3 格一樣就中" },
   { id: 4, name: "4×4", rows: 4, cols: 4, syms: ["🍒", "🍋", "💎"], hint: "10 條線，整排整欄 4 格一樣才中" },
 ];

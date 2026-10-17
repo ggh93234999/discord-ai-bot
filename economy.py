@@ -25,8 +25,8 @@ START_COINS = 200         # 新玩家起始代幣
 COIN = "🪙"
 RNG = random.SystemRandom()   # 賭博用真亂數
 
-SLOT_SYMBOLS = ["🍒", "🍋", "🔔", "🍇", "🍀", "💎"]
-SLOT_TRIPLE = {"🍒": 5, "🍋": 8, "🔔": 12, "🍇": 15, "🍀": 25, "💎": 50}   # 三個一樣：拿回幾倍賭注
+SLOT_SYMBOLS = ["🍒", "🍋", "💎"]   # 3 格單排只用 3 種圖案
+SLOT_TRIPLE = {"🍒": 2, "🍋": 2.5, "💎": 3.2}   # 三個一樣：拿回幾倍賭注
 SLOT_PAIR = 1                                                           # 兩個一樣：賭注退回
 
 wallet: dict = {}
