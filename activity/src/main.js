@@ -7,8 +7,7 @@ import { mountSlots } from "./slots.js";
 import { mountDown } from "./stairs.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
-const optional = import.meta.glob(["./pikachu.js", "./pikachu_online.js", "./lf2.js"], { eager: true });
-const mountPikachu = optional["./pikachu.js"]?.mountPikachu;
+const optional = import.meta.glob(["./pikachu_online.js", "./lf2.js"], { eager: true });
 const mountPikachuOnline = optional["./pikachu_online.js"]?.mountPikachuOnline;
 const mountLf2 = optional["./lf2.js"]?.mountLf2;
 
@@ -38,7 +37,6 @@ const GAMES = [
   { id: "c4", cat: "board", icon: "🔴", name: "四連棋", players: "2 人", desc: "棋子往下掉，先連四顆", mount: mountConnect4 },
   { id: "rv", cat: "board", icon: "⚪", name: "黑白棋", players: "2 人", desc: "夾住對方的棋就翻面", mount: mountReversi },
   { id: "down", cat: "action", icon: "🪜", name: "小朋友下樓梯", players: "1–4 人", desc: "往下踩樓梯別被刺扎到", mount: mountDown },
-  { id: "pika", cat: "action", icon: "⚡", name: "皮卡丘排球", players: "1 人", desc: "單人對電腦，經典 1997", mount: mountPikachu },
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "練習模式或真代幣賭注", mount: mountSlots },
