@@ -353,3 +353,7 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .poker .ptag{font-size:10px;color:#ffab91;line-height:1.1}
 body.pk-myturn{background:#16296b !important;transition:background .25s}
 body.pk-myturn .game.poker{background:#16296b}
+.poker .pcfg{padding:0 12px 16px;text-align:center;font-size:13px}.poker .pcfg summary{cursor:pointer;color:#b0bec5}
+.poker .pcfgbox{display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:8px}
+.poker .pcfgbox input[type=number]{width:70px;padding:3px 6px;border-radius:6px;border:1px solid #666;background:#1b1e26;color:#fff;text-align:center}
+.poker .pcfgbox small{opacity:.65;max-width:320px}

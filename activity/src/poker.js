@@ -29,10 +29,12 @@ export function mountPoker(opts = {}) {
         <div class="ptable"><div class="pfelt"><div class="pcenter"><div class="ptimer"></div><div class="ppot"></div><div class="pboard"></div></div></div><div class="pseats"></div></div>
         <div class="plog"></div>
         <div class="pctl"></div>
+        <div class="pcfg"></div>
       </div>`;
     attachRules(root.querySelector(".game"), "poker");
     const $ = (s) => root.querySelector(s);
-    const statusEl = $(".status"), potEl = $(".ppot"), timerEl = $(".ptimer"), boardEl = $(".pboard"), seatsEl = $(".pseats"), logEl = $(".plog"), ctl = $(".pctl"), watchEl = $(".watch");
+    const statusEl = $(".status"), potEl = $(".ppot"), timerEl = $(".ptimer"), boardEl = $(".pboard"), seatsEl = $(".pseats"), logEl = $(".plog"), ctl = $(".pctl"), cfgEl = $(".pcfg"), watchEl = $(".watch");
+    let cfgSig = "", cfgOpen = false;
     let ws = null, closed = false, retry = 0, st = null, timer = 0, raiseTo = 0, ctlKey = "";
     const pid = getPid();
     const nmIn = $(".pnm"), lsGet = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
@@ -93,14 +95,34 @@ export function mountPoker(opts = {}) {
         logEl.innerHTML = `<div class="prt">攤牌　公開牌型</div>${rows}`;
       } else logEl.textContent = st.log || "";
       renderCtl();
+      renderCfg();
       tickStatus();
+    }
+
+    function renderCfg() {
+      const seated = st.you >= 0 && !spectate, c = st.cfg || { sb: 10, up: false, every: 8 };
+      const sig = [seated, c.sb, c.up, c.every].join("|");
+      if (sig === cfgSig) return;
+      cfgSig = sig;
+      if (!seated) { cfgEl.innerHTML = ""; return; }
+      cfgEl.innerHTML = `<details${cfgOpen ? " open" : ""}><summary>⚙ 盲注設定　目前 ${c.sb}/${c.sb * 2}${c.up ? `，每 ${c.every} 手升級` : "，固定"}</summary>
+        <div class="pcfgbox">
+          <label>起始小盲 <input type="number" class="cf-sb" min="1" max="2500" value="${c.sb}"></label>
+          <label><input type="checkbox" class="cf-up"${c.up ? " checked" : ""}> 隨手數升盲</label>
+          <label>每 <input type="number" class="cf-ev" min="1" max="100" value="${c.every}"> 手升一級</label>
+          <small>大盲 = 小盲 × 2；升級順序 …10 → 15 → 20 → 30 → 50 → 75 → 100 → 150 → 200 …（從起始小盲往上）。下一手起生效。</small>
+          <button class="pb ghost cf-ok">套用</button>
+        </div></details>`;
+      const d = cfgEl.querySelector("details");
+      d.addEventListener("toggle", () => { cfgOpen = d.open; });
+      cfgEl.querySelector(".cf-ok").addEventListener("click", () => send({ t: "pcfg", sb: Number(cfgEl.querySelector(".cf-sb").value), up: cfgEl.querySelector(".cf-up").checked, every: Number(cfgEl.querySelector(".cf-ev").value) }));
     }
 
     function tickStatus() {
       if (!st) return;
       const left = st.deadline ? Math.max(0, Math.ceil((st.deadline - (Date.now() - st.at)) / 1000)) : 0;
       const me = st.you >= 0 ? st.seats[st.you] : null;
-      let t = `${PHASE[st.phase] || ""}　盲注 ${st.sb}/${st.bb}　第 ${st.handNo} 手`;
+      let t = `${PHASE[st.phase] || ""}　盲注 ${st.sb}/${st.bb}${st.lvl && st.lvl.next ? `（${st.lvl.left} 手後 ${st.lvl.next}/${st.lvl.next * 2}）` : ""}　第 ${st.handNo} 手`;
       if (spectate) t = "👀 旁觀中　" + t;
       else if (!me) t = "還沒入座　" + t;
       if (st.toAct >= 0 && st.seats[st.toAct]) t += st.toAct === st.you ? `　輪到你（${left}s）` : `　輪到 ${st.seats[st.toAct].name}${left && !st.seats[st.toAct].bot ? `（${left}s）` : ""}`;

@@ -251,7 +251,7 @@ wss.on("connection", (ws, req) => {
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
     if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist|clogq)$/.test(m.t)) { handleCasino(ws, m); return; }
-    if (typeof m.t === "string" && /^(pjoin|psit|pstand|paddbot|pdelbot|pact|pname|preset)$/.test(m.t)) { handlePoker(ws, m); return; }
+    if (typeof m.t === "string" && /^(pjoin|psit|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));

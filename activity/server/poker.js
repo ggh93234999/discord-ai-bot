@@ -2,7 +2,13 @@
 // 牌桌：每個 Activity instance 一桌；伺服器負責發牌、輪流下注、邊池、判勝負，前端只畫畫面。
 import { randomInt, randomBytes } from "node:crypto";
 
-const SEATS = 6, START = 1000, SB = 10, BB = 20;
+const SEATS = 6, START = 1000;
+// 盲注設定：sb 起始小盲；up 是否隨手數升盲；every 每幾手升一級。升級順序沿用「好看的整數」
+const LEVELS = [5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000];
+const DEFAULT_CFG = { sb: 10, up: false, every: 8 };
+function blindSeq(cfg) { return [cfg.sb, ...LEVELS.filter((x) => x > cfg.sb)]; }
+function levelOf(t, hand) { const seq = blindSeq(t.cfg); if (!t.cfg.up) return { k: 0, sb: t.cfg.sb, next: null, left: 0 }; const k = Math.min(seq.length - 1, Math.floor((hand - 1 - t.lvlBase) / t.cfg.every)); const left = k >= seq.length - 1 ? 0 : t.cfg.every - ((hand - 1 - t.lvlBase) % t.cfg.every); return { k, sb: seq[k], next: k < seq.length - 1 ? seq[k + 1] : null, left }; }
+function applyBlinds(t, hand) { const L = levelOf(t, hand); t.sb = L.sb; t.bb = L.sb * 2; t.lvl = L; }
 const ACT_MS = 25000, RESULT_MS = 11000, STREET_MS = 1200;
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "大鵰", "豆豆"];
 
@@ -117,8 +123,8 @@ function botDecide(t, s) {
   }
   if (e > 0.78 - (P.agg - 1) * 0.05 && r < Math.min(0.95, 0.55 * P.agg) && !(r < P.slow)) return { a: "raise", amt: raiseTo(0.8) };
   if (e < 0.5 && r < P.bluff * 0.5) return { a: "raise", amt: raiseTo(0.8) };         // 衝動型的恐嚇加注
-  if (e > odds + 0.05 + P.loose && (e > 0.35 + P.loose || toCall <= BB * 2)) return { a: "call" };
-  if (r < 0.05 + Math.max(0, -P.loose) * 0.4 && toCall <= BB * 3) return { a: "call" };
+  if (e > odds + 0.05 + P.loose && (e > 0.35 + P.loose || toCall <= t.bb * 2)) return { a: "call" };
+  if (r < 0.05 + Math.max(0, -P.loose) * 0.4 && toCall <= t.bb * 3) return { a: "call" };
   return { a: "fold" };
 }
 
@@ -131,7 +137,7 @@ const nameOf = (ws) => ws.pname || ws.user?.name || (ws.pguest ||= "玩家" + St
 function newTable(id) {
   const t = {
     id, members: new Set(), seats: Array(SEATS).fill(null), dealer: -1, phase: "wait", board: [], deck: [],
-    curBet: 0, minRaise: BB, toAct: -1, deadline: 0, nextAt: 0, handNo: 0, result: null, log: "等玩家入座…", botSeq: 0,
+    cfg: { ...DEFAULT_CFG }, lvlBase: 0, sb: DEFAULT_CFG.sb, bb: DEFAULT_CFG.sb * 2, lvl: null, curBet: 0, minRaise: DEFAULT_CFG.sb * 2, toAct: -1, deadline: 0, nextAt: 0, handNo: 0, result: null, log: "等玩家入座…", botSeq: 0,
   };
   t.potTotal = () => t.seats.reduce((s, x) => s + (x ? x.total : 0), 0);
   return t;
@@ -146,7 +152,7 @@ function view(t, ws) {
   const mine = t.seats.findIndex((s) => s && s.ws === ws);
   const showAll = t.phase === "result" && t.result && t.result.showdown;
   return {
-    t: "pstate", phase: t.phase, board: t.board, dealer: t.dealer, curBet: t.curBet, minRaise: t.minRaise, bb: BB, sb: SB,
+    t: "pstate", phase: t.phase, board: t.board, dealer: t.dealer, curBet: t.curBet, minRaise: t.minRaise, bb: t.bb, sb: t.sb, cfg: t.cfg, lvl: t.lvl ? { next: t.lvl.next, left: t.lvl.left } : null,
     toAct: t.toAct, deadline: t.deadline, nextAt: t.phase === "result" ? t.nextAt : 0, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
     watchers: [...t.members].filter((w) => w.pspec).length, result: t.result,
     seats: t.seats.map((s, i) => s && ({
@@ -186,10 +192,11 @@ function seatPlayer(t, i, o) {
 // ---- 一手牌
 function startHand(t) {
   const swaps = [];
+  applyBlinds(t, t.handNo + 1);
   const players = t.seats.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
   for (const i of players) {
     const s = t.seats[i];
-    if (s.chips < BB) {
+    if (s.chips < t.bb) {
       if (s.bot) { const old = s.name; seatPlayer(t, i, { bot: true, name: "🤖" + pickBotName(t), last: "新電腦" }); swaps.push(`${old} 輸光了，換 ${t.seats[i].name} 入座`); }   // 電腦輸光就換一個新的
       else { s.chips = START; s.last = "補充籌碼"; }
     }
@@ -203,10 +210,10 @@ function startHand(t) {
   const next = (from) => { let k = from; do { k = (k + 1) % SEATS; } while (!t.seats[k] || !t.seats[k].inHand); return k; };
   const heads = players.length === 2;
   const sbI = heads ? d : next(d), bbI = next(sbI);
-  const post = (i, amt) => { const s = t.seats[i], a = Math.min(amt, s.chips); s.chips -= a; s.bet += a; s.total += a; if (!s.chips) s.allin = true; s.last = amt === SB ? "小盲" : "大盲"; };
-  post(sbI, SB); post(bbI, BB);
-  t.curBet = BB; t.minRaise = BB;
-  t.log = (swaps.length ? swaps.join("；") + "。" : "") + `第 ${t.handNo} 手：${t.seats[sbI].name} 小盲 ${SB}，${t.seats[bbI].name} 大盲 ${BB}`;
+  const post = (i, amt) => { const s = t.seats[i], a = Math.min(amt, s.chips); s.chips -= a; s.bet += a; s.total += a; if (!s.chips) s.allin = true; s.last = amt === t.sb ? "小盲" : "大盲"; };
+  post(sbI, t.sb); post(bbI, t.bb);
+  t.curBet = t.bb; t.minRaise = t.bb;
+  t.log = (swaps.length ? swaps.join("；") + "。" : "") + `第 ${t.handNo} 手：${t.seats[sbI].name} 小盲 ${t.sb}，${t.seats[bbI].name} 大盲 ${t.bb}`;
   t.toAct = nextActor(t, bbI);
   armTimer(t);
   if (t.toAct < 0) runout(t);
@@ -265,7 +272,7 @@ function afterAction(t, from) {
 
 function endRound(t) {
   for (const s of t.seats) if (s) { s.bet = 0; s.acted = false; }
-  t.curBet = 0; t.minRaise = BB;
+  t.curBet = 0; t.minRaise = t.bb;
   if (t.phase === "river") return finish(t, true);
   const nextPhase = { preflop: "flop", flop: "turn", turn: "river" }[t.phase];
   t.phase = nextPhase;
@@ -383,10 +390,17 @@ export function handlePoker(ws, m) {
   } else if (m.t === "pname") {
     const nm = cleanName(m.name); if (!nm) return true;
     ws.pname = nm; if (mine >= 0) t.seats[mine].name = nm; push(t);
+  } else if (m.t === "pcfg") {
+    if (mine < 0) return true;
+    const sb = Math.round(Number(m.sb)), every = Math.round(Number(m.every));
+    if (!(sb >= 1 && sb <= 2500) || !(every >= 1 && every <= 100)) return true;
+    t.cfg = { sb, up: !!m.up, every }; t.lvlBase = t.handNo;     // 從下一手起套用，並以現在的手數為第 1 級起算
+    t.log = `${nameOf(ws)} 調整盲注：小盲 ${sb} / 大盲 ${sb * 2}${t.cfg.up ? `，每 ${every} 手升級` : "，固定不升"}（下一手起生效）`;
+    push(t);
   } else if (m.t === "preset") {
     if (mine < 0) return true;                                   // 入座的人可以重開：全員籌碼歸 START、重新發牌
     for (const x of t.seats) if (x) Object.assign(x, { chips: START, hole: [], bet: 0, total: 0, folded: false, allin: false, acted: false, inHand: false, last: "", score: null, removeAfter: false });
-    t.board = []; t.result = null; t.toAct = -1; t.deadline = 0; t.curBet = 0; t.handNo = 0; t.phase = "wait";
+    t.board = []; t.result = null; t.toAct = -1; t.deadline = 0; t.curBet = 0; t.handNo = 0; t.lvlBase = 0; t.phase = "wait";
     t.log = `${nameOf(ws)} 重開牌局，大家籌碼回到 ${START}`;
     startHand(t); push(t);
   } else if (m.t === "pact") {
