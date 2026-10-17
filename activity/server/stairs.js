@@ -1,88 +1,123 @@
 // 小朋友下樓梯 / 小朋友上樓梯：最多 4 人同場的物理模擬（60 tick/秒，全部由伺服器算）。
-// 座標：寬 400、高 640 的「螢幕座標」；快照送給前端的 y 已經是螢幕座標，前端只負責畫。
+// 快照送給前端的座標已經是「畫面座標」，前端只負責畫。
 export const W = 400, H = 640;
-const PW = 92, PH = 12, KW = 22, KH = 30;
+const PW = 92, KW = 22, KH = 30;
 export const MAXHP = 12;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (table) => { let r = Math.random() * table.reduce((s, [, w]) => s + w, 0); for (const [v, w] of table) { if ((r -= w) <= 0) return v; } return table[0][0]; };
 
-// ───────────────────────────── 下樓梯 ─────────────────────────────
-// 樓梯往上捲，人往下掉；頭頂有天花板的刺，掉出畫面下緣就死。踩平台回血，踩刺扣血。
-// 依原版 NS-SHAFT：普通（回 1 血）、釘板（-5）、左右傳送帶、跳板、翻板（站一下就翻）、消失（踩一下就沒）
-const DOWN_TYPES = [["normal", 40], ["spike", 14], ["left", 8], ["right", 8], ["spring", 8], ["flip", 11], ["vanish", 11]];
+// 事件旗標（給前端放音效）
+const EV_LAND = 1, EV_HEAL = 2, EV_HURT = 4, EV_SPRING = 8, EV_FLIP = 16, EV_DIE = 32;
 
-function downPlat(sim, y, type) {
-  return { id: sim.nextId++, x: rnd(0, W - PW), y, w: PW, type: type || pick(DOWN_TYPES), t: 0 };
+// ───────────────────────────── 下樓梯（照原版 NS-SHAFT 的規則）─────────────────────────────
+// ・場地是一口豎井：左右是牆，頂端一排刺。樓梯一層一層等距往上捲，「地下 N 階」大家共用。
+// ・生命 12 格。踩到新的平台回 1 格；踩到釘板扣 5；被頂到天花板的刺扣 5，並且從腳下的平台穿過去掉下來。
+// ・平台六種：普通、釘板、左輸送帶、右輸送帶、彈簧床（一直彈）、翻轉板（踩上去一下子就翻掉）。
+// ・越往下捲得越快（每 5 階加速一次）。掉出畫面下緣或生命歸零就出局。
+// 尺寸照原版畫面比例（場地接近正方形；平台約場寬 1/4；小人約半層樓高）
+export const DW = 636, DH = 540, WALL = 26, ROW = 73, DPW = 146, CEIL = 26;
+const DKW = 28, DKH = 38;
+const EARLY = [["normal", 72], ["left", 9], ["right", 9], ["tramp", 10]];
+// 難度（原版也有 やさしい／ふつう／むずかしい：改變床的出現方式與捲動速度）
+const DIFF = {
+  easy:   { speed: 0.82, types: [["normal", 50], ["nails", 8], ["left", 10], ["right", 10], ["tramp", 12], ["fake", 10]] },
+  normal: { speed: 1.0,  types: [["normal", 40], ["nails", 15], ["left", 10], ["right", 10], ["tramp", 10], ["fake", 15]] },
+  hard:   { speed: 1.22, types: [["normal", 30], ["nails", 22], ["left", 11], ["right", 11], ["tramp", 8], ["fake", 18]] },
+};
+
+function newRow(sim, y) {
+  const TYPES = DIFF[sim.diff].types;
+  let type = pick(sim.rows < 6 ? EARLY : TYPES);
+  if (type === "nails" && sim.lastType === "nails") type = pick(TYPES);     // 少一點連續釘板
+  sim.lastType = type; sim.rows++;
+  return { id: sim.nextId++, x: rnd(WALL, DW - WALL - DPW), y, w: DPW, type, t: 0, flip: false, bounce: 0 };
 }
 
-function createDown(seats) {
-  const sim = { mode: "down", t: 0, nextId: 1, plats: [], ps: [], deaths: [], over: false, winner: -1, speed: 1 };
-  const first = { id: sim.nextId++, x: W / 2 - 90, y: 300, w: 180, type: "normal", t: 0 };
+function createDown(seats, opt = {}) {
+  const sim = { mode: "down", diff: DIFF[opt.diff] ? opt.diff : "normal", t: 0, nextId: 1, plats: [], ps: [], deaths: [], over: false, winner: -1,
+                speed: 0, scrolled: 0, floor: 0, ready: 120, rows: 0, lastType: "normal" };
+  const first = { id: sim.nextId++, x: DW / 2 - 90, y: 170, w: 180, type: "normal", t: 0, flip: false, bounce: 0 };
   sim.plats.push(first);
-  for (let y = 300 + 80; y < H + 120; y += rnd(72, 96)) sim.plats.push(downPlat(sim, y));
-  sim.plats[1].type = "normal";
-  let k = 0;
-  for (const s of seats) sim.ps.push({ seat: s, x: 130 + (k++) * 38, y: 300 - KH, vx: 0, vy: 0, hp: MAXHP, alive: true, score: 0, on: first, lastId: first.id, hurt: 0, face: 1 });
+  for (let y = first.y + ROW; y < DH + ROW; y += ROW) sim.plats.push(newRow(sim, y));
+  const n = seats.length;
+  seats.forEach((s, k) => {
+    const x = n === 1 ? DW / 2 - DKW / 2 : first.x + 8 + k * ((first.w - 16 - DKW) / (n - 1));
+    sim.ps.push({ seat: s, x, y: first.y - DKH, vy: 0, hp: MAXHP, alive: true, score: 0, on: first, lastId: first.id,
+                  hurt: 0, face: 1, pass: -1, ev: 0, walk: false });
+  });
   return sim;
+}
+
+function land(p, pl) {
+  const fresh = pl.id !== p.lastId;
+  p.lastId = pl.id;
+  p.y = pl.y - DKH;
+  if (pl.type === "nails") { if (fresh) { p.hp -= 5; p.hurt = 40; p.ev |= EV_HURT; } }
+  else if (fresh && p.hp < MAXHP) { p.hp++; p.ev |= EV_HEAL; }
+  if (fresh) p.ev |= EV_LAND;
+  if (pl.type === "tramp") { p.vy = -6.6; p.on = null; pl.bounce = 8; p.ev |= EV_SPRING; return; }
+  p.vy = 0; p.on = pl;
+  if (pl.type === "fake" && pl.t === 0) { pl.t = 1; p.ev |= EV_FLIP; }
 }
 
 function stepDown(sim, input) {
   sim.t++;
-  // 上捲速度隨「層數」加快（原版是越往下越快）：用場上最深的人的層數
-  const depth = sim.ps.reduce((m, p) => Math.max(m, p.score), 0);
-  const sp = sim.speed = Math.min(3.4, 1.0 + depth / 40);
-  for (const p of sim.plats) p.y -= sp;
-  sim.plats = sim.plats.filter((p) => p.y > -24 && !p.gone);
+  let sp = 0;
+  if (sim.ready > 0) sim.ready--;
+  else {
+    const k = DIFF[sim.diff].speed;
+    sp = sim.speed = Math.min(3.0 * k, (1.0 + Math.floor(sim.floor / 5) * 0.09) * k);
+    sim.scrolled += sp;
+    sim.floor = Math.floor(sim.scrolled / ROW);
+  }
+  for (const pl of sim.plats) {
+    pl.y -= sp;
+    if (pl.type === "fake" && pl.t > 0 && !pl.flip) { pl.t++; if (pl.t > 18) pl.flip = true; }
+    if (pl.bounce > 0) pl.bounce--;
+  }
+  sim.plats = sim.plats.filter((p) => p.y > -24);
   let last = sim.plats.reduce((m, p) => Math.max(m, p.y), -1e9);
-  while (last < H + 60) { last += rnd(70, 98); sim.plats.push(downPlat(sim, last)); }
+  while (last < DH + ROW) { last += ROW; sim.plats.push(newRow(sim, last)); }
 
   for (const p of sim.ps) {
     if (!p.alive) continue;
     const inp = input[p.seat] || {};
     const dir = (inp.r ? 1 : 0) - (inp.l ? 1 : 0);
-    let vx = dir * 3.0;
     if (dir) p.face = dir;
+    p.walk = dir !== 0;
     if (p.hurt > 0) p.hurt--;
+    let vx = dir * 4.6;
     const on = p.on;
-    if (on && !on.gone && p.x + KW > on.x && p.x < on.x + on.w) {
-      p.y = on.y - KH; p.vy = 0;
-      if (on.type === "left") vx -= 1.5; else if (on.type === "right") vx += 1.5;
-      if (on.type === "flip") { on.t++; if (on.t > 26) { on.gone = true; p.on = null; } }
-      else if (on.type === "vanish") { on.t++; if (on.t > 9) { on.gone = true; p.on = null; } }
+    if (on && !on.flip && p.x + DKW > on.x + 4 && p.x < on.x + on.w - 4) {
+      p.y = on.y - DKH; p.vy = 0;
+      if (on.type === "left") vx -= 2.0; else if (on.type === "right") vx += 2.0;
     } else {
       p.on = null;
-      const prevBottom = p.y + KH;
-      p.vy = Math.min(7.5, p.vy + 0.36);
+      const prevBottom = p.y + DKH;
+      p.vy = Math.min(6.0, p.vy + 0.29);
       p.y += p.vy;
-      const bottom = p.y + KH;
-      if (p.vy > 0) {
+      const bottom = p.y + DKH;
+      if (p.vy >= 0) {
         let hit = null;
         for (const pl of sim.plats) {
-          if (pl.gone) continue;
-          if (p.x + KW > pl.x + 2 && p.x < pl.x + pl.w - 2 && bottom >= pl.y && prevBottom <= pl.y + sp + 5 && (!hit || pl.y < hit.y)) hit = pl;
+          if (pl.flip || pl.id === p.pass) continue;
+          if (p.x + DKW > pl.x + 4 && p.x < pl.x + pl.w - 4 && bottom >= pl.y && prevBottom <= pl.y + sp + 2 && (!hit || pl.y < hit.y)) hit = pl;
         }
-        if (hit) {
-          p.y = hit.y - KH; p.vy = 0; p.on = hit;
-          if (hit.id !== p.lastId) {
-            p.lastId = hit.id; p.score++;
-            if (hit.type === "spike") { p.hp -= 5; p.hurt = 30; } else p.hp = Math.min(MAXHP, p.hp + 1);
-          }
-          if (hit.type === "spring") { p.vy = -11.5; p.on = null; }
-        }
+        if (hit) land(p, hit);
       }
     }
-    p.x = Math.max(0, Math.min(W - KW, p.x + vx));
-    if (p.y < 28) {                          // 天花板的刺
-      if (p.hurt <= 0) { p.hp -= 5; p.hurt = 50; }
-      p.y = 28; p.vy = Math.max(p.vy, 1.5); p.on = null;
+    p.x = Math.max(WALL, Math.min(DW - WALL - DKW, p.x + vx));
+    if (p.y < CEIL) {                         // 被頂到天花板的刺：扣 5，從腳下的平台穿過去
+      if (p.hurt <= 0) { p.hp -= 5; p.hurt = 60; p.ev |= EV_HURT; }
+      if (p.on) { p.pass = p.on.id; p.on = null; }
+      p.y = CEIL; p.vy = Math.max(p.vy, 1);
     }
-    if (p.hp <= 0 || p.y > H + 10) kill(sim, p);
+    if (p.hp <= 0 || p.y > DH + 4) kill(sim, p);
   }
   checkEnd(sim);
 }
 
-// ───────────────────────────── 上樓梯 ─────────────────────────────
-// 人自動彈跳，只要左右移動；一路往上爬，畫面慢慢往上捲，掉到畫面下緣就淘汰。
+// ───────────────────────────── 上樓梯（目前選單沒開放）─────────────────────────────
 const UP_TYPES = [["normal", 64], ["move", 14], ["spring", 7], ["fragile", 15]];
 const GROUND = H - 30;
 
@@ -96,14 +131,13 @@ function createUp(seats) {
   const sim = { mode: "up", t: 0, nextId: 1, plats: [], ps: [], deaths: [], over: false, winner: -1, cam: 0, topY: GROUND, prevFragile: false, speed: 0 };
   sim.plats.push({ id: sim.nextId++, x: 0, x0: 0, y: GROUND, w: W, type: "normal", ph: 0, amp: 0, t: 0 });
   let k = 0;
-  for (const s of seats) sim.ps.push({ seat: s, x: 70 + (k++) * 70, y: GROUND - KH, vx: 0, vy: -11, hp: 1, alive: true, score: 0, face: 1, best: 0 });
+  for (const s of seats) sim.ps.push({ seat: s, x: 70 + (k++) * 70, y: GROUND - KH, vx: 0, vy: -11, hp: 1, alive: true, score: 0, face: 1, best: 0, ev: 0 });
   return sim;
 }
 
 function stepUp(sim, input) {
   sim.t++;
   const auto = sim.speed = Math.min(1.7, 0.25 + sim.t / 5400);
-  // 平台：移動型左右擺動、碎裂型踩過後掉落
   for (const pl of sim.plats) {
     if (pl.type === "move") pl.x = Math.max(0, Math.min(W - pl.w, pl.x0 + Math.sin(sim.t * 0.02 + pl.ph) * pl.amp * 0.5));
   }
@@ -135,9 +169,7 @@ function stepUp(sim, input) {
     p.score = p.best;
     topAlive = Math.min(topAlive, p.y);
   }
-  // 鏡頭：永遠往上，最高的人在畫面約 45% 的位置；另外有最低速度往上捲
   sim.cam = Math.min(sim.cam - auto, topAlive === Infinity ? sim.cam : topAlive - H * 0.45);
-  // 補平台
   while (sim.topY > sim.cam - 240) {
     sim.topY -= rnd(58, 108);
     const pl = upPlat(sim, sim.topY, sim.prevFragile ? "normal" : null);
@@ -152,21 +184,30 @@ function stepUp(sim, input) {
 // ───────────────────────────── 共用 ─────────────────────────────
 function kill(sim, p) {
   p.alive = false; p.hp = Math.max(0, p.hp);
+  if (sim.mode === "down") p.score = sim.floor;
+  p.ev = (p.ev || 0) | EV_DIE;
   sim.deaths.push(p.seat);
 }
 function checkEnd(sim) {
   const alive = sim.ps.filter((p) => p.alive);
   const multi = sim.ps.length >= 2;
+  if (sim.mode === "down") {
+    // 下樓梯：大家都出局才結束（最後一個人可以繼續往下挑戰紀錄），最後出局的人獲勝
+    if (alive.length === 0) { sim.over = true; if (multi) sim.winner = sim.deaths[sim.deaths.length - 1]; }
+    return;
+  }
   if (alive.length === 0 || (multi && alive.length === 1)) {
     sim.over = true;
     if (multi && alive.length === 1) sim.winner = alive[0].seat;
+    if (sim.mode === "down") for (const p of alive) p.score = sim.floor;
   }
 }
 
-export function create(mode, seats) { return mode === "up" ? createUp(seats) : createDown(seats); }
+export function create(mode, seats, opt) { return mode === "up" ? createUp(seats) : createDown(seats, opt); }
 export function step(sim, input) { return sim.mode === "up" ? stepUp(sim, input) : stepDown(sim, input); }
+export function clearEvents(sim) { for (const p of sim.ps) p.ev = 0; }
 
-// 名次：贏家第一，其餘依死亡先後（晚死的在前）；還活著（單人結束不會有）排最前
+// 名次：贏家第一，其餘依出局先後（晚出局的在前）
 export function ranking(sim) {
   const order = [];
   if (sim.winner >= 0) order.push(sim.winner);
@@ -174,11 +215,20 @@ export function ranking(sim) {
   return order.map((seat) => { const p = sim.ps.find((q) => q.seat === seat); return { seat, score: p ? p.score : 0 }; });
 }
 
+const r1 = (v) => Math.round(v * 10) / 10;
 export function snapshot(sim) {
-  const cam = sim.mode === "up" ? sim.cam : 0;
+  if (sim.mode === "down") {
+    return {
+      mode: "down", diff: sim.diff, speed: r1(sim.ready > 0 ? 0 : sim.speed), floor: sim.floor, ready: sim.ready,
+      ps: sim.ps.map((p) => ({ s: p.seat, x: r1(p.x), y: r1(p.y), hp: p.hp, a: p.alive ? 1 : 0, sc: p.alive ? sim.floor : p.score,
+                                f: p.face, h: p.hurt > 0 ? 1 : 0, g: p.on ? 1 : 0, w: p.walk ? 1 : 0, ev: p.ev || 0 })),
+      pl: sim.plats.map((p) => [p.id, Math.round(p.x), r1(p.y), p.w, p.type, p.t, p.flip ? 1 : 0, p.bounce]),
+    };
+  }
+  const cam = sim.cam;
   return {
-    mode: sim.mode, speed: Math.round(sim.speed * 100) / 100,
-    ps: sim.ps.map((p) => ({ s: p.seat, x: Math.round(p.x * 10) / 10, y: Math.round((p.y - cam) * 10) / 10, hp: p.hp, a: p.alive ? 1 : 0, sc: p.score, f: p.face, h: p.hurt > 0 ? 1 : 0, g: sim.mode === "down" ? (p.on ? 1 : 0) : (p.vy < 0 ? 0 : 1) })),
-    pl: sim.plats.map((p) => [p.id, Math.round(p.x), Math.round((p.y - cam) * 10) / 10, p.w, p.type, (p.type === "fragile" || p.type === "flip" || p.type === "vanish") ? p.t : 0]),
+    mode: "up", speed: r1(sim.speed),
+    ps: sim.ps.map((p) => ({ s: p.seat, x: r1(p.x), y: r1(p.y - cam), hp: p.hp, a: p.alive ? 1 : 0, sc: p.score, f: p.face, h: 0, g: p.vy < 0 ? 0 : 1, w: 1, ev: p.ev || 0 })),
+    pl: sim.plats.map((p) => [p.id, Math.round(p.x), r1(p.y - cam), p.w, p.type, 0, 0, 0]),
   };
 }
