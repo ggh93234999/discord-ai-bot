@@ -140,7 +140,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 
 ## 代幣系統（economy.py）
 - 賺：每分鐘最多 +10 🪙——在文字頻道發言，或掛在語音頻道（沒關耳機、不在 AFK 頻道）。新玩家起始 200。資料在 `wallet.json`，每個伺服器各自一本帳。
-- 指令：`/錢包`(wallet) `/排行`(leaderboard) `/轉帳`(pay) `/擲硬幣`(coinflip) `/骰子`(dice) `/老虎機`(slots) `/21點`(blackjack)。
+- 指令：`/規則`(rules) `/錢包`(wallet) `/排行`(leaderboard) `/轉帳`(pay) `/擲硬幣`(coinflip) `/骰子`(dice) `/老虎機`(slots) `/21點`(blackjack)。
 - 老虎機：三個一樣 5~50 倍，兩個一樣退錢（理論回報率約 95%）；21 點 Blackjack 賠 1.5 倍；其餘賭局公平。
 - 21 點開局先扣賭注，機器人若在牌局中重啟，該局賭注會損失。
 - `/發錢 對象 金額`（give）：機器人擁有者專用，直接發代幣。

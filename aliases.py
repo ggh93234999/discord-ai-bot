@@ -74,6 +74,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
            {"則數": ("count", "How many recent messages (default 100, max 500)"),
             "重點": ("focus", "What to focus on (optional)")}),
     "錢包": ("wallet", "See how many tokens you (or someone else) have", {"對象": ("user", "Whose wallet (default: yours)")}),
+    "規則": ("rules", "How the token games work: payouts, odds and rules", {"遊戲": ("game", "Which game (default: all)")}),
     "排行": ("leaderboard", "Token leaderboard for this server (top 10)", {}),
     "轉帳": ("pay", "Give some of your tokens to someone",
            {"對象": ("user", "Who to pay"), "金額": ("amount", "How many tokens")}),
@@ -83,7 +84,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "擲硬幣": ("coinflip", "Call heads or tails: win doubles your bet, lose it all",
             {"猜": ("guess", "Heads or tails"), "賭注": ("bet", "How many tokens to bet")}),
     "骰子": ("dice", "Roll two dice against the bot: higher wins, tie refunds", {"賭注": ("bet", "How many tokens to bet")}),
-    "老虎機": ("slots", "Slot machine: three of a kind pays big (up to 50x), a pair refunds your bet",
+    "老虎機": ("slots", "Slot machine: 3 cells, 3x3 or 4x4 grid, more lines pay more (see /rules)",
             {"賭注": ("bet", "How many tokens to bet"), "格數": ("cells", "3 = single row, 9 = 3x3 grid, 16 = 4x4 grid")}),
     "21點": ("blackjack", "Play blackjack against the dealer (blackjack pays 3:2)", {"賭注": ("bet", "How many tokens to bet")}),
     "重置": ("reset", "Make the bot forget this channel's conversation so far and start fresh", {}),
@@ -92,7 +93,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
 }
 
 CHOICE_EN = {
-    "開": "on", "關": "off", "3 格（單排）": "3 cells (single row)", "9 格（3×3）": "9 cells (3x3)", "16 格（4×4）": "16 cells (4x4)", "正面": "heads", "反面": "tails", "文字": "text", "語音": "voice",
+    "開": "on", "關": "off", "3 格（單排）": "3 cells (single row)", "9 格（3×3）": "9 cells (3x3)", "16 格（4×4）": "16 cells (4x4)", "正面": "heads", "反面": "tails", "全部": "all", "代幣怎麼賺": "how to earn tokens", "老虎機": "slots", "21點": "blackjack", "賽馬": "horse race", "擲硬幣": "coin flip", "骰子": "dice", "文字": "text", "語音": "voice",
     "封存（可還原）": "archive (restorable)", "解除封存": "unarchive", "刪除（永久）": "delete (permanent)",
 }
 
