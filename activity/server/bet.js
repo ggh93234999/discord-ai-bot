@@ -47,7 +47,14 @@ async function bot(path, body) {
 }
 export const botInfo = (uid) => bot("/wallet/info", { gid: GUILD_ID, uid });
 export const botSettle = (uid, name, bet, back, why) => bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet, back, why });
-export const botPay = (uid, name, amount, why) => bot("/wallet/pay", { gid: GUILD_ID, uid, name, amount, why });
+// 派彩：優先用機器人的 /wallet/pay；機器人還沒更新（沒有這個介面）時，改用 settle 湊出同樣的淨額（押 1 拿回 amount+1）
+export async function botPay(uid, name, amount, why) {
+  try {
+    const r = await bot("/wallet/pay", { gid: GUILD_ID, uid, name, amount, why });
+    if (r && (r.ok || r.error === "no_guild" || r.error === "bad_amount")) return r;
+  } catch {}
+  return bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet: 1, back: amount + 1, why });
+}
 
 // ---- HTTP：POST /api/token { code } → { token, name }
 const hits = new Map();   // 每個來源 IP 每分鐘最多 8 次

@@ -4,7 +4,7 @@
 // 託管中的賭注會記在 escrow.json，伺服器如果在比賽途中重啟，啟動時會把賭注全額退回。
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { botSettle, botPay } from "./bet.js";
+import { botSettle, botPay, botInfo } from "./bet.js";
 
 export const WAGERS = [10, 50, 100, 500];
 export const GRACE_MS = 30000;      // 賭注比賽中斷線，給 30 秒回來，沒回來就算輸
@@ -79,7 +79,13 @@ export async function acceptOffer(room, ws, role, rebroadcast) {
   let err = null;
   const taken = [];
   try {
+    // 兩邊都要留至少 1 個代幣（派彩備援用），先確認餘額
     for (const p of [A, B]) {
+      const i = await botInfo(p.uid);
+      if (!i.ok) { err = i.error || "bot_down"; break; }
+      if (i.balance < amount + 1) { err = p === A ? "opp_broke" : "you_broke"; break; }
+    }
+    if (!err) for (const p of [A, B]) {
       const r = await botSettle(p.uid, p.name, amount, 0, "對賭押金");
       if (!r.ok) { err = r.error === "insufficient" ? (p === A ? "opp_broke" : "you_broke") : (r.error || "bot_down"); break; }
       taken.push(p);
