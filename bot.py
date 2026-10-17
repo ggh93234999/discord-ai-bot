@@ -107,6 +107,7 @@ TOOL_GUIDE = (
     "看對話紀錄時，只有真的出現工具呼叫和工具結果的，才代表你做過；你嘴巴說過但沒有工具紀錄的，等於沒做。"
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
     "因為結果會自動附上，你自己的回覆簡短一句就好。"
+    "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
 OFFLINE_REPLY = "⚠️ 模型那台電腦現在沒開或連不到，晚點再試。"
 ERROR_REPLY = "抱歉，我這邊出了點問題，等等再試一次。"
@@ -354,7 +355,7 @@ async def build_conversation(channel) -> list[dict]:
             logged = action_log.get(str(msg.id))
             if text and not logged and not had_line and CLAIM_RE.search(text):
                 # 以前說「做好了」但沒有任何實際動作紀錄的回覆：是假的，別讓模型照抄
-                text = "（這則回覆說做了某件事，但其實沒有實際執行，內容不可信）"
+                text = "（較早的回覆，略）"
             if logged:
                 ids = [f"call_{msg.id}_{i}" for i in range(len(logged))]
                 turns.append({"role": "assistant", "content": [], "tool_calls": [
@@ -640,29 +641,44 @@ def clean_text(text: str | None) -> str:
 ACTION_TOOLS = {"music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
 CLAIM_RE = re.compile(
     r"(建好|開好|建立好|創好|已經?(建立|開(?!始|心|學)|建|創|封存|解除|刪|移除|清空|鎖|隱藏|放(?!學|假)|播|加入|跳過|暫停|停止)|"
-    r"(封存|鎖|藏|開|建|創)(起來|好)了|頻道.{0,6}(好了|完成)|幫你(放|播|點|排|開|建|封存|搬|移|改)|正在播放|開始播放|搞定|排(了|好|進|入)|已排|"
-    r"(點|放|播|來)(了|一首|首|首歌)|給你(放|播|點)|播放中|加入佇列|放進佇列|(搬|移|改)(好|過去)了|(移|拿|刪)掉了|從佇列|狀態(改|設)(好|成|為)|(改|設)好(狀態|了))"
+    r"(封存|鎖|藏|開|建|創)(起來|好)了|頻道.{0,6}(好了|完成)|幫你(放|播|點|排|開|建|封存|搬|移|改)|正在播放|開始播放|排(好了|進|入)|已排|"
+    r"(點|放|播)了(一|兩|三|[0-9]+)?首|(點|放|播|來)(一首|首歌)|給你(放|播|點)|播放中|加入佇列|放進佇列|(搬|移|改)(好|過去)了|(移|拿|刪)掉了|從佇列|狀態(改|設)(好|成|為)|(改|設)好(狀態|了))"
 )
 PLAYING_CLAIM_RE = re.compile(r"(正在|還在|現在|已經|持續|目前).{0,6}(播|放)|在播|播放中|佇列(裡|中).{0,4}(有|還有)|在語音(頻道)?(裡|中)|(下一首|接下來).{0,6}(是|會)")
+INTERNAL = ("（這是程式內部的檢查，使用者看不到，也不知道有這回事。請直接寫給使用者看的最終回覆，"
+            "不要提到「系統檢查」「沒做任何動作」「沒呼叫工具」之類的話，也不要解釋你為什麼重寫。）\n")
 STATE_NUDGE = (
+    INTERNAL +
     "（系統檢查）你說了有關播放的狀態，但實際上機器人現在沒有在播歌。{state}\n"
     "請依真實狀態重寫回覆；如果使用者想聽歌，就呼叫 music 工具 play，不要說已經在播。"
 )
 MULTI_NUDGE = (
+    INTERNAL +
     "（系統檢查）你的回覆提到了 {said} 首歌，但你這一輪只呼叫了 {real} 次 music play，所以其餘的歌其實沒有排進佇列。"
     "music 的 play 一次只能點一首：請把還沒點的歌各呼叫一次 music play（可以同時呼叫多個），"
     "之後只能說真的點成功的歌。"
 )
 
 TITLE_NUDGE = (
+    INTERNAL +
     "（系統檢查）你提到了歌名，但這一輪沒有呼叫 music 工具，所以沒有任何歌被點進佇列。"
     "如果使用者要聽歌，現在每首各呼叫一次 music play；如果只是在推薦，就明講是推薦、還沒點，不要說已經排了或在播。"
 )
 NUDGE = (
+    INTERNAL +
     "（系統檢查）你剛才的回覆說已經完成某個動作，但你這一輪並沒有呼叫任何工具，所以實際上什麼都沒發生。"
     "如果使用者要你放歌、開頻道或封存，現在就呼叫對應的工具；"
     "如果其實不需要做動作，就重寫回覆，不要說已經完成。"
 )
+
+
+META_RE = re.compile(r"[^。！？!?\n]*(系統檢查|沒做任何動作|沒有做任何動作|沒說自己做了|沒有說自己做了|沒呼叫(任何)?工具|沒有呼叫(任何)?工具|純聊天啦)[^。！？!?\n]*[。！？!?～~]*")
+
+
+def strip_meta(text: str) -> str:
+    """模型偶爾會把內部檢查的事講出來，這裡把那幾句拿掉（全拿光就留原文，不回空字串）。"""
+    out = META_RE.sub("", text).strip()
+    return out or text
 
 
 async def ask_model(conversation: list[dict], on_status=None, msg: discord.Message | None = None,
@@ -707,7 +723,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
                 messages.append({"role": "assistant", "content": text})
                 messages.append({"role": "user", "content": MULTI_NUDGE.format(said=len(titles), real=play_calls)})
                 continue
-            return text
+            return strip_meta(text)
         if any(c.get("function", {}).get("name") == "music_status" for c in calls):
             used_status = True
         if any(c.get("function", {}).get("name") in ACTION_TOOLS for c in calls):
@@ -729,7 +745,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
             messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": result})
     # 沒開工具，或工具輪數用完：不給工具，直接要答案
     reply = await call_model(messages, use_tools=False)
-    return ACTION_LINE_RE.sub("", clean_text(reply.get("content"))).strip()
+    return strip_meta(ACTION_LINE_RE.sub("", clean_text(reply.get("content"))).strip())
 
 
 # ---------------------------------------------------------------- 回覆訊息
