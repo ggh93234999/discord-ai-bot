@@ -538,42 +538,53 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         n = balance(interaction.guild_id, who.id)
         await interaction.response.send_message(f"{COIN} **{who.display_name}** 有 {fmt(n)}")
 
-    def rules_text(which: str) -> str:
-        triple = "、".join(f"{k}×{v}" for k, v in SLOT_TRIPLE.items())
-        g3 = "、".join(f"{k}×{v}" for k, v in GRID_PAY[3].items())
-        g4 = "、".join(f"{k}×{v}" for k, v in GRID_PAY[4].items())
-        R = {
-            "coin": f"**🪙 /擲硬幣**\n猜正面或反面，猜中拿回賭注的 2 倍（淨賺一份），猜錯輸掉賭注。公平 50/50。",
-            "dice": f"**🎲 /骰子**\n你和機器人各擲兩顆骰子，點數加總大的贏：贏了淨賺一份賭注，輸了賠掉，一樣大就退錢。",
-            "slots": (
-                "**🎰 /老虎機**　三種格數，結果都在按下去的瞬間用真亂數決定，動畫只是演出。\n"
-                f"**3 格（單排）**：三個一樣拿回倍率（{triple}），只有兩個一樣退回賭注，其他全輸。\n"
-                f"**9 格（3×3）**：只有 🍒🍋🔔💎 四種圖案。橫 3 條、直 3 條、斜 2 條共 8 條線，一條線三個一樣就中，倍率 {g3}，"
-                "同一把可以同時中好幾條、倍率加起來。約 41% 的把數會賺錢。\n"
-                f"**16 格（4×4）**：8 種圖案，任何方向連續 3 格一樣都算一條線，倍率 {g4}，可同時中很多條。\n"
-                "拿回的是「含本金的倍數」，例如賭 100 中 1.2 倍拿回 120。各版本長期回報率約 94～95%。"
-            ),
-            "bj": (
-                "**🃏 /21點**\n"
-                "目標是點數比莊家大，但不能超過 21（爆牌就輸）。A 算 1 或 11，J/Q/K 算 10。\n"
-                "開局你拿兩張，莊家一張明牌一張蓋牌。按「要牌」多拿一張，按「停牌」結束輪到莊家，莊家 16 點以下一直補牌、17 點以上停。\n"
-                "贏了淨賺一份賭注；一開始就是 21（A+10 點牌）叫 Blackjack，賠 1.5 倍；點數一樣平手退錢；爆牌或比莊家小就輸。"
-            ),
-            "horse": (
-                "**🏇 /賽馬**\n"
-                "開一場後有一段時間可以下注（預設 40 秒），每人一注，按馬名下注、輸入金額；重按別匹馬會改注（賭注退回再重下）。\n"
-                "每匹馬有速度、耐力、爆發、穩定、狀態等數值和最近戰績，面板上也會顯示勝率。賠率 = 0.95 ÷ 勝率，所以強馬賠得少、冷門賠得多，"
-                "賠率是「含本金的倍數」，押中拿回 賭注×賠率，莊家抽 5%。名次由比賽模擬跑出來，不是純亂數。"
-            ),
-            "coins": (
-                f"**💰 代幣**\n新玩家起始 {fmt(START_COINS)}。每分鐘最多賺 {fmt(EARN_AMOUNT)}：在文字頻道發言，或掛在語音頻道"
-                "（沒關耳機、不在 AFK 頻道）都算，兩邊合起來每分鐘最多一份。可以用 /錢包 查餘額、/排行 看排行榜、/轉帳 給別人。"
-                "錢輸光了不會變負的，只是歸零，繼續聊天就會慢慢賺回來。"
-            ),
+    def rules_embeds(which: str) -> list[discord.Embed]:
+        def table(d: dict) -> str:
+            return "　".join(f"{k} ×{v}" for k, v in d.items())
+
+        def mk(title: str, desc: str, color, fields: list[tuple[str, str]], foot: str | None = None) -> discord.Embed:
+            e = discord.Embed(title=title, description=desc, color=color)
+            for n, v in fields:
+                e.add_field(name=n, value=v, inline=False)
+            if foot:
+                e.set_footer(text=foot)
+            return e
+
+        gold, green, red, blue, purple = (discord.Color.gold(), discord.Color.green(), discord.Color.red(),
+                                          discord.Color.blurple(), discord.Color.purple())
+        E = {
+            "coins": mk("💰 代幣", f"新玩家起始 **{fmt(START_COINS)}**", gold, [
+                ("怎麼賺", f"▸ 文字頻道發言，或掛在語音頻道（沒關耳機、不在 AFK 頻道）\n▸ 每分鐘最多 **+{EARN_AMOUNT}**，文字和語音合起來算一份"),
+                ("怎麼用", "▸ `/錢包` 看餘額　`/排行` 排行榜　`/轉帳` 給別人\n▸ 拿去玩下面的小遊戲"),
+                ("輸光了？", "只會歸零不會變負，繼續聊天就會慢慢賺回來。"),
+            ]),
+            "coin": mk("🪙 擲硬幣　`/擲硬幣`", "最簡單的 50/50。", blue, [
+                ("玩法", "選正面或反面，下賭注。"),
+                ("結果", "▸ 猜中：拿回 **2 倍**（淨賺一份賭注）\n▸ 猜錯：輸掉賭注"),
+            ]),
+            "dice": mk("🎲 骰子　`/骰子`", "跟機器人比大小。", blue, [
+                ("玩法", "你和機器人各擲兩顆骰子，點數加總比大小。"),
+                ("結果", "▸ 你比較大：淨賺一份賭注\n▸ 你比較小：輸掉賭注\n▸ 一樣大：賭注退回"),
+            ]),
+            "slots": mk("🎰 老虎機　`/老虎機 賭注 [格數]`", "按下去的瞬間用真亂數決定結果，動畫只是演出。\n倍率是「**含本金**拿回幾倍」：賭 100、中 1.2 倍 → 拿回 120。", red, [
+                ("3 格（單排）", f"三個一樣：{table(SLOT_TRIPLE)}\n只有兩個一樣：**退回賭注**\n其他：輸"),
+                ("9 格（3×3）　約 41% 的把數會賺", f"4 種圖案。橫 3 條 + 直 3 條 + 斜 2 條，共 **8 條線**，一條線三個一樣就中。\n倍率：{table(GRID_PAY[3])}\n同一把可以中好幾條，倍率**加起來**。"),
+                ("16 格（4×4）", f"8 種圖案。**任何方向連續 3 格**一樣都算一條線。\n倍率：{table(GRID_PAY[4])}\n同樣可以同時中很多條。"),
+            ], "各版本長期回報率約 94～95%"),
+            "bj": mk("🃏 21點　`/21點 賭注`", "點數比莊家大，但不能超過 21。", green, [
+                ("點數", "A 算 1 或 11　J / Q / K 算 10　其他照牌面"),
+                ("流程", "▸ 開局你兩張牌，莊家一明一暗\n▸ ➕ 要牌：再拿一張（超過 21 就爆牌輸）\n▸ ✋ 停牌：換莊家，**16 點以下補牌、17 點以上停**"),
+                ("結果", "▸ 贏：淨賺一份賭注\n▸ 🌟 Blackjack（開局 A + 10 點牌）：賠 **1.5 倍**\n▸ 點數一樣：退回賭注\n▸ 爆牌或比莊家小：輸"),
+            ]),
+            "horse": mk("🏇 賽馬　`/賽馬`", "大家一起押馬，跑完依賠率分錢。", purple, [
+                ("下注", "▸ 開一場後有一段時間下注（預設 40 秒）\n▸ 按馬名按鈕、輸入金額，**每人一注**\n▸ 想改注：按別匹馬，賭注會退回再重下"),
+                ("看數值", "每匹馬有速度、耐力、爆發、穩定、狀態和近期戰績，面板上有勝率。"),
+                ("賠率", "**賠率 = 0.95 ÷ 勝率**（含本金的倍數）\n強馬賠得少、冷門賠得多，莊家抽 5%。\n押中拿回 賭注 × 賠率。"),
+                ("名次", "由比賽模擬跑出來，有能力差距也有運氣，不是純亂數。"),
+            ]),
         }
-        if which == "all":
-            return "\n\n".join(R[k] for k in ("coins", "coin", "dice", "slots", "bj", "horse"))
-        return R[which]
+        order = ["coins", "coin", "dice", "slots", "bj", "horse"]
+        return [E[k] for k in order] if which == "all" else [E[which]]
 
     @tree.command(name="規則", description="看賭博小遊戲和代幣的規則、賠率")
     @app_commands.describe(遊戲="要看哪個，不選就是全部")
@@ -583,8 +594,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                               app_commands.Choice(name="骰子", value="dice")])
     async def cmd_rules(interaction: discord.Interaction, 遊戲: app_commands.Choice[str] = None):
         which = 遊戲.value if 遊戲 else "all"
-        await interaction.response.send_message(embed=discord.Embed(title="📖 遊戲規則", description=rules_text(which)[:4000],
-                                                                    color=discord.Color.blurple()), ephemeral=True)
+        await interaction.response.send_message(embeds=rules_embeds(which), ephemeral=True)
 
     @tree.command(name="排行", description="本伺服器代幣排行榜（前 10 名）")
     @app_commands.guild_only()
