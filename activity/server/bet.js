@@ -46,7 +46,8 @@ async function bot(path, body) {
   return r.json();
 }
 export const botInfo = (uid) => bot("/wallet/info", { gid: GUILD_ID, uid });
-export const botSettle = (uid, name, bet, back) => bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet, back });
+export const botSettle = (uid, name, bet, back, why) => bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet, back, why });
+export const botPay = (uid, name, amount, why) => bot("/wallet/pay", { gid: GUILD_ID, uid, name, amount, why });
 
 // ---- HTTP：POST /api/token { code } → { token, name }
 const hits = new Map();   // 每個來源 IP 每分鐘最多 8 次

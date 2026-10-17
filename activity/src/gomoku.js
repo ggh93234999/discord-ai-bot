@@ -1,3 +1,4 @@
+import { createWager } from "./wager.js";
 // 五子棋（兩人，透過 WebSocket 同步）
 const SIZE = 15;
 
@@ -15,6 +16,7 @@ export function mountGomoku(root, { env, back }) {
     <div class="game gomoku">
       <header><button class="back">← 選單</button><h2>五子棋</h2><span class="watch"></span></header>
       <div class="status">連線中…</div>
+      <div class="wager"></div>
       <div class="cwrap"><canvas></canvas></div>
       <div class="actions"><button class="resign" hidden>認輸</button><button class="again" hidden>再來一局（黑白互換）</button></div>
     </div>`;
@@ -22,14 +24,15 @@ export function mountGomoku(root, { env, back }) {
   const canvas = $("canvas"), ctx = canvas.getContext("2d");
   const statusEl = $(".status"), resignBtn = $(".resign"), againBtn = $(".again"), watchEl = $(".watch");
   $(".back").addEventListener("click", back);
+  const wg = createWager(root, { env, getWs: () => ws, getSt: () => st });
 
   let st = null, ws = null, closed = false, retry = 0, hover = null;
   let cell = 30, pad = 18;
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
-    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", room: env.instanceId })); };
-    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === "state") { st = m; render(); } };
+    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", room: env.instanceId })); wg.onOpen(); };
+    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === "state") { st = m; render(); wg.update(); } else wg.onMsg(m); };
     ws.onclose = () => {
       if (closed) return;
       statusEl.textContent = "連線中斷，重新連線…";

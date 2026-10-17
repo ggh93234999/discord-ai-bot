@@ -6,6 +6,7 @@ import { WebSocketServer } from "ws";
 import { handleApi, getSession, botInfo, botSettle } from "./bet.js";
 import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
+import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -62,7 +63,7 @@ function broadcast(room) {
       t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
       line: room.line, last: room.last, moves: room.moves,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
-      speed: room.speed, ping: room.ping,
+      speed: room.speed, ping: room.ping, ...wagerView(room),
       vb: room.vb ? snapshotVb(room.vb) : undefined,
       pika: room.pika ? snapshotPika(room.pika) : undefined,
     });
@@ -70,9 +71,14 @@ function broadcast(room) {
 }
 
 function assignSeat(room, ws) {
-  if (!room.players.b) room.players.b = ws;
-  else if (!room.players.w) room.players.w = ws;
+  for (const c of ["b", "w"]) {
+    if (room.players[c]) continue;
+    if (seatReserved(room, c, ws)) continue;     // 對賭中，空出來的座位留給原本的人
+    room.players[c] = ws;
+    return;
+  }
 }
+const rebroadcast = (room) => () => broadcast(room);
 
 function place(room, role, m) {
   if (room.game === "gomoku") {
@@ -110,6 +116,7 @@ const httpServer = http.createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ server: httpServer, path: "/ws", maxPayload: 4096 });
+recoverEscrow().catch((e) => console.log("escrow 還原失敗", e.message));
 httpServer.listen(PORT, "127.0.0.1");
 
 wss.on("connection", (ws) => {
@@ -129,6 +136,7 @@ wss.on("connection", (ws) => {
       const s = getSession(m.token);
       if (!s) return send(ws, { t: "bauthed", ok: false });
       ws.user = s;
+      if (ws.room && roleOf(ws.room, ws) === "s" && reclaimSeat(ws.room, ws)) broadcast(ws.room);
       botInfo(s.uid)
         .then((r) => send(ws, { t: "bauthed", ok: !!r.ok, balance: r.balance, name: s.name }))
         .catch(() => send(ws, { t: "bauthed", ok: false, error: "bot_down" }));
@@ -183,11 +191,16 @@ wss.on("connection", (ws) => {
       if (room.game === "vb" || room.game === "pika") return;
       if (role === "s" || room.winner || room.turn !== role) return;
       if (!room.players.b || !room.players.w) return;     // 要兩個人都到了才能下
+      if (room.busy) return;                               // 押金還在扣款
       if (!place(room, role, m)) return;
+      if (room.offer) clearOffer(room);                    // 開始下棋就取消還沒人接的賭注
       if (!room.winner) room.turn = role === "b" ? "w" : "b";
+      else settleWager(room, rebroadcast(room));
       broadcast(room);
     } else if (m.t === "again") {
       if (role === "s" || !room.winner) return;
+      if (room.wager && !room.wager.settled) return;
+      room.wager = null; room.wresult = null; room.offer = null;
       // 重新開局，先後手互換
       const { b, w } = room.players;
       Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0 });
@@ -214,7 +227,15 @@ wss.on("connection", (ws) => {
       if (role === "s" || room.winner) return;
       room.winner = role === "b" ? "w" : "b";
       room.line = null;
+      settleWager(room, rebroadcast(room));
       broadcast(room);
+    } else if (m.t === "woffer") {
+      const e = makeOffer(room, ws, role, Number(m.amount));
+      if (e) send(ws, { t: "werr", error: e }); else broadcast(room);
+    } else if (m.t === "wcancel") {
+      if (room.offer && role !== "s" && !room.busy) { clearOffer(room); broadcast(room); }
+    } else if (m.t === "waccept") {
+      acceptOffer(room, ws, role, rebroadcast(room)).then((e) => { if (e) send(ws, { t: "werr", error: e }); broadcast(room); });
     }
   });
 
@@ -222,7 +243,11 @@ wss.on("connection", (ws) => {
     const room = ws.room;
     if (!room) return;
     room.clients.delete(ws);
-    for (const c of ["b", "w"]) if (room.players[c] === ws) { room.players[c] = null; room.input[c] = {}; room.ping[c] = null; }
+    for (const c of ["b", "w"]) if (room.players[c] === ws) {
+      room.players[c] = null; room.input[c] = {}; room.ping[c] = null;
+      if (room.offer && room.offer.by === c) room.offer = null;
+      onPlayerLeft(room, c, rebroadcast(room));
+    }
     // 有旁觀者就遞補空位
     for (const w of room.clients) if (roleOf(room, w) === "s") assignSeat(room, w);
     if (room.clients.size === 0) room.emptySince = Date.now();

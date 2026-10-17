@@ -577,12 +577,32 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "insufficient", "balance": have})
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, back - bet, name)   # 同一個事件迴圈裡，沒有 await，不會被別的請求插隊
-            log.info("Activity 老虎機結算：%s 賭 %s 拿回 %s → 餘額 %s", name, bet, back, new)
+            log.info("Activity %s結算：%s 賭 %s 拿回 %s → 餘額 %s", str(d.get("why") or "老虎機")[:20], name, bet, back, new)
+            return web.json_response({"ok": True, "balance": new})
+
+        async def pay(request):
+            # 對賭派彩／退款：把錢加給玩家（賭注先前已經用 settle 扣掉）
+            p = await parse(request)
+            if not p:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            gid, uid, d = p
+            try:
+                amount = int(d["amount"])
+            except Exception:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            if not (1 <= amount <= 2000):
+                return web.json_response({"ok": False, "error": "bad_amount"}, status=400)
+            if not guild_ok(gid):
+                return web.json_response({"ok": False, "error": "no_guild"})
+            name = str(d.get("name") or uid)[:80]
+            new = add(gid, uid, amount, name)
+            log.info("Activity %s派彩：%s +%s → 餘額 %s", str(d.get("why") or "")[:20], name, amount, new)
             return web.json_response({"ok": True, "balance": new})
 
         app = web.Application(middlewares=[auth])
         app.router.add_post("/wallet/info", info)
         app.router.add_post("/wallet/settle", settle)
+        app.router.add_post("/wallet/pay", pay)
         runner = web.AppRunner(app)
         await runner.setup()
         await web.TCPSite(runner, "127.0.0.1", 3107).start()

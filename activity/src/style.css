@@ -97,3 +97,9 @@ canvas { max-width:100%; border-radius:6px; touch-action:manipulation; cursor:po
 .slots .confirm{margin:8px auto;max-width:360px;padding:10px;border:1px solid #c0392b;border-radius:8px;background:#2a1d1d;text-align:center}
 .slots .confirm[hidden]{display:none}
 .slots .cbtns{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.gomoku .wager{width:100%;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;min-height:0;font-size:14px}
+.gomoku .wager:empty{display:none}
+.gomoku .wager.live{background:#2a2410;border:1px solid #c9a227;border-radius:8px;padding:6px 10px}
+.gomoku .wager .wline{width:100%;text-align:center}
+.gomoku .wager button{padding:6px 14px;border-radius:8px;border:1px solid #556;background:#2a2d3a;color:#fff;cursor:pointer;font-weight:700}
+.gomoku .wager button.yes{background:#c0392b;border-color:#c0392b}

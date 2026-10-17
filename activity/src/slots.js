@@ -41,7 +41,7 @@ export function mountSlots(root, { env, back }) {
 
   let kind = KINDS[1], bet = 50, ws = null, closed = false, retry = 0, busy = false, pending = false, muted = false;
   let cell = 64, last = null;
-  let mode = "practice", session = null, practiceBal = null, realBal = null, wantReal = false;
+  let mode = "practice", session = env.session || null, practiceBal = null, realBal = null, wantReal = false;
   const timers = [];
   const real = () => mode === "real";
   const cur = () => (real() ? realBal : practiceBal);
@@ -134,7 +134,7 @@ export function mountSlots(root, { env, back }) {
         const j = await r.json().catch(() => ({}));
         if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用賭注模式"; return; }
         if (!r.ok || !j.token) { statusEl.textContent = "登入失敗，請再試一次（" + (j.error || r.status) + "）"; return; }
-        session = { token: j.token, name: j.name };
+        session = { token: j.token, name: j.name }; env.session = session;
       }
       wantReal = true;
       send({ t: "bauth", token: session.token });
@@ -144,7 +144,7 @@ export function mountSlots(root, { env, back }) {
   }
   function onAuthed(m) {
     if (!m.ok) {
-      session = null;
+      session = null; env.session = null;
       if (wantReal) { wantReal = false; statusEl.textContent = m.error === "bot_down" ? ERR.bot_down : "登入已失效，請重新開啟賭注模式"; }
       if (real()) setMode("practice");
       return;
