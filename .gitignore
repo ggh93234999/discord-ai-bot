@@ -18,3 +18,6 @@ _old_claude_api/
 # 只在自己伺服器用的部署檔（含使用者名稱與路徑）
 update-ytdlp.sh
 discord-bot.service
+
+# LF2 連線版（含原版素材）
+lf2-online/

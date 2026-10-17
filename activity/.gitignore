@@ -14,3 +14,7 @@ public/resources/
 server/.dc_oauth.txt
 server/internal.key
 server/escrow.json
+
+# 小朋友齊打交（LF2）：原版素材與相關程式不上傳
+src/lf2.js
+LF2_HEADLESS_API.md

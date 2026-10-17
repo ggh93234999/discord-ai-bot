@@ -2,11 +2,14 @@ import { DiscordSDK } from "@discord/embedded-app-sdk";
 import "./style.css";
 import { mountGomoku } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";
-import { mountPikachu } from "./pikachu.js";
-import { mountPikachuOnline } from "./pikachu_online.js";
 import { mountSlots } from "./slots.js";
 import { mountDown } from "./stairs.js";
-import { mountLf2 } from "./lf2.js";
+
+// 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
+const optional = import.meta.glob(["./pikachu.js", "./pikachu_online.js", "./lf2.js"], { eager: true });
+const mountPikachu = optional["./pikachu.js"]?.mountPikachu;
+const mountPikachuOnline = optional["./pikachu_online.js"]?.mountPikachuOnline;
+const mountLf2 = optional["./lf2.js"]?.mountLf2;
 
 // ---------- Discord SDK（在 Discord 裡才啟動；一般瀏覽器開也能玩）
 const clientId = import.meta.env.VITE_CLIENT_ID;
@@ -31,7 +34,7 @@ const GAMES = [
   { id: "slots", icon: "🎰", name: "老虎機", desc: "轉輪拉霸，練習模式隨便玩", mount: mountSlots },
   { id: "pika2", icon: "⚡", name: "皮卡丘排球 2P", desc: "兩人連線對戰，伺服器運算", mount: mountPikachuOnline },
   { id: "lf2", icon: "🥋", name: "小朋友齊打交", desc: "連線對戰 / 闖關，最多 8 角色", mount: mountLf2 },
-];
+].filter((g) => typeof g.mount === "function");
 
 function showMenu() {
   app.innerHTML = `
