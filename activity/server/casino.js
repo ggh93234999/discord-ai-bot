@@ -138,7 +138,7 @@ export function casinoClose(ws) {
 }
 
 // ---- 賽馬（全房一起押的回合）
-const HORSE_POOL = ["赤兔", "烏騅", "的盧", "絕影", "爪黃飛電", "踏雪", "照夜玉獅子", "追風", "青驄", "黃驃", "驊騮", "飛黃"];
+const HORSE_POOL = ["赤兔", "烏騅", "的盧", "絕影", "爪黃飛電", "踏雪", "照夜玉獅子", "追風", "驊騮", "飛黃"];
 const FORMS = [["🔥 絕佳", 7], ["😀 良好", 3], ["😐 普通", 0], ["😓 欠佳", -4], ["🤕 低迷", -8]];
 const FORM_W = [10, 30, 35, 18, 7];
 function pickWeighted(w) { let r = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; } return w.length - 1; }
