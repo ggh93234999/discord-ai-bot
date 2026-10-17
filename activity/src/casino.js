@@ -229,7 +229,8 @@ export function mountCasino(game, opts = {}) {
     // ---- 賽馬（全房一起押）
     // 畫面分三塊：標題（倒數）、主區（馬匹清單或跑道）、下注名單。各塊只在內容真的變了才重畫，避免閃爍和版面跳動。
     const myBet = () => (hs && you ? hs.bets.find((b) => b.id === you) : null);
-    let hsig = { main: "", bets: "", round: "" }, hz = [], laneW = 0;
+    let hsig = { main: "", bets: "", round: "" };
+    let rcv = null, rctx = null, rW = 340, rH = 332, rparts = [], rseed = [], rconf = "";
     function onHorse(m) {
       const first = !hs || hs.id !== m.id;
       hs = m; skew = m.now - Date.now(); busy = false;
@@ -253,7 +254,7 @@ export function mountCasino(game, opts = {}) {
 
       head.innerHTML = hs.phase === "bet" ? `第 ${hs.no} 場　<b class="cd">--</b>` : hs.phase === "run" ? `第 ${hs.no} 場　🏇 比賽進行中！` : `第 ${hs.no} 場　🏆 ${esc(hs.names[hs.win])} 奪冠！`;
 
-      const msig = hs.phase === "bet" ? ["bet", hs.id, horseSel, mine ? mine.idx : -1, per.join()].join("|") : [hs.phase, hs.id, mine ? mine.idx : -1].join("|");
+      const msig = hs.phase === "bet" ? ["bet", hs.id, horseSel, mine ? mine.idx : -1, per.join()].join("|") : ["track", hs.id, mine ? mine.idx : -1].join("|");
       if (msig !== hsig.main) {
         hsig.main = msig;
         if (hs.phase === "bet") {
@@ -261,8 +262,7 @@ export function mountCasino(game, opts = {}) {
             `<button class="hrow ${horseSel === i ? "sel" : ""} ${mine && mine.idx === i ? "mine" : ""}" data-i="${i}"><b>${i + 1}</b><span>${esc(n)}</span><em>${hs.forms[i]}${per[i] ? `　👥${per[i]}` : ""}</em><i>${hs.odds[i]}x</i>${horseInfo(i)}</button>`).join("")}</div>`;
           main.querySelectorAll(".hrow").forEach((r) => r.addEventListener("click", () => { if (busy || myBet() || hs.phase !== "bet") return; horseSel = Number(r.dataset.i); renderHorse(); draw(); }));
         } else {
-          main.innerHTML = `<div class="track">${hs.names.map((n, i) => `<div class="lane ${mine && mine.idx === i ? "mine" : ""}"><span class="ln">${i + 1} ${esc(n)}</span><span class="hz">🐎</span><span class="fin">🏁</span></div>`).join("")}</div>`;
-          hz = [...main.querySelectorAll(".hz")]; laneW = main.querySelector(".lane").clientWidth - 90;
+          main.innerHTML = `<canvas class="rcv"></canvas>`; rcv = main.querySelector("canvas"); sizeRace(); initRace();
         }
       }
 
@@ -288,20 +288,102 @@ export function mountCasino(game, opts = {}) {
         statusEl.textContent = hs.phase === "run" ? "🏇 開跑！" : m ? (m.back > 0 ? `🎉 押中了！+${money(m.back - m.bet)}` : `😢 沒押中 -${money(m.bet)}`) : `🏆 ${hs.names[hs.win]} 奪冠`;
       } else hsig.round = "";
     }
-    function animateRace() {
-      const frame = () => {
-        if (closed || !hs || hs.phase === "bet") return;
-        const t = serverNow() - hs.startAt; let all = true;
-        for (let i = 0; i < hz.length; i++) {
-          const p = Math.max(0, Math.min(1, t / hs.times[i])), wob = p > 0 && p < 1 ? Math.sin(t / 180 + i * 1.7) * 0.02 : 0;
-          hz[i].style.transform = `translateX(${Math.max(0, Math.min(1, p * p * 0.35 + p * 0.65 + wob)) * laneW}px) scaleX(-1)`;
-          if (p < 1) all = false;
-        }
-        if (!all) raf = requestAnimationFrame(frame);
-      };
-      frame();
+    // ---- 賽道：canvas 畫的，馬有起伏、揚塵、速度忽快忽慢（最後名次由伺服器決定，每匹馬的跑法只是在同一個終點時間前加上起伏）
+    const SILK = ["#e53935", "#1e88e5", "#fdd835", "#43a047", "#8e24aa", "#fb8c00"];
+    const EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    function sizeRace() {
+      if (!rcv) return;
+      rW = rcv.parentElement.clientWidth || 340; rH = 332;
+      const d = window.devicePixelRatio || 1;
+      rcv.style.width = rW + "px"; rcv.style.height = rH + "px"; rcv.width = Math.round(rW * d); rcv.height = Math.round(rH * d);
+      rctx = rcv.getContext("2d"); rctx.setTransform(d, 0, 0, d, 0, 0);
     }
-    const onResize = () => { const l = stage.querySelector(".lane"); if (l) laneW = l.clientWidth - 90; };
+    function initRace() {      // 用場次 id 當種子，每個人看到同樣的起伏
+      let h = 2166136261; for (const ch of hs.id) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+      const rng = () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      rseed = hs.names.map(() => ({ k: 2 + Math.floor(rng() * 2), phi: rng(), a: 0.32 + rng() * 0.2 }));
+      rparts = [];
+    }
+    function prog(i, t) {
+      const u = Math.max(0, Math.min(1, t / hs.times[i])), q = rseed[i];
+      const f = u + q.a * (Math.sin(2 * Math.PI * (q.k * u + q.phi)) - Math.sin(2 * Math.PI * q.phi)) / (2 * Math.PI * q.k);
+      const g = Math.max(0, Math.min(1, f));
+      return g * g * 0.22 + g * 0.78;            // 起跑稍慢，之後加速
+    }
+    function drawRace(t, dt) {
+      const c = rctx; if (!c || !rseed.length) return;
+      const n = hs.names.length, top = 36, laneH = (rH - top - 8) / n, x0 = 78, x1 = rW - 58, len = x1 - x0;
+      const mine = myBet(), running = t >= 0 && t < Math.max(...hs.times);
+      c.clearRect(0, 0, rW, rH);
+      c.fillStyle = "#17241a"; c.fillRect(0, 0, rW, top);
+      for (let k = 0; k < rW / 11; k++) {          // 看台上的觀眾
+        c.fillStyle = SILK[k % 6]; c.globalAlpha = 0.8;
+        c.beginPath(); c.arc(6 + k * 11, top - 9 - (running ? Math.abs(Math.sin(t / 160 + k)) * 3 : 0), 3.5, 0, 7); c.fill();
+      }
+      c.globalAlpha = 1;
+      for (let i = 0; i < n; i++) {
+        const y = top + i * laneH;
+        c.fillStyle = i % 2 ? "#2f6b33" : "#37793b"; c.fillRect(0, y, rW, laneH);
+        c.fillStyle = "rgba(255,255,255,.06)";
+        for (let x = -((t > 0 ? t * 0.12 : 0) % 40); x < rW; x += 40) c.fillRect(x, y + 2, 20, laneH - 4);     // 草地條紋往後捲，有速度感
+        c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(0, y, rW, 1);
+      }
+      c.fillRect(0, top + n * laneH, rW, 1);
+      c.strokeStyle = "rgba(255,255,255,.25)"; c.setLineDash([4, 5]); c.lineWidth = 1;
+      for (const f of [0.25, 0.5, 0.75]) { const x = x0 + f * len; c.beginPath(); c.moveTo(x, top); c.lineTo(x, top + n * laneH); c.stroke(); }
+      c.setLineDash([]);
+      c.strokeStyle = "#fff"; c.lineWidth = 2; c.beginPath(); c.moveTo(x0 - 2, top); c.lineTo(x0 - 2, top + n * laneH); c.stroke();   // 起跑線
+      const sq = laneH / 4;                                                    // 終點的方格旗
+      for (let r = 0; r < n * 4; r++) for (let k = 0; k < 2; k++) { c.fillStyle = (r + k) % 2 ? "#111" : "#fff"; c.fillRect(x1 + k * sq, top + r * sq, sq, sq); }
+      const ps = hs.names.map((_, i) => prog(i, t));
+      let lead = 0; ps.forEach((p, i) => { if (p > ps[lead]) lead = i; });
+      for (let i = 0; i < n; i++) {
+        const p = ps[i], yc = top + i * laneH + laneH / 2, x = x0 + p * (len - 10);
+        const moving = running && p < 1, bob = moving ? Math.sin(t / 65 + i * 2.1) * 2.6 : 0;
+        if (mine && mine.idx === i) { c.strokeStyle = "#e0a526"; c.lineWidth = 2; c.strokeRect(1, top + i * laneH + 1, rW - 2, laneH - 2); }
+        if (moving && Math.random() < 60 * dt) rparts.push({ x: x - 12, y: yc + laneH * 0.28, vx: -30 - Math.random() * 40, vy: -Math.random() * 18, life: 0.5, max: 0.5, r: 2 + Math.random() * 2, dust: 1 });
+        c.save(); c.translate(x, yc + bob); c.scale(-1, 1); c.font = `${Math.floor(laneH * 0.82)}px ${EMO}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("🐎", 0, 1); c.restore();
+        c.fillStyle = SILK[i % 6]; c.beginPath(); c.arc(x - 3, yc - laneH * 0.16 + bob, 7, 0, 7); c.fill();
+        c.fillStyle = "#fff"; c.font = "bold 10px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(i + 1), x - 3, yc - laneH * 0.16 + bob + 1);
+        c.textAlign = "left"; c.font = "12px sans-serif"; c.fillStyle = "rgba(255,255,255,.85)";
+        c.fillText(`${i + 1} ${hs.names[i]}${mine && mine.idx === i ? " ★" : ""}`, 6, yc);
+        if (p >= 1 && hs.order) { const pl = hs.order.indexOf(i); c.textAlign = "left"; c.font = "16px " + EMO; c.fillText(["🥇", "🥈", "🥉"][pl] || String(pl + 1), x1 + sq * 2 + 4, yc); }
+        if (i === lead && running && p > 0.04) { c.font = "16px " + EMO; c.textAlign = "center"; c.fillText("👑", x - 3, yc - laneH * 0.55 + bob); }
+      }
+      if (t < 0) { c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(0, top, rW, n * laneH); c.fillStyle = "#fff"; c.font = "bold 28px sans-serif"; c.textAlign = "center"; c.fillText("預備…", rW / 2, top + n * laneH / 2); }
+      else if (running) {                                                         // 轉播字幕
+        const left = Math.round((1 - ps[lead]) * 100);
+        c.fillStyle = "#fff"; c.font = "bold 13px sans-serif"; c.textAlign = "left"; c.textBaseline = "middle";
+        c.fillText(`🎙 領先：${lead + 1}號 ${hs.names[lead]}　${left > 85 ? "起跑！" : left > 15 ? `距終點 ${left}%` : "衝刺！"}`, 8, 12);
+      }
+      const tw = Math.min(...hs.times);                                           // 冠軍衝線：噴彩帶
+      if (t >= tw && rconf !== hs.id && t - tw < 2500) {
+        rconf = hs.id; const wi = hs.order ? hs.order[0] : lead, yc = top + wi * laneH + laneH / 2;
+        for (let k = 0; k < 70; k++) rparts.push({ x: x1, y: yc, vx: -120 + Math.random() * 240, vy: -140 - Math.random() * 160, life: 1.6, max: 1.6, r: 3, col: SILK[k % 6] });
+      }
+      for (const q of rparts) {
+        q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; if (!q.dust) q.vy += 380 * dt;
+        c.globalAlpha = Math.max(0, q.life / q.max) * (q.dust ? 0.5 : 1); c.fillStyle = q.dust ? "#d7c9a3" : q.col;
+        c.beginPath(); if (q.dust) c.arc(q.x, q.y, q.r, 0, 7); else c.rect(q.x, q.y, 5, 3); c.fill();
+      }
+      c.globalAlpha = 1; rparts = rparts.filter((q) => q.life > 0);
+      if (hs.phase === "result" || t >= Math.max(...hs.times)) {                  // 結束後在賽道上顯示冠軍
+        c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(0, 0, rW, 24); c.fillStyle = "#ffd54a"; c.font = "bold 14px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+        c.fillText(`🏆 ${hs.names[hs.win]} 奪冠`, rW / 2, 12);
+      }
+    }
+    function animateRace() {
+      let last = performance.now();
+      const frame = (ts) => {
+        if (closed || !hs || hs.phase === "bet" || !rcv) return;
+        const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+        const t = serverNow() - hs.startAt;
+        drawRace(t, dt);
+        if (t < Math.max(...hs.times) + 400 || rparts.length) raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+    }
+    const onResize = () => { sizeRace(); if (hs && hs.phase !== "bet" && rseed.length) drawRace(serverNow() - hs.startAt, 0); };
     window.addEventListener("resize", onResize);
 
     // ---- 旁觀：選一位玩家，同步看他的牌桌（賽馬直接看整場）
