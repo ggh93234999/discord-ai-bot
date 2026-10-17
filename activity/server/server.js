@@ -8,6 +8,7 @@ import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
+import { handleCasino, casinoClose } from "./casino.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -212,6 +213,7 @@ wss.on("connection", (ws) => {
       ws.practice += back;
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
+    if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));
@@ -288,6 +290,7 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    casinoClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
     if (!room) return;

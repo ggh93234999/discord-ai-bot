@@ -4,6 +4,7 @@ import { mountGomoku } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";
 import { mountReversi } from "./reversi.js";
 import { mountSlots } from "./slots.js";
+import { mountCasino } from "./casino.js";
 import { mountDown } from "./stairs.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
@@ -30,7 +31,7 @@ const app = document.getElementById("app");
 const CATS = [
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
   { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
-  { id: "casino", icon: "🎰", name: "賭場", note: "拿代幣玩" },
+  { id: "casino", icon: "🎰", name: "賭場", note: "練習幣或真代幣，每個遊戲裡都有 📖 規則" },
 ];
 const GAMES = [
   { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
@@ -39,7 +40,11 @@ const GAMES = [
   { id: "down", cat: "action", icon: "🪜", name: "小朋友下樓梯", players: "1–4 人", desc: "往下踩樓梯別被刺扎到", mount: mountDown },
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
-  { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "練習模式或真代幣賭注", mount: mountSlots },
+  { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
+  { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
+  { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "1 人", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
+  { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
+  { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {

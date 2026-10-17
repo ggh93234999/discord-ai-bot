@@ -3,6 +3,7 @@
 //   練習模式：練習幣，不需要登入，隨便玩。
 //   賭注模式：要用 Discord 授權確認身分，動用機器人錢包裡的真代幣（只能在 Discord 裡開 Activity 時使用）。
 import { wsUrl } from "./gomoku.js";
+import { attachRules } from "./rules.js";
 
 const KINDS = [
   { id: 1, name: "3 格", rows: 1, cols: 3, syms: ["🍒", "🍋", "💎"], hint: "三個一樣拿 2～3.2 倍，兩個一樣退錢" },
@@ -38,6 +39,7 @@ export function mountSlots(root, { env, back }) {
   const reelsEl = $(".reels"), statusEl = $(".status"), spinBtn = $(".spin"), balEl = $(".bal b"), resetBtn = $(".reset");
   const gameEl = $(".slots"), confirmEl = $(".confirm");
   $(".back").addEventListener("click", back);
+  attachRules(root, "slots");
 
   let kind = KINDS[1], bet = 50, ws = null, closed = false, retry = 0, busy = false, pending = false, muted = false;
   let cell = 64, last = null;
