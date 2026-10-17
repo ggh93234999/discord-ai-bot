@@ -137,7 +137,7 @@ export function mountPoker(opts = {}) {
           <button class="pb call">${toCall ? (toCall >= me.chips ? `全下 ${me.chips}` : `跟注 ${toCall}`) : "過牌"}</button>
           ${canRaise ? `<button class="pb raise">${st.curBet ? "加注到" : "下注"} <span class="rv">${raiseTo}</span></button>` : ""}
         </div>`;
-        if (canRaise && minTo < maxTo) h += `<div class="prow"><input type="range" class="rs" min="${minTo}" max="${maxTo}" step="10" value="${raiseTo}">
+        if (canRaise && minTo < maxTo) h += `<div class="prow amt">自訂金額 <input type="number" class="rn" inputmode="numeric" min="${minTo}" max="${maxTo}" step="10" value="${raiseTo}"><span>（${minTo}～${maxTo}）</span></div><div class="prow"><input type="range" class="rs" min="${minTo}" max="${maxTo}" step="10" value="${raiseTo}">
           <span class="pre"><button data-f="0.5">½池</button><button data-f="1">1池</button><button data-f="all">全下</button></span></div>`;
       } else if (st.phase === "wait" || st.phase === "result") {
         h += seatedCount < 2 ? `<div class="mempty">人不夠，按空位的「＋電腦」找人陪你玩</div>` : `<div class="mempty">${st.phase === "result" ? "下一手馬上開始…" : "準備開始…"}</div>`;
@@ -150,8 +150,12 @@ export function mountPoker(opts = {}) {
       q(".raise") && q(".raise").addEventListener("click", () => send({ t: "pact", a: raiseTo >= maxTo ? "allin" : "raise", amt: raiseTo }));
       const rs = q(".rs");
       if (rs) {
-        const setV = (v) => { raiseTo = Math.max(minTo, Math.min(maxTo, Math.round(v))); rs.value = raiseTo; q(".rv").textContent = raiseTo; };
+        const rn = q(".rn");
+        const setV = (v) => { raiseTo = Math.max(minTo, Math.min(maxTo, Math.round(v) || minTo)); rs.value = raiseTo; rn.value = raiseTo; q(".rv").textContent = raiseTo; };
         rs.addEventListener("input", () => setV(Number(rs.value)));
+        rn.addEventListener("input", () => { const v = Math.round(Number(rn.value)); if (v > 0) { raiseTo = Math.max(minTo, Math.min(maxTo, v)); rs.value = raiseTo; q(".rv").textContent = raiseTo; } });   // 打字時只更新按鈕，輸入完（離開欄位）才校正到合法範圍
+        rn.addEventListener("change", () => setV(Number(rn.value)));
+        rn.addEventListener("keydown", (e) => { if (e.key === "Enter") { setV(Number(rn.value)); rn.blur(); } });
         ctl.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => {
           const f = b.dataset.f; setV(f === "all" ? maxTo : st.curBet + Math.round((st.pot + toCall) * Number(f) / 10) * 10);
         }));

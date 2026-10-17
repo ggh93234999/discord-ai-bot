@@ -6,7 +6,7 @@ import { attachRules } from "./rules.js";
 import { createWatch, entryHtml } from "./watch.js";
 import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
-import { horseCards, VARIANTS } from "./horsecards.js";
+import { horseCards } from "./horsecards.js";
 
 const BETS = [10, 50, 100, 500];
 const ERR = {
@@ -62,7 +62,6 @@ export function mountCasino(game, opts = {}) {
     let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false, you = null;
     let mode = "practice", session = env.session || null, practiceBal = null, realBal = null;
     let pick = "heads", inHand = false;
-    let hui = (() => { try { return localStorage.getItem("horseui") || "A"; } catch { return "A"; } })();
     let hs = null, skew = 0, horseSel = -1, raf = 0, tickTimer = 0;     // 賽馬狀態
     const timers = [];
     const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
@@ -259,12 +258,11 @@ export function mountCasino(game, opts = {}) {
 
       head.innerHTML = hs.phase === "bet" ? `第 ${hs.no} 場　<b class="cd">--</b>` : hs.phase === "run" ? `第 ${hs.no} 場　🏇 比賽進行中！` : `第 ${hs.no} 場　🏆 ${esc(hs.names[hs.win])} 奪冠！`;
 
-      const msig = hs.phase === "bet" ? ["bet", hui, hs.id, horseSel, mine ? mine.idx : -1, per.join()].join("|") : ["track", hs.id, mine ? mine.idx : -1].join("|");
+      const msig = hs.phase === "bet" ? ["bet", hs.id, horseSel, mine ? mine.idx : -1, per.join()].join("|") : ["track", hs.id, mine ? mine.idx : -1].join("|");
       if (msig !== hsig.main) {
         hsig.main = msig;
         if (hs.phase === "bet") {
-          main.innerHTML = `<div class="hui">${VARIANTS.map(([k, n]) => `<button data-v="${k}" class="${hui === k ? "on" : ""}">${k} ${n}</button>`).join("")}</div>` + horseCards(hui, hs, { sel: horseSel, mine, per });
-          main.querySelectorAll(".hui button").forEach((x) => x.addEventListener("click", () => { hui = x.dataset.v; try { localStorage.setItem("horseui", hui); } catch {} renderHorse(); }));
+          main.innerHTML = horseCards(hs, { sel: horseSel, mine, per });
           main.querySelectorAll(".hcard").forEach((r) => r.addEventListener("click", () => { if (busy || myBet() || hs.phase !== "bet") return; horseSel = Number(r.dataset.i); renderHorse(); draw(); }));
         } else {
           main.innerHTML = `<canvas class="rcv"></canvas>`; rcv = main.querySelector("canvas"); sizeRace(); initRace();
