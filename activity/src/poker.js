@@ -25,13 +25,13 @@ export function mountPoker(opts = {}) {
       <div class="game slots poker">
         <header><button class="back">← 選單</button><h2>德州撲克</h2><span class="watch"></span></header>
         <div class="status">連線中…</div>
-        <div class="ptable"><div class="pfelt"><div class="pcenter"><div class="ppot"></div><div class="pboard"></div></div></div><div class="pseats"></div></div>
+        <div class="ptable"><div class="pfelt"><div class="pcenter"><div class="ptimer"></div><div class="ppot"></div><div class="pboard"></div></div></div><div class="pseats"></div></div>
         <div class="plog"></div>
         <div class="pctl"></div>
       </div>`;
     attachRules(root.querySelector(".game"), "poker");
     const $ = (s) => root.querySelector(s);
-    const statusEl = $(".status"), potEl = $(".ppot"), boardEl = $(".pboard"), seatsEl = $(".pseats"), logEl = $(".plog"), ctl = $(".pctl"), watchEl = $(".watch");
+    const statusEl = $(".status"), potEl = $(".ppot"), timerEl = $(".ptimer"), boardEl = $(".pboard"), seatsEl = $(".pseats"), logEl = $(".plog"), ctl = $(".pctl"), watchEl = $(".watch");
     let ws = null, closed = false, retry = 0, st = null, timer = 0, raiseTo = 0, ctlKey = "";
     const pid = getPid();
     const room = spectate ? spectate.room : env.instanceId;
@@ -99,6 +99,16 @@ export function mountPoker(opts = {}) {
       else if (!me) t = "還沒入座　" + t;
       if (st.toAct >= 0 && st.seats[st.toAct]) t += st.toAct === st.you ? `　輪到你（${left}s）` : `　輪到 ${st.seats[st.toAct].name}${left && !st.seats[st.toAct].bot ? `（${left}s）` : ""}`;
       statusEl.textContent = t;
+      // 螢幕上的大計時器：輪到人類行動時倒數；結算時倒數下一手
+      const nowS = Date.now() - st.at;
+      let sec = 0, kind = "";
+      if (st.phase === "result" && st.nextAt) { sec = Math.max(0, Math.ceil((st.nextAt - nowS) / 1000)); kind = "next"; }
+      else if (st.toAct >= 0 && st.deadline && st.seats[st.toAct] && !st.seats[st.toAct].bot) { sec = left; kind = st.toAct === st.you ? "me" : "other"; }
+      if (!kind) timerEl.className = "ptimer", timerEl.textContent = "";
+      else {
+        timerEl.className = `ptimer on ${kind}${kind !== "next" && sec <= 5 ? " urgent" : ""}`;
+        timerEl.textContent = kind === "next" ? `下一手 ${sec}` : `⏱ ${sec}`;
+      }
     }
 
     function renderCtl() {
@@ -143,7 +153,7 @@ export function mountPoker(opts = {}) {
       q(".stand").addEventListener("click", () => { send({ t: "pstand" }); });
     }
 
-    timer = setInterval(tickStatus, 500);
+    timer = setInterval(tickStatus, 250);
     function cleanup() { closed = true; clearInterval(timer); try { ws.close(); } catch {} }
     connect();
     return cleanup;

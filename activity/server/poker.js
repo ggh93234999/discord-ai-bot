@@ -130,7 +130,7 @@ function view(t, ws) {
   const showAll = t.phase === "result" && t.result && t.result.showdown;
   return {
     t: "pstate", phase: t.phase, board: t.board, dealer: t.dealer, curBet: t.curBet, minRaise: t.minRaise, bb: BB, sb: SB,
-    toAct: t.toAct, deadline: t.deadline, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
+    toAct: t.toAct, deadline: t.deadline, nextAt: t.phase === "result" ? t.nextAt : 0, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
     watchers: [...t.members].filter((w) => w.pspec).length, result: t.result,
     seats: t.seats.map((s, i) => s && ({
       i, name: s.name, chips: s.chips, bet: s.bet, total: s.total, bot: s.bot, folded: s.folded, allin: s.allin, inHand: s.inHand, away: s.bot ? false : !s.ws,

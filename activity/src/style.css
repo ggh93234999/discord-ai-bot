@@ -370,3 +370,8 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .poker .prr.win{background:#3b3210;outline:1px solid #e0a526}
 .poker .prr b{min-width:60px}.poker .prr em{font-style:normal;color:#80deea}.poker .prr strong{margin-left:auto;color:#ffd54f}
 .poker .prh{display:inline-flex}
+.poker .ptimer{display:none;margin:0 auto 4px;padding:2px 14px;border-radius:20px;font-weight:800;font-size:22px;background:#0008;color:#fff;width:fit-content}
+.poker .ptimer.on{display:block}.poker .ptimer.me{background:#1b5e20;box-shadow:0 0 10px #66bb6a}
+.poker .ptimer.other{background:#263238}.poker .ptimer.next{font-size:15px;background:#4527a0}
+.poker .ptimer.urgent{background:#b71c1c;color:#fff;animation:ptpulse .5s infinite alternate}
+@keyframes ptpulse{to{transform:scale(1.12)}}
