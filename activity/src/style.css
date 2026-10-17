@@ -365,3 +365,8 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .casino .vd.r-rare{background:linear-gradient(135deg,#1565c0,#90caf9,#7e57c2)}
 .casino .vd.r-legend{background:linear-gradient(120deg,#ff5252,#ffd740,#69f0ae,#40c4ff,#e040fb,#ff5252);background-size:200% 200%;animation:holo 4s linear infinite}
 @keyframes holo{to{background-position:200% 0}}
+.poker .prt{font-weight:700;margin-bottom:4px;color:#ffd54f}
+.poker .prr{display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px;font-size:13px}
+.poker .prr.win{background:#3b3210;outline:1px solid #e0a526}
+.poker .prr b{min-width:60px}.poker .prr em{font-style:normal;color:#80deea}.poker .prr strong{margin-left:auto;color:#ffd54f}
+.poker .prh{display:inline-flex}

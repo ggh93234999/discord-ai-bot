@@ -79,7 +79,13 @@ export function mountPoker(opts = {}) {
       seatsEl.querySelectorAll("[data-sit]").forEach((b) => b.addEventListener("click", () => send({ t: "psit", seat: Number(b.dataset.sit) })));
       seatsEl.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "paddbot", seat: Number(b.dataset.bot) })));
       seatsEl.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => send({ t: "pdelbot", seat: Number(b.dataset.del) })));
-      logEl.textContent = st.log || "";
+      if (st.phase === "result" && st.result && st.result.showdown) {
+        const rows = st.seats.filter((s) => s && s.inHand && !s.folded && s.hand).map((s) => {
+          const w = st.result.winners.find((x) => x.i === s.i);
+          return `<div class="prr${w ? " win" : ""}"><b>${esc(s.name)}</b><span class="prh">${s.hole.map((c) => card(c, true)).join("")}</span><em>${s.hand}</em>${w ? `<strong>🏆 +${w.amount}</strong>` : ""}</div>`;
+        }).join("");
+        logEl.innerHTML = `<div class="prt">攤牌　公開牌型</div>${rows}`;
+      } else logEl.textContent = st.log || "";
       renderCtl();
       tickStatus();
     }

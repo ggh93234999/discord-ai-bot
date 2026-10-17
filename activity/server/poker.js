@@ -3,7 +3,7 @@
 import { randomInt, randomBytes } from "node:crypto";
 
 const SEATS = 6, START = 1000, SB = 10, BB = 20;
-const ACT_MS = 25000, RESULT_MS = 7000, STREET_MS = 1200;
+const ACT_MS = 25000, RESULT_MS = 11000, STREET_MS = 1200;
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "大鵰", "豆豆"];
 
 // ---------------------------------------------------------------- 牌與牌型
