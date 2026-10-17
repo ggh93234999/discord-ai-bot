@@ -19,6 +19,13 @@ function body(e) {
   return "";
 }
 
+// 單一玩家的最新狀態（21 點進行中顯示手牌，其餘顯示最新一把）
+export function entryHtml(p) {
+  if (p.hand) return `<div><small>🃏 思考中…　押 ${money(p.hand.bet)}</small></div><div>${cards([p.hand.dealerUp], true)}<small> 莊</small></div><div>${cards(p.hand.player)}<small> 他 ${p.hand.pv}</small></div>`;
+  if (p.last) return body(p.last);
+  return `<small>還沒開始玩</small>`;
+}
+
 export function createWatch(root, { title = "👀 同房玩家" } = {}) {
   const box = document.createElement("div");
   box.className = "watchbox";

@@ -215,7 +215,7 @@ wss.on("connection", (ws) => {
       casinoFeed(ws, { g: "slots", real: false, kind, bet, back, grid: r.grid, nwin: r.wins.length });
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
-    if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse)$/.test(m.t)) { handleCasino(ws, m); return; }
+    if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));

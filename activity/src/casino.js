@@ -3,7 +3,7 @@
 // 每個遊戲下方有「👀 同房玩家」旁觀面板。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
-import { createWatch } from "./watch.js";
+import { createWatch, entryHtml } from "./watch.js";
 import { addBetInput } from "./betinput.js";
 
 const BETS = [10, 50, 100, 500];
@@ -12,7 +12,7 @@ const ERR = {
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
   error: "發生錯誤，再試一次",
 };
-const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬" };
+const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", slots: "老虎機" };
 const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
   dice: "你和莊家各擲兩顆骰子比點數，大的贏（拿回 2 倍），一樣退錢",
@@ -23,11 +23,12 @@ const dieFace = (n) => "⚀⚁⚂⚃⚄⚅"[n - 1];
 const money = (n) => n.toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-export function mountCasino(game) {
+export function mountCasino(game, opts = {}) {
+  const spectate = opts.spectate || null;       // { room } → 旁觀別人的房間，不能玩
   return function (root, { env, back }) {
     root.innerHTML = `
       <div class="game slots casino">
-        <header><button class="back">← 選單</button><h2>${TITLES[game]}</h2><span class="watch"></span></header>
+        <header><button class="back">← 選單</button><h2>${spectate ? "👀 旁觀 · " : ""}${TITLES[game]}</h2><span class="watch"></span></header>
         <div class="modebar">
           <button class="mode on" data-m="practice">🎮 練習模式</button>
           <button class="mode" data-m="real">💰 賭注模式</button>
@@ -51,7 +52,9 @@ export function mountCasino(game) {
     const gameEl = $(".casino"), confirmEl = $(".confirm"), betsEl = $(".bets");
     $(".back").addEventListener("click", back);
     attachRules(root, game);
-    const watch = createWatch(gameEl);
+    const watch = spectate ? { setYou() {}, update() {}, destroy() {} } : createWatch(gameEl);
+    if (spectate) gameEl.classList.add("spectating");
+    let specList = [], specSel = null, specSig = "";
 
     let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false, you = null;
     let mode = "practice", session = env.session || null, practiceBal = null, realBal = null;
@@ -65,13 +68,13 @@ export function mountCasino(game) {
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
       ws.onopen = () => {
-        retry = 0; send({ t: "cjoin", game, room: env.instanceId });
+        retry = 0; send({ t: "cjoin", game, room: spectate ? spectate.room : env.instanceId, spectate: !!spectate });
         if (session) send({ t: "bauth", token: session.token });
       };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.t === "cinit") { practiceBal = m.balance; you = m.you; watch.setYou(you); showBalance(); statusEl.textContent = game === "horse" ? "選一匹馬，下注吧" : "選賭注，開始吧"; }
-        else if (m.t === "cwho") watch.update(m.list);
+        if (m.t === "cinit") { practiceBal = m.balance; you = m.you; watch.setYou(you); showBalance(); statusEl.textContent = spectate ? "旁觀中" : game === "horse" ? "選一匹馬，下注吧" : "選賭注，開始吧"; }
+        else if (m.t === "cwho") { watch.update(m.list); if (spectate) specUpdate(m); }
         else if (m.t === "cres") onRes(m);
         else if (m.t === "hstate") onHorse(m);
         else if (m.t === "cbal") { if (m.balance != null) { if (m.real) realBal = m.balance; else practiceBal = m.balance; showBalance(); } if (m.payfail) statusEl.textContent = "派彩失敗，請聯絡管理員"; }
@@ -224,60 +227,91 @@ export function mountCasino(game) {
     }
 
     // ---- 賽馬（全房一起押）
+    // 畫面分三塊：標題（倒數）、主區（馬匹清單或跑道）、下注名單。各塊只在內容真的變了才重畫，避免閃爍和版面跳動。
     const myBet = () => (hs && you ? hs.bets.find((b) => b.id === you) : null);
+    let hsig = { main: "", bets: "", round: "" }, hz = [], laneW = 0;
     function onHorse(m) {
-      const newRound = !hs || hs.id !== m.id;
+      const first = !hs || hs.id !== m.id;
       hs = m; skew = m.now - Date.now(); busy = false;
-      if (newRound) { horseSel = -1; stage.innerHTML = ""; }
+      if (first) { horseSel = -1; }
       renderHorse(); draw();
     }
     const serverNow = () => Date.now() + skew;
     function renderHorse() {
       if (!hs) return;
-      cancelAnimationFrame(raf); clearInterval(tickTimer);
       const mine = myBet(), tot = hs.bets.reduce((a, b) => a + b.bet, 0);
       const per = hs.names.map((_, i) => hs.bets.filter((b) => b.idx === i).length);
-      const head = hs.phase === "bet" ? `第 ${hs.no} 場　<b class="cd">--</b> 秒後截止下注` : hs.phase === "run" ? `第 ${hs.no} 場　🏇 比賽進行中！` : `第 ${hs.no} 場　🏆 ${esc(hs.names[hs.win])} 奪冠！`;
-      let html = `<div class="hhead">${head}</div>`;
-      if (hs.phase === "bet") {
-        html += `<div class="hlist">${hs.names.map((n, i) =>
-          `<button class="hrow ${horseSel === i ? "sel" : ""} ${mine && mine.idx === i ? "mine" : ""}" data-i="${i}"><b>${i + 1}</b><span>${esc(n)}</span><em>${hs.forms[i]}${per[i] ? `　👥${per[i]}` : ""}</em><i>賠率 ${hs.odds[i]}</i></button>`).join("")}</div>`;
-      } else {
-        html += `<div class="track">${hs.names.map((n, i) => `<div class="lane ${mine && mine.idx === i ? "mine" : ""}"><span class="ln">${i + 1} ${esc(n)}</span><span class="hz" data-i="${i}" style="left:0">🐎</span><span class="fin">🏁</span></div>`).join("")}</div>`;
+      const roundKey = hs.id + hs.phase;
+      if (!stage.querySelector(".hmain")) stage.innerHTML = `<div class="hhead"></div><div class="hmain"></div><div class="hbets"></div>`;
+      const head = stage.querySelector(".hhead"), main = stage.querySelector(".hmain"), betsBox = stage.querySelector(".hbets");
+
+      head.innerHTML = hs.phase === "bet" ? `第 ${hs.no} 場　<b class="cd">--</b>` : hs.phase === "run" ? `第 ${hs.no} 場　🏇 比賽進行中！` : `第 ${hs.no} 場　🏆 ${esc(hs.names[hs.win])} 奪冠！`;
+
+      const msig = hs.phase === "bet" ? ["bet", hs.id, horseSel, mine ? mine.idx : -1, per.join()].join("|") : [hs.phase, hs.id, mine ? mine.idx : -1].join("|");
+      if (msig !== hsig.main) {
+        hsig.main = msig;
+        if (hs.phase === "bet") {
+          main.innerHTML = `<div class="hlist">${hs.names.map((n, i) =>
+            `<button class="hrow ${horseSel === i ? "sel" : ""} ${mine && mine.idx === i ? "mine" : ""}" data-i="${i}"><b>${i + 1}</b><span>${esc(n)}</span><em>${hs.forms[i]}${per[i] ? `　👥${per[i]}` : ""}</em><i>${hs.odds[i]}x</i></button>`).join("")}</div>`;
+          main.querySelectorAll(".hrow").forEach((r) => r.addEventListener("click", () => { if (busy || myBet() || hs.phase !== "bet") return; horseSel = Number(r.dataset.i); renderHorse(); draw(); }));
+        } else {
+          main.innerHTML = `<div class="track">${hs.names.map((n, i) => `<div class="lane ${mine && mine.idx === i ? "mine" : ""}"><span class="ln">${i + 1} ${esc(n)}</span><span class="hz">🐎</span><span class="fin">🏁</span></div>`).join("")}</div>`;
+          hz = [...main.querySelectorAll(".hz")]; laneW = main.querySelector(".lane").clientWidth - 90;
+        }
       }
-      html += `<div class="hbets"><h4>本場下注${hs.bets.length ? `（${hs.bets.length} 人，共 ${money(tot)}）` : ""}</h4>${hs.bets.length ? hs.bets.map((b) => {
-        const res = hs.phase === "result" ? (b.back > 0 ? `<b class="w">+${money(b.back - b.bet)}</b>` : `<b class="l">-${money(b.bet)}</b>`) : "";
-        return `<div class="hb ${b.id === you ? "me" : ""}"><span>${b.real ? "💰" : "🎮"} ${esc(b.name)}${b.id === you ? "（你）" : ""}</span><span>押 ${b.idx + 1} 號 ${esc(hs.names[b.idx])}　${money(b.bet)}</span>${res}</div>`;
-      }).join("") : `<div class="mempty">還沒有人下注。你可以當第一個，或等朋友下注後旁觀比賽。</div>`}</div>`;
-      stage.innerHTML = html;
-      stage.querySelectorAll(".hrow").forEach((r) => r.addEventListener("click", () => { if (busy || myBet() || hs.phase !== "bet") return; horseSel = Number(r.dataset.i); renderHorse(); draw(); }));
+
+      const bsig = JSON.stringify([hs.phase, hs.bets.map((b) => [b.id, b.idx, b.bet, b.back]), you]);
+      if (bsig !== hsig.bets) {
+        hsig.bets = bsig;
+        betsBox.innerHTML = `<h4>本場下注${hs.bets.length ? `（${hs.bets.length} 人，共 ${money(tot)}）` : ""}</h4>${hs.bets.length ? hs.bets.map((b) => {
+          const res = hs.phase === "result" ? (b.back > 0 ? `<b class="w">+${money(b.back - b.bet)}</b>` : `<b class="l">-${money(b.bet)}</b>`) : "";
+          return `<div class="hb ${b.id === you ? "me" : ""}"><span class="hn">${b.real ? "💰" : "🎮"} ${esc(b.name)}${b.id === you ? "（你）" : ""}</span><span class="hp">${b.idx + 1}號 ${esc(hs.names[b.idx])}　${money(b.bet)}</span>${res}</div>`;
+        }).join("") : `<div class="mempty">還沒有人下注。你可以當第一個，或等朋友下注後旁觀比賽。</div>`}`;
+      }
+
+      clearInterval(tickTimer);
       if (hs.phase === "bet") {
-        const cd = stage.querySelector(".cd");
-        const tick = () => { const s = Math.max(0, Math.ceil((hs.closeAt - serverNow()) / 1000)); cd.textContent = s; if (!hs.bets.length && s === 0) cd.textContent = "等人下注"; };
-        tick(); tickTimer = setInterval(tick, 250);
-        statusEl.textContent = mine ? "已下注，等開跑" : "選馬、選賭注，按下注";
-      } else animateRace();
+        const cd = head.querySelector(".cd");
+        const tick = () => { const sec = Math.max(0, Math.ceil((hs.closeAt - serverNow()) / 1000)); cd.textContent = !hs.bets.length && sec === 0 ? "等人下注" : `${sec} 秒後截止`; };
+        tick(); tickTimer = setInterval(tick, 500);
+        statusEl.textContent = spectate ? "旁觀中：下注時間到就開跑" : mine ? "已下注，等開跑" : "選馬、選賭注，按下注";
+      }
+      if (hs.phase !== "bet") {
+        if (roundKey !== hsig.round) { hsig.round = roundKey; cancelAnimationFrame(raf); animateRace(); }
+        const m = myBet();
+        statusEl.textContent = hs.phase === "run" ? "🏇 開跑！" : m ? (m.back > 0 ? `🎉 押中了！+${money(m.back - m.bet)}` : `😢 沒押中 -${money(m.bet)}`) : `🏆 ${hs.names[hs.win]} 奪冠`;
+      } else hsig.round = "";
     }
     function animateRace() {
-      const hz = [...stage.querySelectorAll(".hz")], lane = stage.querySelector(".lane");
-      const width = () => lane.clientWidth - 90;
       const frame = () => {
         if (closed || !hs || hs.phase === "bet") return;
         const t = serverNow() - hs.startAt; let all = true;
-        hz.forEach((h, i) => {
+        for (let i = 0; i < hz.length; i++) {
           const p = Math.max(0, Math.min(1, t / hs.times[i])), wob = p > 0 && p < 1 ? Math.sin(t / 180 + i * 1.7) * 0.02 : 0;
-          h.style.left = Math.max(0, Math.min(1, p * p * 0.35 + p * 0.65 + wob)) * width() + "px";
+          hz[i].style.transform = `translateX(${Math.max(0, Math.min(1, p * p * 0.35 + p * 0.65 + wob)) * laneW}px) scaleX(-1)`;
           if (p < 1) all = false;
-        });
+        }
         if (!all) raf = requestAnimationFrame(frame);
       };
       frame();
-      const mine = myBet();
-      if (hs.phase === "run") statusEl.textContent = "🏇 開跑！";
-      else statusEl.textContent = mine ? (mine.back > 0 ? `🎉 押中了！+${money(mine.back - mine.bet)}` : `😢 沒押中 -${money(mine.bet)}`) : `🏆 ${hs.names[hs.win]} 奪冠`;
     }
-    const onResize = () => { if (hs && hs.phase !== "bet") renderHorse(); };
+    const onResize = () => { const l = stage.querySelector(".lane"); if (l) laneW = l.clientWidth - 90; };
     window.addEventListener("resize", onResize);
+
+    // ---- 旁觀：選一位玩家，同步看他的牌桌（賽馬直接看整場）
+    function specUpdate(m) {
+      if (game === "horse") { $(".watch").textContent = m.watchers ? `👀 ${m.watchers} 人旁觀` : ""; return; }
+      specList = m.list;
+      if (!specList.find((p) => p.id === specSel)) specSel = specList.length ? specList[0].id : null;
+      const sig = JSON.stringify([specSel, specList.map((p) => [p.id, p.name, p.real, p.last, p.hand])]);
+      if (sig === specSig) return;
+      const prev = specSig; specSig = sig;
+      const cur = specList.find((p) => p.id === specSel);
+      stage.innerHTML = `<div class="specchips">${specList.map((p) => `<button class="chip ${p.id === specSel ? "sel" : ""}" data-id="${p.id}">${p.real ? "💰" : "🎮"} ${esc(p.name)}</button>`).join("") || "<span class='mempty'>房間裡的人都離開了</span>"}</div>` +
+        (cur ? `<div class="spectable${prev ? " fresh" : ""}">${entryHtml(cur)}</div>` : "");
+      stage.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { specSel = c.dataset.id; specSig = ""; specUpdate({ list: specList, watchers: 0 }); }));
+      $(".watch").textContent = m.watchers ? `👀 ${m.watchers} 人旁觀` : "";
+    }
 
     connect();
     draw();

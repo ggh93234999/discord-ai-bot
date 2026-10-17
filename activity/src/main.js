@@ -5,6 +5,7 @@ import { mountConnect4 } from "./connect4.js";
 import { mountReversi } from "./reversi.js";
 import { mountSlots } from "./slots.js";
 import { mountCasino } from "./casino.js";
+import { mountSpectateLobby } from "./spectate.js";
 import { mountDown } from "./stairs.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
@@ -45,6 +46,7 @@ const GAMES = [
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "1 人", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
+  { id: "spectate", cat: "casino", icon: "👀", name: "旁觀大廳", players: "不限", desc: "看有哪些房間在玩，按下去同步旁觀", mount: mountSpectateLobby },
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {

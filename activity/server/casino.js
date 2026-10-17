@@ -67,13 +67,13 @@ let guestN = 0;
 function nameOf(ws) { return ws.user?.name || (ws.guest ||= "路人" + String(++guestN).padStart(2, "0")); }
 function roomOf(game, id) {
   const key = game + ":" + id;
-  if (!rooms.has(key)) rooms.set(key, { key, game, members: new Set(), h: null, round: 0 });
+  if (!rooms.has(key)) rooms.set(key, { key, game, id, members: new Set(), h: null, round: 0 });
   return rooms.get(key);
 }
 function whoList(room) {
-  return [...room.members].map((w) => ({ id: w.cid, name: nameOf(w), real: !!w.creal, last: w.clast || null, hand: w.chand || null }));
+  return [...room.members].filter((w) => !w.cspec).map((w) => ({ id: w.cid, name: nameOf(w), real: !!w.creal, last: w.clast || null, hand: w.chand || null }));
 }
-function pushWho(room) { const m = { t: "cwho", list: whoList(room) }; for (const w of room.members) out(w, m); }
+function pushWho(room) { const m = { t: "cwho", list: whoList(room), watchers: [...room.members].filter((w) => w.cspec).length }; for (const w of room.members) out(w, m); }
 export function casinoFeed(ws, entry) {       // 任何遊戲結束一把就呼叫，讓同房的人看到
   ws.clast = { ...entry, ts: Date.now() }; ws.creal = !!entry.real; ws.chand = null;
   if (ws.cr) pushWho(ws.cr);
@@ -194,14 +194,30 @@ function horseTick() {
 setInterval(horseTick, 500).unref();
 setInterval(() => { for (const room of rooms.values()) if (room.game === "horse" && room.h && room.h.phase === "bet" && room.members.size) pushHorse(room); }, 5000).unref();
 
+// 旁觀大廳：有人（非旁觀者）在玩的房間
+export function listRooms() {
+  const out = [];
+  for (const room of rooms.values()) {
+    const players = whoList(room);
+    if (!players.length) continue;
+    const h = room.h;
+    out.push({ game: room.game, id: room.id, players: players.map((p) => ({ name: p.name, real: p.real, playing: !!p.hand })),
+               watchers: [...room.members].filter((w) => w.cspec).length,
+               horse: room.game === "horse" && h ? { phase: h.phase, no: h.no, bets: h.bets.length, closeAt: h.closeAt, now: Date.now() } : undefined });
+  }
+  return out.sort((a, b) => b.players.length - a.players.length);
+}
+
 const fail = (ws, r, extra = {}) => out(ws, { t: "cerr", error: r.error || "error", balance: r.balance, ...extra });
 
 export async function handleCasino(ws, m) {
+  if (m.t === "clist") { out(ws, { t: "clist", rooms: listRooms() }); return true; }
   if (m.t === "cjoin") {
     const game = CASINO_GAMES.includes(m.game) ? m.game : "coin";
     leave(ws);
     const room = roomOf(game, String(m.room || "default").slice(0, 80));
     ws.cid ||= randomBytes(3).toString("hex");
+    ws.cspec = !!m.spectate;
     ws.cr = room; room.members.add(ws); ws.cprac = ws.cprac ?? PRACTICE_START;
     if (game === "horse" && !room.h) horseNew(room);
     out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid });
@@ -211,6 +227,7 @@ export async function handleCasino(ws, m) {
   }
   if (m.t === "creset") { if (!ws.bj) ws.cprac = PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); return true; }
   if (!["cplay", "cbj", "chorse"].includes(m.t)) return false;
+  if (ws.cspec) return true;                       // 旁觀者不能玩
   if (ws.cbusy) return true;
   ws.cbusy = true;
   try {

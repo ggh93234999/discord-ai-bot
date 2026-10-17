@@ -203,3 +203,43 @@ canvas { max-width:100%; border-radius:6px; touch-action:manipulation; cursor:po
 .allin{padding:6px 10px;border:0;border-radius:8px;background:#3b4252;color:#fff;font-size:14px;cursor:pointer}
 .allin.sel{background:#e0a526;color:#1b1b1b;font-weight:700}
 .slots .bets{flex-wrap:wrap}
+
+/* 版面穩定：賭注確認改成浮出視窗、狀態列固定高度、賽馬分區固定高度 */
+.slots .confirm{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;width:min(340px,88vw);margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.6),0 8px 30px rgba(0,0,0,.6)}
+.slots .status{min-height:2.7em;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3;overflow:hidden}
+.slots .status{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;align-content:center}
+.casino .cstage{justify-content:flex-start}
+.casino .hhead{height:28px;line-height:28px}
+.casino .hmain{width:100%;min-height:292px}
+.casino .hbets{min-height:84px}
+.casino .hb{align-items:center}
+.casino .hb .hn{flex:0 0 38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.casino .hb .hp{flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.casino .hrow{contain:layout}
+.casino .hz{left:0;will-change:transform}
+.casino .lane{contain:layout paint}
+
+/* 內容比視窗高時往下捲動，不要互相擠壓重疊 */
+.game.slots{height:auto;min-height:100vh}
+.game.slots > *{flex-shrink:0}
+html,body{overflow-y:auto}
+
+/* 旁觀 */
+.spectating .modebar,.spectating .bar,.spectating .cctl,.spectating .hint,.spectating .actions,.spectating .confirm{display:none}
+.specchips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%}
+.specchips .chip{padding:6px 12px;border:1px solid #556;border-radius:999px;background:#2a2d3a;color:#ccd;cursor:pointer;font-size:14px}
+.specchips .chip.sel{background:#5865f2;border-color:#5865f2;color:#fff;font-weight:700}
+.spectable{width:100%;padding:14px;border-radius:12px;background:#1b1d26;border:1px solid #3b4252;font-size:16px;line-height:1.7;text-align:center}
+.spectable .mgrid{font-size:34px;line-height:1.25;letter-spacing:4px}
+.spectable .mc{display:inline-block;min-width:38px;margin:2px;padding:8px 4px;border-radius:6px;background:#fff;color:#111;font-weight:700;font-size:20px}
+.spectable .mc.r{color:#d32f2f} .spectable .mc.b{background:#38508f;color:#fff}
+.spectable b.w{color:#7ee787} .spectable b.l{color:#ff8a80}
+.spectable.fresh{animation:mfresh 1.2s ease-out}
+.spectlobby .roomlist{width:100%;display:flex;flex-direction:column;gap:8px}
+.roomcard{display:block;width:100%;padding:12px 14px;border:2px solid #3b4252;border-radius:12px;background:#1d1f28;color:#fff;text-align:left;cursor:pointer;font-size:15px}
+.roomcard:hover{border-color:#5865f2}
+.roomcard .rtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.roomcard .rtop em{margin-left:auto;font-style:normal;font-size:12px;opacity:.7}
+.roomcard .rplayers{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;opacity:.9}
+.tag,.tagmine{font-size:11px;padding:2px 8px;border-radius:999px;background:#3b4252}
+.tagmine{background:#2f6f4f}
