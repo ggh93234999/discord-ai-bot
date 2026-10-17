@@ -13,10 +13,34 @@ import { createPika, stepPika, snapshotPika } from "./pika.js";
 const PORT = Number(process.env.PORT || 3101);
 const GOMOKU = 15;
 const C4_W = 7, C4_H = 6;
+const RV = 8;
 const rooms = new Map();
+
+// ---- 黑白棋（reversi）規則
+const RV_DIRS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+function rvFlips(board, x, y, c) {
+  if (board[y * RV + x] !== ".") return [];
+  const o = c === "b" ? "w" : "b", out = [];
+  for (const [dx, dy] of RV_DIRS) {
+    const run = []; let nx = x + dx, ny = y + dy;
+    while (nx >= 0 && ny >= 0 && nx < RV && ny < RV && board[ny * RV + nx] === o) { run.push(ny * RV + nx); nx += dx; ny += dy; }
+    if (run.length && nx >= 0 && ny >= 0 && nx < RV && ny < RV && board[ny * RV + nx] === c) out.push(...run);
+  }
+  return out;
+}
+function rvHasMove(board, c) {
+  for (let y = 0; y < RV; y++) for (let x = 0; x < RV; x++) if (rvFlips(board, x, y, c).length) return true;
+  return false;
+}
+function rvStart() {
+  const a = Array(RV * RV).fill(".");
+  a[3 * RV + 3] = "w"; a[4 * RV + 4] = "w"; a[3 * RV + 4] = "b"; a[4 * RV + 3] = "b";
+  return a.join("");
+}
 
 function freshBoard(game) {
   if (game === "vb" || game === "pika") return "";
+  if (game === "rv") return rvStart();
   return game === "c4" ? ".".repeat(C4_W * C4_H) : ".".repeat(GOMOKU * GOMOKU);
 }
 
@@ -62,7 +86,7 @@ function broadcast(room) {
   for (const ws of room.clients) {
     send(ws, {
       t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
-      line: room.line, last: room.last, moves: room.moves,
+      line: room.line, last: room.last, moves: room.moves, passed: room.passed || null,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
       speed: room.speed, ping: room.ping, ...wagerView(room),
       vb: room.vb ? snapshotVb(room.vb) : undefined,
@@ -82,6 +106,23 @@ function assignSeat(room, ws) {
 const rebroadcast = (room) => () => broadcast(room);
 
 function place(room, role, m) {
+  if (room.game === "rv") {
+    const x = Number(m.x), y = Number(m.y);
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= RV || y >= RV) return false;
+    const fl = rvFlips(room.board, x, y, role);
+    if (!fl.length) return false;
+    const a = room.board.split("");
+    a[y * RV + x] = role; for (const i of fl) a[i] = role;
+    room.board = a.join(""); room.last = [x, y]; room.moves++; room.passed = null;
+    const opp = role === "b" ? "w" : "b";
+    if (rvHasMove(room.board, opp)) room.turn = opp;
+    else if (rvHasMove(room.board, role)) { room.turn = role; room.passed = opp; }   // 對方沒地方下，跳過
+    else {
+      const nb = [...room.board].filter((c) => c === "b").length, nw = [...room.board].filter((c) => c === "w").length;
+      room.winner = nb === nw ? "d" : nb > nw ? "b" : "w";
+    }
+    return true;
+  }
   if (room.game === "gomoku") {
     const x = Number(m.x), y = Number(m.y);
     if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= GOMOKU || y >= GOMOKU) return false;
@@ -179,7 +220,7 @@ wss.on("connection", (ws) => {
     if (ws.multi) { handleMulti(ws, m); return; }
     if (m.t === "join") {
       if (ws.room) return;
-      const game = ["c4", "vb", "pika"].includes(m.game) ? m.game : "gomoku";
+      const game = ["c4", "rv", "vb", "pika"].includes(m.game) ? m.game : "gomoku";
       const id = String(m.room || "default").slice(0, 80);
       const room = getRoom(game, id);
       ws.room = room;
@@ -201,8 +242,8 @@ wss.on("connection", (ws) => {
       if (room.busy) return;                               // 押金還在扣款
       if (!place(room, role, m)) return;
       if (room.offer) clearOffer(room);                    // 開始下棋就取消還沒人接的賭注
-      if (!room.winner) room.turn = role === "b" ? "w" : "b";
-      else settleWager(room, rebroadcast(room));
+      if (!room.winner && room.game !== "rv") room.turn = role === "b" ? "w" : "b";
+      if (room.winner) settleWager(room, rebroadcast(room));
       broadcast(room);
     } else if (m.t === "again") {
       if (role === "s" || !room.winner) return;
@@ -210,7 +251,7 @@ wss.on("connection", (ws) => {
       room.wager = null; room.wresult = null; room.offer = null;
       // 重新開局，先後手互換
       const { b, w } = room.players;
-      Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0 });
+      Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0, passed: null });
       room.players = { b: w, w: b };
       room.ping = { b: room.ping.w, w: room.ping.b };
       room.acc = 0;

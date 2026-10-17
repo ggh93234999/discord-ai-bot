@@ -2,6 +2,7 @@ import { DiscordSDK } from "@discord/embedded-app-sdk";
 import "./style.css";
 import { mountGomoku } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";
+import { mountReversi } from "./reversi.js";
 import { mountSlots } from "./slots.js";
 import { mountDown } from "./stairs.js";
 
@@ -26,23 +27,32 @@ if (inDiscord && clientId) {
 
 const app = document.getElementById("app");
 
+// cat：選單分類；players：人數標籤
+const CATS = [
+  { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
+  { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
+  { id: "casino", icon: "🎰", name: "賭場", note: "拿代幣玩" },
+];
 const GAMES = [
-  { id: "gomoku", icon: "⚫", name: "五子棋", desc: "兩人對戰，先連五子獲勝", mount: mountGomoku },
-  { id: "c4", icon: "🔴", name: "四連棋", desc: "兩人對戰，棋子往下掉，先連四顆獲勝", mount: mountConnect4 },
-  { id: "pika", icon: "⚡", name: "皮卡丘排球", desc: "單人對電腦，經典 1997 排球", mount: mountPikachu },
-  { id: "down", icon: "🪜", name: "小朋友下樓梯", desc: "最多 4 人，往下踩樓梯別被刺扎到", mount: mountDown },
-  { id: "slots", icon: "🎰", name: "老虎機", desc: "轉輪拉霸，練習模式隨便玩", mount: mountSlots },
-  { id: "pika2", icon: "⚡", name: "皮卡丘排球 2P", desc: "兩人連線對戰，伺服器運算", mount: mountPikachuOnline },
-  { id: "lf2", icon: "🥋", name: "小朋友齊打交", desc: "連線對戰 / 闖關，最多 8 角色", mount: mountLf2 },
+  { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
+  { id: "c4", cat: "board", icon: "🔴", name: "四連棋", players: "2 人", desc: "棋子往下掉，先連四顆", mount: mountConnect4 },
+  { id: "rv", cat: "board", icon: "⚪", name: "黑白棋", players: "2 人", desc: "夾住對方的棋就翻面", mount: mountReversi },
+  { id: "down", cat: "action", icon: "🪜", name: "小朋友下樓梯", players: "1–4 人", desc: "往下踩樓梯別被刺扎到", mount: mountDown },
+  { id: "pika", cat: "action", icon: "⚡", name: "皮卡丘排球", players: "1 人", desc: "單人對電腦，經典 1997", mount: mountPikachu },
+  { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
+  { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
+  { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "練習模式或真代幣賭注", mount: mountSlots },
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {
+  const card = (g) => `<button class="card" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
   app.innerHTML = `
     <div class="menu">
       <h1>遊戲間</h1>
-      <div class="cards">
-        ${GAMES.map((g) => `<button class="card" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><small>${g.desc}</small></button>`).join("")}
-      </div>
+      ${CATS.map((c) => {
+        const list = GAMES.filter((g) => g.cat === c.id);
+        return list.length ? `<section class="cat"><h2>${c.icon} ${c.name}<small>${c.note}</small></h2><div class="cards">${list.map(card).join("")}</div></section>` : "";
+      }).join("")}
     </div>`;
   app.querySelectorAll(".card").forEach((b) => {
     b.addEventListener("click", () => start(b.dataset.g));

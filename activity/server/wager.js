@@ -47,7 +47,7 @@ export function wagerView(room) {
   };
 }
 
-export function canWager(room) { return room.game === "gomoku" || room.game === "c4"; }
+export function canWager(room) { return room.game === "gomoku" || room.game === "c4" || room.game === "rv"; }
 
 // 回傳錯誤碼字串，成功回傳 null
 export function makeOffer(room, ws, role, amount) {
