@@ -9,3 +9,7 @@ src/pikachu_online.js
 server/pika/
 server/pika.js
 public/resources/
+
+# 本機 OAuth 密鑰備份
+server/.dc_oauth.txt
+server/internal.key

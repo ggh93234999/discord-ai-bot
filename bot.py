@@ -204,6 +204,7 @@ class Bot(discord.Client):
     async def setup_hook(self):
         self.http_session = aiohttp.ClientSession()
         economy.start_voice_loop()  # 掛語音也賺代幣
+        economy.start_internal_api()  # 給 Discord Activity 賭注模式用的內部 API
         aliases.add_english_aliases(self.tree)  # 每個中文指令再加一個英文名字的版本
         await self.sync_commands()
 

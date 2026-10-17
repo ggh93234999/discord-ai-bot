@@ -1,7 +1,9 @@
 // 雙人棋類房間伺服器（五子棋 gomoku、四連棋 c4）。
 // 一個 Discord Activity instance（instanceId）+ 遊戲種類 = 一個房間。
 // 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
+import http from "node:http";
 import { WebSocketServer } from "ws";
+import { handleApi, getSession, botInfo, botSettle } from "./bet.js";
 import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
@@ -102,7 +104,13 @@ function place(room, role, m) {
   return true;
 }
 
-const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1", path: "/ws", maxPayload: 4096 });
+const REAL_BETS = [10, 50, 100, 500];
+const httpServer = http.createServer((req, res) => {
+  if (req.url.startsWith("/api/")) return handleApi(req, res).catch(() => { try { res.writeHead(500); res.end(); } catch {} });
+  res.writeHead(404); res.end();
+});
+const wss = new WebSocketServer({ server: httpServer, path: "/ws", maxPayload: 4096 });
+httpServer.listen(PORT, "127.0.0.1");
 
 wss.on("connection", (ws) => {
   ws.isAlive = true;
@@ -116,6 +124,33 @@ wss.on("connection", (ws) => {
     // 老虎機練習模式：每條連線一份練習幣，不碰真代幣
     if (m.t === "slotjoin") { ws.practice = ws.practice ?? 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
     if (m.t === "slotreset") { ws.practice = 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
+    // 賭注模式：用登入憑證綁定 Discord 身分，之後的轉動會真的動代幣（由機器人那邊結算）
+    if (m.t === "bauth") {
+      const s = getSession(m.token);
+      if (!s) return send(ws, { t: "bauthed", ok: false });
+      ws.user = s;
+      botInfo(s.uid)
+        .then((r) => send(ws, { t: "bauthed", ok: !!r.ok, balance: r.balance, name: s.name }))
+        .catch(() => send(ws, { t: "bauthed", ok: false, error: "bot_down" }));
+      return;
+    }
+    if (m.t === "spin" && m.real) {
+      const u = ws.user, kind = Number(m.kind), bet = Number(m.bet);
+      if (!u) return send(ws, { t: "bauthed", ok: false });
+      if (!SLOT_KINDS[kind] || !REAL_BETS.includes(bet)) return;
+      if (ws.spinning || Date.now() - (ws.lastSpin || 0) < 800) return;
+      ws.spinning = true; ws.lastSpin = Date.now();
+      (async () => {
+        try {
+          const r = slotSpin(kind), back = Math.floor(bet * r.mult);     // 結果先由伺服器決定，再去結算
+          const st = await botSettle(u.uid, u.name, bet, back);
+          if (!st.ok) send(ws, { t: "slotinit", real: true, balance: st.balance ?? null, broke: st.error === "insufficient", error: st.error });
+          else send(ws, { t: "slot", real: true, kind, bet, back, balance: st.balance, ...r });
+        } catch { send(ws, { t: "slotinit", real: true, error: "bot_down", balance: null }); }
+        finally { ws.spinning = false; }
+      })();
+      return;
+    }
     if (m.t === "spin") {
       const kind = Number(m.kind), bet = Number(m.bet);
       if (!SLOT_KINDS[kind] || !Number.isInteger(bet) || bet < 1 || bet > 1000) return;

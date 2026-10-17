@@ -58,6 +58,7 @@ def on_message(msg: discord.Message) -> None:
 
 
 start_voice_loop = lambda: None   # setup() 之後換成真的
+start_internal_api = lambda: None   # setup() 之後換成真的
 
 
 def _acct(gid: int, uid: int, name: str | None = None) -> dict:
@@ -514,8 +515,80 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             except Exception:
                 log.exception("語音賺幣迴圈出錯")
 
-    global start_voice_loop
+    global start_voice_loop, start_internal_api
     start_voice_loop = lambda: asyncio.create_task(voice_earn_loop())
+
+    # ---- 內部 API：給 Discord Activity 的後端用（只聽 127.0.0.1，要帶金鑰）。
+    # 錢包只有機器人這個行程在讀寫，Activity 想動錢一律透過這裡，避免兩邊同時改 wallet.json。
+    async def internal_api():
+        from aiohttp import web
+        import hmac
+        key_file = Path(__file__).parent / "activity" / "server" / "internal.key"
+        try:
+            key = key_file.read_text().strip()
+        except OSError:
+            log.info("沒有 internal.key，不啟動 Activity 內部 API")
+            return
+        if len(key) < 32:
+            return
+
+        # 成員身分由 Activity 後端用玩家自己的 OAuth（guilds 範圍）確認過才會呼叫這裡；
+        # 這裡只認得金鑰，並且只服務機器人實際所在的伺服器。
+        def guild_ok(gid: int) -> bool:
+            return client.get_guild(gid) is not None
+
+        @web.middleware
+        async def auth(request, handler):
+            if not hmac.compare_digest(request.headers.get("X-Key", ""), key):
+                return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+            return await handler(request)
+
+        async def parse(request):
+            try:
+                d = await request.json()
+                return int(d["gid"]), int(d["uid"]), d
+            except Exception:
+                return None
+
+        async def info(request):
+            p = await parse(request)
+            if not p:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            gid, uid, _ = p
+            if not guild_ok(gid):
+                return web.json_response({"ok": False, "error": "no_guild"})
+            return web.json_response({"ok": True, "balance": balance(gid, uid)})
+
+        async def settle(request):
+            p = await parse(request)
+            if not p:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            gid, uid, d = p
+            try:
+                bet, back = int(d["bet"]), int(d["back"])
+            except Exception:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            if not (1 <= bet <= 1000) or back < 0 or back > bet * 100:
+                return web.json_response({"ok": False, "error": "bad_amount"}, status=400)
+            if not guild_ok(gid):
+                return web.json_response({"ok": False, "error": "no_guild"})
+            have = balance(gid, uid)
+            if have < bet:
+                return web.json_response({"ok": False, "error": "insufficient", "balance": have})
+            name = str(d.get("name") or uid)[:80]
+            new = add(gid, uid, back - bet, name)   # 同一個事件迴圈裡，沒有 await，不會被別的請求插隊
+            log.info("Activity 老虎機結算：%s 賭 %s 拿回 %s → 餘額 %s", name, bet, back, new)
+            return web.json_response({"ok": True, "balance": new})
+
+        app = web.Application(middlewares=[auth])
+        app.router.add_post("/wallet/info", info)
+        app.router.add_post("/wallet/settle", settle)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(runner, "127.0.0.1", 3107).start()
+        log.info("Activity 內部 API 已啟動（127.0.0.1:3107）")
+
+    start_internal_api = lambda: asyncio.create_task(internal_api())
 
     def check_bet(inter: discord.Interaction, bet: int) -> str | None:
         have = balance(inter.guild_id, inter.user.id)
