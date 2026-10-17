@@ -8,7 +8,7 @@ import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
-import { handleCasino, casinoClose, casinoFeed, recoverCasinoEscrow } from "./casino.js";
+import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow } from "./casino.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -163,14 +163,17 @@ recoverEscrow().catch((e) => console.log("escrow 還原失敗", e.message));
 recoverCasinoEscrow().catch((e) => console.log("賭場 escrow 還原失敗", e.message));
 httpServer.listen(PORT, "127.0.0.1");
 
-wss.on("connection", (ws) => {
-  ws.isAlive = true;
+wss.on("connection", (ws, req) => {
+  ws.ua = String((req && req.headers["user-agent"]) || "").replace(/.*discord\/([\d.]+).*/, "discord/$1").slice(0, 40); ws.mtypes = [];
+  ws.isAlive = true; ws.born = Date.now(); ws.missed = 0;
   ws.room = null;
-  ws.on("pong", () => { ws.isAlive = true; });
+  ws.on("pong", () => { ws.isAlive = true; ws.missed = 0; });
+  ws.on("error", (e) => console.log("ws error", e && e.message));
 
   ws.on("message", (raw) => {
     let m;
     try { m = JSON.parse(raw.toString()); } catch { return; }
+    if (ws.mtypes.length < 6) ws.mtypes.push(m.t);
     if (m.t === "ping") { send(ws, { t: "pong", ts: m.ts }); return; }
     // 老虎機練習模式：每條連線一份練習幣，不碰真代幣
     if (m.t === "slotjoin") { ws.practice = ws.practice ?? 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
@@ -180,6 +183,7 @@ wss.on("connection", (ws) => {
       const s = getSession(m.token);
       if (!s) return send(ws, { t: "bauthed", ok: false });
       ws.user = s;
+      casinoReclaim(ws);
       if (ws.room && roleOf(ws.room, ws) === "s" && reclaimSeat(ws.room, ws)) broadcast(ws.room);
       botInfo(s.uid)
         .then((r) => send(ws, { t: "bauthed", ok: !!r.ok, balance: r.balance, name: s.name }))
@@ -291,7 +295,8 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => {
+  ws.on("close", (code, reason) => {
+    console.log(`ws close code=${code} reason=${String(reason || "").slice(0, 40)} ua=${ws.ua} msgs=${ws.mtypes.join(",")} age=${Math.round((Date.now() - ws.born) / 1000)}s missed=${ws.missed} room=${ws.cr ? ws.cr.key : ws.room ? "board" : ws.multi ? "multi" : "-"}`);
     casinoClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
@@ -344,7 +349,7 @@ setInterval(tickMulti, 1000 / 60);
 // 心跳：斷線的連線清掉；沒人的房間 10 分鐘後刪除
 setInterval(() => {
   for (const ws of wss.clients) {
-    if (!ws.isAlive) { ws.terminate(); continue; }
+    if (!ws.isAlive && ++ws.missed >= 4) { ws.terminate(); continue; }   // 連續約 100 秒沒回應才斷線（代理可能吃掉 ping）
     ws.isAlive = false;
     ws.ping();
   }

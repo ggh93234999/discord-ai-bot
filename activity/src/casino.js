@@ -266,13 +266,13 @@ export function mountCasino(game, opts = {}) {
         betsBox.innerHTML = `<h4>本場下注${hs.bets.length ? `（${hs.bets.length} 人，共 ${money(tot)}）` : ""}</h4>${hs.bets.length ? hs.bets.map((b) => {
           const res = hs.phase === "result" ? (b.back > 0 ? `<b class="w">+${money(b.back - b.bet)}</b>` : `<b class="l">-${money(b.bet)}</b>`) : "";
           return `<div class="hb ${b.id === you ? "me" : ""}"><span class="hn">${b.real ? "💰" : "🎮"} ${esc(b.name)}${b.id === you ? "（你）" : ""}</span><span class="hp">${b.idx + 1}號 ${esc(hs.names[b.idx])}　${money(b.bet)}</span>${res}</div>`;
-        }).join("") : `<div class="mempty">還沒有人下注。你可以當第一個，或等朋友下注後旁觀比賽。</div>`}`;
+        }).join("") : `<div class="mempty">還沒有人下注。時間到不管有沒有人下注都會開跑，你可以當第一個，或純看比賽。</div>`}`;
       }
 
       clearInterval(tickTimer);
       if (hs.phase === "bet") {
         const cd = head.querySelector(".cd");
-        const tick = () => { const sec = Math.max(0, Math.ceil((hs.closeAt - serverNow()) / 1000)); cd.textContent = !hs.bets.length && sec === 0 ? "等人下注" : `${sec} 秒後截止`; };
+        const tick = () => { const sec = Math.max(0, Math.ceil((hs.closeAt - serverNow()) / 1000)); cd.textContent = sec === 0 ? "開跑中…" : `${sec} 秒後截止`; };
         tick(); tickTimer = setInterval(tick, 500);
         statusEl.textContent = spectate ? "旁觀中：下注時間到就開跑" : mine ? "已下注，等開跑" : "選馬、選賭注，按下注";
       }

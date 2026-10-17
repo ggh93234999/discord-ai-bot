@@ -15,6 +15,17 @@ const rnd = (n) => randomInt(n);
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 
+// ---- 賽馬場次：每個房間（Activity）各自累計，房間清空、伺服器重啟都不歸零
+const SFILE = fileURLToPath(new URL("./casino_state.json", import.meta.url));
+let raceNos = {};
+try { raceNos = JSON.parse(fs.readFileSync(SFILE, "utf8")).raceNos || {}; } catch {}
+function nextRaceNo(roomId) {
+  raceNos[roomId] = (raceNos[roomId] || 0) + 1;
+  const keys = Object.keys(raceNos); if (keys.length > 300) delete raceNos[keys[0]];
+  try { fs.writeFileSync(SFILE, JSON.stringify({ raceNos })); } catch (e) { console.log("場次寫入失敗", e.message); }
+  return raceNos[roomId];
+}
+
 // ---- 真代幣託管
 const EFILE = fileURLToPath(new URL("./casino_escrow.json", import.meta.url));
 let escrow = {};
@@ -145,7 +156,7 @@ function raceOrder(probs) {
 }
 function horseNew(room) {
   const card = newRaceCard();
-  room.h = { phase: "bet", id: randomBytes(5).toString("hex"), card, closeAt: Date.now() + BET_MS, bets: [], pending: 0, no: ++room.round };
+  room.h = { phase: "bet", id: randomBytes(5).toString("hex"), card, closeAt: Date.now() + BET_MS, bets: [], pending: 0, no: nextRaceNo(room.id) };
 }
 function horseView(room) {
   const h = room.h, c = h.card;
@@ -183,7 +194,6 @@ function horseTick() {
     if (h.phase === "closed") continue;
     if (h.phase === "bet" && now >= h.closeAt) {
       if (h.pending > 0) continue;
-      if (!h.bets.length) { h.closeAt = now + BET_MS; pushHorse(room); continue; }   // 沒人下注就繼續等，不開跑
       h.order = raceOrder(h.card.probs); h.win = h.order[0];
       const times = Array(6).fill(0); let t = 7500; h.order.forEach((i) => { times[i] = t; t += 250 + rnd(500); });
       h.times = times; h.startAt = now + 1000; h.phase = "run"; pushHorse(room);
@@ -208,6 +218,15 @@ export function listRooms() {
   return out.sort((a, b) => b.players.length - a.players.length);
 }
 
+// 重新整理／斷線重連後，用 Discord 身分認回這一場自己已下的注
+export function casinoReclaim(ws) {
+  const room = ws.cr, h = room && room.game === "horse" ? room.h : null;
+  if (!h || !ws.user) return;
+  let changed = false;
+  for (const b of h.bets) if (b.real && b.uid === ws.user.uid && b.ws !== ws) { b.ws = ws; changed = true; }
+  if (changed) { ws.creal = true; pushHorse(room); pushWho(room); }
+}
+
 const fail = (ws, r, extra = {}) => out(ws, { t: "cerr", error: r.error || "error", balance: r.balance, ...extra });
 
 export async function handleCasino(ws, m) {
@@ -222,7 +241,7 @@ export async function handleCasino(ws, m) {
     if (game === "horse" && !room.h) horseNew(room);
     out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid });
     pushWho(room);
-    if (game === "horse") out(ws, horseView(room));
+    if (game === "horse") { out(ws, horseView(room)); casinoReclaim(ws); }
     return true;
   }
   if (m.t === "creset") { if (!ws.bj) ws.cprac = PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); return true; }
@@ -278,7 +297,7 @@ export async function handleCasino(ws, m) {
       const room = ws.cr, h = room && room.game === "horse" ? room.h : null, idx = Number(m.idx);
       if (!h || h.phase !== "bet" || Date.now() >= h.closeAt) return fail(ws, { error: "closed" }), true;
       if (m.id !== h.id || !betOk || !Number.isInteger(idx) || idx < 0 || idx > 5) return true;
-      if (h.bets.some((b) => b.ws === ws) || ws.hpend === h.id) return fail(ws, { error: "already" }), true;
+      if (h.bets.some((b) => b.ws === ws || (real && b.real && b.uid && b.uid === ws.user?.uid)) || ws.hpend === h.id) return fail(ws, { error: "already" }), true;
       ws.hpend = h.id; h.pending++;
       const r = await stake(ws, real, bet, "賽馬");
       h.pending--;
