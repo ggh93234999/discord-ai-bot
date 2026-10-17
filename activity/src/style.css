@@ -310,3 +310,58 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .betlog .bl-r .g em{font-style:normal;opacity:.65;margin-left:6px;font-size:11px}
 .betlog .bl-r .b{opacity:.8;white-space:nowrap}.betlog .bl-r b{text-align:right}
 @media (min-width:900px){.betlog{position:fixed;right:14px;top:64px;width:300px;max-width:300px;margin:0;max-height:calc(100vh - 90px);overflow:auto;z-index:5}.betlog .bl-list{max-height:calc(100vh - 220px)}}
+/* 馬匹介紹卡（四版型） */
+.casino .hui{display:flex;gap:4px;width:100%;margin-bottom:6px}
+.casino .hui button{flex:1;padding:5px 2px;border:1px solid #3b4252;border-radius:6px;background:#20232c;color:#aab;font-size:12px;cursor:pointer}
+.casino .hui button.on{background:#e0a526;color:#111;border-color:#e0a526;font-weight:700}
+.casino .hcards{display:flex;flex-direction:column;gap:8px;width:100%}
+.casino .hcard{position:relative;width:100%;text-align:left;color:#fff;cursor:pointer;font:inherit;padding:0;border:0;background:none}
+.casino .hcard .none{opacity:.5}
+.casino .hcard .pl{display:inline-block;width:17px;height:17px;line-height:17px;margin-left:2px;border-radius:4px;text-align:center;font-style:normal;font-size:11px;font-weight:700;background:#3b4252;color:#ddd}
+.casino .hcard .pl.p1{background:#ffd54f;color:#321} .casino .hcard .pl.p2{background:#cfd8dc;color:#222} .casino .hcard .pl.p3{background:#d08a4e;color:#221}
+.casino .hcard .hot{color:#ff7043}.casino .hcard .up{color:#9ccc65}.casino .hcard .mid{color:#cfd8dc}.casino .hcard .down{color:#ffb74d}.casino .hcard .cold{color:#64b5f6}
+.casino .hcard.sel{outline:3px solid #ffca28;outline-offset:1px} .casino .hcard.mine::after{content:"我押";position:absolute;right:6px;top:6px;background:#e0a526;color:#111;font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;z-index:3}
+.casino .hcard .bar,.casino .hcard .led{flex:1;height:7px;border-radius:4px;background:#0003;overflow:hidden}
+.casino .hcard .st{display:flex;align-items:center;gap:6px;font-size:12px}.casino .hcard .st span{width:34px;opacity:.8}.casino .hcard .st em{font-style:normal;width:22px;text-align:right}
+.casino .hcard .bar u{display:block;height:100%;background:linear-gradient(90deg,#26c6da,#ffee58)}
+/* A 出馬表 */
+.casino .va{display:grid;grid-template-columns:44px 1fr 62px;border-radius:6px;overflow:hidden;background:#f3ead2;color:#2a2318;border:2px solid #8d7b4f;font-family:"Noto Serif TC",serif}
+.casino .va .no{display:flex;align-items:center;justify-content:center;background:var(--s);color:#fff;font-size:26px;font-weight:900;text-shadow:0 1px 2px #0006}
+.casino .va .body{padding:6px 8px;display:flex;flex-direction:column;gap:3px}
+.casino .va .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.casino .va .nm{font-size:18px}
+.casino .va .tag{font-size:11px;padding:0 6px;border:1px solid #8d7b4f;border-radius:3px}.casino .va .form{font-size:12px;font-weight:700}.casino .va .ppl{font-size:11px;margin-left:auto}
+.casino .va .bl{font-size:12px;opacity:.8}.casino .va .sts{display:grid;gap:1px}.casino .va .st em{color:#2a2318}
+.casino .va .rec{display:flex;justify-content:space-between;font-size:12px;border-top:1px dashed #8d7b4f;padding-top:3px}
+.casino .va .odds{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#2a2318;color:#ffd54f}.casino .va .odds b{font-size:20px}.casino .va .odds small{font-size:10px;opacity:.7}
+.casino .va .hot{color:#c62828}.casino .va .up{color:#2e7d32}.casino .va .mid{color:#555}.casino .va .down{color:#e65100}.casino .va .cold{color:#1565c0}
+/* B 戰鬥卡 */
+.casino .vb{padding:8px 10px;border-radius:12px;border:2px solid var(--c);background:linear-gradient(135deg,#12141c,#1e2233);box-shadow:0 0 12px -2px var(--c),inset 0 0 18px -10px var(--c)}
+.casino .vbhead{display:flex;align-items:center;gap:8px}.casino .vb .no{background:var(--c);color:#111;font-weight:900;border-radius:6px;padding:0 8px;font-size:18px}
+.casino .vb .nm{font-size:18px;text-shadow:0 0 8px var(--c)}.casino .vb .tag{font-size:11px;padding:1px 8px;border-radius:10px;background:var(--c);color:#111;font-weight:700}
+.casino .vb .oddsb{margin-left:auto;font-size:18px;font-weight:900;color:#ffd54f}
+.casino .vbmid{display:flex;gap:8px;align-items:center;margin:4px 0}.casino .vb .radar{width:76px;height:76px;flex:none}.casino .vb .radar text{fill:#fff;font-size:8px}
+.casino .vb .info{flex:1;display:flex;flex-direction:column;gap:3px}.casino .vb .bl{font-size:12px;opacity:.85}.casino .vbf{font-size:12px;font-weight:700}
+.casino .vbn{display:flex;gap:10px;font-size:12px;opacity:.9}.casino .vbn b{color:var(--c)}
+.casino .vbfoot{display:flex;justify-content:space-between;align-items:center;font-size:12px;border-top:1px solid #fff2;padding-top:4px}
+/* C 儀表板 */
+.casino .vc{padding:8px;border-radius:6px;background:#0b0f14;border:1px solid #1f3a4a;border-left:5px solid var(--s);font-family:ui-monospace,Menlo,monospace}
+.casino .vcrow{display:grid;grid-template-columns:26px 1fr auto auto auto;gap:8px;align-items:center}
+.casino .vc .no{font-size:20px;color:var(--s);font-weight:900}.casino .vc .id{display:flex;flex-direction:column;align-items:flex-start}.casino .vc .nm{font-size:16px;color:#e0f7fa}.casino .vc .tag{font-size:10px;color:#4dd0e1}
+.casino .vc .trend{text-align:center;font-size:14px}.casino .vc .trend small{display:block;font-size:10px}
+.casino .vc .spk{text-align:center}.casino .vc .spark{width:64px;height:24px}.casino .vc .spk small{display:block;font-size:9px;opacity:.6}
+.casino .vc .odds{text-align:center;background:#102a33;border:1px solid #26c6da;border-radius:4px;padding:2px 8px}.casino .vc .odds b{display:block;font-size:20px;color:#76ff03}.casino .vc .odds small{font-size:9px;color:#4dd0e1}
+.casino .vcmore{margin-top:6px;display:grid;gap:3px;font-size:11px}.casino .vc .led{display:flex;gap:2px;background:none;height:8px}.casino .vc .led u{flex:1;background:#17303a;border-radius:1px}.casino .vc .led u.on{background:#00e5ff;box-shadow:0 0 4px #00e5ff}
+.casino .vc .bl{opacity:.75}.casino .vc .rec{color:#80cbc4}
+/* D 收藏卡 */
+.casino .hv-D{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.casino .vd{padding:3px;border-radius:12px;background:linear-gradient(135deg,#888,#ccc,#888);display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.casino .vd>*{margin:0 3px}.casino .vd .art{position:relative;height:74px;margin:0;border-radius:9px 9px 0 0;background:radial-gradient(circle at 50% 60%,var(--c),#111 75%);display:flex;align-items:center;justify-content:center}
+.casino .vd .horse{font-size:38px;filter:drop-shadow(0 2px 6px #000)}.casino .vd .no{position:absolute;left:6px;top:4px;font-size:18px;font-weight:900;color:#fff;text-shadow:0 1px 3px #000}
+.casino .vd .rar{position:absolute;right:6px;top:5px;font-size:10px;padding:0 6px;border-radius:8px;background:#000a}.casino .vd .sty{position:absolute;left:6px;bottom:4px;font-size:10px;background:var(--s);padding:0 6px;border-radius:8px;color:#fff}
+.casino .vd .nm{font-weight:900;font-size:15px;text-align:center;color:#111}.casino .vd .vds{display:flex;justify-content:space-around;font-size:12px;color:#222}
+.casino .vd .bl{font-size:11px;color:#333;text-align:center;min-height:30px}.casino .vd .vdr{font-size:11px;color:#222;display:flex;flex-direction:column;align-items:center;gap:2px}
+.casino .vd .vdf{display:flex;justify-content:space-between;font-size:12px;font-weight:700;background:#111;margin:0;padding:4px 8px;border-radius:0 0 9px 9px}.casino .vd .rib{color:#ffd54f}
+.casino .vd.r-common{background:linear-gradient(135deg,#777,#bbb,#777)}.casino .vd.r-good{background:linear-gradient(135deg,#2e7d32,#a5d6a7,#2e7d32)}
+.casino .vd.r-rare{background:linear-gradient(135deg,#1565c0,#90caf9,#7e57c2)}
+.casino .vd.r-legend{background:linear-gradient(120deg,#ff5252,#ffd740,#69f0ae,#40c4ff,#e040fb,#ff5252);background-size:200% 200%;animation:holo 4s linear infinite}
+@keyframes holo{to{background-position:200% 0}}
