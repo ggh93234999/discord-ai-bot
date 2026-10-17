@@ -167,14 +167,33 @@ export function listPokerTables() {
   return res;
 }
 
+// 隨機挑一個電腦名字：不挑目前在桌上的，也盡量不挑這桌打過的（全都打過了才重新洗牌）
+function pickBotName(t) {
+  const seated = new Set(t.seats.filter(Boolean).map((x) => x.name));
+  const free = BOT_NAMES.filter((n) => !seated.has("🤖" + n));
+  t.botHist = t.botHist || new Set();
+  let pool = free.filter((n) => !t.botHist.has(n));
+  if (!pool.length) { t.botHist = new Set(); pool = free; }
+  if (!pool.length) return "電腦" + (++t.botSeq);
+  const n = pool[Math.floor(Math.random() * pool.length)];
+  t.botHist.add(n);
+  return n;
+}
 function seatPlayer(t, i, o) {
   t.seats[i] = { ws: null, pid: null, bot: false, name: "", chips: START, hole: [], bet: 0, total: 0, folded: false, allin: false, acted: false, inHand: false, last: "", score: null, idle: 0, ...o };
 }
 
 // ---- 一手牌
 function startHand(t) {
+  const swaps = [];
   const players = t.seats.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
-  for (const i of players) { const s = t.seats[i]; if (s.chips < BB) { s.chips = START; s.last = "補充籌碼"; } }
+  for (const i of players) {
+    const s = t.seats[i];
+    if (s.chips < BB) {
+      if (s.bot) { const old = s.name; seatPlayer(t, i, { bot: true, name: "🤖" + pickBotName(t), last: "新電腦" }); swaps.push(`${old} 輸光了，換 ${t.seats[i].name} 入座`); }   // 電腦輸光就換一個新的
+      else { s.chips = START; s.last = "補充籌碼"; }
+    }
+  }
   if (players.length < 2) { t.phase = "wait"; t.toAct = -1; t.log = "等玩家入座…（可以加電腦）"; return; }
   t.handNo++; t.deck = newDeck(); t.board = []; t.result = null; t.phase = "preflop";
   for (const i of players) { const s = t.seats[i]; Object.assign(s, { hole: [t.deck.pop(), t.deck.pop()], bet: 0, total: 0, folded: false, allin: false, acted: false, inHand: true, last: "", score: null }); }
@@ -187,7 +206,7 @@ function startHand(t) {
   const post = (i, amt) => { const s = t.seats[i], a = Math.min(amt, s.chips); s.chips -= a; s.bet += a; s.total += a; if (!s.chips) s.allin = true; s.last = amt === SB ? "小盲" : "大盲"; };
   post(sbI, SB); post(bbI, BB);
   t.curBet = BB; t.minRaise = BB;
-  t.log = `第 ${t.handNo} 手：${t.seats[sbI].name} 小盲 ${SB}，${t.seats[bbI].name} 大盲 ${BB}`;
+  t.log = (swaps.length ? swaps.join("；") + "。" : "") + `第 ${t.handNo} 手：${t.seats[sbI].name} 小盲 ${SB}，${t.seats[bbI].name} 大盲 ${BB}`;
   t.toAct = nextActor(t, bbI);
   armTimer(t);
   if (t.toAct < 0) runout(t);
@@ -354,9 +373,7 @@ export function handlePoker(ws, m) {
     if (mine < 0) return true;                                   // 要先入座才能加電腦
     const i = Number.isInteger(Number(m.seat)) && !t.seats[Number(m.seat)] && Number(m.seat) >= 0 && Number(m.seat) < SEATS ? Number(m.seat) : t.seats.findIndex((s) => !s);
     if (i < 0) return out(ws, { t: "perr", error: "full" }), true;
-    const used = new Set(t.seats.filter(Boolean).map((s) => s.name));
-    const name = BOT_NAMES.find((n) => !used.has("🤖" + n)) || "電腦" + (++t.botSeq);
-    seatPlayer(t, i, { bot: true, name: "🤖" + name }); push(t);
+    seatPlayer(t, i, { bot: true, name: "🤖" + pickBotName(t) }); push(t);
   } else if (m.t === "pdelbot") {
     const i = Number(m.seat), s = t.seats[i];
     if (mine < 0 || !s || !s.bot) return true;
