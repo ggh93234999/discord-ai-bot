@@ -154,6 +154,19 @@ const horses = (() => {
   try { fs.writeFileSync(HFILE, JSON.stringify(d, null, 1)); } catch {}
   return d;
 })();
+// 每匹馬的固定特色：跑法（只影響比賽演出的節奏，不改變勝率）、毛色、個性介紹
+const TRAITS = {
+  "赤兔": { style: "先行", coat: "#b5462d", mane: "#2a1a10", blurb: "人中呂布、馬中赤兔。起跑俐落，一路緊咬前段，不太容易被追過。" },
+  "烏騅": { style: "逃馬", coat: "#1c1c20", mane: "#08080a", blurb: "脾氣烈的黑馬，一開閘就衝到最前面，但後段容易喘。" },
+  "的盧": { style: "穩定", coat: "#6b4a2e", mane: "#1f130b", blurb: "傳說會躍過檀溪的名駒。全程速度平均，越到後面越穩。" },
+  "絕影": { style: "追込", coat: "#8d9094", mane: "#4a4d52", blurb: "像影子一樣安靜，前半段落在後面，最後直線暴衝追上來。" },
+  "爪黃飛電": { style: "逃馬", coat: "#c8a24b", mane: "#f2e3a6", blurb: "金黃毛色、腳程飛快，開局搶位最兇，後半看體力。" },
+  "踏雪": { style: "穩定", coat: "#f2f2f0", mane: "#cfd3d6", blurb: "四蹄踏雪的優雅白馬，步伐平穩，很少出大失誤。" },
+  "照夜玉獅子": { style: "先行", coat: "#fbfbfb", mane: "#d9dde0", blurb: "通體雪白的名駒，一出閘就搶前排，氣勢最盛。" },
+  "追風": { style: "追込", coat: "#a9754b", mane: "#3a2415", blurb: "名字就是追風：慢熱型，後半程一路追趕前面的馬。" },
+  "驊騮": { style: "爆發", coat: "#5a3a22", mane: "#1a0f08", blurb: "周穆王八駿之一。前面不急，最後 200 公尺會突然加速。" },
+  "飛黃": { style: "爆發", coat: "#e3b23c", mane: "#fff0b8", blurb: "神話裡的瑞獸之馬，衝刺力一流，最後直線最可怕。" },
+};
 function recordRace(names, order) {
   order.forEach((idx, k) => { const h = horses[names[idx]]; h.races++; if (k === 0) h.wins++; if (k < 3) h.top3++; h.last = [...h.last, k + 1].slice(-5); });
   try { fs.writeFileSync(HFILE, JSON.stringify(horses, null, 1)); } catch (e) { console.log("馬匹戰績寫入失敗", e.message); }
@@ -183,7 +196,7 @@ function horseNew(room) {
 function horseView(room) {
   const h = room.h, c = h.card;
   return { t: "hstate", phase: h.phase, id: h.id, no: h.no, names: c.names, forms: c.forms, odds: c.odds, probs: c.probs.map((p) => Math.round(p * 1000) / 10),
-    info: c.names.map((n) => { const x = horses[n]; return { spd: x.spd, sta: x.sta, bst: x.bst, races: x.races, wins: x.wins, last: x.last }; }), now: Date.now(), closeAt: h.closeAt,
+    info: c.names.map((n) => { const x = horses[n]; return { spd: x.spd, sta: x.sta, bst: x.bst, races: x.races, wins: x.wins, last: x.last, ...(TRAITS[n] || {}) }; }), now: Date.now(), closeAt: h.closeAt,
     startAt: h.startAt, times: h.times, order: h.order, win: h.win, resultAt: h.resultAt,
     bets: h.bets.map((b) => ({ id: b.ws.cid, name: b.name, idx: b.idx, bet: b.bet, real: b.real, back: b.back })) };
 }

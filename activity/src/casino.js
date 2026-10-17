@@ -242,7 +242,7 @@ export function mountCasino(game, opts = {}) {
     function horseInfo(i) {
       const f = hs.info && hs.info[i]; if (!f) return "";
       const rec = f.races ? `${f.races} 戰 ${f.wins} 勝（${Math.floor(f.wins * 100 / f.races)}%）` : "新馬，還沒有戰績";
-      return `<div class="hd">勝率約 <b>${hs.probs ? hs.probs[i] : "?"}%</b>　速度 ${bar5(f.spd)} ${f.spd}　耐力 ${bar5(f.sta)} ${f.sta}　爆發 ${bar5(f.bst)} ${f.bst}<br>戰績 ${rec}　近 5 場：${f.last.length ? f.last.join("、") : "—"}</div>`;
+      return `<div class="hd"><span class="coat" style="background:${f.coat || "#999"}"></span><b>${esc(f.style || "")}</b>　${esc(f.blurb || "")}<br>勝率約 <b>${hs.probs ? hs.probs[i] : "?"}%</b>　速度 ${bar5(f.spd)} ${f.spd}　耐力 ${bar5(f.sta)} ${f.sta}　爆發 ${bar5(f.bst)} ${f.bst}<br>戰績 ${rec}　近 5 場：${f.last.length ? f.last.join("、") : "—"}</div>`;
     }
     function renderHorse() {
       if (!hs) return;
@@ -288,9 +288,11 @@ export function mountCasino(game, opts = {}) {
         statusEl.textContent = hs.phase === "run" ? "🏇 開跑！" : m ? (m.back > 0 ? `🎉 押中了！+${money(m.back - m.bet)}` : `😢 沒押中 -${money(m.bet)}`) : `🏆 ${hs.names[hs.win]} 奪冠`;
       } else hsig.round = "";
     }
-    // ---- 賽道：canvas 畫的，馬有起伏、揚塵、速度忽快忽慢（最後名次由伺服器決定，每匹馬的跑法只是在同一個終點時間前加上起伏）
+    // ---- 賽道：canvas 畫的。每匹馬有固定的毛色與跑法（逃馬／先行／穩定／追込／爆發），腿部有完整的奔馳動作；
+    // 名次仍由伺服器決定，跑法只是決定「在同一個終點時間前」怎麼跑（誰起跑快、誰後段追上）。
     const SILK = ["#e53935", "#1e88e5", "#fdd835", "#43a047", "#8e24aa", "#fb8c00"];
     const EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    let rph = [];
     function sizeRace() {
       if (!rcv) return;
       rW = rcv.parentElement.clientWidth || 340; rH = 332;
@@ -301,19 +303,84 @@ export function mountCasino(game, opts = {}) {
     function initRace() {      // 用場次 id 當種子，每個人看到同樣的起伏
       let h = 2166136261; for (const ch of hs.id) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
       const rng = () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-      rseed = hs.names.map(() => ({ k: 2 + Math.floor(rng() * 2), phi: rng(), a: 0.32 + rng() * 0.2 }));
+      rseed = hs.names.map(() => ({ k: 2 + Math.floor(rng() * 2), phi: rng(), a: 0.16 + rng() * 0.16 }));
+      rph = hs.names.map(() => rng() * 6.28);
       rparts = [];
     }
+    // 跑法：把時間比例 u(0..1) 換成路程比例（都是遞增、起點 0、終點 1）
+    const SHAPE = {
+      "逃馬": (u) => 0.62 * (1 - Math.pow(1 - u, 1.7)) + 0.38 * u,
+      "先行": (u) => 0.4 * (1 - Math.pow(1 - u, 1.4)) + 0.6 * u,
+      "追込": (u) => 0.62 * Math.pow(u, 1.8) + 0.38 * u,
+      "爆發": (u) => 0.5 * Math.pow(u, 2.6) + 0.5 * u,
+    };
+    const styleOf = (i) => (hs.info && hs.info[i] && hs.info[i].style) || "穩定";
     function prog(i, t) {
-      const u = Math.max(0, Math.min(1, t / hs.times[i])), q = rseed[i];
+      const u0 = Math.max(0, Math.min(1, t / hs.times[i])), q = rseed[i];
+      const u = (SHAPE[styleOf(i)] || ((x) => x))(u0);
       const f = u + q.a * (Math.sin(2 * Math.PI * (q.k * u + q.phi)) - Math.sin(2 * Math.PI * q.phi)) / (2 * Math.PI * q.k);
       const g = Math.max(0, Math.min(1, f));
-      return g * g * 0.22 + g * 0.78;            // 起跑稍慢，之後加速
+      return g * g * 0.18 + g * 0.82;            // 起跑稍慢，之後加速
+    }
+    // 一匹馬（朝右）。S = 大小（約等於馬長），ph = 步伐相位，run = 是否在跑
+    function drawHorse(c, cx, cy, S, ph, run, coat, mane, silk, num) {
+      const k = (v) => v * S, OUT = "rgba(0,0,0,.5)";
+      const limb = (x1, y1, x2, y2, w, col) => {
+        c.lineCap = "round"; c.strokeStyle = OUT; c.lineWidth = k(w + 0.022); c.beginPath(); c.moveTo(k(x1), k(y1)); c.lineTo(k(x2), k(y2)); c.stroke();
+        c.strokeStyle = col; c.lineWidth = k(w); c.beginPath(); c.moveTo(k(x1), k(y1)); c.lineTo(k(x2), k(y2)); c.stroke();
+      };
+      c.save(); c.translate(cx, cy);
+      const bob = run ? -Math.abs(Math.sin(ph + 0.4)) * 0.05 * S : 0, pitch = run ? Math.sin(ph + 0.9) * 0.055 : 0;
+      c.translate(0, bob); c.rotate(pitch);
+      c.lineJoin = "round";
+      const shade = (col, f) => { const n = parseInt(col.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255; const m = (v) => Math.max(0, Math.min(255, Math.round(v * f))); return `rgb(${m(r)},${m(g)},${m(b)})`; };
+      const far = shade(coat, 0.72);
+      const leg = (hx, hy, off, col, hind) => {
+        const a = ph + off * 6.283, sw = run ? Math.sin(a) : 0, lift = run ? Math.max(0, Math.sin(a + 1.2)) : 0;
+        const th1 = sw * 0.8 + (hind ? -0.05 : 0.05);
+        const th2 = hind ? th1 + 0.25 - lift * 1.05 : th1 - lift * 1.15 - 0.08;
+        const kx = hx + Math.sin(th1) * 0.2, ky = hy + Math.cos(th1) * 0.2, fx = kx + Math.sin(th2) * 0.2, fy = ky + Math.cos(th2) * 0.2;
+        limb(hx, hy, kx, ky, 0.07, col); limb(kx, ky, fx, fy, 0.045, col);
+        c.fillStyle = "#222"; c.beginPath(); c.arc(k(fx), k(fy), k(0.03), 0, 7); c.fill();
+        return [fx, fy];
+      };
+      // 尾巴
+      const tw = run ? Math.sin(ph - 0.7) * 0.06 : 0.01;
+      c.strokeStyle = mane; c.lineWidth = k(0.06); c.lineCap = "round"; c.beginPath(); c.moveTo(k(-0.3), k(-0.07)); c.quadraticCurveTo(k(-0.45), k(-0.12 + tw), k(-0.55), k(0.05 + tw * 2)); c.stroke();
+      // 遠側的腿
+      const feet = [leg(-0.21, 0.07, 0.12, far, true), leg(0.2, 0.08, 0.57, far, false)];
+      // 身體
+      c.fillStyle = coat; c.strokeStyle = OUT; c.lineWidth = k(0.022);
+      c.beginPath(); c.ellipse(0, 0, k(0.31), k(0.14), 0, 0, 7); c.fill(); c.stroke();
+      // 脖子與頭（跑的時候頭會上下點）
+      const hb = run ? Math.sin(ph + 1.6) * 0.03 : 0;
+      limb(0.2, -0.04, 0.35, -0.22 + hb * 0.5, 0.13, coat);
+      c.save(); c.translate(k(0.44), k(-0.25 + hb)); c.rotate(0.72);
+      c.fillStyle = coat; c.beginPath(); c.ellipse(0, 0, k(0.115), k(0.05), 0, 0, 7); c.fill(); c.stroke();
+      c.restore();
+      c.fillStyle = coat; c.beginPath(); c.moveTo(k(0.38), k(-0.3 + hb)); c.lineTo(k(0.405), k(-0.38 + hb)); c.lineTo(k(0.43), k(-0.3 + hb)); c.closePath(); c.fill(); c.stroke();   // 耳朵
+      c.fillStyle = "#111"; c.beginPath(); c.arc(k(0.455), k(-0.285 + hb), k(0.011), 0, 7); c.fill();
+      // 鬃毛
+      const mw = run ? Math.sin(ph + 0.2) * 0.04 : 0;
+      c.strokeStyle = mane; c.lineWidth = k(0.05); c.beginPath(); c.moveTo(k(0.31), k(-0.31 + hb)); c.quadraticCurveTo(k(0.2 - mw), k(-0.26), k(0.12 - mw * 1.5), k(-0.1)); c.stroke();
+      // 近側的腿
+      leg(-0.24, 0.07, 0.0, coat, true); leg(0.22, 0.08, 0.45, coat, false);
+      // 馬衣（號碼布）與騎師
+      c.fillStyle = silk; c.strokeStyle = OUT; c.lineWidth = k(0.015);
+      c.beginPath(); c.rect(k(-0.1), k(-0.15), k(0.2), k(0.1)); c.fill(); c.stroke();
+      c.fillStyle = "#fff"; c.font = `bold ${Math.max(8, k(0.085))}px sans-serif`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(num), 0, k(-0.1));
+      const jb = run ? Math.sin(ph + 0.5) * 0.012 : 0;
+      limb(-0.02, -0.14, 0.12, -0.28 + jb, 0.075, silk);
+      limb(0.11, -0.27 + jb, 0.29, -0.25 + hb, 0.025, "#eee");
+      c.fillStyle = "#f3c9a0"; c.beginPath(); c.arc(k(0.17), k(-0.325 + jb), k(0.038), 0, 7); c.fill();
+      c.fillStyle = silk; c.beginPath(); c.arc(k(0.17), k(-0.335 + jb), k(0.043), Math.PI, 0); c.fill();
+      c.restore();
+      return feet;
     }
     function drawRace(t, dt) {
       const c = rctx; if (!c || !rseed.length) return;
-      const n = hs.names.length, top = 36, laneH = (rH - top - 8) / n, x0 = 78, x1 = rW - 58, len = x1 - x0;
-      const mine = myBet(), running = t >= 0 && t < Math.max(...hs.times);
+      const n = hs.names.length, top = 36, laneH = (rH - top - 8) / n, x0 = 96, x1 = rW - 74, len = x1 - x0, sq = laneH / 4;
+      const tmax = Math.max(...hs.times), mine = myBet(), running = t >= 0 && t < tmax + 1600;
       c.clearRect(0, 0, rW, rH);
       c.fillStyle = "#17241a"; c.fillRect(0, 0, rW, top);
       for (let k = 0; k < rW / 11; k++) {          // 看台上的觀眾
@@ -333,25 +400,34 @@ export function mountCasino(game, opts = {}) {
       for (const f of [0.25, 0.5, 0.75]) { const x = x0 + f * len; c.beginPath(); c.moveTo(x, top); c.lineTo(x, top + n * laneH); c.stroke(); }
       c.setLineDash([]);
       c.strokeStyle = "#fff"; c.lineWidth = 2; c.beginPath(); c.moveTo(x0 - 2, top); c.lineTo(x0 - 2, top + n * laneH); c.stroke();   // 起跑線
-      const sq = laneH / 4;                                                    // 終點的方格旗
-      for (let r = 0; r < n * 4; r++) for (let k = 0; k < 2; k++) { c.fillStyle = (r + k) % 2 ? "#111" : "#fff"; c.fillRect(x1 + k * sq, top + r * sq, sq, sq); }
+      for (let r = 0; r < n * 4; r++) for (let k = 0; k < 2; k++) { c.fillStyle = (r + k) % 2 ? "#111" : "#fff"; c.fillRect(x1 + k * sq, top + r * sq, sq, sq); }   // 終點方格旗
       const ps = hs.names.map((_, i) => prog(i, t));
       let lead = 0; ps.forEach((p, i) => { if (p > ps[lead]) lead = i; });
+      if (hs.order && t >= Math.min(...hs.times)) lead = hs.order[0];        // 已經有馬衝線，領先的就是冠軍
+      // 由上往下畫，下面的馬蓋在上面的馬前面
       for (let i = 0; i < n; i++) {
-        const p = ps[i], yc = top + i * laneH + laneH / 2, x = x0 + p * (len - 10);
-        const moving = running && p < 1, bob = moving ? Math.sin(t / 65 + i * 2.1) * 2.6 : 0;
+        const p = ps[i], yc = top + i * laneH + laneH / 2, info = hs.info && hs.info[i] || {};
+        const after = Math.max(0, t - hs.times[i]), run = t >= 0 && after < 1500;                  // 衝線後再滑行一小段、慢慢停下來
+        const slide = after > 0 ? (1 - Math.pow(1 - Math.min(1, after / 1500), 2)) * 46 : 0;
+        const x = x0 + p * len + slide;
+        // 步頻跟著當下的速度走
+        const v = t >= 0 && p < 1 ? (prog(i, t + 60) - p) / 60 * hs.times[i] : after < 1500 ? Math.max(0, 1 - after / 1500) : 0;
+        rph[i] += dt * 6.283 * (run ? 1.6 + 1.5 * Math.max(0.3, Math.min(2.2, v)) : 0);
         if (mine && mine.idx === i) { c.strokeStyle = "#e0a526"; c.lineWidth = 2; c.strokeRect(1, top + i * laneH + 1, rW - 2, laneH - 2); }
-        if (moving && Math.random() < 60 * dt) rparts.push({ x: x - 12, y: yc + laneH * 0.28, vx: -30 - Math.random() * 40, vy: -Math.random() * 18, life: 0.5, max: 0.5, r: 2 + Math.random() * 2, dust: 1 });
-        c.save(); c.translate(x, yc + bob); c.scale(-1, 1); c.font = `${Math.floor(laneH * 0.82)}px ${EMO}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("🐎", 0, 1); c.restore();
-        c.fillStyle = SILK[i % 6]; c.beginPath(); c.arc(x - 3, yc - laneH * 0.16 + bob, 7, 0, 7); c.fill();
-        c.fillStyle = "#fff"; c.font = "bold 10px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(i + 1), x - 3, yc - laneH * 0.16 + bob + 1);
-        c.textAlign = "left"; c.font = "12px sans-serif"; c.fillStyle = "rgba(255,255,255,.85)";
-        c.fillText(`${i + 1} ${hs.names[i]}${mine && mine.idx === i ? " ★" : ""}`, 6, yc);
-        if (p >= 1 && hs.order) { const pl = hs.order.indexOf(i); c.textAlign = "left"; c.font = "16px " + EMO; c.fillText(["🥇", "🥈", "🥉"][pl] || String(pl + 1), x1 + sq * 2 + 4, yc); }
-        if (i === lead && running && p > 0.04) { c.font = "16px " + EMO; c.textAlign = "center"; c.fillText("👑", x - 3, yc - laneH * 0.55 + bob); }
+        const S = laneH * 1.02;
+        if (run && Math.random() < 70 * dt) rparts.push({ x: x - S * 0.3, y: yc + S * 0.38, vx: -35 - Math.random() * 45, vy: -Math.random() * 20, life: 0.55, max: 0.55, r: 2 + Math.random() * 2.5, dust: 1 });
+        drawHorse(c, x, yc - S * 0.04, S, rph[i], run, info.coat || "#a9754b", info.mane || "#2a1a10", SILK[i % 6], i + 1);
+        // 左邊：名次獎牌／號碼 + 名字 + 跑法
+        c.textAlign = "left"; c.textBaseline = "middle";
+        const pl = hs.order && p >= 1 ? hs.order.indexOf(i) : -1;
+        if (pl >= 0 && pl < 3) { c.font = "15px " + EMO; c.fillStyle = "#fff"; c.fillText(["🥇", "🥈", "🥉"][pl], 3, yc); }
+        else { c.font = "bold 12px sans-serif"; c.fillStyle = SILK[i % 6]; c.fillText(pl >= 0 ? `${pl + 1}.` : String(i + 1), 6, yc); }
+        c.font = "12px sans-serif"; c.fillStyle = "rgba(255,255,255,.9)"; c.fillText(`${hs.names[i]}${mine && mine.idx === i ? " ★" : ""}`, 24, yc - 6);
+        c.font = "10px sans-serif"; c.fillStyle = "rgba(255,255,255,.55)"; c.fillText(info.style || "", 24, yc + 8);
+        if (i === lead && t > 0 && t < tmax && p > 0.04) { c.font = "15px " + EMO; c.textAlign = "center"; c.fillText("👑", x + S * 0.1, yc - S * 0.62); }
       }
-      if (t < 0) { c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(0, top, rW, n * laneH); c.fillStyle = "#fff"; c.font = "bold 28px sans-serif"; c.textAlign = "center"; c.fillText("預備…", rW / 2, top + n * laneH / 2); }
-      else if (running) {                                                         // 轉播字幕
+      if (t < 0) { c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(0, top, rW, n * laneH); c.fillStyle = "#fff"; c.font = "bold 28px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("預備…", rW / 2, top + n * laneH / 2); }
+      else if (t < tmax) {                                                         // 轉播字幕
         const left = Math.round((1 - ps[lead]) * 100);
         c.fillStyle = "#fff"; c.font = "bold 13px sans-serif"; c.textAlign = "left"; c.textBaseline = "middle";
         c.fillText(`🎙 領先：${lead + 1}號 ${hs.names[lead]}　${left > 85 ? "起跑！" : left > 15 ? `距終點 ${left}%` : "衝刺！"}`, 8, 12);
@@ -367,7 +443,7 @@ export function mountCasino(game, opts = {}) {
         c.beginPath(); if (q.dust) c.arc(q.x, q.y, q.r, 0, 7); else c.rect(q.x, q.y, 5, 3); c.fill();
       }
       c.globalAlpha = 1; rparts = rparts.filter((q) => q.life > 0);
-      if (hs.phase === "result" || t >= Math.max(...hs.times)) {                  // 結束後在賽道上顯示冠軍
+      if (hs.phase === "result" || t >= tmax) {                                    // 結束後在賽道上顯示冠軍
         c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(0, 0, rW, 24); c.fillStyle = "#ffd54a"; c.font = "bold 14px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
         c.fillText(`🏆 ${hs.names[hs.win]} 奪冠`, rW / 2, 12);
       }

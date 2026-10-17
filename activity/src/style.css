@@ -295,3 +295,4 @@ html,body{overflow-y:auto}
 .game.slots.realmode{background:linear-gradient(180deg,#3a0e16 0%,#1d0a0f 100%)}
 body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .game.realmode .status{color:#ffd9d9}
+.casino .hrow .hd .coat{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;border:1px solid rgba(255,255,255,.5)}
