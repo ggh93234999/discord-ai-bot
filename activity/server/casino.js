@@ -166,6 +166,11 @@ function newRaceCard() {
   const probs = ex.map((x) => x / tot);
   return { names, forms: forms.map((f) => f[0]), probs, odds: probs.map((p) => Math.max(1.1, Math.round(0.95 / p * 10) / 10)) };
 }
+// 模擬 n 場賽馬並計入戰績（拿來建立基本資料；跑法和真的比賽一樣：每場抽 6 匹、依勝率抽名次）
+export function simulateRaces(n) {
+  for (let k = 0; k < n; k++) { const c = newRaceCard(); recordRace(c.names, raceOrder(c.probs)); }
+  return horses;
+}
 function raceOrder(probs) {
   const left = probs.map((p, i) => [i, p]), order = [];
   while (left.length) { const k = pickWeighted(left.map((x) => x[1])); order.push(left[k][0]); left.splice(k, 1); }
