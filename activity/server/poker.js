@@ -150,7 +150,7 @@ function view(t, ws) {
     toAct: t.toAct, deadline: t.deadline, nextAt: t.phase === "result" ? t.nextAt : 0, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
     watchers: [...t.members].filter((w) => w.pspec).length, result: t.result,
     seats: t.seats.map((s, i) => s && ({
-      i, name: s.name, tag: s.bot ? personaOf(s).tag : undefined, chips: s.chips, bet: s.bet, total: s.total, bot: s.bot, folded: s.folded, allin: s.allin, inHand: s.inHand, away: s.bot ? false : !s.ws,
+      i, name: s.name, chips: s.chips, bet: s.bet, total: s.total, bot: s.bot, folded: s.folded, allin: s.allin, inHand: s.inHand, away: s.bot ? false : !s.ws,
       last: s.last, hole: s.inHand && (s.ws === ws || (showAll && !s.folded)) ? s.hole : s.inHand ? [-1, -1] : [], hand: showAll && !s.folded && s.score != null ? HAND_NAMES[handCat(s.score)] : undefined,
     })),
   };

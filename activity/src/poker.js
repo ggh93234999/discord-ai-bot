@@ -75,7 +75,7 @@ export function mountPoker(opts = {}) {
         return `<div class="${cls}" style="${style}">
           ${st.dealer === i ? `<span class="pdealer">D</span>` : ""}
           <div class="phole">${hole}</div>
-          <div class="pname">${esc(s.name)}${s.away ? "（離線）" : ""}</div>${s.tag ? `<div class="ptag">${esc(s.tag)}</div>` : ""}
+          <div class="pname">${esc(s.name)}${s.away ? "（離線）" : ""}</div>${s.bot ? `<div class="ptag">？</div>` : ""}
           <div class="pchips">💰 ${s.chips}${s.allin ? " 全下" : ""}</div>
           ${s.hand ? `<div class="phand">${s.hand}</div>` : s.last ? `<div class="plast">${esc(s.last)}</div>` : ""}
           ${s.bet ? `<div class="pbet">${s.bet}</div>` : ""}
