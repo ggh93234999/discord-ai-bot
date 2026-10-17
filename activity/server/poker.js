@@ -109,7 +109,8 @@ function botDecide(t, s) {
 // ---------------------------------------------------------------- 牌桌
 const tables = new Map();
 let guest = 0;
-const nameOf = (ws) => ws.user?.name || (ws.pguest ||= "玩家" + String(++guest).padStart(2, "0"));
+const cleanName = (v) => String(v || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12);
+const nameOf = (ws) => ws.pname || ws.user?.name || (ws.pguest ||= "玩家" + String(++guest).padStart(2, "0"));
 
 function newTable(id) {
   const t = {
@@ -312,7 +313,7 @@ export function handlePoker(ws, m) {
   if (m.t === "pjoin") {
     if (ws.ptable) pokerClose(ws);
     const t = getTable(String(m.room || "default").slice(0, 80));
-    ws.ptable = t; ws.pspec = !!m.spectate; ws.pid = String(m.pid || "").slice(0, 40) || randomBytes(4).toString("hex");
+    ws.ptable = t; ws.pspec = !!m.spectate; if (cleanName(m.name)) ws.pname = cleanName(m.name); ws.pid = String(m.pid || "").slice(0, 40) || randomBytes(4).toString("hex");
     t.members.add(ws);
     // 重新整理後認回原本的座位
     if (!ws.pspec) { const i = t.seats.findIndex((s) => s && !s.bot && s.pid === ws.pid); if (i >= 0) { t.seats[i].ws = ws; t.seats[i].name = nameOf(ws); t.seats[i].idle = 0; } }
@@ -346,6 +347,15 @@ export function handlePoker(ws, m) {
     if (s.inHand && t.phase !== "result" && t.phase !== "wait") s.removeAfter = true;   // 這手打完才請下桌
     else t.seats[i] = null;
     push(t);
+  } else if (m.t === "pname") {
+    const nm = cleanName(m.name); if (!nm) return true;
+    ws.pname = nm; if (mine >= 0) t.seats[mine].name = nm; push(t);
+  } else if (m.t === "preset") {
+    if (mine < 0) return true;                                   // 入座的人可以重開：全員籌碼歸 START、重新發牌
+    for (const x of t.seats) if (x) Object.assign(x, { chips: START, hole: [], bet: 0, total: 0, folded: false, allin: false, acted: false, inHand: false, last: "", score: null, removeAfter: false });
+    t.board = []; t.result = null; t.toAct = -1; t.deadline = 0; t.curBet = 0; t.handNo = 0; t.phase = "wait";
+    t.log = `${nameOf(ws)} 重開牌局，大家籌碼回到 ${START}`;
+    startHand(t); push(t);
   } else if (m.t === "pact") {
     if (mine < 0 || t.toAct !== mine) return true;
     act(t, mine, String(m.a), m.amt); push(t);

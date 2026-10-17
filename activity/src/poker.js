@@ -25,6 +25,7 @@ export function mountPoker(opts = {}) {
       <div class="game slots poker">
         <header><button class="back">← 選單</button><h2>德州撲克</h2><span class="watch"></span></header>
         <div class="status">連線中…</div>
+        ${spectate ? "" : `<div class="pnamebar">名稱 <input class="pnm" maxlength="12" placeholder="輸入你的名稱"></div>`}
         <div class="ptable"><div class="pfelt"><div class="pcenter"><div class="ptimer"></div><div class="ppot"></div><div class="pboard"></div></div></div><div class="pseats"></div></div>
         <div class="plog"></div>
         <div class="pctl"></div>
@@ -34,13 +35,18 @@ export function mountPoker(opts = {}) {
     const statusEl = $(".status"), potEl = $(".ppot"), timerEl = $(".ptimer"), boardEl = $(".pboard"), seatsEl = $(".pseats"), logEl = $(".plog"), ctl = $(".pctl"), watchEl = $(".watch");
     let ws = null, closed = false, retry = 0, st = null, timer = 0, raiseTo = 0, ctlKey = "";
     const pid = getPid();
+    const nmIn = $(".pnm"), lsGet = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
+    if (nmIn) {
+      nmIn.value = lsGet();
+      nmIn.addEventListener("change", () => { const v = nmIn.value.trim(); try { localStorage.setItem("pokername", v); } catch {} if (v) send({ t: "pname", name: v }); });
+    }
     const room = spectate ? spectate.room : env.instanceId;
     const send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
     $(".back").addEventListener("click", () => { cleanup(); back(); });
 
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
-      ws.onopen = () => { retry = 0; send({ t: "pjoin", room, spectate: !!spectate, pid }); };
+      ws.onopen = () => { retry = 0; send({ t: "pjoin", room, spectate: !!spectate, pid, name: lsGet() }); };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
         if (m.t === "pstate") { st = m; st.at = Date.now() - m.now; render(); }
@@ -136,7 +142,7 @@ export function mountPoker(opts = {}) {
       } else if (st.phase === "wait" || st.phase === "result") {
         h += seatedCount < 2 ? `<div class="mempty">人不夠，按空位的「＋電腦」找人陪你玩</div>` : `<div class="mempty">${st.phase === "result" ? "下一手馬上開始…" : "準備開始…"}</div>`;
       } else h += `<div class="mempty">${me.folded ? "你已棄牌，等這手結束" : "等其他人行動…"}</div>`;
-      h += `<div class="prow small"><button class="pb ghost stand">離桌</button></div>`;
+      h += `<div class="prow small"><button class="pb ghost reset">🔄 重開</button><button class="pb ghost stand">離桌</button></div>`;
       ctl.innerHTML = h;
       const q = (s) => ctl.querySelector(s);
       q(".fold") && q(".fold").addEventListener("click", () => send({ t: "pact", a: "fold" }));
@@ -150,6 +156,10 @@ export function mountPoker(opts = {}) {
           const f = b.dataset.f; setV(f === "all" ? maxTo : st.curBet + Math.round((st.pot + toCall) * Number(f) / 10) * 10);
         }));
       }
+      { const rb = q(".reset"); let armed = 0; rb.addEventListener("click", () => {      // 兩段確認（Discord 內嵌畫面不一定能彈 confirm）
+        if (armed) { armed = 0; send({ t: "preset" }); return; }
+        armed = 1; rb.textContent = "再按一次確認重開"; setTimeout(() => { armed = 0; rb.textContent = "🔄 重開"; }, 3000);
+      }); }
       q(".stand").addEventListener("click", () => { send({ t: "pstand" }); });
     }
 

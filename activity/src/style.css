@@ -375,3 +375,4 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .poker .ptimer.other{background:#263238}.poker .ptimer.next{font-size:15px;background:#4527a0}
 .poker .ptimer.urgent{background:#b71c1c;color:#fff;animation:ptpulse .5s infinite alternate}
 @keyframes ptpulse{to{transform:scale(1.12)}}
+.poker .pnamebar{text-align:center;font-size:13px;margin:2px 0}.poker .pnm{width:140px;padding:3px 8px;border-radius:6px;border:1px solid #555;background:#1b1e26;color:#fff}
