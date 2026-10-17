@@ -539,8 +539,9 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         await interaction.response.send_message(f"{COIN} **{who.display_name}** 有 {fmt(n)}")
 
     def rules_embeds(which: str) -> list[discord.Embed]:
-        def table(d: dict) -> str:
-            return "　".join(f"{k} ×{v}" for k, v in d.items())
+        def table(d: dict, per: int = 3) -> str:
+            items = [f"{k} ×{v}" for k, v in d.items()]
+            return "\n".join("　".join(items[i:i + per]) for i in range(0, len(items), per))
 
         def mk(title: str, desc: str, color, fields: list[tuple[str, str]], foot: str | None = None) -> discord.Embed:
             e = discord.Embed(title=title, description=desc, color=color)
@@ -567,9 +568,9 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 ("結果", "▸ 你比較大：淨賺一份賭注\n▸ 你比較小：輸掉賭注\n▸ 一樣大：賭注退回"),
             ]),
             "slots": mk("🎰 老虎機　`/老虎機 賭注 [格數]`", "按下去的瞬間用真亂數決定結果，動畫只是演出。\n倍率是「**含本金**拿回幾倍」：賭 100、中 1.2 倍 → 拿回 120。", red, [
-                ("3 格（單排）", f"三個一樣：{table(SLOT_TRIPLE)}\n只有兩個一樣：**退回賭注**\n其他：輸"),
-                ("9 格（3×3）　約 41% 的把數會賺", f"4 種圖案。橫 3 條 + 直 3 條 + 斜 2 條，共 **8 條線**，一條線三個一樣就中。\n倍率：{table(GRID_PAY[3])}\n同一把可以中好幾條，倍率**加起來**。"),
-                ("16 格（4×4）", f"8 種圖案。**任何方向連續 3 格**一樣都算一條線。\n倍率：{table(GRID_PAY[4])}\n同樣可以同時中很多條。"),
+                ("3 格（單排）", f"三個一樣拿回：\n{table(SLOT_TRIPLE)}\n只有兩個一樣：**退回賭注**　其他：輸"),
+                ("9 格（3×3）　約 41% 的把數會賺", f"4 種圖案。橫 3 條 + 直 3 條 + 斜 2 條，共 **8 條線**，一條線三個一樣就中。\n一條線拿回：\n{table(GRID_PAY[3], 4)}\n同一把可以中好幾條，倍率**加起來**。"),
+                ("16 格（4×4）", f"8 種圖案。**任何方向連續 3 格**一樣都算一條線。\n一條線拿回：\n{table(GRID_PAY[4], 4)}\n同樣可以同時中很多條。"),
             ], "各版本長期回報率約 94～95%"),
             "bj": mk("🃏 21點　`/21點 賭注`", "點數比莊家大，但不能超過 21。", green, [
                 ("點數", "A 算 1 或 11　J / Q / K 算 10　其他照牌面"),
