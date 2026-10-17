@@ -243,3 +243,39 @@ html,body{overflow-y:auto}
 .roomcard .rplayers{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;opacity:.9}
 .tag,.tagmine{font-size:11px;padding:2px 8px;border-radius:999px;background:#3b4252}
 .tagmine{background:#2f6f4f}
+
+/* 德州撲克 */
+.poker .ptable{position:relative;width:100%;max-width:560px;aspect-ratio:1/1.05;margin:6px auto}
+.poker .pfelt{position:absolute;inset:12% 6%;border-radius:50%;background:radial-gradient(#1f7a3d,#145a2c);border:6px solid #5b3a1a;box-shadow:inset 0 0 30px rgba(0,0,0,.45)}
+.poker .pcenter{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
+.poker .ppot{color:#ffe08a;font-weight:700;min-height:1.3em;margin-bottom:4px}
+.poker .pboard{display:flex;gap:3px;justify-content:center}
+.poker .pcard{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:32px;height:44px;border-radius:5px;background:#fff;color:#111;font-size:15px;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.poker .pcard b{font-size:15px}.poker .pcard i{font-style:normal;font-size:15px}
+.poker .pcard.red{color:#d32f2f}
+.poker .pcard.empty{background:rgba(255,255,255,.1);box-shadow:none}
+.poker .pcard.back{background:repeating-linear-gradient(45deg,#3a56b0,#3a56b0 4px,#2c4291 4px,#2c4291 8px)}
+.poker .pcard.sm{width:24px;height:34px}.poker .pcard.sm b,.poker .pcard.sm i{font-size:11px}
+.poker .pseat{position:absolute;transform:translate(-50%,-50%);width:92px;text-align:center;background:rgba(20,20,30,.82);border:2px solid transparent;border-radius:10px;padding:3px 2px;font-size:12px;color:#eee}
+.poker .pseat.empty{background:transparent;border:1px dashed rgba(255,255,255,.3);padding:8px 2px}
+.poker .pseat.empty button{font-size:12px;padding:3px 6px}
+.poker .pseat.me{width:120px}
+.poker .pseat.me .pcard.sm{width:32px;height:44px}
+.poker .pseat.turn{border-color:#ffd54f;box-shadow:0 0 10px #ffd54f}
+.poker .pseat.win{border-color:#66bb6a;box-shadow:0 0 12px #66bb6a}
+.poker .pseat.folded{opacity:.45}.poker .pseat.away{opacity:.6}
+.poker .phole{display:flex;gap:2px;justify-content:center;min-height:6px}
+.poker .pname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.poker .plast,.poker .phand{color:#ffd54f;font-size:11px}
+.poker .pbet{position:absolute;left:50%;transform:translateX(-50%);bottom:-18px;background:#c62828;color:#fff;border-radius:10px;padding:0 7px;font-size:11px}
+.poker .pdealer{position:absolute;left:-8px;top:-8px;background:#fff;color:#111;border-radius:50%;width:18px;height:18px;line-height:18px;font-weight:700;font-size:11px}
+.poker .pdel{position:absolute;right:-6px;top:-6px;width:18px;height:18px;padding:0;border-radius:50%;font-size:10px;line-height:1}
+.poker .plog{margin-top:20px;text-align:center;font-size:13px;color:#cfd8dc;min-height:1.4em;padding:0 8px}
+.poker .pctl{padding:6px 10px 14px}
+.poker .prow{display:flex;gap:8px;justify-content:center;align-items:center;margin:6px 0}
+.poker .prow.small{margin-top:10px}
+.poker .pb{padding:10px 14px;border-radius:8px;font-weight:700}
+.poker .pb.fold{background:#8e2c2c}.poker .pb.call{background:#2e7d32}.poker .pb.raise{background:#e08a00}
+.poker .pb.ghost{background:transparent;border:1px solid #777;font-weight:400;padding:4px 12px}
+.poker .rs{flex:1;max-width:260px}
+.poker .pre button{font-size:12px;padding:3px 6px;margin-left:3px}

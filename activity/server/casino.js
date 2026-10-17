@@ -2,6 +2,7 @@
 // 每個 Activity instance 的每種遊戲是一個「房間」：同房的人看得到彼此的名單與最新一把（旁觀），賽馬是全房一起押的回合制。
 // 練習模式：每條連線一份練習幣；賭注模式：用 bauth 綁定的 Discord 身分，動用機器人錢包的真代幣。
 // 真代幣押注中（21 點一手、賽馬一回合）會記在 casino_escrow.json，伺服器若在途中重啟，啟動時全額退回。
+import { listPokerTables } from "./poker.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -206,7 +207,7 @@ setInterval(() => { for (const room of rooms.values()) if (room.game === "horse"
 
 // 旁觀大廳：有人（非旁觀者）在玩的房間
 export function listRooms() {
-  const out = [];
+  const out = [...listPokerTables()];
   for (const room of rooms.values()) {
     const players = whoList(room);
     if (!players.length) continue;

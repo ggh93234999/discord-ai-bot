@@ -5,6 +5,7 @@ import { mountConnect4 } from "./connect4.js";
 import { mountReversi } from "./reversi.js";
 import { mountSlots } from "./slots.js";
 import { mountCasino } from "./casino.js";
+import { mountPoker } from "./poker.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountDown } from "./stairs.js";
 
@@ -42,6 +43,7 @@ const GAMES = [
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
+  { id: "poker", cat: "casino", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "1 人", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },

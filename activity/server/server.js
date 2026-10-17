@@ -9,6 +9,7 @@ import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
 import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow } from "./casino.js";
+import { handlePoker, pokerClose } from "./poker.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -220,6 +221,7 @@ wss.on("connection", (ws, req) => {
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
     if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist)$/.test(m.t)) { handleCasino(ws, m); return; }
+    if (typeof m.t === "string" && /^(pjoin|psit|pstand|paddbot|pdelbot|pact)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));
@@ -298,6 +300,7 @@ wss.on("connection", (ws, req) => {
   ws.on("close", (code, reason) => {
     console.log(`ws close code=${code} reason=${String(reason || "").slice(0, 40)} ua=${ws.ua} msgs=${ws.mtypes.join(",")} age=${Math.round((Date.now() - ws.born) / 1000)}s missed=${ws.missed} room=${ws.cr ? ws.cr.key : ws.room ? "board" : ws.multi ? "multi" : "-"}`);
     casinoClose(ws);
+    pokerClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
     if (!room) return;
