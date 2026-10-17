@@ -4,6 +4,7 @@
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 import { createWatch, entryHtml } from "./watch.js";
+import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
 
 const BETS = [10, 50, 100, 500];
@@ -54,6 +55,7 @@ export function mountCasino(game, opts = {}) {
     attachRules(root, game);
     const watch = spectate ? { setYou() {}, update() {}, destroy() {} } : createWatch(gameEl);
     if (spectate) gameEl.classList.add("spectating");
+    const blog = spectate ? { onMsg: () => false, setMode() {}, destroy() {} } : createBetLog(gameEl, { send: (o) => send(o) });
     let specList = [], specSel = null, specSig = "";
 
     let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false, you = null;
@@ -73,6 +75,7 @@ export function mountCasino(game, opts = {}) {
       };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
+        if (blog.onMsg(m)) return;
         if (m.t === "cinit") { practiceBal = m.balance; you = m.you; watch.setYou(you); showBalance(); statusEl.textContent = spectate ? "旁觀中" : game === "horse" ? "選一匹馬，下注吧" : "選賭注，開始吧"; }
         else if (m.t === "cwho") { watch.update(m.list); if (spectate) specUpdate(m); }
         else if (m.t === "cres") onRes(m);
@@ -103,7 +106,7 @@ export function mountCasino(game, opts = {}) {
     function setMode(m) {
       mode = m;
       modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m));
-      gameEl.classList.toggle("realmode", m === "real");
+      gameEl.classList.toggle("realmode", m === "real"); blog.setMode(m === "real");
       $(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";
       showBalance(); draw();
       statusEl.textContent = m === "real" ? `賭注模式：${session ? session.name : ""}，用的是真代幣！` : "練習模式：選賭注，開始吧";
@@ -479,6 +482,6 @@ export function mountCasino(game, opts = {}) {
 
     connect();
     draw();
-    return () => { closed = true; window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); try { ws.close(); } catch {} };
+    return () => { closed = true; window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); blog.destroy(); try { ws.close(); } catch {} };
   };
 }

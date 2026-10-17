@@ -86,7 +86,38 @@ function whoList(room) {
   return [...room.members].filter((w) => !w.cspec).map((w) => ({ id: w.cid, name: nameOf(w), real: !!w.creal, last: w.clast || null, hand: w.chand || null }));
 }
 function pushWho(room) { const m = { t: "cwho", list: whoList(room), watchers: [...room.members].filter((w) => w.cspec).length }; for (const w of room.members) out(w, m); }
+// ---- 賭博紀錄：每把結束記一筆。賭注模式（真代幣）依 Discord 身分存檔，換裝置也看得到；練習模式只回傳給當事人，由前端存在自己的瀏覽器
+const LFILE = fileURLToPath(new URL("./casino_log.json", import.meta.url));
+let blog = {};
+try { blog = JSON.parse(fs.readFileSync(LFILE, "utf8")); } catch {}
+let lsaveT = 0;
+const lsave = () => { clearTimeout(lsaveT); lsaveT = setTimeout(() => { try { fs.writeFileSync(LFILE, JSON.stringify(blog)); } catch (e) { console.log("賭博紀錄寫入失敗", e.message); } }, 1500); };
+function logLabel(e) {
+  if (e.g === "coin") return `猜${e.pick === "heads" ? "正面" : "反面"}，開${e.res === "heads" ? "正面" : "反面"}`;
+  if (e.g === "dice") return `你 ${e.me}　莊家 ${e.bot}`;
+  if (e.g === "bj") return `${e.pv} 比 ${e.dv}　${String(e.text || "").replace(/^[^\u4e00-\u9fa5A-Za-z]+/, "")}`;
+  if (e.g === "horse") return `${(e.idx ?? 0) + 1}號 ${e.name || ""}${e.win === e.idx ? "（冠軍）" : ""}`;
+  if (e.g === "slots") return `${{ 1: "3 格", 3: "3×3", 4: "4×4" }[e.kind] || ""}${e.nwin ? `　中 ${e.nwin} 線` : ""}`;
+  return "";
+}
+function recordBet(ws, e) {
+  if (!Number.isFinite(e.bet) || !Number.isFinite(e.back)) return;
+  const entry = { ts: Date.now(), g: e.g, real: !!e.real, bet: e.bet, back: e.back, label: logLabel(e) };
+  const uid = ws.user && ws.user.uid;
+  if (entry.real && uid) {
+    const u = (blog[uid] ||= { n: 0, bet: 0, back: 0, wins: 0, list: [] });
+    u.n++; u.bet += e.bet; u.back += e.back; if (e.back > e.bet) u.wins++;
+    u.list.push(entry); if (u.list.length > 300) u.list.shift();
+    lsave();
+  }
+  out(ws, { t: "clog", e: entry });
+}
+function sendLog(ws) {
+  const u = ws.user && blog[ws.user.uid];
+  out(ws, { t: "clog", all: true, stats: u ? { n: u.n, bet: u.bet, back: u.back, wins: u.wins } : { n: 0, bet: 0, back: 0, wins: 0 }, list: u ? u.list.slice(-60) : [] });
+}
 export function casinoFeed(ws, entry) {       // 任何遊戲結束一把就呼叫，讓同房的人看到
+  recordBet(ws, entry);
   ws.clast = { ...entry, ts: Date.now() }; ws.creal = !!entry.real; ws.chand = null;
   if (ws.cr) pushWho(ws.cr);
 }
@@ -267,6 +298,7 @@ export function casinoReclaim(ws) {
 const fail = (ws, r, extra = {}) => out(ws, { t: "cerr", error: r.error || "error", balance: r.balance, ...extra });
 
 export async function handleCasino(ws, m) {
+  if (m.t === "clogq") { sendLog(ws); return true; }
   if (m.t === "clist") { out(ws, { t: "clist", rooms: listRooms() }); return true; }
   if (m.t === "cjoin") {
     const game = CASINO_GAMES.includes(m.game) ? m.game : "coin";

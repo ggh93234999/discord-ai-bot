@@ -5,6 +5,7 @@
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 import { createWatch } from "./watch.js";
+import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
 
 const KINDS = [
@@ -43,6 +44,7 @@ export function mountSlots(root, { env, back }) {
   $(".back").addEventListener("click", back);
   attachRules(root, "slots");
   const watch = createWatch(gameEl);
+  const blog = createBetLog(gameEl, { send: (o) => send(o) });
   let you = null;
 
   let kind = KINDS[1], bet = 50, ws = null, closed = false, retry = 0, busy = false, pending = false, muted = false;
@@ -73,6 +75,7 @@ export function mountSlots(root, { env, back }) {
     };
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
+      if (blog.onMsg(m)) return;
       if (m.t === "cinit") { you = m.you; watch.setYou(you); }
       else if (m.t === "cwho") watch.update(m.list);
       else if (m.t === "slotinit") onInit(m);
@@ -110,7 +113,7 @@ export function mountSlots(root, { env, back }) {
   function setMode(m) {
     mode = m;
     modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m));
-    gameEl.classList.toggle("realmode", m === "real");
+    gameEl.classList.toggle("realmode", m === "real"); blog.setMode(m === "real");
     root.querySelector(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";
     showBalance();
     statusEl.textContent = m === "real" ? `賭注模式：${session ? session.name : ""}，用的是真代幣！` : "練習模式：選賭注，按開轉";
@@ -258,5 +261,5 @@ export function mountSlots(root, { env, back }) {
   const onResize = () => { if (!busy) build(); };
   window.addEventListener("resize", onResize);
   build(); connect();
-  return () => { closed = true; timers.forEach(clearTimeout); window.removeEventListener("resize", onResize); try { ws.close(); } catch {} };
+  return () => { closed = true; timers.forEach(clearTimeout); window.removeEventListener("resize", onResize); blog.destroy(); try { ws.close(); } catch {} };
 }
