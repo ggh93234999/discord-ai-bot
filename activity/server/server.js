@@ -3,6 +3,7 @@
 // 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
 import { WebSocketServer } from "ws";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
+import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
 const GOMOKU = 15;
@@ -10,14 +11,17 @@ const C4_W = 7, C4_H = 6;
 const rooms = new Map();
 
 function freshBoard(game) {
-  if (game === "vb") return "";
+  if (game === "vb" || game === "pika") return "";
   return game === "c4" ? ".".repeat(C4_W * C4_H) : ".".repeat(GOMOKU * GOMOKU);
 }
 
 function newRoom(game) {
   return { game, board: freshBoard(game), turn: "b", winner: null, line: null, last: null, moves: 0,
            players: { b: null, w: null }, clients: new Set(), emptySince: null,
-           vb: game === "vb" ? createVb() : null, input: { b: {}, w: {} } };
+           vb: game === "vb" ? createVb() : null,
+           pika: game === "pika" ? createPika() : null,
+           input: { b: {}, w: {} },
+           speed: 1, acc: 0, ping: { b: null, w: null } };
 }
 
 function getRoom(game, id) {
@@ -55,7 +59,9 @@ function broadcast(room) {
       t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
       line: room.line, last: room.last, moves: room.moves,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
+      speed: room.speed, ping: room.ping,
       vb: room.vb ? snapshotVb(room.vb) : undefined,
+      pika: room.pika ? snapshotPika(room.pika) : undefined,
     });
   }
 }
@@ -105,9 +111,10 @@ wss.on("connection", (ws) => {
   ws.on("message", (raw) => {
     let m;
     try { m = JSON.parse(raw.toString()); } catch { return; }
+    if (m.t === "ping") { send(ws, { t: "pong", ts: m.ts }); return; }
     if (m.t === "join") {
       if (ws.room) return;
-      const game = ["c4", "vb"].includes(m.game) ? m.game : "gomoku";
+      const game = ["c4", "vb", "pika"].includes(m.game) ? m.game : "gomoku";
       const id = String(m.room || "default").slice(0, 80);
       const room = getRoom(game, id);
       ws.room = room;
@@ -121,9 +128,9 @@ wss.on("connection", (ws) => {
     if (!room) return;
     const role = roleOf(room, ws);
     if (m.t === "in") {
-      if (room.game === "vb" && role !== "s") room.input[role] = { l: !!m.l, r: !!m.r, j: !!m.j, p: !!m.p };
+      if ((room.game === "vb" || room.game === "pika") && role !== "s") room.input[role] = { l: !!m.l, r: !!m.r, j: !!m.j, d: !!m.d, p: !!m.p };
     } else if (m.t === "move") {
-      if (room.game === "vb") return;
+      if (room.game === "vb" || room.game === "pika") return;
       if (role === "s" || room.winner || room.turn !== role) return;
       if (!room.players.b || !room.players.w) return;     // 要兩個人都到了才能下
       if (!place(room, role, m)) return;
@@ -135,7 +142,23 @@ wss.on("connection", (ws) => {
       const { b, w } = room.players;
       Object.assign(room, { board: freshBoard(room.game), turn: "b", winner: null, line: null, last: null, moves: 0 });
       room.players = { b: w, w: b };
+      room.ping = { b: room.ping.w, w: room.ping.b };
+      room.acc = 0;
       if (room.game === "vb") { room.vb = createVb(); room.input = { b: {}, w: {} }; }
+      else if (room.game === "pika") { room.pika = createPika(); room.input = { b: {}, w: {} }; }
+      broadcast(room);
+    } else if (m.t === "restart") {
+      // 打到一半重來：不換邊，直接重開本局
+      if (role === "s") return;
+      if (room.game === "pika") { room.pika = createPika(); room.input = { b: {}, w: {} }; room.winner = null; room.acc = 0; }
+      broadcast(room);
+    } else if (m.t === "speed") {
+      if (role === "s") return;
+      const v = Number(m.speed);
+      if ([1, 1.5, 2].includes(v)) { room.speed = v; broadcast(room); }
+    } else if (m.t === "pingreport") {
+      if (role === "s") return;
+      room.ping[role] = Math.max(0, Math.round(Number(m.rtt) || 0));
       broadcast(room);
     } else if (m.t === "resign") {
       if (role === "s" || room.winner) return;
@@ -149,7 +172,7 @@ wss.on("connection", (ws) => {
     const room = ws.room;
     if (!room) return;
     room.clients.delete(ws);
-    for (const c of ["b", "w"]) if (room.players[c] === ws) { room.players[c] = null; room.input[c] = {}; }
+    for (const c of ["b", "w"]) if (room.players[c] === ws) { room.players[c] = null; room.input[c] = {}; room.ping[c] = null; }
     // 有旁觀者就遞補空位
     for (const w of room.clients) if (roleOf(room, w) === "s") assignSeat(room, w);
     if (room.clients.size === 0) room.emptySince = Date.now();
@@ -166,6 +189,25 @@ setInterval(() => {
     broadcast(room);
   }
 }, 1000 / 60);
+
+// 皮卡丘排球：25 tick/秒。贏了之後仍推進「輸/贏動作」，認輸則直接凍結畫面。
+setInterval(() => {
+  for (const room of rooms.values()) {
+    if (room.game !== "pika" || !room.players.b || !room.players.w) continue;
+    if (room.winner && room.pika.state !== "over") continue;
+    // 速度倍率：acc 累積到 ≥1 就推進一步物理（speed 2 = 每 tick 兩步 = 50fps）
+    room.acc += room.speed || 1;
+    let stepped = 0;
+    while (room.acc >= 1 && stepped < 4) {
+      stepPika(room.pika, room.input);
+      if (!room.winner && room.pika.winner) room.winner = room.pika.winner === 1 ? "b" : "w";
+      room.acc -= 1;
+      stepped++;
+    }
+    if (room.acc > 1) room.acc = 1;
+    broadcast(room);
+  }
+}, 1000 / 25);
 
 // 心跳：斷線的連線清掉；沒人的房間 10 分鐘後刪除
 setInterval(() => {

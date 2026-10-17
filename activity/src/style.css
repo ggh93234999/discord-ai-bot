@@ -33,7 +33,7 @@ h1 { margin:0; font-size:26px; letter-spacing:4px; }
 .game { max-width:680px; height:100vh; margin:0 auto; padding:8px 10px 12px; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .game header { width:100%; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:6px; }
 .game header h2 { margin:0; font-size:22px; letter-spacing:3px; }
-.back { background:none; border:1px solid var(--line); color:#fff; padding:6px 10px; border-radius:8px; cursor:pointer; }
+.back, .fs { background:none; border:1px solid var(--line); color:#fff; padding:6px 10px; border-radius:8px; cursor:pointer; }
 .msg, .status { min-height:24px; font-weight:600; text-align:center; }
 .wboard { display:grid; grid-template-rows: repeat(6, 1fr); gap:6px; width:min(100%, 330px); }
 .wrow { display:grid; grid-template-columns: repeat(5, 1fr); gap:6px; }
@@ -44,6 +44,15 @@ h1 { margin:0; font-size:26px; letter-spacing:4px; }
 .gomoku .actions .resign { background:#8b3a3a; }
 .cwrap { flex:1; width:100%; min-height:0; display:flex; align-items:flex-start; justify-content:center; }
 canvas { max-width:100%; border-radius:6px; touch-action:manipulation; cursor:pointer; }
-.vb .pad { display:flex; gap:10px; justify-content:center; margin:8px 0; touch-action:none; user-select:none; }
-.vb .pad button { width:76px; height:52px; font-size:20px; border:0; border-radius:10px; background:#3b4252; color:#fff; touch-action:none; }
-.vb .pad button:active { background:#5a647c; }
+.pad { display:flex; gap:10px; justify-content:center; margin:8px 0; touch-action:none; user-select:none; }
+.pad button { width:76px; height:52px; font-size:20px; border:0; border-radius:10px; background:#3b4252; color:#fff; touch-action:none; }
+.pad button:active { background:#5a647c; }
+.pikachu .hint { font-size:12px; opacity:.7; text-align:center; }
+.pikachu { max-width:none; }
+.right { display:flex; gap:8px; align-items:center; }
+.ping { font-size:12px; opacity:.8; white-space:nowrap; }
+.side { font-size:12px; font-weight:700; padding:2px 9px; border-radius:11px; white-space:nowrap; }
+.side.b { background:#444; color:#fff; border:1px solid #666; }
+.side.w { background:#e8e8e8; color:#111; }
+.side:not(.b):not(.w) { border:1px solid var(--line); opacity:.8; }
+.cwrap:fullscreen, .cwrap:-webkit-full-screen { align-items:center; background:#000; }

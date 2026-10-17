@@ -108,10 +108,11 @@ def slot_spin() -> tuple[list[str], int, str]:
 # ---- 多格老虎機：9 格（3×3，8 條連線）、16 格（4×4，每個方向任意連續 3 格一樣算一條）
 GRID_SYMBOLS = {3: SLOT_SYMBOLS, 4: ["🍒", "🍉", "🍋", "🔔", "🍇", "⭐", "🍀", "💎"]}
 GRID_PAY = {
-    3: {"🍒": 1, "🍋": 1.5, "🔔": 2, "🍇": 3, "🍀": 5, "💎": 10},
+    3: {"🍒": 1.5, "🍋": 2, "🔔": 2.5, "🍇": 3.5, "🍀": 5, "💎": 6.5},
     4: {"🍒": 1, "🍉": 1, "🍋": 1.2, "🔔": 1.5, "🍇": 2, "⭐": 3, "🍀": 4, "💎": 7},
 }
-GRID_SCALE = {3: 1.135, 4: 0.97}   # 調到理論回報率約 95%
+GRID_SCALE = {3: 1.0, 4: 0.97}
+PAIR_PAY_3X3 = 0.4   # 3×3：每一橫排左邊兩格一樣（第三格不同）退 0.4 倍，讓常有小回饋   # 調到理論回報率約 95%
 
 
 def grid_lines(n: int) -> list[list[tuple[int, int]]]:
@@ -145,6 +146,11 @@ def grid_spin(n: int) -> tuple[list[list[str]], float, list[str]]:
             sym = g[line[0][0]][line[0][1]]
             mult += GRID_PAY[n][sym]
             wins.append(sym)
+    if n == 3:
+        for r in range(3):
+            if g[r][0] == g[r][1] != g[r][2]:
+                mult += PAIR_PAY_3X3
+                wins.append("左兩格")
     mult *= GRID_SCALE[n]
     return g, mult, wins
 
@@ -650,7 +656,14 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         else:
             grid, mult, wins = grid_spin(kind)
             final = grid
-            wins_text = ("中了 " + "、".join(f"{w}×{wins.count(w)}" for w in dict.fromkeys(wins)) + " 連線") if wins else "沒連線"
+            full = [w for w in wins if w != "左兩格"]
+            pairs = wins.count("左兩格")
+            parts = []
+            if full:
+                parts.append("中了 " + "、".join(f"{w}×{full.count(w)}" for w in dict.fromkeys(full)) + " 連線")
+            if pairs:
+                parts.append(f"{pairs} 排左兩格一樣（小退）")
+            wins_text = "，".join(parts) if parts else "沒連線"
         rows, cols = len(final), len(final[0])
         syms = SLOT_SYMBOLS if kind in (1, 3) else GRID_SYMBOLS[4]
 
@@ -659,15 +672,18 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             body = "\n".join("　".join(r) for r in cells)
             return f"🎰 **老虎機**　賭注 {fmt(賭注)}\n\n{body}\n\n{footer}"
 
-        spin = lambda: [[RNG.choice(syms) for _ in range(cols)] for _ in range(rows)]
-        await interaction.response.send_message(render(spin(), "轉動中…"))
-        for _ in range(2):
+        # 每一直排各自滾動，由左到右一排一排停下（停下的排固定顯示結果）
+        def frame(k: int):
+            return [[final[r][c] if k >= 2 + c else RNG.choice(syms) for c in range(cols)] for r in range(rows)]
+
+        await interaction.response.send_message(render(frame(0), "轉動中…"))
+        for k in range(1, 2 + cols):
             await asyncio.sleep(0.8)
             try:
-                await interaction.edit_original_response(content=render(spin(), "轉動中…"))
+                await interaction.edit_original_response(content=render(frame(k), "轉動中…"))
             except discord.HTTPException:
                 pass
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.6)
         back = int(賭注 * mult)
         new = add(gid, uid, back)
         net = back - 賭注

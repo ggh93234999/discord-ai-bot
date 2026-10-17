@@ -1,9 +1,9 @@
 import { DiscordSDK } from "@discord/embedded-app-sdk";
 import "./style.css";
-import { mountWordle } from "./wordle.js";
 import { mountGomoku } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";
-import { mountVolley } from "./volley.js";
+import { mountPikachu } from "./pikachu.js";
+import { mountPikachuOnline } from "./pikachu_online.js";
 
 // ---------- Discord SDK（在 Discord 裡才啟動；一般瀏覽器開也能玩）
 const clientId = import.meta.env.VITE_CLIENT_ID;
@@ -21,10 +21,10 @@ if (inDiscord && clientId) {
 const app = document.getElementById("app");
 
 const GAMES = [
-  { id: "wordle", icon: "🟩", name: "Wordle", desc: "單人猜字，6 次機會", mount: mountWordle },
   { id: "gomoku", icon: "⚫", name: "五子棋", desc: "兩人對戰，先連五子獲勝", mount: mountGomoku },
   { id: "c4", icon: "🔴", name: "四連棋", desc: "兩人對戰，棋子往下掉，先連四顆獲勝", mount: mountConnect4 },
-  { id: "vb", icon: "🏐", name: "圓球排球", desc: "兩人即時對戰，先得 15 分獲勝", mount: mountVolley },
+  { id: "pika", icon: "⚡", name: "皮卡丘排球", desc: "單人對電腦，經典 1997 排球", mount: mountPikachu },
+  { id: "pika2", icon: "⚡", name: "皮卡丘排球 2P", desc: "兩人連線對戰，伺服器運算", mount: mountPikachuOnline },
 ];
 
 function showMenu() {

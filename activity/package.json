@@ -8,7 +8,22 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@discord/embedded-app-sdk": "^2.0.0"
+    "@discord/embedded-app-sdk": "^2.0.0",
+    "@pixi/canvas-display": "^6.5.10",
+    "@pixi/canvas-prepare": "^6.5.10",
+    "@pixi/canvas-renderer": "^6.5.10",
+    "@pixi/canvas-sprite": "^6.5.10",
+    "@pixi/constants": "^6.5.10",
+    "@pixi/core": "^6.5.10",
+    "@pixi/display": "^6.5.10",
+    "@pixi/loaders": "^6.5.10",
+    "@pixi/prepare": "^6.5.10",
+    "@pixi/settings": "^6.5.10",
+    "@pixi/sound": "^4.4.1",
+    "@pixi/sprite": "^6.5.10",
+    "@pixi/sprite-animated": "^6.5.10",
+    "@pixi/spritesheet": "^6.5.10",
+    "@pixi/ticker": "^6.5.10"
   },
   "devDependencies": {
     "vite": "^6.0.0"
