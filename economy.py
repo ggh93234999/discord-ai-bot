@@ -594,7 +594,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                               app_commands.Choice(name="骰子", value="dice")])
     async def cmd_rules(interaction: discord.Interaction, 遊戲: app_commands.Choice[str] = None):
         which = 遊戲.value if 遊戲 else "all"
-        await interaction.response.send_message(embeds=rules_embeds(which), ephemeral=True)
+        await interaction.response.send_message(embeds=rules_embeds(which))
 
     @tree.command(name="排行", description="本伺服器代幣排行榜（前 10 名）")
     @app_commands.guild_only()
