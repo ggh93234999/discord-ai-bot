@@ -1,6 +1,7 @@
 // 西洋棋、象棋（兩人，透過 WebSocket 同步）：規則和合法走法都在伺服器，這裡只畫棋盤、點選棋子、送出走法。
 import { wsUrl } from "./gomoku.js";
 import { createWager } from "./wager.js";
+import { createSeat, specFirst } from "./seat.js";
 
 const GL = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
 const XQ_RED = { R: "車", H: "馬", E: "相", A: "仕", K: "帥", C: "炮", P: "兵" };
@@ -29,16 +30,17 @@ export function mountBoard(game) {
     const statusEl = $(".status"), resignBtn = $(".resign"), againBtn = $(".again"), watchEl = $(".watch"), promoEl = $(".promo");
     $(".back").addEventListener("click", back);
     const wg = createWager(root, { env, getWs: () => ws, getSt: () => st });
+    const seat = createSeat(root, { getWs: () => ws, getSt: () => st });
 
     let st = null, ws = null, closed = false, retry = 0, sel = -1, w = 360, h = 360, cell = 45, pad = 0;
     const flipped = () => st && st.you === "w";
 
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
-      ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game, room: env.instanceId })); wg.onOpen(); };
+      ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game, room: env.instanceId, spectate: specFirst() })); wg.onOpen(); };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.t === "state") { if (!st || m.moves !== st.moves || m.winner !== st.winner) { sel = -1; promoEl.hidden = true; } st = m; render(); wg.update(); }
+        if (m.t === "state") { if (!st || m.moves !== st.moves || m.winner !== st.winner) { sel = -1; promoEl.hidden = true; } st = m; render(); wg.update(); seat.update(); }
         else wg.onMsg(m);
       };
       ws.onclose = () => { if (closed) return; statusEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };

@@ -1,6 +1,7 @@
 // 黑白棋（兩人，透過 WebSocket 同步）：8×8，夾住對方的棋就翻面，沒地方下會自動跳過
 import { wsUrl } from "./gomoku.js";
 import { createWager } from "./wager.js";
+import { createSeat, specFirst } from "./seat.js";
 const N = 8;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
@@ -31,20 +32,21 @@ export function mountReversi(root, { env, back }) {
   const statusEl = $(".status"), scoreEl = $(".rvscore"), resignBtn = $(".resign"), againBtn = $(".again"), watchEl = $(".watch");
   $(".back").addEventListener("click", back);
   const wg = createWager(root, { env, getWs: () => ws, getSt: () => st });
+  const seat = createSeat(root, { getWs: () => ws, getSt: () => st });
 
   let st = null, ws = null, closed = false, retry = 0, hover = null, cell = 50, px = 400;
   let prev = null, flipAt = {};   // 翻面動畫：記下哪些格剛翻過
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
-    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game: "rv", room: env.instanceId })); wg.onOpen(); };
+    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game: "rv", room: env.instanceId, spectate: specFirst() })); wg.onOpen(); };
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
       if (m.t === "state") {
         if (prev && prev.length === m.board.length) {
           for (let i = 0; i < m.board.length; i++) if (prev[i] !== "." && m.board[i] !== prev[i]) flipAt[i] = performance.now();
         }
-        prev = m.board; st = m; render(); wg.update(); animate();
+        prev = m.board; st = m; render(); wg.update(); seat.update(); animate();
       } else wg.onMsg(m);
     };
     ws.onclose = () => {

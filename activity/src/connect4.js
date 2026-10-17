@@ -1,6 +1,7 @@
 // 四連棋（兩人，透過 WebSocket 同步）：7 欄 × 6 列，棋子往下掉，先連四顆獲勝
 import { wsUrl } from "./gomoku.js";
 import { createWager } from "./wager.js";
+import { createSeat, specFirst } from "./seat.js";
 const W = 7, H = 6;
 
 export function mountConnect4(root, { env, back }) {
@@ -17,13 +18,14 @@ export function mountConnect4(root, { env, back }) {
   const statusEl = $(".status"), resignBtn = $(".resign"), againBtn = $(".again"), watchEl = $(".watch");
   $(".back").addEventListener("click", back);
   const wg = createWager(root, { env, getWs: () => ws, getSt: () => st });
+  const seat = createSeat(root, { getWs: () => ws, getSt: () => st });
 
   let st = null, ws = null, closed = false, retry = 0, hover = -1, cell = 60, W_px = 420, H_px = 360;
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
-    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game: "c4", room: env.instanceId })); wg.onOpen(); };
-    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === "state") { st = m; render(); wg.update(); } else wg.onMsg(m); };
+    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game: "c4", room: env.instanceId, spectate: specFirst() })); wg.onOpen(); };
+    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === "state") { st = m; render(); wg.update(); seat.update(); } else wg.onMsg(m); };
     ws.onclose = () => {
       if (closed) return;
       statusEl.textContent = "連線中斷，重新連線…";

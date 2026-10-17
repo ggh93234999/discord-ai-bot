@@ -279,3 +279,11 @@ html,body{overflow-y:auto}
 .poker .pb.ghost{background:transparent;border:1px solid #777;font-weight:400;padding:4px 12px}
 .poker .rs{flex:1;max-width:260px}
 .poker .pre button{font-size:12px;padding:3px 6px;margin-left:3px}
+
+/* 觀眾席按鈕、皮卡丘音量 */
+.seatbar{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin:6px 8px;font-size:13px;color:#b0bec5}
+.seatbar button{padding:8px 14px;border-radius:8px;font-weight:700}
+.seatbar .sit{background:#2e7d32}.seatbar .stand{background:#455a64}
+.seatbar .sp{display:flex;align-items:center;gap:4px}
+.volrow{display:flex;gap:14px;justify-content:center;align-items:center;font-size:12px;color:#cfd8dc;padding:2px 8px;flex-wrap:wrap}
+.volrow input{width:90px;vertical-align:middle}

@@ -1,4 +1,5 @@
 import { createWager } from "./wager.js";
+import { createSeat, specFirst } from "./seat.js";
 // 五子棋（兩人，透過 WebSocket 同步）
 const SIZE = 15;
 
@@ -25,14 +26,15 @@ export function mountGomoku(root, { env, back }) {
   const statusEl = $(".status"), resignBtn = $(".resign"), againBtn = $(".again"), watchEl = $(".watch");
   $(".back").addEventListener("click", back);
   const wg = createWager(root, { env, getWs: () => ws, getSt: () => st });
+  const seat = createSeat(root, { getWs: () => ws, getSt: () => st });
 
   let st = null, ws = null, closed = false, retry = 0, hover = null;
   let cell = 30, pad = 18;
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
-    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", room: env.instanceId })); wg.onOpen(); };
-    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === "state") { st = m; render(); wg.update(); } else wg.onMsg(m); };
+    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", room: env.instanceId, spectate: specFirst() })); wg.onOpen(); };
+    ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === "state") { st = m; render(); wg.update(); seat.update(); } else wg.onMsg(m); };
     ws.onclose = () => {
       if (closed) return;
       statusEl.textContent = "連線中斷，重新連線…";

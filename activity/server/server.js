@@ -93,6 +93,8 @@ function broadcast(room) {
     send(ws, {
       t: "state", game: room.game, you: roleOf(room, ws), board: room.board, turn: room.turn, winner: room.winner,
       line: room.line, last: room.last, moves: room.moves, passed: room.passed || null,
+      canSit: roleOf(room, ws) === "s" && ["b", "w"].some((c) => !room.players[c] && !seatReserved(room, c, ws)),
+      canStand: roleOf(room, ws) !== "s" && standOk(room),
       check: room.check ?? -1, reason: room.reason || "",
       legal: ENG[room.game] && !room.winner && roleOf(room, ws) === room.turn && room.players.b && room.players.w ? ENG[room.game].moves(room.cs).map((x) => [x.f, x.t]) : undefined,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
@@ -103,6 +105,14 @@ function broadcast(room) {
   }
 }
 
+// 能不能離開座位回觀眾席：對賭中、或雙方都在而且對局進行中都不行（要先認輸）
+function standOk(room) {
+  if (room.game === "vb") return false;
+  if (room.wager && !room.wager.settled) return false;
+  const both = room.players.b && room.players.w;
+  if (both && !room.winner && !(room.game !== "pika" && room.moves === 0)) return false;
+  return true;
+}
 function assignSeat(room, ws) {
   for (const c of ["b", "w"]) {
     if (room.players[c]) continue;
@@ -256,7 +266,7 @@ wss.on("connection", (ws, req) => {
       ws.room = room;
       room.clients.add(ws);
       room.emptySince = null;
-      assignSeat(room, ws);
+      if (!m.spectate) assignSeat(room, ws);          // spectate：先當觀眾，不佔座位
       broadcast(room);
       return;
     }
@@ -275,6 +285,13 @@ wss.on("connection", (ws, req) => {
       if (!room.winner && room.game !== "rv") room.turn = role === "b" ? "w" : "b";
       if (room.winner) settleWager(room, rebroadcast(room));
       broadcast(room);
+    } else if (m.t === "sit") {
+      if (role !== "s") return;
+      assignSeat(room, ws); broadcast(room);
+    } else if (m.t === "stand") {
+      if (role === "s" || !standOk(room)) return;
+      if (room.offer) clearOffer(room);
+      room.players[role] = null; broadcast(room);
     } else if (m.t === "again") {
       if (role === "s" || !room.winner) return;
       if (room.wager && !room.wager.settled) return;
