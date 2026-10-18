@@ -13,6 +13,8 @@ log = logging.getLogger("discord-ai-bot.aliases")
 
 # 中文指令名 → (英文指令名, 英文說明, {中文參數名: (英文參數名, 英文說明)})
 TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
+    "私訊紀錄": ("dmlog", "(Bot owner only) Read DMs people sent to the bot; only you can see it",
+             {"使用者": ("user", "Whose DMs to read (leave empty to list recent senders)"), "則數": ("count", "How many recent messages, default 30, max 200")}),
     "播放": ("play", "Play music from YouTube (song name, YouTube link or playlist link)",
            {"歌曲": ("song", "Song name (add the artist if you like) or a YouTube link")}),
     "插播": ("playnext", "Queue-jump: play a song next, or right now (skips the current one)",

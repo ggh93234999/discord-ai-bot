@@ -34,6 +34,7 @@ import channels
 import economy
 import extras
 import divination
+import dmlog
 import fortune
 import models
 import music
@@ -243,6 +244,7 @@ channels.setup(client, client.tree, state, save_state)
 models.setup(client, client.tree, state, save_state, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, TZ)
 extras.setup(client, client.tree, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
 economy.setup(client, client.tree)
+dmlog.setup(client, client.tree)
 if not economy.GAMBLING_ENABLED:      # 賭博類指令暫時下架（英文別名是之後從現有指令產生的，所以不會留下）
     for _n in economy.GAMBLING_COMMANDS:
         client.tree.remove_command(_n)
@@ -821,6 +823,7 @@ async def on_ready():
 @client.event
 async def on_message(msg: discord.Message):
     economy.on_message(msg)
+    dmlog.record(msg)
     if msg.author.id == client.user.id or not should_reply(msg):
         return
 
@@ -973,7 +976,7 @@ async def cmd_help(interaction: discord.Interaction):
     e = discord.Embed(title=f"🤖 {client.user.display_name} 使用說明", color=0x5865F2)
     e.add_field(
         name="怎麼叫我",
-        value="・私訊我\n・在頻道 @我，或回覆我的訊息\n・用 `/自動回覆 開` 的頻道，大家說話我都會回",
+        value="・私訊我（私訊內容機器人擁有者看得到）\n・在頻道 @我，或回覆我的訊息\n・用 `/自動回覆 開` 的頻道，大家說話我都會回",
         inline=False,
     )
     e.add_field(
