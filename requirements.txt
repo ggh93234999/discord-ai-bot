@@ -5,3 +5,6 @@ trafilatura
 pillow
 yt-dlp[default]
 # 另外需要系統裝 ffmpeg 和 node（yt-dlp 解 YouTube 用）
+lunar_python
+kerykeion
+opencc-python-reimplemented

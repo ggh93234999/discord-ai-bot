@@ -34,6 +34,7 @@ import channels
 import economy
 import extras
 import divination
+import fortune
 import models
 import music
 import vstatus
@@ -97,6 +98,8 @@ TOOL_GUIDE = (
     "要你隨機選數字、骰骰子、抽號碼時，一定要呼叫 random_number，不能自己編數字。"
     "有人要占卜、算命、抽塔羅、抽籤、擲筊、卜卦時，一定要呼叫 divination，結果以工具為準，絕對不能自己編牌或編籤；"
     "結果卡會由程式貼在你的回覆上面，你不用重抄，直接用溫和、有趣的口吻解讀，回答對方真正想問的事。"
+    "有人要排八字、命盤、星盤、看上升星座時，呼叫 fortune_chart（要出生日期，時間、出生地、性別有就填，缺的資料先問）；"
+    "命盤卡和星盤圖會由程式貼出，你只要解讀，不要自己排盤或編干支、星座。"
     "在伺服器裡你還有 music 工具，可以在使用者所在的語音頻道放 YouTube 音樂、跳過、暫停、停止、看佇列；"
     "有人叫你放歌就直接用它，放歌後簡短回一句就好，不用附來源網址。"
     "你還有 create_channel 工具可以開文字／語音頻道；有人明確要你開頻道才用，權限由程式檢查，你照工具結果回報就好。"
@@ -555,6 +558,9 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return extras.run_tool(args)
         if name == "divination":
             return divination.run_tool(args)
+        if name == "fortune_chart":
+            text, files = await fortune.run(client.http_session, args)
+            return text + "".join(f"\n[[FILE:{f}]]" for f in files)
         if name == "music_status":
             return music.real_state(msg.guild if msg else None)
         if name == "music":
@@ -584,6 +590,8 @@ def tool_status(name: str, args_json: str) -> str:
         return "🔎 確認播放狀態"
     if name == "random_number":
         return "🎲 抽數字"
+    if name == "fortune_chart":
+        return "🧭 排命盤中…" if args.get("kind") == "bazi" else "🧭 排盤、畫星盤中…"
     if name == "divination":
         return {"tarot": "🔮 洗牌、抽塔羅…", "jiaobei": "🙏 擲筊中…", "qian": "🏮 搖籤筒…", "iching": "☯️ 擲錢起卦…"}.get(args.get("kind"), "🔮 占卜中…")
     if name == "create_channel":
@@ -649,6 +657,8 @@ def clean_text(text: str | None) -> str:
 
 
 ACTION_TOOLS = {"music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
+CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
+FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
 CLAIM_RE = re.compile(
     r"(建好|開好|建立好|創好|已經?(建立|開(?!始|心|學)|建|創|封存|解除|刪|移除|清空|鎖|隱藏|放(?!學|假)|播|加入|跳過|暫停|停止)|"
     r"(封存|鎖|藏|開|建|創)(起來|好)了|頻道.{0,6}(好了|完成)|幫你(放|播|點|排|開|建|封存|搬|移|改)|正在播放|開始播放|排(好了|進|入)|已排|"
@@ -696,7 +706,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL] + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = False
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
     big_playlist = False
@@ -750,9 +760,9 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
                 play_calls += 1
                 if result.startswith("📃"):
                     big_playlist = True
-            if actions is not None and (name in ACTION_TOOLS or name == "divination"):
+            if actions is not None and (name in ACTION_TOOLS or name in CARD_TOOLS):
                 actions.append({"name": name, "arguments": args, "result": result})
-            messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": result})
+            messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": FILE_RE.sub("", result).strip()})
     # 沒開工具，或工具輪數用完：不給工具，直接要答案
     reply = await call_model(messages, use_tools=False)
     return strip_meta(ACTION_LINE_RE.sub("", clean_text(reply.get("content"))).strip())
@@ -830,6 +840,7 @@ async def on_message(msg: discord.Message):
                 pass
 
         actions: list[dict] = []
+        attach: list[str] = []   # 要附在回覆上的圖片（例如星盤圖）
 
         async def slow_notice():
             await asyncio.sleep(SLOW_NOTICE_SECONDS)
@@ -843,8 +854,11 @@ async def on_message(msg: discord.Message):
                 if not conversation:
                     return
                 reply = await ask_model(conversation, on_status=on_status, msg=msg, actions=actions)
-                acts = [a for a in actions if a["name"] != "divination"]
-                cards = [divination.split_card(a["result"])[0] for a in actions if a["name"] == "divination"]
+                acts = [a for a in actions if a["name"] not in CARD_TOOLS]
+                cards = [FILE_RE.sub("", divination.split_card(a["result"])[0]).strip() for a in actions if a["name"] in CARD_TOOLS and divination.DIVIDER in a["result"]]
+                for a in actions:
+                    if a["name"] in CARD_TOOLS:
+                        attach += FILE_RE.findall(a["result"])
                 if cards:
                     # 占卜結果（抽到的牌／籤／卦）由程式貼在最上面，模型只負責解讀
                     reply = "\n\n".join(cards) + ("\n\n" + reply if reply else "")
@@ -866,15 +880,21 @@ async def on_message(msg: discord.Message):
         chunks = split_for_discord(reply)
         first = None
         for i, chunk in enumerate(chunks):
+            files = [discord.File(p) for p in attach if os.path.exists(p)] if i == 0 else []
             if i == 0 and status_msg is not None:
-                await status_msg.edit(content=chunk)  # 把「搜尋中…」那則改成答案
+                await status_msg.edit(content=chunk, attachments=files)  # 把「搜尋中…」那則改成答案
                 first = status_msg
             elif i == 0:
-                first = await msg.reply(chunk, mention_author=False)
+                first = await msg.reply(chunk, mention_author=False, files=files)
             else:
                 await msg.channel.send(chunk)
         if actions and first is not None:
-            record_actions(first.id, actions)
+            record_actions(first.id, [{**a, "result": FILE_RE.sub("", a["result"]).strip()} for a in actions])
+        for p in attach:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------- 斜線指令
@@ -960,6 +980,7 @@ async def cmd_help(interaction: discord.Interaction):
         name="我會做的事",
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
               "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
+              "・排八字命盤、畫星盤（說「@我 幫我排八字和星盤，1990-05-15 14:30 台北出生，男」）\n"
               "・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
