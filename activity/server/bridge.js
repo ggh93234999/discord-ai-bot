@@ -174,20 +174,39 @@ function handInfo(hand) {
   const balanced = len.every((n) => n >= 2) && len.filter((n) => n === 2).length <= 1 && Math.max(...len) <= 5;
   return { len, hcp, pts, balanced };
 }
+// 電腦個性（跟著名字走）：bold 叫牌膽量（加在估計墩數上）、fit 支持同伴的加分、ntMin 幾點以上牌型平均就叫無王、
+// major 偏好高花（♥♠）、compete 同伴拿著合約也敢改叫、noise 出牌亂出的機率（新手）
+const PERSONA = {
+  "阿發": { tag: "愛搶叫", bold: 1.2, fit: 1, ntMin: 15, major: false, compete: true, noise: 0 },
+  "小明": { tag: "穩健", bold: 0, fit: 1, ntMin: 15, major: false, compete: false, noise: 0 },
+  "老王": { tag: "老狐狸", bold: 0.2, fit: 1.2, ntMin: 16, major: false, compete: false, noise: 0 },
+  "花花": { tag: "愛叫無王", bold: 0.3, fit: 1, ntMin: 11, major: false, compete: false, noise: 0 },
+  "阿牛": { tag: "保守", bold: -1, fit: 0.8, ntMin: 16, major: false, compete: false, noise: 0 },
+  "小美": { tag: "挺同伴", bold: 0, fit: 2, ntMin: 15, major: false, compete: false, noise: 0 },
+  "豆豆": { tag: "新手", bold: 0.6, fit: 0.5, ntMin: 13, major: false, compete: true, noise: 0.25 },
+  "阿嬤": { tag: "老派高花", bold: -0.3, fit: 1, ntMin: 16, major: true, compete: false, noise: 0 },
+  "橋神": { tag: "高手", bold: 0.1, fit: 1.3, ntMin: 15, major: false, compete: false, noise: 0 },
+  "胖虎": { tag: "莽夫", bold: 2, fit: 1, ntMin: 14, major: false, compete: true, noise: 0.05 },
+};
+const DEFAULT_PERSONA = { tag: "", bold: 0, fit: 1, ntMin: 15, major: false, compete: false, noise: 0 };
+export const brPersona = (s) => (s && s.bot && PERSONA[String(s.name || "").replace(/^🤖/, "")]) || DEFAULT_PERSONA;
 function botBid(t, i) {
-  const h = t.h, me = handInfo(h.hands[i]), p = (i + 2) % 4;
+  const h = t.h, me = handInfo(h.hands[i]), p = (i + 2) % 4, P = brPersona(t.seats[i]);
   const pBids = h.bids.filter((b) => b.seat === p), pLast = [...pBids].reverse().find((b) => b.bid);
   const pPts = pLast ? 12 + 2 * (pLast.bid.l - 1) : pBids.length ? 8 : 10;     // 從同伴叫過什麼猜他的牌力
   // 選王：同伴叫過的花色我有 3 張以上就支持；不然叫自己最長的花色；牌型平均又夠強就叫無王
   let strain, fit = false;
   if (pLast && pLast.bid.s < 4 && me.len[pLast.bid.s] >= 3) { strain = pLast.bid.s; fit = true; }
   else if (pLast && pLast.bid.s === 4 && me.balanced) { strain = 4; fit = true; }
-  else if (me.balanced && me.hcp >= 15) strain = 4;
-  else { strain = 3; for (let s = 3; s >= 0; s--) if (me.len[s] > me.len[strain]) strain = s; }
-  const tricks = (me.pts + pPts) / 2.85 + (fit ? 1 : 0) + (strain < 4 && me.len[strain] >= 6 ? 0.5 : 0);
+  else if (me.balanced && me.hcp >= P.ntMin) strain = 4;
+  else {
+    strain = 3; for (let s = 3; s >= 0; s--) if (me.len[s] > me.len[strain]) strain = s;
+    if (P.major && strain < 2) { const m = me.len[3] >= me.len[2] ? 3 : 2; if (me.len[m] >= 4) strain = m; }   // 老派：有四張高花就叫高花
+  }
+  const tricks = (me.pts + pPts) / 2.85 + (fit ? P.fit : 0) + (strain < 4 && me.len[strain] >= 6 ? 0.5 : 0) + P.bold;
   const maxLevel = Math.min(7, Math.floor(tricks) - 6);
   if (h.high && teamOf(h.high.seat) === teamOf(i)) {          // 同伴現在拿著合約：沒有明顯更好就 pass
-    if (h.high.s === strain || maxLevel < h.high.l + 1 || !(strain < 4 && me.len[strain] >= 6)) return null;
+    if (h.high.s === strain || maxLevel < h.high.l + 1 || !(strain < 4 && me.len[strain] >= (P.compete ? 5 : 6))) return null;
   }
   const lv = !h.high ? 1 : h.high.l + (strain > h.high.s ? 0 : 1);
   return lv <= maxLevel && lv <= 7 ? { l: lv, s: strain } : null;
@@ -196,6 +215,8 @@ function botBid(t, i) {
 // ---------------------------------------------------------------- 電腦：出牌
 function botCard(t, i) {
   const h = t.h, hand = h.hands[i], legal = legalCards(t, i), trump = h.trump;
+  const P = brPersona(t.seats[i]);
+  if (P.noise && Math.random() < P.noise) return legal[randomInt(legal.length)];       // 新手偶爾亂出
   const low = (arr) => arr.reduce((a, b) => (rankOf(b) < rankOf(a) ? b : a));
   const high = (arr) => arr.reduce((a, b) => (rankOf(b) > rankOf(a) ? b : a));
   // 「大牌」：同花色比它大的牌都已經打出去或在自己手上
@@ -248,7 +269,7 @@ function view(t, ws) {
   const h = t.h;
   const v = { t: "brstate", phase: t.phase, started: t.started, cfg: t.cfg, lens: LENS, stakes: STAKES, you, log: t.log, now: now(),
     watchers: [...t.members].filter((w) => w.brspec).length, final: t.final, handNo: t.g ? t.g.handNo : 0 };
-  v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0, won: h ? h.won[i] : 0 });
+  v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, tag: s.bot ? brPersona(s).tag : "", away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0, won: h ? h.won[i] : 0 });
   if (h && t.phase === "play") {
     Object.assign(v, { stage: h.stage, turn: h.turn, first: h.first, bids: h.bids, high: h.high, contract: h.contract, trump: h.trump, need: h.need, tricks: h.tricks,
       trick: h.trick, lastTrick: h.lastTrick, winner: h.stage === "trick" ? h.winner : -1, deadline: h.deadline });

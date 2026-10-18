@@ -369,10 +369,37 @@ function visibleCounts(t, i) {
   for (const d of h.dora) c[kindOf(d)]++;
   return c;
 }
+// 電腦個性（跟著名字走）：claim 吃碰積極度（0 只胡不叫、1 普通、2 不變差就叫）、defThr 有人聽牌時向聽數幾以上就改打安全牌（99 從不防守）、
+// riichi 聽牌時立直的機率、color 做清一色／混一色的傾向、noise 亂打的程度（新手）
+const PERSONA = {
+  "阿發": { tag: "速攻", claim: 2, defThr: 2, riichi: 1, color: 0, noise: 0 },
+  "小明": { tag: "穩健", claim: 1, defThr: 1, riichi: 0.85, color: 0, noise: 0 },
+  "老王": { tag: "老狐狸", claim: 1, defThr: 1, riichi: 0.55, color: 0, noise: 0, wary: true },
+  "花花": { tag: "愛吃碰", claim: 2, defThr: 99, riichi: 1, color: 0, noise: 0 },
+  "阿牛": { tag: "鐵壁", claim: 0.5, defThr: 0, riichi: 0.7, color: 0, noise: 0, wary: true },
+  "小美": { tag: "做大牌", claim: 1, defThr: 2, riichi: 0.8, color: 1, noise: 0 },
+  "豆豆": { tag: "新手", claim: 1, defThr: 99, riichi: 1, color: 0, noise: 900 },
+  "阿嬤": { tag: "門清派", claim: 0, defThr: 1, riichi: 0.9, color: 0, noise: 0 },
+  "雀神": { tag: "高手", claim: 2, defThr: 2, riichi: 1, color: 0, noise: 0 },
+  "胖虎": { tag: "莽夫", claim: 2, defThr: 99, riichi: 1, color: 0, noise: 0 },
+};
+const DEFAULT_PERSONA = { tag: "", claim: 1, defThr: 1, riichi: 1, color: 0, noise: 0 };
+export const mjPersona = (s) => (s && s.bot && PERSONA[String(s.name || "").replace(/^🤖/, "")]) || DEFAULT_PERSONA;
+// 做色：手上（含副露）哪一門數牌最多、加上字牌有幾張；夠多就往清一色／混一色做
+function colorPlan(p) {
+  const n = [0, 0, 0]; let hon = 0;
+  for (const x of [...p.hand, ...p.melds.flatMap((m) => m.tiles)]) { const k = kindOf(x); if (k >= 34) continue; if (k >= 27) hon++; else n[Math.floor(k / 9)]++; }
+  const suit = n.indexOf(Math.max(...n));
+  const offMelds = p.melds.some((m) => { const k = kindOf(m.tiles[0]); return k < 27 && Math.floor(k / 9) !== suit; });
+  return { suit, commit: offMelds ? 0 : n[suit] + hon };
+}
 function evalDiscards(t, i) {
-  const h = t.h, p = h.p[i], need = needOf(t, p), jp = t.rule === "jp";
+  const h = t.h, p = h.p[i], need = needOf(t, p), jp = t.rule === "jp", P = mjPersona(t.seats[i]);
   const c = toCounts(p.hand), vis = visibleCounts(t, i);
-  const danger = jp ? h.p.map((q, k) => (k !== i && q.riichi ? k : -1)).filter((k) => k >= 0) : [];
+  // 危險的人：日麻是立直的人；謹慎型的電腦在台麻也會提防已經副露 3 組以上的人
+  const danger = h.p.map((q, k) => (k !== i && ((jp && q.riichi) || (P.wary && q.melds.length >= 3)) ? k : -1)).filter((k) => k >= 0);
+  const plan = P.color ? colorPlan(p) : null, total = jp ? 14 : 17;
+  const colorW = plan ? P.color * (plan.commit >= total * 0.7 ? 1200 : plan.commit >= total * 0.55 ? 350 : 0) : 0;
   const res = [];
   for (const k0 of new Set(p.hand)) {
     const k = kindOf(k0);
@@ -383,7 +410,9 @@ function evalDiscards(t, i) {
     c[k]++;
     const safe = danger.length && danger.every((d) => h.p[d].river.some((r) => kindOf(r.t) === k));
     let score = -sh * 1000 + uke * 4 + (isHonor(k) ? 2 : 0) + (k < 27 && (k % 9 === 0 || k % 9 === 8) ? 1 : 0);
-    if (danger.length && sh >= 1) score += safe ? 3000 : 0;
+    if (danger.length && sh >= P.defThr) score += safe ? 3000 : 0;
+    if (colorW && k < 27 && Math.floor(k / 9) !== plan.suit) score += colorW;     // 做色：別門的數牌先丟
+    if (P.noise) score += Math.random() * P.noise;
     if (isAka(k0)) score -= 6;                                      // 一樣的牌先打普通的，留著赤五
     res.push({ k: k0, sh, score });
   }
@@ -394,7 +423,7 @@ function botTurn(t, i) {
   if (o.tsumo) return doTsumo(t, i);
   if (o.lock) return discard(t, i, h.drawn, false);
   const best = evalDiscards(t, i)[0];
-  if (o.riichi.includes(best.k) && best.sh === 0) return discard(t, i, best.k, true);
+  if (o.riichi.includes(best.k) && best.sh === 0 && Math.random() < mjPersona(t.seats[i]).riichi) return discard(t, i, best.k, true);
   return discard(t, i, best.k, false);
 }
 function hasYakuhaiMeld(t, i) {
@@ -413,10 +442,16 @@ function botClaim(t, i, o) {
   };
   const sw = 27 + seatW(t, i), rw = 27 + (t.g.round % 4);
   const yakuhai = isDragon(tile) || tile === sw || tile === rw;
-  const allowOpen = !jp || yakuhai || hasYakuhaiMeld(t, i);           // 日麻：要有役牌才敢副露
-  if (o.pon && allowOpen && (after([tile, tile]) < now || (jp && yakuhai && after([tile, tile]) <= now))) return { a: "pon" };
-  if (o.chi.length && allowOpen && !(jp && !hasYakuhaiMeld(t, i))) {
-    for (const w of o.chi) if (after(w) < now) return { a: "chi", with: w };
+  const P = mjPersona(t.seats[i]);
+  if (P.claim <= 0) return { a: "pass" };                           // 門清派：只胡不叫
+  const plan = P.color ? colorPlan(p) : null;
+  const offColor = plan && plan.commit >= (jp ? 8 : 10) && tile < 27 && Math.floor(tile / 9) !== plan.suit;   // 正在做色就不叫別門的牌
+  const allowOpen = (!jp || yakuhai || hasYakuhaiMeld(t, i) || (plan && plan.commit >= 10 && !offColor)) && !offColor;   // 日麻：要有役牌（或做色）才敢副露
+  const eager = P.claim >= 2, timid = P.claim < 1;
+  const better = (x) => x < now || (eager && x <= now && now <= 2);
+  if (o.pon && allowOpen && (better(after([tile, tile])) || (jp && yakuhai && after([tile, tile]) <= now)) && !(timid && !yakuhai)) return { a: "pon" };
+  if (o.chi.length && allowOpen && !timid && !(jp && !hasYakuhaiMeld(t, i) && !(plan && plan.commit >= 10))) {
+    for (const w of o.chi) if (better(after(w))) return { a: "chi", with: w };
   }
   return { a: "pass" };
 }
@@ -429,7 +464,7 @@ function view(t, ws) {
     watchers: [...t.members].filter((w) => w.mspec).length, final: t.final, round: g ? roundLabel(t) : "", dealer: h ? h.dealer : g ? g.dealer : -1, honba: g ? g.honba : 0, sticks: g ? g.sticks : 0, lian: g ? g.lian : 0 };
   v.seats = t.seats.map((s, i) => {
     if (!s) return null;
-    const o = { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points };
+    const o = { i, name: s.name, bot: s.bot, tag: s.bot ? mjPersona(s).tag : "", away: !s.bot && !s.ws, points: s.points };
     if (h && g) { const p = h.p[i]; Object.assign(o, { wind: WINDS[(i - h.dealer + 4) % 4], melds: p.melds, flowers: p.flowers, river: p.river, riichi: p.riichi, count: p.hand.length }); }
     return o;
   });

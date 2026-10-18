@@ -66,7 +66,7 @@ export function mountBridge(opts = {}) {
       const seats = [2, 1, 3, 0].map((i) => {
         const s = st.seats[i], lab = `<span class="w t${i % 2}">${DIR[i]}</span>`;
         if (!s) return `<div class="brls p${i} empty">${lab}${spectate ? "空位" : !seated ? `<button class="mb" data-sit="${i}">入座</button>` : `<button class="mb ghost" data-bot="${i}">＋電腦</button>`}</div>`;
-        return `<div class="brls p${i}${i === st.you ? " me" : ""}">${lab}<b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}${seated && s.bot ? `<button class="mdel" data-del="${i}">✕</button>` : ""}</div>`;
+        return `<div class="brls p${i}${i === st.you ? " me" : ""}">${lab}<b>${esc(s.name)}</b>${s.tag ? `<span class="btag" title="電腦個性">${s.tag}</span>` : ""}${s.away ? "（離線）" : ""}${seated && s.bot ? `<button class="mdel" data-del="${i}">✕</button>` : ""}</div>`;
       }).join("");
       let cfg = "";
       const c = st.cfg;
@@ -98,7 +98,7 @@ export function mountBridge(opts = {}) {
       const lastBid = st.stage === "bid" && myBids.length ? `<span class="brbub">${bidHTML(myBids[myBids.length - 1].bid)}</span>` : "";
       const backs = r === 0 && st.you >= 0 ? "" : `<span class="brcnt"><span class="bc back xs"></span>${s.count}</span>`;
       return `<div class="brseat r${r}${turn ? " turn" : ""}${st.you === i ? " me" : ""}">
-        <div class="brname"><span class="w t${i % 2}">${DIR[i]}</span><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}${decl ? `<span class="brdecl">莊家</span>` : ""}</div>
+        <div class="brname"><span class="w t${i % 2}">${DIR[i]}</span><b>${esc(s.name)}</b>${s.tag ? `<span class="btag" title="電腦個性">${s.tag}</span>` : ""}${s.away ? "（離線）" : ""}${decl ? `<span class="brdecl">莊家</span>` : ""}</div>
         <div class="brsub">${backs}${st.stage !== "bid" ? `<span class="brwon">吃 ${s.won} 墩</span>` : ""}<em>${s.points.toLocaleString()}</em></div>${lastBid}
       </div>`;
     }
