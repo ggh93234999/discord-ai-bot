@@ -257,7 +257,7 @@ wss.on("connection", (ws, req) => {
     if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
-    if (typeof m.t === "string" && /^(tjoin|tname|tadd|tplay|tpause|tseek|tspeed|tskip|tremove|tup)$/.test(m.t)) { handleTheater(ws, m).catch(() => {}); return; }
+    if (typeof m.t === "string" && /^(tjoin|tname|tadd|tqual|tplay|tpause|tseek|tspeed|tskip|tremove|tup)$/.test(m.t)) { handleTheater(ws, m).catch(() => {}); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));

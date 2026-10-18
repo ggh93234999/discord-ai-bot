@@ -13,7 +13,10 @@ const YTDLP = process.env.YTDLP || "/home/ggh93234999/.venvs/discord-bot/bin/yt-
 const MAX_DUR = 3 * 3600;                 // 最長 3 小時
 const MAX_CACHE = 30 * 1024 ** 3;         // 快取上限 30 GB，超過就刪最久沒看的
 const MAX_QUEUE = 30;
-const FORMAT = "bv*[height<=720][vcodec^=avc1]+ba[ext=m4a]/b[height<=720][ext=mp4]/bv*[height<=720]+ba/b";
+// 預設 720p（房間共用、大家先拿這個）；有人選別的畫質時才另外下載那個版本。都用 H.264（avc1），各平台都能播
+const QUALS = [360, 480, 720, 1080];
+const formatOf = (q) => `bv*[height<=${q}][vcodec^=avc1]+ba[ext=m4a]/b[height<=${q}][ext=mp4]/bv*[height<=${q}]+ba/b`;
+const keyOf = (vid, q = 720) => (q === 720 ? vid : `${vid}.q${q}`);
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const cleanName = (v) => String(v || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 20);
 const nameOf = (ws) => ws.tname || ws.user?.name || "觀眾";
@@ -26,7 +29,14 @@ function roomOf(id) {
 }
 
 // ---------------------------------------------------------------- 影片資訊與下載
-const files = (vid) => path.join(DIR, vid + ".mp4");
+const files = (vid, q = 720) => path.join(DIR, keyOf(vid, q) + ".mp4");
+const qWatch = new Map();                  // 「vid.q畫質」→ 等這個畫質的連線
+function notifyQual(vid, q) {
+  const set = qWatch.get(keyOf(vid, q)); if (!set) return;
+  const st = statusOf(vid, q);
+  for (const ws of set) out(ws, { t: "tqual", vid, q, ...st });
+  if (st.status !== "downloading") qWatch.delete(keyOf(vid, q));
+}
 const meta = new Map();                    // vid → { title, dur }
 const jobs = new Map();                    // vid → { status, pct, err, waiters:Set<room> }
 
@@ -63,6 +73,12 @@ function pickSubs(j) {
   // 只用 YouTube 影片本身的字幕：上傳者提供的字幕＋YouTube 依原語言自動產生的字幕；不用 YouTube 的「自動翻譯」（常被限流 429）
   return out;
 }
+function qualsOf(j) {
+  const hs = (j.formats || []).filter((f) => /^avc1/.test(f.vcodec || "") && f.height).map((f) => f.height);
+  const max = hs.length ? Math.max(...hs) : 720;
+  const q = QUALS.filter((h) => h <= Math.max(max, 360));
+  return q.length ? q : [720];
+}
 async function lookup(target) {
   const txt = await run(["-J", "--no-playlist", "--flat-playlist", target.url]);
   let j = JSON.parse(txt);
@@ -72,22 +88,27 @@ async function lookup(target) {
   let dur = Number(j.duration) || 0;
   let title = j.title || j.id;
   let subs = pickSubs(j);
+  let j2 = null;
   if (target.search) {                                                  // 搜尋結果只有簡略資訊，再查一次
     const d = JSON.parse(await run(["-J", "--no-playlist", "https://www.youtube.com/watch?v=" + j.id]));
+    j2 = d;
     dur = Number(d.duration) || dur; title = d.title || title; subs = pickSubs(d);
   }
   if (dur > MAX_DUR) throw new Error(`影片太長（上限 ${MAX_DUR / 3600} 小時）`);
-  meta.set(j.id, { title, dur, subs });
-  return { vid: j.id, title, dur, subs };
+  const quals = qualsOf(target.search ? j2 || j : j);
+  meta.set(j.id, { title, dur, subs, quals });
+  return { vid: j.id, title, dur, subs, quals };
 }
-function download(vid) {
-  if (fs.existsSync(files(vid))) { touch(vid); return; }
-  if (jobs.has(vid) && jobs.get(vid).status === "downloading") return;
+function download(vid, q = 720) {
+  const key = keyOf(vid, q);
+  if (fs.existsSync(files(vid, q))) { touch(vid, q); return; }
+  if (jobs.has(key) && jobs.get(key).status === "downloading") return;
   const job = { status: "downloading", pct: 0, phase: 0, lastP: 0, err: "" };
-  jobs.set(vid, job);
-  const tmp = path.join(DIR, vid + ".part.%(ext)s");
+  jobs.set(key, job);
+  const tmp = path.join(DIR, key + ".part.%(ext)s");
+  const notify = (v) => (q === 720 ? pushVid(v) : notifyQual(v, q));   // 720p 通知整個房間，其他畫質只通知要的人
   let lastPush = 0;
-  run(["-f", FORMAT, "--merge-output-format", "mp4", "--no-playlist", "--newline", "--no-part",
+  run(["-f", formatOf(q), "--merge-output-format", "mp4", "--no-playlist", "--newline", "--no-part",
        "--postprocessor-args", "ffmpeg:-movflags +faststart", "-o", tmp, "https://www.youtube.com/watch?v=" + vid], (line) => {
     const m = line.match(/\[download\]\s+([\d.]+)%/);
     if (m) {
@@ -95,30 +116,30 @@ function download(vid) {
       if (p < job.lastP - 50) job.phase++;                              // 影像下載完換聲音
       job.lastP = p;
       job.pct = Math.min(99, job.phase ? 90 + p / 10 : p * 0.9);
-      if (Date.now() - lastPush > 1000) { lastPush = Date.now(); pushVid(vid); }
-    } else if (/Merger|Fixup|ffmpeg/i.test(line)) { job.pct = 99; pushVid(vid); }
+      if (Date.now() - lastPush > 1000) { lastPush = Date.now(); notify(vid); }
+    } else if (/Merger|Fixup|ffmpeg/i.test(line)) { job.pct = 99; notify(vid); }
   }).then(() => {
-    const done = fs.existsSync(path.join(DIR, vid + ".part.mp4")) ? vid + ".part.mp4" : fs.readdirSync(DIR).find((f) => f.startsWith(vid + ".part.") && f.endsWith(".mp4"));
+    const done = fs.existsSync(path.join(DIR, key + ".part.mp4")) ? key + ".part.mp4" : fs.readdirSync(DIR).find((f) => f.startsWith(key + ".part.") && f.endsWith(".mp4"));
     if (!done) throw new Error("下載完成但找不到檔案");
-    fs.renameSync(path.join(DIR, done), files(vid));
-    for (const f of fs.readdirSync(DIR)) if (f.startsWith(vid + ".part.")) try { fs.unlinkSync(path.join(DIR, f)); } catch {}
+    fs.renameSync(path.join(DIR, done), files(vid, q));
+    for (const f of fs.readdirSync(DIR)) if (f.startsWith(key + ".part.")) try { fs.unlinkSync(path.join(DIR, f)); } catch {}
     job.status = "ready"; job.pct = 100;
     cleanCache();
-    pushVid(vid);
+    notify(vid);
   }).catch((e) => {
     job.status = "error"; job.err = String(e.message || e).slice(0, 120);
-    for (const f of fs.readdirSync(DIR)) if (f.startsWith(vid + ".part.")) try { fs.unlinkSync(path.join(DIR, f)); } catch {}
-    console.log("影片下載失敗", vid, job.err);
-    pushVid(vid);
+    for (const f of fs.readdirSync(DIR)) if (f.startsWith(key + ".part.")) try { fs.unlinkSync(path.join(DIR, f)); } catch {}
+    console.log("影片下載失敗", key, job.err);
+    notify(vid);
   });
 }
-const statusOf = (vid) => { if (fs.existsSync(files(vid))) return { status: "ready", pct: 100 }; const j = jobs.get(vid); return j ? { status: j.status, pct: Math.round(j.pct), err: j.err } : { status: "queued", pct: 0 }; };
-function touch(vid) { const f = files(vid); try { const t = new Date(); fs.utimesSync(f, t, t); } catch {} }
+const statusOf = (vid, q = 720) => { if (fs.existsSync(files(vid, q))) return { status: "ready", pct: 100 }; const j = jobs.get(keyOf(vid, q)); return j ? { status: j.status, pct: Math.round(j.pct), err: j.err } : { status: "queued", pct: 0 }; };
+function touch(vid, q = 720) { const f = files(vid, q); try { const t = new Date(); fs.utimesSync(f, t, t); } catch {} }
 function cleanCache() {
   const inUse = new Set();
   for (const r of rooms.values()) { if (r.cur) inUse.add(r.cur.vid); for (const q of r.queue) inUse.add(q.vid); }
   for (const f of fs.readdirSync(DIR)) if (f.endsWith(".vtt") && !fs.existsSync(path.join(DIR, f.slice(0, 11) + ".mp4")) && !inUse.has(f.slice(0, 11))) try { fs.unlinkSync(path.join(DIR, f)); } catch {}
-  const list = fs.readdirSync(DIR).filter((f) => /^[A-Za-z0-9_-]{11}\.mp4$/.test(f)).map((f) => { const st = fs.statSync(path.join(DIR, f)); return { f, size: st.size, t: st.mtimeMs }; });
+  const list = fs.readdirSync(DIR).filter((f) => /^[A-Za-z0-9_-]{11}(\.q\d{3,4})?\.mp4$/.test(f)).map((f) => { const st = fs.statSync(path.join(DIR, f)); return { f, size: st.size, t: st.mtimeMs }; });
   let total = list.reduce((s, x) => s + x.size, 0);
   for (const x of list.sort((a, b) => a.t - b.t)) {
     if (total <= MAX_CACHE) break;
@@ -134,7 +155,7 @@ function view(r) {
   const c = r.cur;
   return {
     t: "tstate", now: Date.now(), log: r.log,
-    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], ...statusOf(c.vid) } : null,
+    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], quals: c.quals || [720], ...statusOf(c.vid) } : null,
     queue: r.queue.map((q) => ({ key: q.key, vid: q.vid, title: q.title, dur: q.dur, by: q.by, ...statusOf(q.vid) })),
     viewers: [...r.members].map(nameOf),
   };
@@ -183,6 +204,17 @@ export async function handleTheater(ws, m) {
   }
   const r = ws.troom; if (!r) return true;
   const who = nameOf(ws);
+  if (m.t === "tqual") {
+    const q = Number(m.q), vid = String(m.vid || "");
+    if (!QUALS.includes(q) || !VID_RE.test(vid) || !(r.cur && r.cur.vid === vid)) return true;
+    const st = statusOf(vid, q);
+    if (st.status === "ready") return out(ws, { t: "tqual", vid, q, ...st }), true;
+    if (!qWatch.has(keyOf(vid, q))) qWatch.set(keyOf(vid, q), new Set());
+    qWatch.get(keyOf(vid, q)).add(ws);
+    download(vid, q);
+    out(ws, { t: "tqual", vid, q, ...statusOf(vid, q) });
+    return true;
+  }
   if (m.t === "tname") { const n = cleanName(m.name); if (n) { ws.tname = n; push(r); } return true; }
   if (m.t === "tadd") {
     if (r.queue.length >= MAX_QUEUE) return out(ws, { t: "terr", error: "清單滿了" }), true;
@@ -267,9 +299,11 @@ export async function serveSub(req, res) {
 
 // ---------------------------------------------------------------- 影片檔（/api/tv/<id>.mp4，支援 Range）
 export function serveVideo(req, res) {
-  const m = new URL(req.url, "http://x").pathname.match(/^\/api\/tv\/([A-Za-z0-9_-]{11})\.mp4$/);
+  const m = new URL(req.url, "http://x").pathname.match(/^\/api\/tv\/([A-Za-z0-9_-]{11})(?:\.q(\d{3,4}))?\.mp4$/);
   if (!m) return false;
-  const f = files(m[1]);
+  const q = m[2] ? Number(m[2]) : 720;
+  if (!QUALS.includes(q)) { res.writeHead(404); res.end(); return true; }
+  const f = files(m[1], q);
   let st;
   try { st = fs.statSync(f); } catch { res.writeHead(404); res.end(); return true; }
   const size = st.size, range = req.headers.range;
@@ -288,6 +322,6 @@ export function serveVideo(req, res) {
     if (req.method === "HEAD") return res.end(), true;
     fs.createReadStream(f).pipe(res);
   }
-  touch(m[1]);
+  touch(m[1], q);
   return true;
 }

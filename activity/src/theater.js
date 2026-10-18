@@ -26,6 +26,7 @@ export function mountTheater() {
           <button class="tb skip" title="跳過這部">⏭</button>
           <button class="tb mute" title="靜音">🔊</button>
           <input class="tvvol" type="range" min="0" max="100" value="${lsGet("tvvol", "80")}">
+          <select class="tvres" title="畫質（只影響自己）"><option value="720">720p</option></select>
           <select class="tvrate" title="播放速度（大家一起變）">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => `<option value="${r}"${r === 1 ? " selected" : ""}>${r}x</option>`).join("")}</select>
           <select class="tvcc" title="字幕（只影響自己）"><option value="">字幕 關</option></select>
           ${env.inDiscord ? `<button class="tb ext" title="在瀏覽器開啟（可以真正全螢幕，一樣同步）">🌐</button>` : ""}
@@ -42,9 +43,20 @@ export function mountTheater() {
     const $ = (s) => root.querySelector(s);
     const video = $(".tv"), playBtn = $(".play"), seek = $(".tvseek"), timeEl = $(".tvtime"), nowEl = $(".tvnow"), msgEl = $(".tvmsg"),
       queueEl = $(".tvqueue"), viewersEl = $(".tvviewers"), unmute = $(".tvunmute"), loadEl = $(".tvload"), emptyEl = $(".tvempty"), watchEl = $(".watch");
-    let ws = null, closed = false, retry = 0, st = null, offset = 0, seeking = false, curSrc = "", blocked = false, timer = 0, startTimer = 0;
+    let ws = null, closed = false, retry = 0, st = null, offset = 0, seeking = false, curSrc = "", curVid = "", blocked = false, timer = 0, startTimer = 0;
     const send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
-    const srcOf = (vid) => (env.inDiscord ? `/.proxy/api/tv/${vid}.mp4` : new URL(`api/tv/${vid}.mp4`, location.href).pathname);
+    // 畫質：預設 720p；選別的畫質時請伺服器準備，準備好才切過去（從同一秒接著播）
+    const qReady = new Set();
+    let wantQ = Number(lsGet("tvres", "720")) || 720;
+    const useQ = (vid) => (wantQ !== 720 && qReady.has(vid + "|" + wantQ) ? wantQ : 720);
+    const fileOf = (vid) => (useQ(vid) === 720 ? `${vid}.mp4` : `${vid}.q${useQ(vid)}.mp4`);
+    const srcOf = (vid) => (env.inDiscord ? `/.proxy/api/tv/${fileOf(vid)}` : new URL(`api/tv/${fileOf(vid)}`, location.href).pathname);
+    let qAsked = "";
+    function askQual(c) {
+      const k = c.vid + "|" + wantQ;
+      if (wantQ === 720 || qReady.has(k) || qAsked === k || !(c.quals || []).includes(wantQ)) return;
+      qAsked = k; send({ t: "tqual", vid: c.vid, q: wantQ });
+    }
     video.volume = Number(lsGet("tvvol", "80")) / 100;
     video.muted = lsGet("tvmute") === "1";
     $(".mute").textContent = video.muted ? "🔇" : "🔊";
@@ -58,6 +70,11 @@ export function mountTheater() {
         const m = JSON.parse(e.data);
         if (m.t === "tstate") { st = m; offset = Date.now() - m.now; st.recv = Date.now(); render(); sync(); }
         else if (m.t === "terr") { msgEl.textContent = "⚠️ " + m.error; msgEl.className = "tvmsg err"; }
+        else if (m.t === "tqual") {
+          if (m.status === "ready") { qReady.add(m.vid + "|" + m.q); if (st && st.cur && st.cur.vid === m.vid && m.q === wantQ) { msgEl.textContent = ""; sync(); } }
+          else if (m.status === "downloading") { msgEl.className = "tvmsg"; msgEl.textContent = `${m.q}p 準備中… ${m.pct || 0}%（先用 720p 播）`; }
+          else if (m.status === "error") { msgEl.className = "tvmsg err"; msgEl.textContent = `⚠️ ${m.q}p 下載失敗，維持 720p`; }
+        }
         else if (m.t === "tinfo") { msgEl.textContent = m.msg; msgEl.className = "tvmsg"; }
       };
       ws.onclose = () => { if (closed) return; msgEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };
@@ -75,9 +92,13 @@ export function mountTheater() {
         return;
       }
       const src = srcOf(c.vid);
-      if (curSrc !== src) { curSrc = src; video.src = src; video.load(); ccFor = ""; }
+      if (curSrc !== src) {
+        const sameVid = curVid === c.vid;
+        curSrc = src; curVid = c.vid; video.src = src; video.load();
+        if (!sameVid) ccFor = "";                                      // 換畫質時字幕不用重抓
+      }
       if (video.playbackRate !== (c.rate || 1)) video.playbackRate = c.rate || 1;
-      setupCC(c);
+      setupCC(c); setupRes(c); askQual(c);
       const go = () => {
         const tg = target();
         if (tg < 0) { if (!video.paused) video.pause(); video.currentTime = 0; startTimer = setTimeout(sync, -tg * 1000); return; }   // 還沒到開始時間
@@ -133,6 +154,17 @@ export function mountTheater() {
       ccSel.value = pick ? pick.lang : "";
       setTrack(c.vid, ccSel.value);
     }
+    const resSel = $(".tvres");
+    let resFor = "";
+    function setupRes(c) {
+      const sig = c.vid + "|" + (c.quals || []).join(",");
+      if (resFor === sig) return;
+      resFor = sig;
+      const qs = c.quals && c.quals.length ? c.quals : [720];
+      resSel.innerHTML = qs.map((q) => `<option value="${q}">${q}p${q === 720 ? "" : ""}</option>`).join("");
+      resSel.value = String(qs.includes(wantQ) ? wantQ : 720);
+    }
+    resSel.addEventListener("change", () => { wantQ = Number(resSel.value); lsSet("tvres", String(wantQ)); const c = st && st.cur; if (c) { if (wantQ === 720) msgEl.textContent = ""; askQual(c); sync(); } });
     ccSel.addEventListener("change", () => { const c = st && st.cur; lsSet("tvcc", ccSel.value); if (c) setTrack(c.vid, ccSel.value); });
     rateSel.addEventListener("change", () => { if (st && st.cur) send({ t: "tspeed", rate: Number(rateSel.value) }); });
     const extBtn = $(".ext");
