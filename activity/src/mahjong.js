@@ -3,6 +3,7 @@
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 import { GUIDE, guideItem, parseTiles } from "./mjguide.js";
+import { mjSfx, mjSfxOn, setMjSfx } from "./mjsfx.js";
 
 const NUM = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const HON = ["東", "南", "西", "北", "白", "發", "中"];
@@ -38,7 +39,7 @@ export function mountMahjong(rule, opts = {}) {
   return function (root, { env, back }) {
     root.innerHTML = `
       <div class="game slots mj mj-${rule}">
-        <header><button class="back">← 選單</button><h2>${TITLE}</h2><button class="mjgbtn">📘 ${rule === "jp" ? "役表" : "台數表"}</button><span class="watch"></span></header>
+        <header><button class="back">← 選單</button><h2>${TITLE}</h2><button class="mjgbtn">📘 ${rule === "jp" ? "役表" : "台數表"}</button><button class="mjsnd" title="音效開關">${mjSfxOn() ? "🔊" : "🔇"}</button><span class="watch"></span></header>
         <div class="mjguide" hidden></div>
         <div class="status">連線中…</div>
         <div class="mjbody"></div>
@@ -56,6 +57,8 @@ export function mountMahjong(rule, opts = {}) {
         <p class="mgintro">範例牌型中間的空隙後面是吃碰槓亮出來的牌。</p>`;
       guideEl.querySelector(".mgclose").addEventListener("click", () => { guideEl.hidden = true; });
     }
+    const sndBtn = $(".mjsnd");
+    sndBtn.addEventListener("click", () => { setMjSfx(!mjSfxOn()); sndBtn.textContent = mjSfxOn() ? "🔊" : "🔇"; if (mjSfxOn()) mjSfx.discard(); });
     $(".mjgbtn").addEventListener("click", () => { if (guideEl.hidden) { renderGuide(); guideEl.hidden = false; guideEl.scrollIntoView({ block: "start" }); } else guideEl.hidden = true; });
     let ws = null, closed = false, retry = 0, st = null, timer = 0, riichiMode = false, lastSig = "";
     const pid = getPid();
@@ -68,7 +71,7 @@ export function mountMahjong(rule, opts = {}) {
       ws.onopen = () => { retry = 0; send({ t: "mjoin", rule, room, spectate: !!spectate, pid, name: lsName() }); };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.t === "mstate") { st = m; st.at = Date.now() - m.now; if (!st.opts || st.opts.kind !== "turn" || !st.opts.riichi.length) riichiMode = false; render(); }
+        if (m.t === "mstate") { const prev = st; try { sounds(prev, m); } catch {} st = m; st.at = Date.now() - m.now; if (!st.opts || st.opts.kind !== "turn" || !st.opts.riichi.length) riichiMode = false; render(); }
         else if (m.t === "merr") statusEl.textContent = m.error === "full" ? "座位滿了" : "發生錯誤";
       };
       ws.onclose = () => { if (closed) return; statusEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };
@@ -191,6 +194,39 @@ export function mountMahjong(rule, opts = {}) {
       body.querySelectorAll(".myk").forEach((el) => el.addEventListener("click", () => { popName = popName === el.dataset.y ? "" : el.dataset.y; render(); }));
       tickStatus();
     }
+    // ---- 音效：比較前後兩次狀態，看發生了什麼事
+    const riverN = (s) => (s && s.seats ? s.seats.reduce((n, x) => n + ((x && x.river) || []).length, 0) : 0);
+    function sounds(prev, m) {
+      if (m.phase === "play" && riverN(m) === 0 && (!prev || prev.phase !== "play" || riverN(prev) > 0)) { mjSfx.shuffle(); return; }   // 新的一局：洗牌
+      if (!prev || prev.phase !== "play") return;
+      if (m.phase === "result" && m.result) {
+        const r = m.result;
+        if (r.kind === "draw") mjSfx.exhaust();
+        else if (r.winner === m.you) mjSfx.win(true);
+        else if (r.from === m.you && m.you >= 0) mjSfx.lose();
+        else mjSfx.win(false);
+        return;
+      }
+      if (m.phase !== "play") return;
+      let called = null, riichi = false, flower = false;
+      m.seats.forEach((x, i) => {
+        const p = prev.seats[i]; if (!x || !p) return;
+        const ml = x.melds || [], pl = p.melds || [];
+        if (ml.length > pl.length) called = ml[ml.length - 1].k;
+        else if (ml.some((mm, k) => pl[k] && mm.tiles.length > pl[k].tiles.length)) called = "kakan";
+        if (x.riichi && !p.riichi) riichi = true;
+        if ((x.flowers || []).length > (p.flowers || []).length) flower = true;
+      });
+      const dn = riverN(m) - riverN(prev);
+      if (riichi) mjSfx.riichi();
+      else if (called) (/kan/.test(called) ? mjSfx.kan() : mjSfx.call());
+      else if (dn > 0) mjSfx.discard();
+      if (flower) setTimeout(() => mjSfx.flower(), 120);
+      const myTurnNow = m.opts && m.opts.kind === "turn", myTurnBefore = prev.opts && prev.opts.kind === "turn";
+      if (myTurnNow && !myTurnBefore) { if (m.drawn != null) mjSfx.draw(); setTimeout(() => mjSfx.myturn(), 160); }
+      if (m.opts && m.opts.kind === "claim" && !(prev.opts && prev.opts.kind === "claim" && prev.opts.tile === m.opts.tile)) setTimeout(() => mjSfx.claim(), 180);
+    }
+
     // ---- 手牌提示：這種牌場上看得到幾張、誰打的
     const kindOf = (t) => (t >= 100 ? t - 100 : t);
     let tipEl = null, tipK = null;
