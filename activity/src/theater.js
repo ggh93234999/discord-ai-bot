@@ -20,12 +20,12 @@ export function mountTheater() {
           <div class="tvload" hidden></div>
         </div>
         <div class="tvbar">
-          <button class="tb play" title="播放／暫停">▶</button>
-          <span class="tvtime">0:00 / 0:00</span>
           <input class="tvseek" type="range" min="0" max="1000" value="0" step="1">
+          <button class="tb play" title="播放／暫停">▶</button>
           <button class="tb skip" title="跳過這部">⏭</button>
           <button class="tb mute" title="靜音">🔊</button>
           <input class="tvvol" type="range" min="0" max="100" step="1" value="${lsGet("tvvol2", "60")}" title="音量 ${lsGet("tvvol2", "60")}%">
+          <span class="tvtime">0:00 / 0:00</span>
           <select class="tvres" title="畫質（只影響自己）"><option value="720">720p</option></select>
           <select class="tvrate" title="播放速度（大家一起變）">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => `<option value="${r}"${r === 1 ? " selected" : ""}>${r}x</option>`).join("")}</select>
           <select class="tvcc" title="字幕（只影響自己）"><option value="">字幕 關</option></select>
