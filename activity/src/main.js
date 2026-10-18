@@ -9,6 +9,7 @@ import { mountBoard } from "./chessui.js";
 import { mountPinball } from "./pinball.js";
 import { mountPoker } from "./poker.js";
 import { mountSpectateLobby } from "./spectate.js";
+import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
@@ -52,6 +53,7 @@ const GAMES = [
   { id: "poker", cat: "casino", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
+  { id: "forgeboard", cat: "forge", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "1 人", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },

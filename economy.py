@@ -633,8 +633,8 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             try:
                 member = g.get_member(uid) or await g.fetch_member(uid)
                 have = {r.name: r for r in g.roles}
-                for t, name, col in FORGE_ROLES:     # 缺的身分組先建好
-                    if name in want and name not in have:
+                for t, name, col in reversed(FORGE_ROLES):     # 8 個身分組一次全部建好（從高階建起，高階排在上面）
+                    if name not in have:
                         have[name] = await g.create_role(name=name, colour=discord.Colour(col), hoist=True, reason="鍛造身分組")
                 mine = {r.name for r in member.roles}
                 drop = [have[n] for _, n, _ in FORGE_ROLES if n in have and n in mine and n not in want]

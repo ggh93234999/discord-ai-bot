@@ -46,8 +46,8 @@ export const FORGE_PRACTICE_START = 100_000;  // 鍛造的練習幣起始金額�
 
 // ---- 存檔：每個身分一把劍。key：p:<id>（練習幣）、r:<uid>（真代幣，練習和真代幣的劍分開）
 const FFILE = fileURLToPath(new URL("./forge.json", import.meta.url));
-let db = { sw: {}, best: {}, xp: {} };
-try { db = { sw: {}, best: {}, xp: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
+let db = { sw: {}, best: {}, xp: {}, nm: {} };
+try { db = { sw: {}, best: {}, xp: {}, nm: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
 let saveT = 0;
 export function forgeSave(now = false) {
   const w = () => { try { fs.writeFileSync(FFILE, JSON.stringify(db)); } catch (e) { console.log("鍛造存檔失敗", e.message); } };
@@ -72,6 +72,20 @@ export const swordTiers = (key) => slotsOf(key).filter(Boolean).map((x) => x.tie
 export const roleSig = (key) => [...new Set(swordTiers(key).filter((t) => t >= 30).map((t) => Math.min(10, Math.floor(t / 10))))].sort((a, b) => a - b).join(",");
 export const getRoleSig = (key) => (db.rl && db.rl[key]) || "";
 export function setRoleSig(key, v) { if (!db.rl) db.rl = {}; db.rl[key] = v; }
+// 神兵榜：記下玩家名字（有登入才知道），依「目前擁有的最高階劍」排行
+export function noteName(key, name) { if (!db.nm) db.nm = {}; if (name && db.nm[key] !== name) { db.nm[key] = name; forgeSave(); } }
+export function forgeBoard(real, limit = 30) {
+  const pre = real ? "r:" : "p:", rows = [];
+  for (const key of Object.keys(db.sw)) {
+    if (!key.startsWith(pre)) continue;
+    const tiers = slotsOf(key).filter(Boolean).map((x) => x.tier);
+    if (!tiers.length) continue;
+    const tier = Math.max(...tiers), id = key.slice(2);
+    rows.push({ name: (db.nm && db.nm[key]) || (key.startsWith("p:g") ? "匿名鍛造師" : "玩家" + id.slice(-4)), tier, swords: tiers.length, best: db.best[key] || tier, sell: V[tier] });
+  }
+  rows.sort((a, b) => b.tier - a.tier || b.best - a.best || b.swords - a.swords);
+  return { t: "fboard", real, rows: rows.slice(0, limit), total: rows.length };
+}
 export const bestOf = (key) => db.best[key] || 0;
 export function noteBest(key, tier) { if (tier > (db.best[key] || 0)) db.best[key] = tier; }
 
