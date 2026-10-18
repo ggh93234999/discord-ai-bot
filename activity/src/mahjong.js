@@ -4,6 +4,7 @@ import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 import { GUIDE, guideItem, parseTiles } from "./mjguide.js";
 import { mjSfx, mjSfxOn, setMjSfx } from "./mjsfx.js";
+import { tileSvg } from "./mjtiles.js";
 
 const NUM = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const HON = ["東", "南", "西", "北", "白", "發", "中"];
@@ -25,7 +26,7 @@ function tile(t, cls = "", attrs = "", noDora = false) {
   let body, k;
   if (t >= 34) { k = "f"; body = `<b>${FLO[t - 34]}</b><i>${(t - 34) % 4 + 1}</i>`; }
   else if (t >= 27) { k = ["w", "w", "w", "w", "dw", "dg", "dr"][t - 27]; body = `<b>${t === 31 ? "" : HON[t - 27]}</b>`; }
-  else { const s = Math.floor(t / 9); k = ["m", "p", "s"][s]; body = `<b>${s === 0 ? NUM[t % 9] : (t % 9) + 1}</b><i>${["萬", "筒", "條"][s]}</i>`; }
+  else { const s = Math.floor(t / 9); k = ["m", "p", "s"][s]; body = s === 0 ? `<b>${NUM[t % 9]}</b><i>萬</i>` : tileSvg(t); }   // 筒子、條子畫圖
   return `<span class="mt k${k} ${cls}" data-k="${t}" ${attrs}>${body}</span>`;
 }
 const meldHTML = (m) => `<span class="mmeld">${m.tiles.map((x, k) => tile(m.k === "ankan" && (k === 0 || k === 3) ? -1 : x, "sm")).join("")}</span>`;
