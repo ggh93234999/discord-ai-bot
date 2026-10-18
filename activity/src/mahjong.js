@@ -62,6 +62,35 @@ export function mountMahjong(rule, opts = {}) {
     sndBtn.addEventListener("click", () => { setMjSfx(!mjSfxOn()); sndBtn.textContent = mjSfxOn() ? "🔊" : "🔇"; if (mjSfxOn()) mjSfx.discard(); });
     $(".mjgbtn").addEventListener("click", () => { if (guideEl.hidden) { renderGuide(); guideEl.hidden = false; guideEl.scrollIntoView({ block: "start" }); } else guideEl.hidden = true; });
     let ws = null, closed = false, retry = 0, st = null, timer = 0, riichiMode = false, lastSig = "";
+    // 雀魂式自動功能：自動理牌（記在瀏覽器）、自動和牌、不吃碰槓、自動摸切（這次開著才有效）
+    let autoSort = true; try { autoSort = localStorage.getItem("mj_sort") !== "0"; } catch {}
+    const auto = { win: false, nocall: false, giri: false };
+    let handOrder = null, autoSig = "", dragI = -1;
+    // 自動理牌關掉時：手牌照自己排的順序，新進來的牌放最右邊
+    function arranged() {
+      const h = st.hand || [];
+      if (autoSort || !handOrder) { handOrder = h.slice(); return h; }
+      const pool = h.slice(), res = [];
+      for (const t of handOrder) { const i = pool.indexOf(t); if (i >= 0) { res.push(t); pool.splice(i, 1); } }
+      res.push(...pool); handOrder = res; return res;
+    }
+    const autoKey = () => JSON.stringify([st.round, st.wall, st.opts && st.opts.kind, st.opts && st.opts.tile, st.drawn, (st.hand || []).length, st.turn]);
+    function autoAct() {
+      if (spectate || !st || st.phase !== "play" || st.you < 0 || !st.opts) return;
+      const o = st.opts, key = autoKey();
+      if (key === autoSig) return;
+      let act = null;
+      if (o.kind === "turn") {
+        if (o.tsumo && auto.win) act = { a: "tsumo" };
+        else if (auto.giri && st.drawn != null && !o.lock && !riichiMode && !o.tsumo) act = { a: "discard", tile: st.drawn };
+      } else if (o.kind === "claim") {
+        if (o.ron && auto.win) act = { a: "ron" };
+        else if (auto.nocall && !o.ron) act = { a: "pass" };
+      }
+      if (!act) return;
+      autoSig = key;
+      setTimeout(() => { if (st && st.opts && autoKey() === key) send({ t: "mact", ...act }); }, 380);
+    }
     const pid = getPid();
     const room = spectate ? spectate.room : env.instanceId;
     const send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
@@ -72,7 +101,7 @@ export function mountMahjong(rule, opts = {}) {
       ws.onopen = () => { retry = 0; send({ t: "mjoin", rule, room, spectate: !!spectate, pid, name: lsName() }); };
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
-        if (m.t === "mstate") { const prev = st; try { sounds(prev, m); } catch {} st = m; st.at = Date.now() - m.now; if (!st.opts || st.opts.kind !== "turn" || !st.opts.riichi.length) riichiMode = false; render(); }
+        if (m.t === "mstate") { const prev = st; try { sounds(prev, m); } catch {} st = m; st.at = Date.now() - m.now; if (!st.opts || st.opts.kind !== "turn" || !st.opts.riichi.length) riichiMode = false; render(); autoAct(); }
         else if (m.t === "merr") statusEl.textContent = m.error === "full" ? "座位滿了" : "發生錯誤";
       };
       ws.onclose = () => { if (closed) return; statusEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };
@@ -146,7 +175,7 @@ export function mountMahjong(rule, opts = {}) {
       if (me && st.phase === "play") {
         const o = st.opts, myTurn = o && o.kind === "turn";
         const can = (t, drawn) => myTurn && (!o.lock || drawn) && (!riichiMode || o.riichi.includes(t));
-        hand = `<div class="mhand">${(st.hand || []).map((t) => tile(t, `big${can(t) ? " can" : ""}${riichiMode && o.riichi.includes(t) ? " rok" : ""}`, `data-t="${t}"`)).join("")}${st.drawn != null ? `<span class="mgap"></span>${tile(st.drawn, `big drawn${can(st.drawn, true) ? " can" : ""}${riichiMode && o.riichi.includes(st.drawn) ? " rok" : ""}`, `data-t="${st.drawn}"`)}` : ""}</div>`;
+        hand = `<div class="mhand${autoSort ? "" : " manual"}">${arranged().map((t, i) => tile(t, `big${can(t) ? " can" : ""}${riichiMode && o.riichi.includes(t) ? " rok" : ""}`, `data-t="${t}" data-i="${i}"${autoSort ? "" : ` draggable="true"`}`)).join("")}${st.drawn != null ? `<span class="mgap"></span>${tile(st.drawn, `big drawn${can(st.drawn, true) ? " can" : ""}${riichiMode && o.riichi.includes(st.drawn) ? " rok" : ""}`, `data-t="${st.drawn}"`)}` : ""}</div>`;
         const b = [];
         if (myTurn) {
           if (o.tsumo) b.push(`<button class="mb hu" data-a="tsumo">${rule === "jp" ? "自摸" : "自摸胡"}</button>`);
@@ -164,6 +193,8 @@ export function mountMahjong(rule, opts = {}) {
         } else ctl = `<div class="mhint">${st.stage === "claim" ? "等其他人決定…" : `輪到 ${esc(st.seats[st.turn]?.name || "")}`}</div>`;
         if (st.waits && st.waits.length) ctl += `<div class="mwaits">聽：${st.waits.map((x) => tile(x, "xs")).join("")}</div>`;
         ctl = `<div class="mctl">${ctl}<div class="mbtns">${b.join("")}</div></div>`;
+        const chip = (k, on, name, tip) => `<button class="${on ? "on" : ""}" data-auto="${k}" title="${tip}">${name}</button>`;
+        hand += `<div class="mauto">${chip("sort", autoSort, "自動理牌", "關掉後手牌不自動排序，可以拖曳牌自己排")}${chip("win", auto.win, "自動和牌", "能自摸或榮和時自動和")}${chip("nocall", auto.nocall, "不吃碰槓", "別人打牌時自動跳過吃、碰、槓（能和牌時還是會問）")}${chip("giri", auto.giri, "自動摸切", "摸到牌直接打出去（能自摸時會停下來讓你決定）")}</div>`;
       } else if (st.phase === "play") ctl = `<div class="mctl"><div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div></div>`;
       const result = st.phase === "result" && st.result ? resultHTML(st.result) : "";
       const keepK = tipK;
@@ -180,6 +211,24 @@ export function mountMahjong(rule, opts = {}) {
         send({ t: "mact", a, tile: el.dataset.t != null ? Number(el.dataset.t) : undefined });
       }));
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "msit", seat: Number(el.dataset.sit) })));
+      body.querySelectorAll("[data-auto]").forEach((el) => el.addEventListener("click", () => {
+        const k = el.dataset.auto;
+        if (k === "sort") { autoSort = !autoSort; try { localStorage.setItem("mj_sort", autoSort ? "1" : "0"); } catch {} }
+        else auto[k] = !auto[k];
+        autoSig = ""; render(); autoAct();
+      }));
+      // 自動理牌關掉時：拖曳手牌換位置
+      if (!autoSort) body.querySelectorAll(".mhand .mt[data-i]").forEach((el) => {
+        el.addEventListener("dragstart", (e) => { dragI = Number(el.dataset.i); hideTip(); try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragI)); } catch {} });
+        el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("dropto"); });
+        el.addEventListener("dragleave", () => el.classList.remove("dropto"));
+        el.addEventListener("drop", (e) => {
+          e.preventDefault(); const to = Number(el.dataset.i);
+          if (dragI >= 0 && dragI !== to && handOrder) { const [t] = handOrder.splice(dragI, 1); handOrder.splice(to, 0, t); }
+          dragI = -1; render();
+        });
+        el.addEventListener("dragend", () => { dragI = -1; });
+      });
       const sb = body.querySelector(".stand"); sb && sb.addEventListener("click", () => send({ t: "mstand" }));
       // 指到手牌：顯示這種牌在場上出現幾張、誰打的，並把桌上同樣的牌標出來（手機長按）
       body.querySelectorAll(".mhand .mt[data-t]").forEach((el) => {

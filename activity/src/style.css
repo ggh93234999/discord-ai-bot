@@ -634,3 +634,10 @@ body.tv-fs{overflow:hidden}
 /* 同房玩家：目前餘額 */
 .watchbox .mbal{font-size:11px;color:#bbb;font-variant-numeric:tabular-nums;margin-left:4px;white-space:nowrap}
 .watchbox .mbal.real{color:#ffd54f}
+
+/* 麻將：雀魂式自動功能開關 */
+.mj .mauto{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:6px 0 2px;width:100%}
+.mj .mauto button{font-size:12px;padding:4px 11px;border-radius:14px;background:rgba(0,0,0,.35);color:#bbb;border:1px solid #555;cursor:pointer}
+.mj .mauto button.on{background:#2e7d32;color:#fff;border-color:#66bb6a;box-shadow:0 0 6px rgba(102,187,106,.5)}
+.mj .mhand.manual .mt[draggable]{cursor:grab}
+.mj .mhand .mt.dropto{outline:2px dashed #4fc3f7;outline-offset:2px}
