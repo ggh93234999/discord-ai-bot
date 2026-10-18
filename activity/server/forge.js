@@ -6,18 +6,21 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const FORGE_MAX = 100;
-const ALPHA = 0.08, RTP = 0.95, TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
-const pTarget = (n) => 0.99 - 0.12 * Math.pow(n / 99, 1.4);
+const RTP = 0.95, TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
+// 成功率：第 1 階 96%，一路降到第 99 階 88%（前面降得比較快，所以大約第 14 階開始「賣掉就賺」）
+const pTarget = (n) => (n === 0 ? 0.97 : 0.96 - 0.08 * Math.pow((n - 1) / 98, 0.6));
+// 鍛造費佔賣價的比例：前期 3%（便宜），後期 8%
+const alpha = (n) => 0.03 + 0.05 * (n / 99);
 function build(C0) {
   const V = [0], C = [C0], P = [];
   V[1] = Math.floor(RTP * C0 / 0.97);
   for (let n = 1; n < FORGE_MAX; n++) {
-    C[n] = Math.max(1, Math.ceil(V[n] * ALPHA));
+    C[n] = Math.max(1, Math.ceil(V[n] * alpha(n)));
     V[n + 1] = Math.max(V[n] + 1, Math.floor(RTP * (V[n] + C[n]) / pTarget(n)));
   }
   for (let n = 0; n < FORGE_MAX; n++) {
     const cap = RTP * (V[n] + C[n]) / V[n + 1];
-    P[n] = Math.floor(1000 * Math.min(n === 0 ? 0.97 : pTarget(n), cap, 0.99)) / 1000;
+    P[n] = Math.floor(1000 * Math.min(pTarget(n), cap, 0.99)) / 1000;
   }
   return { V, C, P, sum: C.reduce((a, b) => a + b, 0) };
 }
