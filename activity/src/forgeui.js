@@ -74,15 +74,16 @@ const money = (n) => Number(n).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }) {
-  let st = null, busy = false, last = "";
+  let st = null, busy = false, last = "", sel = 0;
   const $ = (s) => stage.querySelector(s);
-  function refresh() { send({ t: "fget", real: getReal(), pid }); }
+  function refresh() { send({ t: "fget", real: getReal(), pid, slot: sel }); }
 
   function render(fx) {
     if (!st) { stage.innerHTML = `<div class="fg"><div class="fgmsg">讀取中…</div></div>`; ctl.innerHTML = ""; return; }
     const t = st.tier;
     stage.innerHTML = `<div class="fg${fx ? " " + fx : ""}">
       <div class="fgtop"><b>${t ? `第 ${t} 階` : "沒有劍"}</b><span>${esc(swordName(t))}</span><em>最高紀錄 ${st.best || 0} 階</em></div>
+      <div class="fgslots">${(st.slots || []).map((x, i) => `<button type="button" class="fgslot${i === sel ? " sel" : ""}${x ? "" : " empty"}" data-i="${i}"><span class="mini">${x ? swordSvg(x, "s" + i) : "＋"}</span><small>${i + 1}號${x ? ` · ${x}階` : " · 空"}</small></button>`).join("")}</div>
       <div class="fgsw">${swordSvg(t, "m")}</div>
       <div class="fgstats">
         <div><small>現在賣價</small><b>${t ? money(st.sell) : "—"}</b></div>
@@ -93,6 +94,7 @@ export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }
       <div class="fgmsg" id="fgmsg">${last}</div>
       <details class="fgbook"><summary>📖 劍譜（各材質的最高階）</summary><div class="fgbookg">${[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((k) => `<div class="${t === k ? "cur" : ""}">${swordSvg(k, "k" + k)}<small>${k} 階<br>${esc(swordName(k))}</small></div>`).join("")}</div></details>
     </div>`;
+    stage.querySelectorAll(".fgslot").forEach((b) => b.addEventListener("click", () => { if (busy) return; sel = +b.dataset.i; last = ""; send({ t: "fget", real: getReal(), pid, slot: sel }); }));
     ctl.innerHTML = "";
     const mk = (label, cls, fn, dis) => { const b = document.createElement("button"); b.className = "spin " + cls; b.textContent = label; b.disabled = !!dis; b.addEventListener("click", fn); ctl.append(b); };
     const maxed = t >= st.max;
@@ -103,14 +105,14 @@ export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }
     if (busy) return;
     busy = true; statusEl.textContent = type === "fforge" ? "鍛造中…" : "…";
     const g = stage.querySelector(".fg"); if (g && type === "fforge") g.classList.add("hammer");
-    send({ t: type, real: getReal(), pid });
+    send({ t: type, real: getReal(), pid, slot: sel });
   }
   function onState(m) {
-    st = m; if (m.balance != null) setBal({ real: false, balance: m.balance });
+    st = m; if (m.slot != null) sel = m.slot; if (m.balance != null) setBal({ real: false, balance: m.balance });
     render();
   }
   function onRes(m) {
-    st = m; busy = false;
+    st = m; if (m.slot != null) sel = m.slot; busy = false;
     if (m.balance != null) setBal({ real: m.real, balance: m.balance });
     if (m.sold) { last = `<span class="ok">💰 賣掉 ${m.prev} 階的劍，拿到 ${money(m.got)}</span>`; statusEl.textContent = "賣出了"; render("sold"); return; }
     if (m.ok) {

@@ -47,18 +47,27 @@ export function forgeSave(now = false) {
   if (now) { clearTimeout(saveT); w(); return; }
   clearTimeout(saveT); saveT = setTimeout(w, 800);
 }
-export const getSword = (key) => db.sw[key] || null;
-export const setSword = (key, s) => { if (s) db.sw[key] = s; else delete db.sw[key]; };
+export const FORGE_SLOTS = 10;                 // 每個身分最多同時擁有的劍（格數）
+// 舊存檔是單把劍（物件），讀到時轉成 10 格的陣列
+function slotsOf(key) {
+  let a = db.sw[key];
+  if (!Array.isArray(a)) a = db.sw[key] = a ? [a] : [];
+  while (a.length < FORGE_SLOTS) a.push(null);
+  return a;
+}
+export const getSword = (key, i = 0) => slotsOf(key)[i] || null;
+export const setSword = (key, i, s) => { slotsOf(key)[i] = s || null; };
 export const bestOf = (key) => db.best[key] || 0;
 export function noteBest(key, tier) { if (tier > (db.best[key] || 0)) db.best[key] = tier; }
 
 // 玩家看到的目前狀態（含下一步的費用、成功率、成功後賣價）
-export function forgeView(key, real) {
-  const s = getSword(key), tier = s ? s.tier : 0;
+export function forgeView(key, real, slot = 0) {
+  slot = Number.isInteger(slot) && slot >= 0 && slot < FORGE_SLOTS ? slot : 0;
+  const s = getSword(key, slot), tier = s ? s.tier : 0;
   const maxed = tier >= FORGE_MAX;
   const sell = (t) => (real ? Math.min(V[t], REAL_SELL_MAX) : V[t]);
   return {
-    t: "fstate", real, tier, sell: sell(tier), best: bestOf(key), max: FORGE_MAX,
+    t: "fstate", real, slot, slots: slotsOf(key).map((x) => (x ? x.tier : 0)), tier, sell: sell(tier), best: bestOf(key), max: FORGE_MAX,
     cost: maxed ? 0 : C[tier], p: maxed ? 0 : P[tier], nextSell: maxed ? 0 : sell(tier + 1), spent: s ? s.spent : 0, forged: s ? s.forged : 0,
   };
 }

@@ -382,3 +382,11 @@ body.pk-myturn .game.poker{background:#16296b}
 .fsw-spin{animation:fsws 14s linear infinite}.fsw-spin2{animation:fsws 22s linear infinite reverse}@keyframes fsws{to{transform:rotate(360deg)}}
 .fsw-flame{animation:fswf .9s ease-in-out infinite alternate}@keyframes fswf{to{transform:translateY(-6px) scale(.8);opacity:.35}}
 .casino.forge .bets{display:none !important}
+
+.fgslots{display:flex;gap:4px;overflow-x:auto;padding:2px 0 4px;justify-content:center;flex-wrap:wrap}
+.fgslot{background:#1b2030;border:1px solid #394060;border-radius:8px;color:#cfd6ee;padding:2px 4px;min-width:46px;cursor:pointer;display:flex;flex-direction:column;align-items:center;font-size:11px}
+.fgslot.sel{border-color:#ffd54a;box-shadow:0 0 6px #ffd54a88;background:#262c44}
+.fgslot .mini{display:block;width:22px;height:34px;line-height:34px;text-align:center;overflow:hidden}
+.fgslot .mini svg{width:22px;height:34px}
+.fgslot.empty{opacity:.65}
+.fgslot small{font-size:10px;white-space:nowrap}
