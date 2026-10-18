@@ -8,6 +8,7 @@ import { mountCasino } from "./casino.js";
 import { mountBoard } from "./chessui.js";
 import { mountPinball } from "./pinball.js";
 import { mountPoker } from "./poker.js";
+import { mountMahjong } from "./mahjong.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
@@ -51,6 +52,8 @@ const GAMES = [
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
   { id: "poker", cat: "casino", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
+  { id: "mjtw", cat: "casino", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
+  { id: "mjjp", cat: "casino", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
   { id: "forgeboard", cat: "forge", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },

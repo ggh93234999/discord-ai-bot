@@ -12,6 +12,7 @@ import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscr
 import * as chessEng from "./chess.js";
 import * as xqEng from "./xq.js";
 import { handlePoker, pokerClose } from "./poker.js";
+import { handleMahjong, mjClose } from "./mahjong.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -252,6 +253,7 @@ wss.on("connection", (ws, req) => {
     }
     if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
+    if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));
@@ -338,6 +340,7 @@ wss.on("connection", (ws, req) => {
     console.log(`ws close code=${code} reason=${String(reason || "").slice(0, 40)} ua=${ws.ua} msgs=${ws.mtypes.join(",")} age=${Math.round((Date.now() - ws.born) / 1000)}s missed=${ws.missed} room=${ws.cr ? ws.cr.key : ws.room ? "board" : ws.multi ? "multi" : "-"}`);
     casinoClose(ws);
     pokerClose(ws);
+    mjClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
     if (!room) return;
