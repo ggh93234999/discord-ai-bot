@@ -49,6 +49,20 @@ function parseTarget(s) {
   if (/^https?:\/\//i.test(s)) return null;                             // 其他網站先不支援
   return { url: "ytsearch1:" + s, search: true };
 }
+// 從 yt-dlp 的資訊挑出可用字幕：人工字幕全收（最多 10 種），自動字幕只收原語言那一份
+const LANG_ZH = { "zh-Hant": "中文（繁體）", "zh-TW": "中文（台灣）", "zh-HK": "中文（香港）", "zh-Hans": "中文（簡體）", "zh-CN": "中文（中國）", zh: "中文",
+  en: "英文", "en-US": "英文（美國）", "en-GB": "英文（英國）", ja: "日文", ko: "韓文", es: "西班牙文", "es-419": "西班牙文（拉美）", fr: "法文", de: "德文", "de-DE": "德文",
+  "pt-BR": "葡萄牙文（巴西）", th: "泰文", vi: "越南文", id: "印尼文", ru: "俄文" };
+const langName = (k) => LANG_ZH[k] || LANG_ZH[k.split("-")[0]] || k;
+function pickSubs(j) {
+  const out = [];
+  for (const k of Object.keys(j.subtitles || {}).filter((k) => k !== "live_chat").slice(0, 10)) out.push({ lang: k, name: langName(k), auto: false });
+  const a = j.automatic_captions || {};
+  const orig = Object.keys(a).find((k) => k.endsWith("-orig"));
+  if (orig) out.push({ lang: orig, name: langName(orig.replace(/-orig$/, "")) + "（自動產生）", auto: true });
+  // 只用 YouTube 影片本身的字幕：上傳者提供的字幕＋YouTube 依原語言自動產生的字幕；不用 YouTube 的「自動翻譯」（常被限流 429）
+  return out;
+}
 async function lookup(target) {
   const txt = await run(["-J", "--no-playlist", "--flat-playlist", target.url]);
   let j = JSON.parse(txt);
@@ -57,13 +71,14 @@ async function lookup(target) {
   if (j.is_live || j.live_status === "is_live" || j.live_status === "is_upcoming") throw new Error("直播或還沒開始的影片不能播");
   let dur = Number(j.duration) || 0;
   let title = j.title || j.id;
-  if (!dur && target.search) {                                         // 搜尋結果只有簡略資訊，再查一次
+  let subs = pickSubs(j);
+  if (target.search) {                                                  // 搜尋結果只有簡略資訊，再查一次
     const d = JSON.parse(await run(["-J", "--no-playlist", "https://www.youtube.com/watch?v=" + j.id]));
-    dur = Number(d.duration) || 0; title = d.title || title;
+    dur = Number(d.duration) || dur; title = d.title || title; subs = pickSubs(d);
   }
   if (dur > MAX_DUR) throw new Error(`影片太長（上限 ${MAX_DUR / 3600} 小時）`);
-  meta.set(j.id, { title, dur });
-  return { vid: j.id, title, dur };
+  meta.set(j.id, { title, dur, subs });
+  return { vid: j.id, title, dur, subs };
 }
 function download(vid) {
   if (fs.existsSync(files(vid))) { touch(vid); return; }
@@ -102,6 +117,7 @@ function touch(vid) { const f = files(vid); try { const t = new Date(); fs.utime
 function cleanCache() {
   const inUse = new Set();
   for (const r of rooms.values()) { if (r.cur) inUse.add(r.cur.vid); for (const q of r.queue) inUse.add(q.vid); }
+  for (const f of fs.readdirSync(DIR)) if (f.endsWith(".vtt") && !fs.existsSync(path.join(DIR, f.slice(0, 11) + ".mp4")) && !inUse.has(f.slice(0, 11))) try { fs.unlinkSync(path.join(DIR, f)); } catch {}
   const list = fs.readdirSync(DIR).filter((f) => /^[A-Za-z0-9_-]{11}\.mp4$/.test(f)).map((f) => { const st = fs.statSync(path.join(DIR, f)); return { f, size: st.size, t: st.mtimeMs }; });
   let total = list.reduce((s, x) => s + x.size, 0);
   for (const x of list.sort((a, b) => a.t - b.t)) {
@@ -112,12 +128,13 @@ function cleanCache() {
 }
 
 // ---------------------------------------------------------------- 房間狀態
-const posOf = (cur) => (cur ? Math.min(cur.dur || Infinity, cur.pos + (cur.playing ? (Date.now() - cur.at) / 1000 : 0)) : 0);
+const posOf = (cur) => (cur ? Math.min(cur.dur || Infinity, cur.pos + (cur.playing ? ((Date.now() - cur.at) / 1000) * (cur.rate || 1) : 0)) : 0);
+const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 function view(r) {
   const c = r.cur;
   return {
     t: "tstate", now: Date.now(), log: r.log,
-    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), ...statusOf(c.vid) } : null,
+    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], ...statusOf(c.vid) } : null,
     queue: r.queue.map((q) => ({ key: q.key, vid: q.vid, title: q.title, dur: q.dur, by: q.by, ...statusOf(q.vid) })),
     viewers: [...r.members].map(nameOf),
   };
@@ -129,7 +146,7 @@ function advance(r) {
   if (r.cur && r.cur.playing && posOf(r.cur) >= r.cur.dur - 0.5 && r.cur.dur) { r.log = `《${r.cur.title}》播完了`; r.cur = null; }
   if (!r.cur && r.queue.length) {
     const q = r.queue.shift();
-    r.cur = { ...q, playing: false, pos: 0, at: Date.now(), waitReady: true };
+    r.cur = { ...q, playing: false, pos: 0, at: Date.now(), rate: 1, waitReady: true };
     download(q.vid);
   }
   if (r.cur && r.cur.waitReady && statusOf(r.cur.vid).status === "ready") {   // 下載好了才開始播
@@ -192,11 +209,59 @@ export async function handleTheater(ws, m) {
     if (!Number.isFinite(p)) return true;
     c.pos = Math.max(0, Math.min(c.dur || p, p)); c.at = Date.now();
     r.log = `${who} 跳到 ${Math.floor(c.pos / 60)}:${String(Math.floor(c.pos % 60)).padStart(2, "0")}`;
+  } else if (m.t === "tspeed" && c) {
+    const v = Number(m.rate); if (!RATES.includes(v)) return true;
+    c.pos = Math.max(0, posOf(c)); c.at = Date.now(); c.rate = v; r.log = `${who} 把速度調成 ${v} 倍`;
   } else if (m.t === "tskip" && c) { r.log = `${who} 跳過《${c.title}》`; r.cur = null; advance(r); }
   else if (m.t === "tremove") { const k = r.queue.findIndex((q) => q.key === m.key); if (k >= 0) { r.log = `${who} 移除《${r.queue[k].title}》`; r.queue.splice(k, 1); } }
   else if (m.t === "tup") { const k = r.queue.findIndex((q) => q.key === m.key); if (k > 0) { const [x] = r.queue.splice(k, 1); r.queue.unshift(x); r.log = `${who} 把《${x.title}》移到下一部`; download(x.vid); } }
   else return true;
   push(r);
+  return true;
+}
+
+// ---------------------------------------------------------------- 字幕檔（/api/tv/sub/<id>/<語言>.vtt，第一次要時才下載）
+const subJobs = new Map();
+function fetchSub(vid, lang) {
+  const f = path.join(DIR, `${vid}.${lang}.vtt`);
+  if (fs.existsSync(f)) return Promise.resolve(f);
+  const k = vid + "|" + lang;
+  if (!subJobs.has(k)) {
+    const auto = !(meta.get(vid)?.subs || []).some((x) => x.lang === lang && !x.auto);
+    const p = run(["--skip-download", auto ? "--write-auto-subs" : "--write-subs", "--sub-langs", lang, "--sub-format", "vtt", "--no-playlist",
+                   "-o", path.join(DIR, vid), "https://www.youtube.com/watch?v=" + vid])
+      .then(() => {
+        if (!fs.existsSync(f)) throw new Error("沒有這個字幕");
+        if (/^zh-(Hans|CN)$/.test(lang)) return toTraditional(f).then(() => f);   // 簡體字幕轉成繁體
+        return f;
+      })
+      .finally(() => setTimeout(() => subJobs.delete(k), 60000));
+    p.catch(() => {});
+    subJobs.set(k, p);
+  }
+  return subJobs.get(k);
+}
+function toTraditional(f) {
+  const py = process.env.OPENCC_PYTHON || "/home/ggh93234999/.venvs/discord-bot/bin/python";
+  return new Promise((resolve) => {
+    const p = spawn(py, ["-c", "import sys,opencc;p=sys.argv[1];t=open(p,encoding='utf-8').read();open(p,'w',encoding='utf-8').write(opencc.OpenCC('s2tw').convert(t))", f]);
+    p.on("close", () => resolve()); p.on("error", () => resolve());
+  });
+}
+export async function serveSub(req, res) {
+  const m = new URL(req.url, "http://x").pathname.match(/^\/api\/tv\/sub\/([A-Za-z0-9_-]{11})\/([A-Za-z0-9-]{1,20})\.vtt$/);
+  if (!m) return false;
+  try {
+    const job = fetchSub(m[1], m[2]);
+    const f = await Promise.race([job, new Promise((r) => setTimeout(() => r(null), 8000))]);
+    if (!f) {                                                           // 還在下載／翻譯：回 202，前端過幾秒再問
+      res.writeHead(202, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ working: true }));
+      return true;
+    }
+    res.writeHead(200, { "Content-Type": "text/vtt; charset=utf-8", "Cache-Control": "no-cache" });
+    fs.createReadStream(f).pipe(res);
+  } catch (e) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); res.end(String(e.message || e).slice(0, 100)); }
   return true;
 }
 

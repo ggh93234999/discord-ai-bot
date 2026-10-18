@@ -26,6 +26,9 @@ export function mountTheater() {
           <button class="tb skip" title="跳過這部">⏭</button>
           <button class="tb mute" title="靜音">🔊</button>
           <input class="tvvol" type="range" min="0" max="100" value="${lsGet("tvvol", "80")}">
+          <select class="tvrate" title="播放速度（大家一起變）">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => `<option value="${r}"${r === 1 ? " selected" : ""}>${r}x</option>`).join("")}</select>
+          <select class="tvcc" title="字幕（只影響自己）"><option value="">字幕 關</option></select>
+          ${env.inDiscord ? `<button class="tb ext" title="在瀏覽器開啟（可以真正全螢幕，一樣同步）">🌐</button>` : ""}
           <button class="tb full" title="全螢幕">⛶</button>
         </div>
         </div>
@@ -61,7 +64,7 @@ export function mountTheater() {
       ws.onerror = () => {};
     }
     // 伺服器上「現在應該播到哪」
-    const target = () => { const c = st && st.cur; if (!c) return 0; return c.pos + (c.playing ? (Date.now() - st.recv) / 1000 : 0); };
+    const target = () => { const c = st && st.cur; if (!c) return 0; return c.pos + (c.playing ? ((Date.now() - st.recv) / 1000) * (c.rate || 1) : 0); };
 
     function sync() {
       const c = st && st.cur;
@@ -72,7 +75,9 @@ export function mountTheater() {
         return;
       }
       const src = srcOf(c.vid);
-      if (curSrc !== src) { curSrc = src; video.src = src; video.load(); }
+      if (curSrc !== src) { curSrc = src; video.src = src; video.load(); ccFor = ""; }
+      if (video.playbackRate !== (c.rate || 1)) video.playbackRate = c.rate || 1;
+      setupCC(c);
       const go = () => {
         const tg = target();
         if (tg < 0) { if (!video.paused) video.pause(); video.currentTime = 0; startTimer = setTimeout(sync, -tg * 1000); return; }   // 還沒到開始時間
@@ -88,8 +93,57 @@ export function mountTheater() {
     video.addEventListener("playing", () => { loadEl.hidden = true; });
     video.addEventListener("canplay", () => { loadEl.hidden = true; });
 
+    // ---- 字幕（每個人自己選，記住偏好語言）
+    let ccFor = "";
+    const ccSel = $(".tvcc"), rateSel = $(".tvrate");
+    const subSrc = (vid, lang) => (env.inDiscord ? `/.proxy/api/tv/sub/${vid}/${lang}.vtt` : new URL(`api/tv/sub/${vid}/${lang}.vtt`, location.href).pathname);
+    let trackSeq = 0, blobUrl = "";
+    async function setTrack(vid, lang) {
+      const my = ++trackSeq;
+      for (const t of [...video.querySelectorAll("track")]) t.remove();
+      for (const tt of video.textTracks) tt.mode = "disabled";
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = ""; }
+      if (!lang) { msgEl.textContent = ""; return; }
+      msgEl.className = "tvmsg"; msgEl.textContent = "字幕載入中…";
+      // 伺服器還在下載或翻譯時回 202，過幾秒再問
+      for (let k = 0; k < 120 && my === trackSeq; k++) {
+        let r;
+        try { r = await fetch(subSrc(vid, lang)); } catch { await new Promise((z) => setTimeout(z, 3000)); continue; }
+        if (my !== trackSeq) return;
+        if (r.status === 202) { msgEl.textContent = "字幕下載中…"; await new Promise((z) => setTimeout(z, 3000)); continue; }
+        if (!r.ok) { msgEl.textContent = "⚠️ " + ((await r.text().catch(() => "")) || "這個字幕抓不到") ; msgEl.className = "tvmsg err"; return; }
+        blobUrl = URL.createObjectURL(new Blob([await r.text()], { type: "text/vtt" }));
+        const tr = document.createElement("track");
+        tr.kind = "subtitles"; tr.srclang = "zh"; tr.label = lang; tr.src = blobUrl; tr.default = true;
+        tr.addEventListener("load", () => { tr.track.mode = "showing"; });
+        video.appendChild(tr);
+        tr.track.mode = "showing";
+        msgEl.textContent = "";
+        return;
+      }
+    }
+    function setupCC(c) {
+      const sig = c.vid + "|" + (c.subs || []).map((x) => x.lang).join(",");
+      if (ccFor === sig) return;
+      ccFor = sig;
+      const subs = c.subs || [];
+      ccSel.innerHTML = `<option value="">${subs.length ? "字幕 關" : "沒有字幕"}</option>` + subs.map((x) => `<option value="${esc(x.lang)}">${esc(x.name)}</option>`).join("");
+      const pref = lsGet("tvcc");
+      const pick = pref ? subs.find((x) => x.lang === pref) || subs.find((x) => x.lang.split("-")[0] === pref.split("-")[0]) : null;
+      ccSel.value = pick ? pick.lang : "";
+      setTrack(c.vid, ccSel.value);
+    }
+    ccSel.addEventListener("change", () => { const c = st && st.cur; lsSet("tvcc", ccSel.value); if (c) setTrack(c.vid, ccSel.value); });
+    rateSel.addEventListener("change", () => { if (st && st.cur) send({ t: "tspeed", rate: Number(rateSel.value) }); });
+    const extBtn = $(".ext");
+    if (extBtn) extBtn.addEventListener("click", () => {
+      const url = `${import.meta.env.VITE_PUBLIC_URL || "https://mh.hy0936.com.tw/wordle/"}?room=${encodeURIComponent(env.instanceId)}&g=theater`;
+      try { env.sdk.commands.openExternalLink({ url }); } catch { window.open(url, "_blank"); }
+    });
+
     function render() {
       const c = st.cur;
+      if (c && document.activeElement !== rateSel) rateSel.value = String(c.rate || 1);
       watchEl.textContent = st.viewers.length ? `👥 ${st.viewers.length}` : "";
       emptyEl.hidden = !!c;
       if (c && c.status !== "ready") { loadEl.hidden = false; loadEl.textContent = c.status === "error" ? "下載失敗" : `伺服器下載中… ${c.pct || 0}%`; }

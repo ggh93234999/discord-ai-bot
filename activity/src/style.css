@@ -590,3 +590,6 @@ body.mj-myturn{background:#16202c}
 .theater .tvstage.fs.idle .tvbar{opacity:0;pointer-events:none}
 .theater .tvstage.fs.idle{cursor:none}
 body.tv-fs{overflow:hidden}
+.theater .tvrate,.theater .tvcc{background:#2c2d33;color:#fff;border:0;border-radius:8px;padding:6px 4px;font-size:13px;flex-shrink:0;max-width:110px}
+.theater video::cue{font-size:1.15em;background:rgba(0,0,0,.6);color:#fff}
+@media (max-width:420px){.theater .tvcc{max-width:76px}}

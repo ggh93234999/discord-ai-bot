@@ -88,4 +88,6 @@ function start(id) {
   cleanup = g.mount(app, { env, back: () => { if (cleanup) cleanup(); cleanup = null; showMenu(); } }) || null;
 }
 
-showMenu();
+// 網址帶 ?g=遊戲代號 就直接開那個遊戲（例如「一起看影片」的「在瀏覽器開啟」）
+{ const g0 = params.get("g"); if (g0 && GAMES.some((x) => x.id === g0)) start(g0); else showMenu(); }
+
