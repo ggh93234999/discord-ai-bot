@@ -11,11 +11,12 @@ const RTP = 0.95, BOOST = Number(process.env.FBOOST || 1.01), TOTAL_COST = 1_000
 const PL0 = Number(process.env.FPL0 || 0.945), PL1 = Number(process.env.FPL1 || 0.935);
 const PE0 = Number(process.env.FPE0 || 0.973), PE1 = Number(process.env.FPE1 || 0.943);
 const pTarget = (n) => (n === 0 ? 0.97 : n < 50 ? PE0 - (PE0 - PE1) * ((n - 1) / 48) : PL0 - (PL0 - PL1) * ((n - 50) / 49));
-// 鍛造費佔賣價的比例：前期 3% 慢慢升到約 5%，50 階以後 7%→8%
-// 每一步的期望回收率：第 1~49 階略大於 1（101%），讓「一路鍛到 50 階再賣」的期望淨值為正；50 階以後回到 95%，所以 50 階是最佳停手點
-const rr = (n) => (n < 50 ? BOOST : RTP);
-const ALATE = Number(process.env.FALATE || 0.07);
-const alpha = (n) => (n < 50 ? 0.03 + 0.05 * (n / 99) : ALATE + (0.08 - ALATE) * ((n - 50) / 49));
+// 鍛造費佔賣價的比例：前期 3% 慢慢升到約 5%，50 階以後 3%
+// 每一步的期望回收率：第 1~49 階略大於 1（101%），讓「一路鍛到 50 階再賣」的期望淨值為正；50 階以後 100%（期望值從 50 階的高點緩緩下降，50 階是最佳停手點）
+const RL = Number(process.env.FRL || 1.0);
+const rr = (n) => (n < 50 ? BOOST : RL);
+const ALATE = Number(process.env.FALATE || 0.03), AEND = Number(process.env.FAEND || 0.03);
+const alpha = (n) => (n < 50 ? 0.03 + 0.05 * (n / 99) : ALATE + (AEND - ALATE) * ((n - 50) / 49));
 function build(C0) {
   const V = [0], C = [C0], P = [];
   V[1] = Math.floor(RTP * C0 / 0.97);
