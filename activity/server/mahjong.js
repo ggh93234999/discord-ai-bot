@@ -464,7 +464,7 @@ function view(t, ws) {
     watchers: [...t.members].filter((w) => w.mspec).length, final: t.final, round: g ? roundLabel(t) : "", dealer: h ? h.dealer : g ? g.dealer : -1, honba: g ? g.honba : 0, sticks: g ? g.sticks : 0, lian: g ? g.lian : 0 };
   v.seats = t.seats.map((s, i) => {
     if (!s) return null;
-    const o = { i, name: s.name, bot: s.bot, tag: s.bot ? mjPersona(s).tag : "", away: !s.bot && !s.ws, points: s.points };
+    const o = { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points };
     if (h && g) { const p = h.p[i]; Object.assign(o, { wind: WINDS[(i - h.dealer + 4) % 4], melds: p.melds, flowers: p.flowers, river: p.river, riichi: p.riichi, count: p.hand.length }); }
     return o;
   });

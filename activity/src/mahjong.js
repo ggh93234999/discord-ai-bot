@@ -123,7 +123,7 @@ export function mountMahjong(rule, opts = {}) {
       const seats = st.seats.map((s, i) => {
         const wind = "東南西北"[i];
         if (!s) return `<div class="mjls empty"><span class="w">${wind}</span>${spectate ? "空位" : !seated ? `<button class="mb" data-sit="${i}">入座</button>` : `<button class="mb ghost" data-bot="${i}">＋電腦</button>`}</div>`;
-        return `<div class="mjls${i === st.you ? " me" : ""}"><span class="w">${wind}</span><b>${esc(s.name)}</b>${s.tag ? `<span class="btag" title="電腦個性">${s.tag}</span>` : ""}${s.away ? "（離線）" : ""}${seated && s.bot ? `<button class="mdel" data-del="${i}">✕</button>` : ""}</div>`;
+        return `<div class="mjls${i === st.you ? " me" : ""}"><span class="w">${wind}</span><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}${seated && s.bot ? `<button class="mdel" data-del="${i}">✕</button>` : ""}</div>`;
       }).join("");
       let cfg = "";
       const c = st.cfg;
@@ -159,7 +159,7 @@ export function mountMahjong(rule, opts = {}) {
       const flowers = (s.flowers || []).map((f) => tile(f, "sm")).join("");
       const hidden = r === 0 && st.you >= 0 ? "" : `<span class="mcnt" title="手牌張數"><span class="mt back xs"></span>${s.count || 0}</span>`;
       return `<div class="mseat r${r}${turn ? " turn" : ""}">
-        <div class="minfo"><span class="mw${st.dealer === i ? " dealer" : ""}">${s.wind || ""}</span><b>${esc(s.name)}</b>${s.tag ? `<span class="btag" title="電腦個性">${s.tag}</span>` : ""}${s.away ? "（離線）" : ""}${s.riichi ? `<span class="mrii">立直</span>` : ""}${hidden}<em>${s.points.toLocaleString()}</em></div>
+        <div class="minfo"><span class="mw${st.dealer === i ? " dealer" : ""}">${s.wind || ""}</span><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}${s.riichi ? `<span class="mrii">立直</span>` : ""}${hidden}<em>${s.points.toLocaleString()}</em></div>
         <div class="mopen">${flowers}${melds}</div>
         <div class="mriver">${river}</div>
       </div>`;
