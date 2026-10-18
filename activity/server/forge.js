@@ -72,6 +72,7 @@ export const swordTiers = (key) => slotsOf(key).filter(Boolean).map((x) => x.tie
 export const roleSig = (key) => [...new Set(swordTiers(key).filter((t) => t >= 30).map((t) => Math.min(10, Math.floor(t / 10))))].sort((a, b) => a - b).join(",");
 export const getRoleSig = (key) => (db.rl && db.rl[key]) || "";
 export function setRoleSig(key, v) { if (!db.rl) db.rl = {}; db.rl[key] = v; }
+export const realKeys = () => Object.keys(db.sw).filter((k) => k.startsWith("r:"));
 // 神兵榜：記下玩家名字（有登入才知道），依「目前擁有的最高階劍」排行
 export function noteName(key, name) { if (!db.nm) db.nm = {}; if (name && db.nm[key] !== name) { db.nm[key] = name; forgeSave(); } }
 export function forgeBoard(real, limit = 30) {

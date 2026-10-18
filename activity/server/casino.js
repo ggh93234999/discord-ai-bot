@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botRole, betLimit } from "./bet.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "./forge.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, realKeys, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
@@ -403,15 +403,26 @@ async function stakeBig(ws, real, cost, why) {
 }
 // ---- 鍛造：每個身分一把劍（存在 forge.json）。練習幣用連線的練習幣，真代幣用機器人錢包。
 // 鍛造身分組：手上每把劍所在區間的組合變了才通知機器人（失敗的話下次再試）
-async function syncRole(key, ws) {
+// 同一個人一次只送一個請求，送完再看劍有沒有又變：避免連續鍛造時舊請求比新請求晚到，
+// 結果劍碎了身分組卻還掛著（以前會這樣）。
+const roleBusy = new Set();
+async function syncRole(key, ws, force = false) {
+  const uid = ws ? ws.user && ws.user.uid : key.slice(2);
+  if (!uid || roleBusy.has(key)) return;
+  roleBusy.add(key);
   try {
-    if (!ws.user) return;
-    const sig = roleSig(key);
-    if (sig === getRoleSig(key)) return;
-    const r = await botRole(ws.user.uid, swordTiers(key));
-    if (r && r.ok) { setRoleSig(key, sig); forgeSave(); }
-  } catch {}
+    for (let i = 0; i < 20; i++) {
+      const sig = roleSig(key);
+      if (!force && sig === getRoleSig(key)) break;
+      force = false;
+      const r = await botRole(uid, swordTiers(key));
+      if (!(r && r.ok)) break;
+      setRoleSig(key, sig); forgeSave();
+    }
+  } catch {} finally { roleBusy.delete(key); }
 }
+// 伺服器啟動後把所有真代幣玩家的身分組對一次（修正以前卡住沒拔掉的）
+setTimeout(async () => { for (const k of realKeys()) { await syncRole(k, null, true); await new Promise((r) => setTimeout(r, 1500)); } }, 20000);
 async function handleForge(ws, m) {
   const real = !!m.real;
   let id;

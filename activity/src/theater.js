@@ -25,7 +25,7 @@ export function mountTheater() {
           <input class="tvseek" type="range" min="0" max="1000" value="0" step="1">
           <button class="tb skip" title="跳過這部">⏭</button>
           <button class="tb mute" title="靜音">🔊</button>
-          <input class="tvvol" type="range" min="0" max="100" value="${lsGet("tvvol", "80")}">
+          <input class="tvvol" type="range" min="0" max="100" step="1" value="${lsGet("tvvol2", "60")}" title="音量 ${lsGet("tvvol2", "60")}%">
           <select class="tvres" title="畫質（只影響自己）"><option value="720">720p</option></select>
           <select class="tvrate" title="播放速度（大家一起變）">${[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((r) => `<option value="${r}"${r === 1 ? " selected" : ""}>${r}x</option>`).join("")}</select>
           <select class="tvcc" title="字幕（只影響自己）"><option value="">字幕 關</option></select>
@@ -60,7 +60,8 @@ export function mountTheater() {
       if (e === mainOf(c) || qReady.has(k) || qAsked === k) return;
       qAsked = k; send({ t: "tqual", vid: c.vid, q: e });
     }
-    video.volume = Number(lsGet("tvvol", "80")) / 100;
+    const volOf = (v) => Math.pow(Math.max(0, Math.min(100, Number(v) || 0)) / 100, 3);
+    video.volume = volOf(lsGet("tvvol2", "60"));
     video.muted = lsGet("tvmute") === "1";
     $(".mute").textContent = video.muted ? "🔇" : "🔊";
     const nm = $(".tvnm"); nm.value = lsGet("pokername");
@@ -207,7 +208,11 @@ export function mountTheater() {
     seek.addEventListener("input", () => { seeking = true; });
     seek.addEventListener("change", () => { seeking = false; const c = st && st.cur; if (c && c.dur) send({ t: "tseek", pos: (Number(seek.value) / 1000) * c.dur }); });
     $(".mute").addEventListener("click", () => { video.muted = !video.muted; lsSet("tvmute", video.muted ? "1" : "0"); $(".mute").textContent = video.muted ? "🔇" : "🔊"; });
-    $(".tvvol").addEventListener("input", (e) => { video.volume = Number(e.target.value) / 100; lsSet("tvvol", e.target.value); if (video.muted && video.volume > 0) $(".mute").click(); });
+    const volEl = $(".tvvol");
+    const setVol = (v) => { v = Math.max(0, Math.min(100, Math.round(v))); volEl.value = v; volEl.title = `音量 ${v}%`; video.volume = volOf(v); lsSet("tvvol2", String(v)); if (video.muted && v > 0) $(".mute").click(); };
+    volEl.addEventListener("input", () => setVol(volEl.value));
+    // 滑鼠滾輪微調（每格 2%）
+    volEl.addEventListener("wheel", (e) => { e.preventDefault(); setVol(Number(volEl.value) + (e.deltaY < 0 ? 2 : -2)); }, { passive: false });
     // 全螢幕：先試瀏覽器原生全螢幕；Discord 內嵌畫面常常不允許，就改用「把影片鋪滿整個活動視窗」，
     // 再搭配 Discord 自己的活動全螢幕／彈出視窗按鈕，就是真正的全螢幕。
     const stage = $(".tvstage"), fullBtn = $(".full");
@@ -224,7 +229,15 @@ export function mountTheater() {
       if (document.fullscreenElement || document.webkitFullscreenElement) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
     }
     fullBtn.addEventListener("click", () => (isFs() ? exitFs() : enterFs()));
-    video.addEventListener("dblclick", () => (isFs() ? exitFs() : enterFs()));
+    let clickT = 0;
+    const wrapEl = $(".tvwrap");
+    wrapEl.addEventListener("click", (e) => {
+      if (e.target.closest(".tvunmute")) return;
+      clearTimeout(clickT);
+      if (e.detail > 1) return;
+      clickT = setTimeout(() => playBtn.click(), 230);
+    });
+    wrapEl.addEventListener("dblclick", (e) => { if (e.target.closest(".tvunmute")) return; clearTimeout(clickT); isFs() ? exitFs() : enterFs(); });
     stage.addEventListener("mousemove", showBar);
     stage.addEventListener("touchstart", showBar, { passive: true });
     const onFsChange = () => { if (!(document.fullscreenElement || document.webkitFullscreenElement) && isFs() && stage.dataset.native === "1") exitFs(); stage.dataset.native = document.fullscreenElement ? "1" : ""; };
