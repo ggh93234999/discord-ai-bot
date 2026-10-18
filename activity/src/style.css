@@ -400,3 +400,7 @@ body.pk-myturn .game.poker{background:#16296b}
 @media (max-width:520px){ .card.wide { grid-column:1 / -1; } }
 
 .fgxp{text-align:center;font-size:13px;color:#e2c46a;margin:2px 0}.fgxp small{opacity:.6;margin-left:4px}
+
+/* 鍛造頁面：水墨夜景背景，不顯示賭博紀錄 */
+.casino.forge { background:#14110f url("./forge-bg.svg") center/cover no-repeat; border-radius:14px; padding:6px 8px 16px; }
+.casino.forge .betlog { display:none !important; }

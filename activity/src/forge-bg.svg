@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <filter id="paper" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.06" numOctaves="4" seed="5" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.8  0 0 0 0 0.72  0 0 0 0 0.55  0 0 0 0.09 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <filter id="wash" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.01 0.025" numOctaves="3" seed="9" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="40"/>
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="glow"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="2" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="4"/></filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14110f"/><stop offset="0.55" stop-color="#1f1a15"/><stop offset="1" stop-color="#0d0b09"/></linearGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#sky)"/>
+  <rect width="600" height="900" fill="#fff" filter="url(#paper)"/>
+  <circle cx="440" cy="190" r="90" fill="#8f1d16" opacity="0.32" filter="url(#glow)"/>
+  <circle cx="440" cy="190" r="58" fill="#b3261e" opacity="0.38" filter="url(#glow)"/>
+  <g filter="url(#wash)">
+    <path d="M-60 520 L60 400 L150 470 L260 350 L360 450 L450 380 L560 470 L680 400 L680 640 L-60 640Z" fill="#4a4a46" opacity="0.32"/>
+    <path d="M-60 640 L80 540 L190 610 L320 500 L430 590 L560 520 L680 600 L680 760 L-60 760Z" fill="#3a3935" opacity="0.5"/>
+    <path d="M-60 780 L100 700 L230 760 L370 690 L500 760 L680 700 L680 960 L-60 960Z" fill="#23211d" opacity="0.8"/>
+  </g>
+  <g filter="url(#soft)" fill="#d9cfb4">
+    <ellipse cx="170" cy="560" rx="230" ry="22" opacity="0.16"/>
+    <ellipse cx="460" cy="660" rx="260" ry="20" opacity="0.14"/>
+    <ellipse cx="300" cy="780" rx="340" ry="18" opacity="0.12"/>
+  </g>
+  <g filter="url(#rough)" stroke="#0a0908" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M-10 90 C60 110 130 90 200 130 C240 150 270 140 300 170" stroke-width="7"/>
+    <path d="M70 108 l-40 -22 M130 106 l-36 24 M190 128 l-30 -26 M240 146 l-26 20" stroke-width="3"/>
+  </g>
+  <g filter="url(#rough)" fill="#b3261e" opacity="0.85">
+    <circle cx="120" cy="620" r="2.4"/><circle cx="480" cy="540" r="2"/><circle cx="330" cy="690" r="2.6"/><circle cx="520" cy="740" r="1.8"/><circle cx="60" cy="740" r="2.2"/><circle cx="260" cy="600" r="1.6"/>
+  </g>
+</svg>

@@ -58,7 +58,7 @@ export function mountCasino(game, opts = {}) {
     attachRules(root, game);
     const watch = spectate ? { setYou() {}, update() {}, destroy() {} } : createWatch(gameEl);
     if (spectate) gameEl.classList.add("spectating");
-    const blog = spectate ? { onMsg: () => false, setMode() {}, destroy() {} } : createBetLog(gameEl, { send: (o) => send(o) });
+    const blog = spectate || game === "forge" ? { onMsg: () => false, setMode() {}, destroy() {} } : createBetLog(gameEl, { send: (o) => send(o) });
     let specList = [], specSel = null, specSig = "";
 
     let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false, you = null;
