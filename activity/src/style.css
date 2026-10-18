@@ -390,3 +390,11 @@ body.pk-myturn .game.poker{background:#16296b}
 .fgslot .mini svg{width:22px;height:34px}
 .fgslot.empty{opacity:.65}
 .fgslot small{font-size:10px;white-space:nowrap}
+
+/* 鍛造：佔三格寬，水墨風背景（窄螢幕就佔滿整列） */
+.card.wide { grid-column:span 3; align-items:flex-start; text-align:left; min-height:150px; padding:18px 20px; border-color:#8a7a55;
+  background:#e9e2cf url("./forge-ink.svg") center/cover no-repeat; color:#1a1814; }
+.card.wide:hover { border-color:#b3261e; background:#e9e2cf url("./forge-ink.svg") center/cover no-repeat; filter:brightness(1.04); }
+.card.wide b { font-size:24px; letter-spacing:4px; } .card.wide em { color:#7a2418; } .card.wide small { opacity:.85; color:#3a342a; font-size:14px; max-width:55%; }
+.card.wide .icon { font-size:30px; }
+@media (max-width:520px){ .card.wide { grid-column:1 / -1; } }

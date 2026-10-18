@@ -51,7 +51,7 @@ const GAMES = [
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
   { id: "poker", cat: "casino", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
-  { id: "forge", cat: "forge", icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
+  { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "1 人", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
@@ -59,7 +59,7 @@ const GAMES = [
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {
-  const card = (g) => `<button class="card" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
+  const card = (g) => `<button class="card${g.wide ? " wide" : ""}" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
   app.innerHTML = `
     <div class="menu">
       <h1>遊戲間</h1>
