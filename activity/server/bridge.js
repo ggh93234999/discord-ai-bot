@@ -59,7 +59,7 @@ function startHand(t, redeal = false) {
   const g = t.g;
   if (!redeal) { g.handNo++; g.redeals = 0; }
   const h = { first: g.first, hands: deal(), stage: "bid", turn: g.first, bids: [], high: null, passes: 0,
-    contract: null, trump: -1, need: [0, 0], tricks: [0, 0], trick: [], lastTrick: null, played: new Set(), won: [0, 0, 0, 0], deadline: 0, botAt: 0, nextAt: 0 };
+    contract: null, trump: -1, need: [0, 0], tricks: [0, 0], trick: [], lastTrick: null, played: new Set(), voids: [new Set(), new Set(), new Set(), new Set()], won: [0, 0, 0, 0], deadline: 0, botAt: 0, nextAt: 0 };
   t.h = h; t.result = null; t.phase = "play";
   t.log = `第 ${g.handNo} 手${redeal ? "（重新發牌）" : ""}，由 ${t.seats[g.first].name} 先叫牌`;
   setTurn(t, g.first);
@@ -131,6 +131,7 @@ function doPlay(t, i, c) {
   c = Number(c);
   if (!legalCards(t, i).includes(c)) return false;
   h.hands[i].splice(h.hands[i].indexOf(c), 1);
+  if (h.trick.length && suitOf(c) !== suitOf(h.trick[0].c)) h.voids[i].add(suitOf(h.trick[0].c));   // 沒跟花色＝這門沒牌了（大家都看得到）
   h.trick.push({ seat: i, c }); h.played.add(c);
   if (h.trick.length < 4) { setTurn(t, (i + 1) % 4); return true; }
   const w = trickWinner(h.trick, h.trump);
@@ -185,13 +186,217 @@ const PERSONA = {
   "小美": { tag: "挺同伴", bold: 0, fit: 2, ntMin: 15, major: false, compete: false, noise: 0 },
   "豆豆": { tag: "新手", bold: 0.6, fit: 0.5, ntMin: 13, major: false, compete: true, noise: 0.25 },
   "阿嬤": { tag: "老派高花", bold: -0.3, fit: 1, ntMin: 16, major: true, compete: false, noise: 0 },
-  "橋神": { tag: "高手", bold: 0.1, fit: 1.3, ntMin: 15, major: false, compete: false, noise: 0 },
+  "橋神": { tag: "高手", bold: 0, fit: 1, ntMin: 15, major: false, compete: false, noise: 0, expert: true },
   "胖虎": { tag: "莽夫", bold: 2, fit: 1, ntMin: 14, major: false, compete: true, noise: 0.05 },
 };
 const DEFAULT_PERSONA = { tag: "", bold: 0, fit: 1, ntMin: 15, major: false, compete: false, noise: 0 };
 export const brPersona = (s) => (s && s.bot && PERSONA[String(s.name || "").replace(/^🤖/, "")]) || DEFAULT_PERSONA;
+function heuristicCard(t, i) {
+  const h = t.h, hand = h.hands[i], legal = legalCards(t, i), trump = h.trump, me = teamOf(i), part = (i + 2) % 4;
+  const low = (arr) => arr.reduce((a, b) => (rankOf(b) < rankOf(a) ? b : a));
+  const high = (arr) => arr.reduce((a, b) => (rankOf(b) > rankOf(a) ? b : a));
+  const unseen = (s) => { const r = []; for (let k = 0; k < 13; k++) { const x = s * 13 + k; if (!h.played.has(x) && !hand.includes(x)) r.push(x); } return r; };
+  const opps = [(i + 1) % 4, (i + 3) % 4];
+  const mayHold = (seat, s) => !h.voids[seat].has(s) && unseen(s).length > 0;
+  // 對某個還沒出牌的對手來說，我這張牌（或同伴那張）會不會被壓過
+  const canBeat = (seat, c, led) => {
+    if (suitOf(c) === led || suitOf(c) !== trump) {
+      if (mayHold(seat, led)) return unseen(led).some((x) => rankOf(x) > rankOf(c) && suitOf(c) === led);
+      return trump >= 0 && suitOf(c) !== trump && mayHold(seat, trump);       // 他缺這門，可能王吃
+    }
+    if (mayHold(seat, led)) return false;                                    // 他還有這門就得跟，不能王吃
+    return unseen(trump).some((x) => rankOf(x) > rankOf(c)) && mayHold(seat, trump);
+  };
+  const after = [1, 2, 3].map((k) => (i + k) % 4).slice(0, 3 - h.trick.length);
+  const sure = (c, led) => after.filter((x) => teamOf(x) !== me).every((x) => !canBeat(x, c, led));
+  // 同一門裡等值的牌（中間的牌都打掉了或在自己手上）出最小的那張
+  const cheapest = (c) => { let x = c; for (let r = rankOf(c) - 1; r >= 2; r--) { const y = suitOf(c) * 13 + r - 2; if (hand.includes(y)) x = y; else if (!h.played.has(y)) break; } return x; };
+  const masterOf = (c) => unseen(suitOf(c)).every((x) => rankOf(x) < rankOf(c));
+  const discard = () => {
+    const pool = legal.filter((c) => suitOf(c) !== trump && !masterOf(c));
+    const cand = pool.length ? pool : legal.filter((c) => suitOf(c) !== trump).length ? legal.filter((c) => suitOf(c) !== trump) : legal;
+    const lenOf = (s) => hand.filter((c) => suitOf(c) === s).length;
+    const haveTrump = trump >= 0 && hand.some((c) => suitOf(c) === trump);
+    const key = (c) => rankOf(c) + lenOf(suitOf(c)) * (haveTrump ? 0.6 : 0.3);      // 小牌優先，短門優先（有王時更想做出缺門）
+    return cand.reduce((a, b) => (key(b) < key(a) ? b : a));
+  };
+  if (!h.trick.length) {                                                      // ---- 先出
+    const declSide = teamOf(h.contract.seat) === me;
+    const myT = trump >= 0 ? hand.filter((c) => suitOf(c) === trump) : [];
+    const oppTrumps = trump >= 0 && opps.some((x) => mayHold(x, trump));
+    if (declSide && oppTrumps && myT.length) {                                // 莊家方先清王
+      const mt = myT.filter(masterOf);
+      if (mt.length) return mt[0];
+      if (myT.length >= 4) return low(myT);
+    }
+    const safeSuit = (s) => s === trump || !opps.some((x) => h.voids[x].has(s) && trump >= 0 && mayHold(x, trump));
+    const cash = legal.filter((c) => suitOf(c) !== trump && masterOf(c) && safeSuit(suitOf(c)));
+    if (cash.length) return cash[0];
+    // 同伴缺門而且可能有王、對手沒缺：出那門讓同伴王吃
+    if (trump >= 0) {
+      const ruffFor = legal.filter((c) => suitOf(c) !== trump && h.voids[part].has(suitOf(c)) && mayHold(part, trump) && opps.every((x) => !h.voids[x].has(suitOf(c))));
+      if (ruffFor.length) return low(ruffFor);
+    }
+    // 同伴叫過的花色
+    const pSuit = [...h.bids].reverse().find((b) => b.seat === part && b.bid && b.bid.s < 4);
+    if (pSuit && pSuit.bid.s !== trump) { const x = legal.filter((c) => suitOf(c) === pSuit.bid.s); if (x.length) return x.length <= 2 ? high(x) : low(x); }
+    const nt = legal.filter((c) => suitOf(c) !== trump && safeSuit(suitOf(c)));
+    const pool = nt.length ? nt : legal.filter((c) => suitOf(c) !== trump).length ? legal.filter((c) => suitOf(c) !== trump) : legal;
+    // 防守方有王：出短門（單張）準備王吃；不然出最長的一門，有連張大牌（KQ、QJ）就出大的
+    if (!declSide && myT.length) { const single = pool.filter((c) => hand.filter((x) => suitOf(x) === suitOf(c)).length === 1 && rankOf(c) < 13); if (single.length) return single[0]; }
+    const lenOf = (s) => pool.filter((c) => suitOf(c) === s).length;
+    let bs = suitOf(pool[0]); for (const c of pool) if (lenOf(suitOf(c)) > lenOf(bs)) bs = suitOf(c);
+    const inS = pool.filter((c) => suitOf(c) === bs), top = high(inS);
+    const seq = inS.some((c) => rankOf(c) === rankOf(top) - 1) && rankOf(top) >= 11;
+    return seq ? top : low(inS);
+  }
+  const led = suitOf(h.trick[0].c), w = trickWinner(h.trick, trump);
+  const partnerWins = teamOf(w.seat) === me;
+  if (partnerWins && sure(w.c, led)) return suitOf(legal[0]) === led ? low(legal) : discard();
+  const winners = legal.filter((c) => beats(c, w.c, led, trump));
+  const sureW = winners.filter((c) => sure(c, led));
+  if (sureW.length) return cheapest(low(sureW));
+  if (suitOf(legal[0]) === led) {
+    if (!winners.length) return low(legal);
+    if (h.trick.length === 3) return low(winners);
+    if (h.trick.length === 1) return partnerWins ? low(legal) : low(legal);     // 二家低
+    return cheapest(high(winners));                                             // 三家：出夠大的（等值出最小）
+  }
+  if (partnerWins && h.trick.length === 3) return discard();
+  const ruff = winners.filter((c) => suitOf(c) === trump);
+  if (ruff.length && !partnerWins) return low(ruff);
+  if (ruff.length && partnerWins && !sure(w.c, led)) return low(ruff);
+  return discard();
+}
+// 高手出牌：把看不到的牌隨機發給另外三家（照已知的缺門），每張候選牌都「假裝打完這一手」很多次，
+// 選讓我們這隊最常達成目標墩數的那張。模擬時四家都用標準電腦的打法。
+const STD_SEATS = [0, 1, 2, 3].map(() => ({ bot: true, name: "🤖小明" }));
+// 叫牌重播：用抽出來的手牌，照每個人的打法重新叫一次，看跟實際叫的差幾次（真人用標準電腦近似）
+const seatModel = (t, x) => (t.seats[x] && t.seats[x].bot && !brPersona(t.seats[x]).expert ? t.seats[x] : STD_SEATS[x]);
+const highOf = (bids) => { let hi = null; for (const b of bids) if (b.bid) hi = { ...b.bid, seat: b.seat }; return hi; };
+function auctionMismatch(t, i, hands) {
+  const h = t.h; let miss = 0;
+  for (let j = 0; j < h.bids.length; j++) {
+    const b = h.bids[j]; if (b.seat === i) continue;
+    const prefix = h.bids.slice(0, j), passes = (() => { let n = 0; for (let k = prefix.length - 1; k >= 0 && !prefix[k].bid; k--) n++; return n; })();
+    const ft = { h: { hands, bids: prefix, high: highOf(prefix), passes }, seats: [0, 1, 2, 3].map((x) => seatModel(t, x)) };
+    const pred = botBid(ft, b.seat);
+    if (!!pred !== !!b.bid || (pred && (pred.l !== b.bid.l || pred.s !== b.bid.s))) miss++;
+  }
+  return miss;
+}
+// 抽 M 組手牌（照缺門），留下跟叫牌最吻合的 S 組
+function sampleWorlds(t, i, S, M) {
+  const h = t.h, res = [];
+  for (let k = 0; k < M; k++) { const hands = sampleHands(h, i); res.push({ hands, miss: h.bids.length ? auctionMismatch(t, i, hands) : 0 }); }
+  res.sort((a, b) => a.miss - b.miss);
+  return res.slice(0, S).map((r) => r.hands);
+}
+// 從某個叫牌狀態把叫牌和打牌都模擬完，回傳 i 這隊的得分（線位 × ±1，四家 Pass 算 0）
+function simulateHand(t, i, hands, bids) {
+  const seats = [0, 1, 2, 3].map((x) => seatModel(t, x)), me = teamOf(i);
+  bids = bids.slice();
+  let passes = 0; for (let k = bids.length - 1; k >= 0 && !bids[k].bid; k--) passes++;
+  let high = highOf(bids), seat = bids.length ? (bids[bids.length - 1].seat + 1) % 4 : t.h.first;
+  for (let guard = 0; guard < 40; guard++) {
+    if (!high && passes >= 4) return 0;
+    if (high && passes >= 3) break;
+    const b = botBid({ h: { hands, bids, high, passes }, seats }, seat);
+    bids.push({ seat, bid: b });
+    if (b) { high = { ...b, seat }; passes = 0; } else passes++;
+    seat = (seat + 1) % 4;
+  }
+  const c = high, dt = teamOf(c.seat), need = [0, 0]; need[dt] = 6 + c.l; need[1 - dt] = 8 - c.l;
+  const sh = { hands, trick: [], played: new Set(), trump: c.s === 4 ? -1 : c.s, contract: c, need, tricks: [0, 0], voids: [new Set(), new Set(), new Set(), new Set()], bids };
+  const st = { h: sh, seats: STD_SEATS };
+  let cur = (c.seat + 1) % 4;
+  for (let guard = 0; guard < 60; guard++) {
+    const card = botCard(st, cur), hd = sh.hands[cur];
+    hd.splice(hd.indexOf(card), 1);
+    if (sh.trick.length && suitOf(card) !== suitOf(sh.trick[0].c)) sh.voids[cur].add(suitOf(sh.trick[0].c));
+    sh.trick.push({ seat: cur, c: card }); sh.played.add(card);
+    if (sh.trick.length === 4) {
+      const w = trickWinner(sh.trick, sh.trump); sh.tricks[teamOf(w.seat)]++; sh.trick = [];
+      if (sh.tricks[dt] >= need[dt]) return dt === me ? c.l : -c.l;
+      if (sh.tricks[1 - dt] >= need[1 - dt]) return dt === me ? -c.l : c.l;
+      cur = w.seat;
+    } else cur = (cur + 1) % 4;
+  }
+  return 0;
+}
+function expertBid(t, i) {
+  const h = t.h;
+  const acts = [null];
+  for (let s2 = 0; s2 <= 4; s2++) { const lo = !h.high ? 1 : h.high.l + (s2 > h.high.s ? 0 : 1); for (let l = lo; l <= Math.min(7, lo + 2); l++) acts.push({ l, s: s2 }); }
+  const S = 20;
+  const worlds = sampleWorlds(t, i, S, S * 6);
+  const val = acts.map(() => 0);
+  for (const w of worlds) acts.forEach((a, k) => { val[k] += simulateHand(t, i, w.map((x) => x.slice()), [...h.bids, { seat: i, bid: a }]) / worlds.length; });
+  let best = 0; for (let k = 1; k < acts.length; k++) if (val[k] > val[best] + 0.04) best = k;     // 差不多就保守一點
+  return acts[best];
+}
+function sampleHands(h, i) {
+  const hand = h.hands[i], unknown = [];
+  for (let c = 0; c < 52; c++) if (!h.played.has(c) && !hand.includes(c)) unknown.push(c);
+  const others = [1, 2, 3].map((k) => (i + k) % 4);
+  for (let tries = 0; tries < 30; tries++) {
+    for (let k = unknown.length - 1; k > 0; k--) { const j = randomInt(k + 1); [unknown[k], unknown[j]] = [unknown[j], unknown[k]]; }
+    const elig = (c) => others.filter((x) => !h.voids[x].has(suitOf(c)));
+    const order = unknown.slice().sort((a, b) => elig(a).length - elig(b).length);
+    const cap = {}; for (const x of others) cap[x] = h.hands[x].length;
+    const out = { [i]: hand.slice() }; for (const x of others) out[x] = [];
+    let ok = true;
+    for (const c of order) {
+      const e = elig(c).filter((x) => cap[x] > 0);
+      if (!e.length) { ok = false; break; }
+      const x = e[randomInt(e.length)]; out[x].push(c); cap[x]--;
+    }
+    if (ok || tries === 29) {
+      if (!ok) { const rest = unknown.slice(); for (const x of others) { out[x] = rest.splice(0, h.hands[x].length); } }
+      return [0, 1, 2, 3].map((k) => out[k]);
+    }
+  }
+}
+function rollout(h, i, c, hands) {
+  const sh = { hands, trick: h.trick.slice(), played: new Set(h.played), trump: h.trump, contract: h.contract, need: h.need, tricks: h.tricks.slice(),
+    voids: h.voids.map((v) => new Set(v)), bids: h.bids };
+  const st = { h: sh, seats: STD_SEATS }, me = teamOf(i);
+  let seat = i, card = c;
+  for (let guard = 0; guard < 60; guard++) {
+    const hd = sh.hands[seat]; hd.splice(hd.indexOf(card), 1);
+    if (sh.trick.length && suitOf(card) !== suitOf(sh.trick[0].c)) sh.voids[seat].add(suitOf(sh.trick[0].c));
+    sh.trick.push({ seat, c: card }); sh.played.add(card);
+    if (sh.trick.length === 4) {
+      const w = trickWinner(sh.trick, sh.trump); sh.tricks[teamOf(w.seat)]++; sh.trick = [];
+      if (sh.tricks[me] >= sh.need[me]) return 1 + sh.tricks[me] * 0.001;
+      if (sh.tricks[1 - me] >= sh.need[1 - me] || !sh.hands[0].length) return sh.tricks[me] * 0.001;
+      seat = w.seat;
+    } else seat = (seat + 1) % 4;
+    card = botCard(st, seat);
+  }
+  return 0;
+}
+function expertCard(t, i) {
+  const h = t.h, legal = legalCards(t, i);
+  if (legal.length === 1) return legal[0];
+  const hand = h.hands[i];
+  // 等值的牌（中間的牌都打掉了或在自己手上）只試最小那張
+  const cand = legal.filter((c) => { const y = c - 1; return !(c % 13 > 0 && suitOf(y) === suitOf(c) && hand.includes(y) && legal.includes(y)); });
+  if (cand.length === 1) return cand[0];
+  const guess = heuristicCard(t, i);
+  const S = 24;
+  const score = new Map(cand.map((c) => [c, c === guess ? 0.02 : 0]));
+  const worlds = sampleWorlds(t, i, S, S * 4);
+  for (let k = 0; k < worlds.length; k++) {
+    const hands = worlds[k];
+    for (const c of cand) score.set(c, score.get(c) + rollout(h, i, c, hands.map((a) => a.slice())) / S);
+  }
+  let best = cand[0]; for (const c of cand) if (score.get(c) > score.get(best)) best = c;
+  return best;
+}
 function botBid(t, i) {
   const h = t.h, me = handInfo(h.hands[i]), p = (i + 2) % 4, P = brPersona(t.seats[i]);
+  if (P.expert) return expertBid(t, i);
   const pBids = h.bids.filter((b) => b.seat === p), pLast = [...pBids].reverse().find((b) => b.bid);
   const pPts = pLast ? 12 + 2 * (pLast.bid.l - 1) : pBids.length ? 8 : 10;     // 從同伴叫過什麼猜他的牌力
   // 選王：同伴叫過的花色我有 3 張以上就支持；不然叫自己最長的花色；牌型平均又夠強就叫無王
@@ -216,6 +421,7 @@ function botBid(t, i) {
 function botCard(t, i) {
   const h = t.h, hand = h.hands[i], legal = legalCards(t, i), trump = h.trump;
   const P = brPersona(t.seats[i]);
+  if (P.expert) return expertCard(t, i);
   if (P.noise && Math.random() < P.noise) return legal[randomInt(legal.length)];       // 新手偶爾亂出
   const low = (arr) => arr.reduce((a, b) => (rankOf(b) < rankOf(a) ? b : a));
   const high = (arr) => arr.reduce((a, b) => (rankOf(b) > rankOf(a) ? b : a));
@@ -384,9 +590,26 @@ export function handleBridge(ws, m) {
   return true;
 }
 
+// 測試用：指定四家手牌和先叫的人，電腦打完這一手，回傳 0 號座位那隊的點數增減（重洗或四家 Pass 算 0）
+export function _playDeal(names, hands, first) {
+  const t = newTable("dup");
+  names.forEach((n, k) => { t.seats[k] = mkSeat({ bot: true, name: "🤖" + n, points: 10000 }); });
+  t.g = { first, handNo: 0, redeals: 0 }; t.started = true;
+  startHand(t); t.h.hands = hands.map((a) => sortHand(a.slice()));
+  for (let guard = 0; guard < 5000; guard++) {
+    if (t.g.redeals) return { delta: 0, redeal: true };
+    if (t.phase === "result") return { delta: t.result.deltas[0], made: t.result.made, contract: t.result.contract };
+    const h = t.h;
+    if (h.stage === "trick") { endTrick(t); continue; }
+    if (!botAct(t, h.turn)) throw new Error("stuck");
+  }
+  throw new Error("too long");
+}
+export const _deal = deal;
 // 測試用：4 個電腦直接打完一整場（不經過計時器）
-export function _simGame(cfg) {
+export function _simGame(cfg, names) {
   const t = newTable("sim"); if (cfg) Object.assign(t.cfg, cfg);
+  if (names) names.forEach((n, i) => { t.seats[i] = mkSeat({ bot: true, name: "🤖" + n }); });
   startGame(t);
   const results = [];
   for (let guard = 0; guard < 100000; guard++) {
@@ -396,5 +619,5 @@ export function _simGame(cfg) {
     if (h.stage === "trick") { endTrick(t); continue; }
     if (!botAct(t, h.turn)) throw new Error("bot stuck " + h.stage);
   }
-  return { results, final: t.final, redeals: t.g.redeals };
+  return { results, final: t.final, redeals: t.g.redeals, seats: t.seats.map((s) => s.points) };
 }

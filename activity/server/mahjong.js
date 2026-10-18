@@ -2,7 +2,7 @@
 // 4 個座位，可加電腦補位；入座後有人按「開始」才開打（空位自動補電腦）。其他人旁觀。
 // 伺服器負責洗牌、摸打、吃碰槓、胡牌判定、計分；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
-import { newWall, toCounts, sortTiles, shanten, waitsOf, isHonor, isDragon, isFlower, tileName, kindOf, isAka } from "./mjcore.js";
+import { newWall, toCounts, sortTiles, shanten, waitsOf, isHonor, isDragon, isFlower, tileName, kindOf, isAka, doraOf } from "./mjcore.js";
 import { scoreJP, payments } from "./mjjp.js";
 import { scoreTW, dealerTai } from "./mjtw.js";
 
@@ -140,7 +140,7 @@ function discard(t, i, tile, riichi) {
     t.log = `${t.seats[i].name} ${p.riichi === 2 ? "雙立直" : "立直"}！`;
   } else if (p.riichi) p.ippatsu = false;
   removeTiles(p.hand, [tile]); sortTiles(p.hand);
-  p.river.push({ t: tile, called: false, riichi: !!riichi });
+  p.river.push({ t: tile, called: false, riichi: !!riichi, seq: (h.seq = (h.seq || 0) + 1) });
   p.firstDone = true; p.tempFuriten = false;
   h.drawn = null; h.rinshan = false; h.last = { seat: i, tile };
   if (!riichi) t.log = `${t.seats[i].name} 打 ${tileName(tile)}`;
@@ -380,7 +380,7 @@ const PERSONA = {
   "小美": { tag: "做大牌", claim: 1, defThr: 2, riichi: 0.8, color: 1, noise: 0 },
   "豆豆": { tag: "新手", claim: 1, defThr: 99, riichi: 1, color: 0, noise: 900 },
   "阿嬤": { tag: "門清派", claim: 0, defThr: 1, riichi: 0.9, color: 0, noise: 0 },
-  "雀神": { tag: "高手", claim: 2, defThr: 2, riichi: 1, color: 0, noise: 0 },
+  "雀神": { tag: "高手", claim: 1, defThr: 1, riichi: 1, color: 0, noise: 0, expert: true },
   "胖虎": { tag: "莽夫", claim: 2, defThr: 99, riichi: 1, color: 0, noise: 0 },
 };
 const DEFAULT_PERSONA = { tag: "", claim: 1, defThr: 1, riichi: 1, color: 0, noise: 0 };
@@ -393,8 +393,70 @@ function colorPlan(p) {
   const offMelds = p.melds.some((m) => { const k = kindOf(m.tiles[0]); return k < 27 && Math.floor(k / 9) !== suit; });
   return { suit, commit: offMelds ? 0 : n[suit] + hon };
 }
+// ---- 高手（雀神）：讀牌防守＋手牌價值
+// 誰有威脅：日麻立直的人（權重 1）；副露 3 組以上、或 2 組且牌山過半的人（權重 0.6）
+function threatsOf(t, i) {
+  const h = t.h, jp = t.rule === "jp", left = wallLeft(t), res = [];
+  h.p.forEach((q, k) => {
+    if (k === i) return;
+    if (jp && q.riichi) { const r = q.river.find((x) => x.riichi); res.push({ k, w: 1, after: r ? r.seq : 0 }); }
+    else if (q.melds.length >= 3 || (q.melds.length >= 2 && left < (jp ? 35 : 45))) res.push({ k, w: 0.6, after: Infinity });
+  });
+  return res;
+}
+// 某種牌對某個威脅者的放槍危險度（0～1）：現物、立直後別人打過沒被胡、筋、壁、字牌見張
+function dangerOf(t, k, th, vis) {
+  const h = t.h, jp = t.rule === "jp", q = h.p[th.k];
+  const inRiver = (x) => q.river.some((r) => kindOf(r.t) === x);
+  if (inRiver(k)) return jp ? 0 : 0.35;                                   // 現物（台麻沒有振聽，只算比較安全）
+  if (jp && h.p.some((pp) => pp.river.some((r) => r.seq > th.after && kindOf(r.t) === k))) return 0.05;   // 立直後有人打過、沒被胡
+  const left4 = (x) => Math.max(0, 4 - vis[x]);
+  if (k >= 27) return Math.min(1, left4(k) / 3) * 0.55;                    // 字牌只可能單騎或雙碰
+  const n = k % 9, base = k - n;
+  const sideA = n <= 6 && !inRiver(base + n + 3) && left4(base + n + 1) && left4(base + n + 2);   // 等 n 的兩面：(n+1, n+2)
+  const sideB = n >= 2 && !inRiver(base + n - 3) && left4(base + n - 1) && left4(base + n - 2);   // 等 n 的兩面：(n-1, n-2)
+  const other = 0.12 + 0.13 * Math.min(1, left4(k) / 2) + (n > 0 && n < 8 && left4(base + n - 1) && left4(base + n + 1) ? 0.1 : 0);   // 嵌張、單騎、雙碰
+  return Math.min(1, other + (sideA ? 0.38 : 0) + (sideB ? 0.38 : 0));
+}
+function expertEval(t, i) {
+  const h = t.h, p = h.p[i], need = needOf(t, p), jp = t.rule === "jp";
+  const c = toCounts(p.hand), vis = visibleCounts(t, i), th = threatsOf(t, i);
+  const sw = 27 + seatW(t, i), rw = 27 + (t.g.round % 4);
+  const doraK = jp ? h.dora.map((d) => doraOf(kindOf(d))) : [];
+  const cur = shanten(c, need, jp);
+  const left = wallLeft(t);
+  const res = [];
+  for (const k0 of new Set(p.hand)) {
+    const k = kindOf(k0);
+    c[k]--;
+    const sh = shanten(c, need, jp);
+    let uke = 0;
+    for (let x = 0; x < 34; x++) { if (c[x] >= 4) continue; c[x]++; if (shanten(c, need, jp) < sh) uke += Math.max(0, 4 - vis[x]); c[x]--; }
+    c[k]++;
+    let score = -sh * 1000 + uke * 4;
+    // 手牌價值：留寶牌、赤五、役牌對子；先丟用不到的字牌和老頭牌
+    const yakuhai = isDragon(k) || k === sw || k === rw;
+    if (jp) score -= doraK.filter((d) => d === k).length * 45 + (isAka(k0) ? 45 : 0);
+    if (yakuhai && c[k] >= 2) score -= 60;
+    else if (isHonor(k)) score += c[k] === 1 ? 14 - Math.max(0, 4 - vis[k]) * 2 : 0;     // 孤張字牌：越多人打過越早丟
+    if (k < 27 && (k % 9 === 0 || k % 9 === 8) && c[k] === 1) score += 6;
+    // 防守：有威脅時依向聽數決定要多在意安全
+    if (jp && th.length) {                                          // 防守只在日麻（台麻沒有振聽、放槍只有一家付，實測防守反而吃虧）
+      const dz = th.reduce((s2, x) => s2 + x.w * dangerOf(t, k, x, vis), 0);
+      const strongThreat = th.some((x) => x.w >= 1);
+      let W;
+      if (sh === 0) W = th.length >= 2 || (uke <= 4 && strongThreat) ? 1500 : 450;    // 聽牌：大多照衝，只挑比較安全的
+      else if (sh === 1) W = strongThreat ? (uke >= 16 && left > 30 ? 1300 : 3200) : 900;
+      else W = strongThreat ? 6000 : 1600;                                              // 一向聽以外：棄和
+      score -= W * dz;
+    }
+    res.push({ k: k0, sh, score, cur });
+  }
+  return res.sort((a, b) => b.score - a.score);
+}
 function evalDiscards(t, i) {
   const h = t.h, p = h.p[i], need = needOf(t, p), jp = t.rule === "jp", P = mjPersona(t.seats[i]);
+  if (P.expert) return expertEval(t, i);
   const c = toCounts(p.hand), vis = visibleCounts(t, i);
   // 危險的人：日麻是立直的人；謹慎型的電腦在台麻也會提防已經副露 3 組以上的人
   const danger = h.p.map((q, k) => (k !== i && ((jp && q.riichi) || (P.wary && q.melds.length >= 3)) ? k : -1)).filter((k) => k >= 0);
@@ -444,6 +506,10 @@ function botClaim(t, i, o) {
   const yakuhai = isDragon(tile) || tile === sw || tile === rw;
   const P = mjPersona(t.seats[i]);
   if (P.claim <= 0) return { a: "pass" };                           // 門清派：只胡不叫
+  if (P.expert && threatsOf(t, i).some((x) => x.w >= 1)) {          // 高手：有人立直、叫完還沒聽牌就不叫
+    const pAfter = o.pon ? after([tile, tile]) : 99;
+    if (!(pAfter === 0 || (o.chi || []).some((w) => after(w) === 0))) return { a: "pass" };
+  }
   const plan = P.color ? colorPlan(p) : null;
   const offColor = plan && plan.commit >= (jp ? 8 : 10) && tile < 27 && Math.floor(tile / 9) !== plan.suit;   // 正在做色就不叫別門的牌
   const allowOpen = (!jp || yakuhai || hasYakuhaiMeld(t, i) || (plan && plan.commit >= 10 && !offColor)) && !offColor;   // 日麻：要有役牌（或做色）才敢副露
@@ -614,8 +680,9 @@ export function handleMahjong(ws, m) {
 }
 
 // 測試用：4 個電腦直接打完一整場（不經過計時器），回傳每手的結果
-export function _simGame(rule, cfg, greedy) {
+export function _simGame(rule, cfg, greedy, names) {
   const t = newTable("sim", rule); if (cfg) Object.assign(t.cfg, cfg);
+  if (names) names.forEach((n, i) => { t.seats[i] = mkSeat({ bot: true, name: "🤖" + n }); });
   startGame(t);
   const results = [];
   for (let guard = 0; guard < 200000; guard++) {
