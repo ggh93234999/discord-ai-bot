@@ -10,9 +10,17 @@ const FLO = ["春", "夏", "秋", "冬", "梅", "蘭", "竹", "菊"];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export function tileName(t) { if (t >= 100) return "赤" + tileName(t - 100); if (t >= 34) return FLO[t - 34]; if (t >= 27) return HON[t - 27]; return NUM[t % 9] + ["萬", "筒", "條"][Math.floor(t / 9)]; }
 // 一張牌：數字牌上面大字、下面小字花色；字牌一個大字；花牌一個字＋編號
-function tile(t, cls = "", attrs = "") {
+// 寶牌：依桌上的寶牌指示牌算出哪些牌是寶牌，畫的時候讓它發光（只有日麻）
+let DORA = new Set();
+function doraOf(ind) {
+  if (ind < 27) return Math.floor(ind / 9) * 9 + ((ind % 9) + 1) % 9;
+  if (ind <= 30) return 27 + ((ind - 27 + 1) % 4);
+  return 31 + ((ind - 31 + 1) % 3);
+}
+function tile(t, cls = "", attrs = "", noDora = false) {
   if (t == null || t < 0) return `<span class="mt back ${cls}" ${attrs}></span>`;
-  if (t >= 100) return tile(t - 100, cls + " aka", attrs);                 // 赤寶牌（紅五）
+  if (t >= 100) return tile(t - 100, cls + " aka", attrs, noDora);         // 赤寶牌（紅五）：加紅框
+  if (!noDora && DORA.has(t)) cls += " dora";
   let body, k;
   if (t >= 34) { k = "f"; body = `<b>${FLO[t - 34]}</b><i>${(t - 34) % 4 + 1}</i>`; }
   else if (t >= 27) { k = ["w", "w", "w", "w", "dw", "dg", "dr"][t - 27]; body = `<b>${t === 31 ? "" : HON[t - 27]}</b>`; }
@@ -69,6 +77,7 @@ export function mountMahjong(rule, opts = {}) {
     const rel = (i) => (i - (st.you >= 0 ? st.you : 0) + 4) % 4;      // 0 自己（下）、1 下家（右）、2 對家（上）、3 上家（左）
 
     function render() {
+      DORA = new Set(rule === "jp" && st.dora ? st.dora.map((d) => doraOf(d >= 100 ? d - 100 : d)) : []);
       watchEl.textContent = st.watchers ? `👀 ${st.watchers}` : "";
       logEl.textContent = st.log || "";
       if (st.phase === "wait" || st.phase === "end") return renderLobby();
@@ -125,7 +134,7 @@ export function mountMahjong(rule, opts = {}) {
     function renderTable() {
       const you = st.you, me = you >= 0 ? st.seats[you] : null;
       const order = [2, 3, 1, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
-      const dora = rule === "jp" && st.dora ? `<div class="mdora">寶牌指示 ${st.dora.map((d) => tile(d, "sm")).join("")}</div>` : "";
+      const dora = rule === "jp" && st.dora ? `<div class="mdora">寶牌指示 ${st.dora.map((d) => tile(d, "sm", "", true)).join("")}<span class="mdorahint">→ 發光的牌是寶牌</span></div>` : "";
       const extra = rule === "jp" ? `${st.honba ? `${st.honba} 本場　` : ""}${st.sticks ? `立直棒 ${st.sticks}` : ""}` : st.lian ? `連莊 ${st.lian}` : "";
       const inRes = st.phase === "result" && st.result;
       const center = `<div class="mcenter"><div class="mround">${inRes ? st.result.label0 : st.round}</div><div class="mwall">${inRes ? "結算中" : `剩 ${st.wall ?? "-"} 張`}</div>${dora}<div class="mextra">${extra}</div><div class="mtimer"></div></div>`;

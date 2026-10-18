@@ -477,7 +477,7 @@ body.pk-myturn .game.poker{background:#16296b}
 .mt.big.rok{outline:2px solid #ffd54f;transform:translateY(-4px)}
 .mt.side{transform:rotate(90deg);margin:0 4px}
 .mt.called{opacity:.35}
-.mt.lastd{outline:2px solid #ff7043}
+.mt.lastd{outline:2px dashed #4fc3f7;outline-offset:1px}
 .mt.win{outline:2px solid #ffd54f}
 .mj .mtable{width:100%;display:grid;grid-template-columns:1fr minmax(96px,1.1fr) 1fr;grid-template-areas:"top top top" "left mid right" "me me me";gap:6px;background:radial-gradient(#1f6e44,#134b2e);border:5px solid #5b3a1a;border-radius:14px;padding:6px;box-sizing:border-box}
 .mj .mseat{background:rgba(0,0,0,.18);border-radius:8px;padding:4px;min-width:0;border:2px solid transparent;display:flex;flex-direction:column;gap:3px}
@@ -595,5 +595,25 @@ body.tv-fs{overflow:hidden}
 .theater .tvrate,.theater .tvcc{background:#2c2d33;color:#fff;border:0;border-radius:8px;padding:6px 4px;font-size:13px;flex-shrink:0;max-width:110px}
 .theater video::cue{font-size:1.15em;background:rgba(0,0,0,.6);color:#fff}
 @media (max-width:420px){.theater .tvcc{max-width:76px}}
-.mt.aka b,.mt.aka i{color:#e0261b!important}
-.mt.aka{box-shadow:inset 0 0 0 2px rgba(224,38,27,.35),0 1px 2px rgba(0,0,0,.5)}
+/* 赤寶牌：牌面不變色，只加紅框 */
+.mt.aka{box-shadow:inset 0 0 0 3px #e0261b,0 1px 2px rgba(0,0,0,.5)}
+/* 寶牌：金色光暈＋微微閃 */
+.mt.dora{box-shadow:0 0 0 2px #ffd54f,0 0 10px 3px rgba(255,213,79,.85);animation:mjdora 1.6s ease-in-out infinite}
+.mt.dora.aka{box-shadow:inset 0 0 0 3px #e0261b,0 0 0 2px #ffd54f,0 0 10px 3px rgba(255,213,79,.85)}
+@keyframes mjdora{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
+.mj .mdorahint{font-size:11px;color:#ffd54f;margin-left:4px}
+.mj .mt.sm.side{margin:0 calc(var(--rt) * .2)}
+/* 麻將：牌放大（桌面版放寬到 1000px；牌河、副露、結算的牌跟著畫面寬度變大，小字花色也看得清楚） */
+.game.mj{max-width:1000px}
+.mj{--mjw:calc((min(100vw, 1000px) - 44px) / var(--mjn, 18.5));--rt:clamp(22px, 3.1vw, 34px)}
+.mt.big{width:min(56px,var(--mjw));height:calc(min(56px,var(--mjw)) * 1.38)}
+.mt.big b{font-size:calc(min(56px,var(--mjw)) * .5)}.mt.big i{font-size:max(8px, calc(min(56px,var(--mjw)) * .27))}
+.mj .mt.sm{width:var(--rt);height:calc(var(--rt) * 1.36);border-bottom-width:3px}
+.mj .mt.sm b{font-size:calc(var(--rt) * .56)}
+.mj .mt.sm i{font-size:max(8px, calc(var(--rt) * .3))}
+.mj .mt.xs{width:calc(var(--rt) * .72);height:calc(var(--rt) * .98)}
+.mj .mt.xs b{font-size:calc(var(--rt) * .42)}.mj .mt.xs i{font-size:max(6px, calc(var(--rt) * .22))}
+.mj .mriver{gap:3px}
+.mj .minfo{font-size:clamp(12px, 1.6vw, 15px)}
+.mj .mtable{grid-template-columns:1fr minmax(110px,.9fr) 1fr}
+.mj .mseat.r2 .mriver,.mj .mseat.r0 .mriver{max-width:min(100%, calc(var(--rt) * 13))}
