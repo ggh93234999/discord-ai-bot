@@ -381,3 +381,4 @@ body.pk-myturn .game.poker{background:#16296b}
 .fsw-twk{animation:fswt 1.8s ease-in-out infinite}@keyframes fswt{0%,100%{opacity:0;transform:scale(.3)}50%{opacity:1;transform:scale(1.2)}}
 .fsw-spin{animation:fsws 14s linear infinite}.fsw-spin2{animation:fsws 22s linear infinite reverse}@keyframes fsws{to{transform:rotate(360deg)}}
 .fsw-flame{animation:fswf .9s ease-in-out infinite alternate}@keyframes fswf{to{transform:translateY(-6px) scale(.8);opacity:.35}}
+.casino.forge .bets{display:none !important}

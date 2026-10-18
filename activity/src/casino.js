@@ -72,7 +72,7 @@ export function mountCasino(game, opts = {}) {
 
     const forgePid = () => { try { let p = localStorage.getItem("forgepid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("forgepid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
     const forge = game === "forge" && !spectate ? createForge({ stage, ctl, statusEl, send: (o) => send(o), getReal: () => real(), setBal: (m) => setBal(m), pid: forgePid() }) : null;
-    if (game === "forge") betsEl.hidden = true;
+    if (game === "forge") gameEl.classList.add("forge");
 
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
