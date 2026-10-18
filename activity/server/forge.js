@@ -37,7 +37,7 @@ const T = build(lo);
 T.C[FORGE_MAX - 1] += TOTAL_COST - T.sum;
 // V[n] = 第 n 階的賣價；C[n] = 從第 n 階鍛到 n+1 階的費用（n=0 表示「買劍」）；P[n] = 成功率
 export const V = T.V, C = T.C, P = T.P;
-export const REAL_SELL_MAX = 3_000_000;       // 賭注模式單把劍賣出上限（正常算出來的最高賣價約 205 萬，這只是保險）
+export const REAL_SELL_MAX = Infinity;         // 賭注模式單把劍賣出沒有上限（保留這個常數方便之後要設上限時使用）
 export const FORGE_PRACTICE_START = 100_000;  // 鍛造的練習幣起始金額（一般賭場遊戲只有 1000，不夠鍛）
 
 // ---- 存檔：每個身分一把劍。key：p:<id>（練習幣）、r:<uid>（真代幣，練習和真代幣的劍分開）
