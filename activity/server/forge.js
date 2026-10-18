@@ -7,9 +7,10 @@ import { fileURLToPath } from "node:url";
 
 export const FORGE_MAX = 100;
 const RTP = 0.95, BOOST = Number(process.env.FBOOST || 1.01), TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
-// 成功率：前 49 階約 99%→98%，50 階以後 93%→89.9%；從零一路成功到 100 階的機率約 0.5%
-const PL0 = Number(process.env.FPL0 || 0.93), PL1 = Number(process.env.FPL1 || 0.899);
-const pTarget = (n) => (n === 0 ? 0.97 : n < 50 ? 0.99 - 0.01 * ((n - 1) / 48) : PL0 - (PL0 - PL1) * ((n - 50) / 49));
+// 成功率：前 49 階約 97.3%→94.3%，50 階以後 94.5%→93.5%；從零一路成功到 100 階的機率約 0.5%
+const PL0 = Number(process.env.FPL0 || 0.945), PL1 = Number(process.env.FPL1 || 0.935);
+const PE0 = Number(process.env.FPE0 || 0.973), PE1 = Number(process.env.FPE1 || 0.943);
+const pTarget = (n) => (n === 0 ? 0.97 : n < 50 ? PE0 - (PE0 - PE1) * ((n - 1) / 48) : PL0 - (PL0 - PL1) * ((n - 50) / 49));
 // 鍛造費佔賣價的比例：前期 3% 慢慢升到約 5%，50 階以後 7%→8%
 // 每一步的期望回收率：第 1~49 階略大於 1（101%），讓「一路鍛到 50 階再賣」的期望淨值為正；50 階以後回到 95%，所以 50 階是最佳停手點
 const rr = (n) => (n < 50 ? BOOST : RTP);
