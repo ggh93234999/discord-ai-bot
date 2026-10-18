@@ -8,10 +8,11 @@ const NUM = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const HON = ["東", "南", "西", "北", "白", "發", "中"];
 const FLO = ["春", "夏", "秋", "冬", "梅", "蘭", "竹", "菊"];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-export function tileName(t) { if (t >= 34) return FLO[t - 34]; if (t >= 27) return HON[t - 27]; return NUM[t % 9] + ["萬", "筒", "條"][Math.floor(t / 9)]; }
+export function tileName(t) { if (t >= 100) return "赤" + tileName(t - 100); if (t >= 34) return FLO[t - 34]; if (t >= 27) return HON[t - 27]; return NUM[t % 9] + ["萬", "筒", "條"][Math.floor(t / 9)]; }
 // 一張牌：數字牌上面大字、下面小字花色；字牌一個大字；花牌一個字＋編號
 function tile(t, cls = "", attrs = "") {
   if (t == null || t < 0) return `<span class="mt back ${cls}" ${attrs}></span>`;
+  if (t >= 100) return tile(t - 100, cls + " aka", attrs);                 // 赤寶牌（紅五）
   let body, k;
   if (t >= 34) { k = "f"; body = `<b>${FLO[t - 34]}</b><i>${(t - 34) % 4 + 1}</i>`; }
   else if (t >= 27) { k = ["w", "w", "w", "w", "dw", "dg", "dr"][t - 27]; body = `<b>${t === 31 ? "" : HON[t - 27]}</b>`; }
@@ -87,6 +88,7 @@ export function mountMahjong(rule, opts = {}) {
       if (seated && !spectate) {
         const lens = rule === "tw" ? [[1, "一圈（東風圈）"], [4, "一將（四圈）"]] : [[1, "東風戰"], [2, "半莊戰（東南）"]];
         cfg = `<div class="mjcfg"><label>長度 <select class="cf-len">${lens.map(([v, n]) => `<option value="${v}"${c.len === v ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+          ${rule === "jp" ? `<label>赤寶牌 <select class="cf-aka"><option value="1"${c.aka !== false ? " selected" : ""}>有（三張紅五）</option><option value="0"${c.aka === false ? " selected" : ""}>無</option></select></label>` : ""}
           ${rule === "tw" ? `<label>底／台 <select class="cf-st">${st.stakes.map(([b, t], k) => `<option value="${k}"${c.base === b && c.tai === t ? " selected" : ""}>${b} 底 ${t} 台</option>`).join("")}</select></label>` : ""}</div>
           <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，坐好後可以加電腦、按開始。</div>`;
@@ -100,7 +102,8 @@ export function mountMahjong(rule, opts = {}) {
       const q = (s) => body.querySelector(s);
       q(".start") && q(".start").addEventListener("click", () => send({ t: "mstart" }));
       q(".stand") && q(".stand").addEventListener("click", () => send({ t: "mstand" }));
-      const sendCfg = () => send({ t: "mcfg", len: Number(q(".cf-len").value), stake: q(".cf-st") ? Number(q(".cf-st").value) : undefined });
+      const sendCfg = () => send({ t: "mcfg", len: Number(q(".cf-len").value), stake: q(".cf-st") ? Number(q(".cf-st").value) : undefined, aka: q(".cf-aka") ? q(".cf-aka").value === "1" : undefined });
+      q(".cf-aka") && q(".cf-aka").addEventListener("change", sendCfg);
       q(".cf-len") && q(".cf-len").addEventListener("change", sendCfg);
       q(".cf-st") && q(".cf-st").addEventListener("change", sendCfg);
     }
@@ -187,17 +190,19 @@ export function mountMahjong(rule, opts = {}) {
       return `<div class="mresult"><h3>${r.label0}　${title}！</h3><div class="mrhand">${handT}</div>${detail}<div class="mdelta">${deltas}</div>${r.gameOver ? "<div class='mrl'>這場打完了，馬上公布名次</div>" : ""}</div>`;
     }
     function tickStatus() {
-      if (!st || st.phase === "wait" || st.phase === "end") return;
+      if (!st || st.phase === "wait" || st.phase === "end") { document.body.classList.remove("mj-myturn", "mj-myclaim"); return; }
       const now = Date.now() - st.at;
       const tEl = body.querySelector(".mtimer");
-      if (st.phase === "result") { statusEl.textContent = `${st.round}　下一局 ${Math.max(0, Math.ceil((st.nextAt - now) / 1000))} 秒`; if (tEl) tEl.textContent = ""; return; }
+      if (st.phase === "result") { document.body.classList.remove("mj-myturn", "mj-myclaim"); statusEl.textContent = `${st.round}　下一局 ${Math.max(0, Math.ceil((st.nextAt - now) / 1000))} 秒`; if (tEl) tEl.textContent = ""; return; }
       const left = st.deadline ? Math.max(0, Math.ceil((st.deadline - now) / 1000)) : 0;
       const mine = st.opts && st.you >= 0;
       statusEl.textContent = `${TITLE}　${st.round}　${mine ? (st.opts.kind === "turn" ? "輪到你" : "可以叫牌") : st.stage === "claim" ? "等待叫牌" : `輪到 ${st.seats[st.turn]?.name || ""}`}`;
       if (tEl) { tEl.textContent = mine && left ? `⏱ ${left}` : ""; tEl.classList.toggle("urgent", mine && left <= 5); }
+      // 輪到自己決定事情：打牌是藍色、可以吃碰槓胡是橘色
       document.body.classList.toggle("mj-myturn", !!(mine && st.opts.kind === "turn"));
+      document.body.classList.toggle("mj-myclaim", !!(mine && st.opts.kind === "claim"));
     }
-    function cleanup() { closed = true; clearInterval(timer); document.body.classList.remove("mj-myturn"); try { ws && ws.close(); } catch {} }
+    function cleanup() { closed = true; clearInterval(timer); document.body.classList.remove("mj-myturn", "mj-myclaim"); try { ws && ws.close(); } catch {} }
     timer = setInterval(tickStatus, 300);
     connect();
     return cleanup;

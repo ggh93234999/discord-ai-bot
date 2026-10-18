@@ -6,7 +6,10 @@ import { randomInt } from "node:crypto";
 
 export const N_KIND = 34;
 export const isHonor = (t) => t >= 27 && t < 34;
-export const isFlower = (t) => t >= 34;
+export const isFlower = (t) => t >= 34 && t < 100;
+// 赤寶牌（紅五）：用 100 + 牌種表示（104 赤五萬、113 赤五筒、122 赤五條）；算牌型時一律先換回牌種
+export const kindOf = (t) => (t >= 100 ? t - 100 : t);
+export const isAka = (t) => t >= 100;
 export const suitOf = (t) => (t < 27 ? Math.floor(t / 9) : 3);
 export const numOf = (t) => (t < 27 ? (t % 9) + 1 : 0);
 export const isTerminal = (t) => t < 27 && (t % 9 === 0 || t % 9 === 8);
@@ -19,20 +22,21 @@ const NUM_ZH = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const HONOR_ZH = ["東", "南", "西", "北", "白", "發", "中"];
 const FLOWER_ZH = ["春", "夏", "秋", "冬", "梅", "蘭", "竹", "菊"];
 export function tileName(t) {
+  if (t >= 100) return "赤" + tileName(t - 100);
   if (t >= 34) return FLOWER_ZH[t - 34];
   if (t >= 27) return HONOR_ZH[t - 27];
   return NUM_ZH[t % 9] + ["萬", "筒", "條"][Math.floor(t / 9)];
 }
 
 export function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-export function newWall(withFlowers) {
+export function newWall(withFlowers, aka) {
   const w = [];
-  for (let t = 0; t < 34; t++) for (let k = 0; k < 4; k++) w.push(t);
+  for (let t = 0; t < 34; t++) for (let k = 0; k < 4; k++) w.push(aka && k === 0 && (t === 4 || t === 13 || t === 22) ? 100 + t : t);
   if (withFlowers) for (let f = 34; f < 42; f++) w.push(f);
   return shuffle(w);
 }
-export function toCounts(tiles) { const c = new Array(34).fill(0); for (const t of tiles) if (t < 34) c[t]++; return c; }
-export const sortTiles = (a) => a.sort((x, y) => x - y);
+export function toCounts(tiles) { const c = new Array(34).fill(0); for (const t of tiles) { const k = t >= 100 ? t - 100 : t; if (k < 34) c[k]++; } return c; }
+export const sortTiles = (a) => a.sort((x, y) => (x >= 100 ? x - 100 : x) - (y >= 100 ? y - 100 : y) || x - y);
 
 // ---------------------------------------------------------------- 向聽數
 // 每一門（萬／筒／條／字）分開列出所有可能的 (面子數 m, 搭子數 t, 有沒有眼 p)，再把四門組合起來取最小。

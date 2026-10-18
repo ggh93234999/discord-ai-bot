@@ -529,7 +529,9 @@ body.pk-myturn .game.poker{background:#16296b}
 .mj .mjfinal .fr{display:flex;gap:10px;align-items:center;padding:3px 6px}
 .mj .mjfinal .fr em{margin-left:auto;font-style:normal;color:#ffe08a}
 .mj .mjfinal .fr.top{background:rgba(255,213,79,.12);border-radius:6px}
-body.mj-myturn{background:#16202c}
+body.mj-myturn{background:#16296b !important;transition:background .25s}
+body.mj-myclaim{background:#6b3a10 !important;transition:background .25s}
+body:not(.mj-myturn):not(.mj-myclaim){transition:background .25s}
 .mj .mjgbtn{margin-left:auto;margin-right:6px;background:#2a3a5a;color:#fff;border:1px solid #4a6aa0;border-radius:14px;padding:3px 10px;font-size:13px;cursor:pointer}
 .mj .mjguide{width:100%;background:#17202c;border:1px solid #33475f;border-radius:12px;padding:10px;box-sizing:border-box;text-align:left}
 .mj .mjguide[hidden]{display:none}
@@ -593,3 +595,5 @@ body.tv-fs{overflow:hidden}
 .theater .tvrate,.theater .tvcc{background:#2c2d33;color:#fff;border:0;border-radius:8px;padding:6px 4px;font-size:13px;flex-shrink:0;max-width:110px}
 .theater video::cue{font-size:1.15em;background:rgba(0,0,0,.6);color:#fff}
 @media (max-width:420px){.theater .tvcc{max-width:76px}}
+.mt.aka b,.mt.aka i{color:#e0261b!important}
+.mt.aka{box-shadow:inset 0 0 0 2px rgba(224,38,27,.35),0 1px 2px rgba(0,0,0,.5)}

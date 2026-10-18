@@ -1,6 +1,6 @@
 // 日本立直麻將計分：役、翻、符、點數。牌桌流程在 mahjong.js，牌的編碼和拆牌在 mjcore.js。
 // 沒有赤寶牌；雙倍役滿不另計（一律當一倍役滿，可以疊加不同的役滿）。
-import { toCounts, decomps, isChiitoi, isKokushi, isHonor, isYaochu, isTerminal, isDragon, isWind, doraOf, suitOf, numOf } from "./mjcore.js";
+import { kindOf, isAka, toCounts, decomps, isChiitoi, isKokushi, isHonor, isYaochu, isTerminal, isDragon, isWind, doraOf, suitOf, numOf } from "./mjcore.js";
 
 // 副露（吃碰槓）轉成面子：{ k: "chow"|"pung"|"kan", t, open }
 export function meldSet(m) {
@@ -33,6 +33,9 @@ export function payments(base, dealer, tsumo) {
 // ctx：hand（含胡的那張）、melds、win、tsumo、seatW、roundW（0~3）、riichi（0/1/2=雙立直）、ippatsu、haitei、houtei、rinshan、chankan、tenhou、chiihou、dora、ura（指示牌陣列）
 // 回傳 null（不能胡：沒有胡牌形或沒有役）或 { han, fu, yaku: [[名稱, 翻]], yakuman, base, label }
 export function scoreJP(ctx) {
+  const aka = [...ctx.hand, ...ctx.melds.flatMap((m) => m.tiles)].filter(isAka).length;
+  ctx = { ...ctx, hand: ctx.hand.map(kindOf), melds: ctx.melds.map((m) => ({ ...m, tiles: m.tiles.map(kindOf) })), win: kindOf(ctx.win),
+          dora: (ctx.dora || []).map(kindOf), ura: (ctx.ura || []).map(kindOf) };
   const c = toCounts(ctx.hand);
   const menzen = ctx.melds.every((m) => m.k === "ankan");
   const mSets = ctx.melds.map(meldSet);
@@ -72,6 +75,7 @@ export function scoreJP(ctx) {
     for (const ind of ctx.dora) dora += ac[doraOf(ind)] || 0;
     if (ctx.riichi) for (const ind of ctx.ura) ura += ac[doraOf(ind)] || 0;
     if (dora) list.push(["寶牌", dora]);
+    if (aka) list.push(["赤寶牌", aka]);
     if (ura) list.push(["裏寶牌", ura]);
     return { han: list.reduce((s, x) => s + x[1], 0), fu, yaku: list, yakuman: 0 };
   }

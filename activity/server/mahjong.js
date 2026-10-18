@@ -2,7 +2,7 @@
 // 4 個座位，可加電腦補位；入座後有人按「開始」才開打（空位自動補電腦）。其他人旁觀。
 // 伺服器負責洗牌、摸打、吃碰槓、胡牌判定、計分；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
-import { newWall, toCounts, sortTiles, shanten, waitsOf, isHonor, isDragon, isFlower, tileName } from "./mjcore.js";
+import { newWall, toCounts, sortTiles, shanten, waitsOf, isHonor, isDragon, isFlower, tileName, kindOf, isAka } from "./mjcore.js";
 import { scoreJP, payments } from "./mjjp.js";
 import { scoreTW, dealerTai } from "./mjtw.js";
 
@@ -10,7 +10,7 @@ const RULES = {
   jp: { name: "日本麻將", n: 13, sets: 4, start: 25000, flowers: false, endLeft: 0, lens: [1, 2] },
   tw: { name: "台灣麻將", n: 16, sets: 5, start: 20000, flowers: true, endLeft: 16, lens: [1, 4] },
 };
-const DEFAULT_CFG = { jp: { len: 2 }, tw: { len: 1, base: 300, tai: 100 } };
+const DEFAULT_CFG = { jp: { len: 2, aka: true }, tw: { len: 1, base: 300, tai: 100 } };
 const TW_STAKES = [[30, 10], [100, 20], [300, 100], [500, 200], [1000, 300]];
 const TURN_MS = 20000, CLAIM_MS = 9000, RESULT_MS = 14000, BOT_MS = [450, 900];
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "豆豆", "阿嬤", "雀神", "胖虎"];
@@ -48,7 +48,7 @@ const seatW = (t, i) => (i - t.g.dealer + 4) % 4;
 function startHand(t) {
   const R = t.R, g = t.g;
   g.handNo++;
-  const wall = newWall(R.flowers);
+  const wall = newWall(R.flowers, t.rule === "jp" && t.cfg.aka !== false);
   const h = { dealer: g.dealer, wall, dead: [], dora: [], ura: [], p: [], turn: g.dealer, stage: "turn", drawn: null, noCalls: true, kans: 0, rinshan: false, claim: null, opts: null, deadline: 0, last: null };
   if (t.rule === "jp") { h.dead = wall.splice(-14); h.dora = [h.dead[4]]; h.ura = [h.dead[9]]; }
   for (let i = 0; i < 4; i++) h.p.push({ hand: [], melds: [], flowers: [], river: [], riichi: 0, ippatsu: false, firstDone: false, tempFuriten: false, riichiFuriten: false });
@@ -99,7 +99,7 @@ function scoreCtx(t, i, hand, win, tsumo, extra = {}) {
   const base = { hand, melds: p.melds, win, tsumo, seatW: seatW(t, i), roundW: g.round % 4, haitei: tsumo && wallLeft(t) <= 0, houtei: !tsumo && wallLeft(t) <= 0, rinshan: tsumo && h.rinshan, chankan: false, ...extra };
   const first = h.noCalls && !p.firstDone;
   if (t.rule === "jp") return scoreJP({ ...base, riichi: p.riichi, ippatsu: p.ippatsu, dora: h.dora, ura: h.ura, tenhou: tsumo && first && i === g.dealer, chiihou: tsumo && first && i !== g.dealer });
-  const c = toCounts(hand); c[win]--;
+  const c = toCounts(hand); c[kindOf(win)]--;
   return scoreTW({ ...base, flowers: p.flowers, waitsN: waitsOf(c, needOf(t, p), false).length, tenhou: tsumo && first && i === g.dealer, chiihou: tsumo && first && i !== g.dealer });
 }
 function enterTurn(t, i, afterCall) {
@@ -113,10 +113,10 @@ function enterTurn(t, i, afterCall) {
     const kanOk = t.rule === "jp" ? h.kans < 4 : true;
     if (!p.riichi && kanOk && wallLeft(t) > 0) {
       for (let k = 0; k < 34; k++) if (c[k] === 4) o.ankan.push(k);
-      for (const m of p.melds) if (m.k === "pon" && c[m.tiles[0]]) o.kakan.push(m.tiles[0]);
+      for (const m of p.melds) if (m.k === "pon" && c[kindOf(m.tiles[0])]) o.kakan.push(kindOf(m.tiles[0]));
     }
     if (t.rule === "jp" && !p.riichi && p.melds.every((m) => m.k === "ankan") && t.seats[i].points >= 1000 && h.wall.length >= 4) {
-      for (const k of new Set(p.hand)) { c[k]--; if (shanten(c, needOf(t, p), true) === 0) o.riichi.push(k); c[k]++; }
+      for (const k of new Set(p.hand)) { c[kindOf(k)]--; if (shanten(c, needOf(t, p), true) === 0) o.riichi.push(k); c[kindOf(k)]++; }
     }
     if (p.riichi) o.lock = true;
   }
@@ -126,6 +126,8 @@ function enterTurn(t, i, afterCall) {
 }
 
 function removeTiles(hand, tiles) { for (const x of tiles) { const k = hand.indexOf(x); if (k < 0) return false; hand.splice(k, 1); } return true; }
+// 依牌種拿掉幾張（赤五也算），回傳實際拿掉的牌（副露要記住有沒有赤五）
+function removeKinds(hand, kinds) { const out = []; for (const x of kinds) { let k = hand.findIndex((y) => y === x); if (k < 0) k = hand.findIndex((y) => kindOf(y) === x); if (k < 0) break; out.push(hand.splice(k, 1)[0]); } return out; }
 
 function discard(t, i, tile, riichi) {
   const h = t.h, p = h.p[i], o = h.opts;
@@ -153,13 +155,14 @@ function canRon(t, j, tile, chankan) {
   if (t.rule === "jp") {
     if (p.tempFuriten || p.riichiFuriten) return null;
     const w = waitsOf(toCounts(p.hand), needOf(t, p), true);
-    if (w.some((x) => p.river.some((r) => r.t === x))) return null;   // 振聽：聽的牌自己打過
+    if (w.some((x) => p.river.some((r) => kindOf(r.t) === x))) return null;   // 振聽：聽的牌自己打過
   }
   return scoreCtx(t, j, hand, tile, false, { chankan });
 }
 function openClaim(t, from, tile, kind) {
   const h = t.h, opts = {};
   const last = wallLeft(t) <= 0;
+  const kt = kindOf(tile);
   for (let k = 1; k < 4; k++) {
     const j = (from + k) % 4, p = h.p[j];
     const c = toCounts(p.hand);
@@ -167,13 +170,13 @@ function openClaim(t, from, tile, kind) {
     const sc = canRon(t, j, tile, kind === "chankan");
     if (sc) { o.ron = true; o.score = sc; }
     if (kind === "discard" && !p.riichi && !last) {
-      if (c[tile] >= 2) o.pon = true;
-      if (c[tile] >= 3 && (t.rule !== "jp" || h.kans < 4)) o.kan = true;
-      if (k === 1 && tile < 27) {
-        const n = tile % 9;
-        if (n >= 2 && c[tile - 2] && c[tile - 1]) o.chi.push([tile - 2, tile - 1]);
-        if (n >= 1 && n <= 7 && c[tile - 1] && c[tile + 1]) o.chi.push([tile - 1, tile + 1]);
-        if (n <= 6 && c[tile + 1] && c[tile + 2]) o.chi.push([tile + 1, tile + 2]);
+      if (c[kt] >= 2) o.pon = true;
+      if (c[kt] >= 3 && (t.rule !== "jp" || h.kans < 4)) o.kan = true;
+      if (k === 1 && kt < 27) {
+        const n = kt % 9;
+        if (n >= 2 && c[kt - 2] && c[kt - 1]) o.chi.push([kt - 2, kt - 1]);
+        if (n >= 1 && n <= 7 && c[kt - 1] && c[kt + 1]) o.chi.push([kt - 1, kt + 1]);
+        if (n <= 6 && c[kt + 1] && c[kt + 2]) o.chi.push([kt + 1, kt + 2]);
       }
     }
     if (o.ron || o.pon || o.kan || o.chi.length) opts[j] = o;
@@ -232,9 +235,10 @@ function doCall(t, j, c, kind, withT) {
   h.noCalls = false; for (const q of h.p) q.ippatsu = false;
   const fromP = h.p[c.from]; if (fromP.river.length) fromP.river[fromP.river.length - 1].called = true;
   const name = t.seats[j].name;
-  if (kind === "chi") { removeTiles(p.hand, withT); p.melds.push({ k: "chi", tiles: sortTiles([...withT, tile]), from: c.from, called: tile }); t.log = `${name} 吃 ${tileName(tile)}`; enterTurn(t, j, true); return; }
-  if (kind === "pon") { removeTiles(p.hand, [tile, tile]); p.melds.push({ k: "pon", tiles: [tile, tile, tile], from: c.from, called: tile }); t.log = `${name} 碰 ${tileName(tile)}`; enterTurn(t, j, true); return; }
-  removeTiles(p.hand, [tile, tile, tile]); p.melds.push({ k: "minkan", tiles: [tile, tile, tile, tile], from: c.from, called: tile });
+  const kt = kindOf(tile);
+  if (kind === "chi") { const got = removeKinds(p.hand, withT); p.melds.push({ k: "chi", tiles: sortTiles([...got, tile]), from: c.from, called: tile }); t.log = `${name} 吃 ${tileName(tile)}`; enterTurn(t, j, true); return; }
+  if (kind === "pon") { const got = removeKinds(p.hand, [kt, kt]); p.melds.push({ k: "pon", tiles: sortTiles([...got, tile]), from: c.from, called: tile }); t.log = `${name} 碰 ${tileName(tile)}`; enterTurn(t, j, true); return; }
+  const got = removeKinds(p.hand, [kt, kt, kt]); p.melds.push({ k: "minkan", tiles: sortTiles([...got, tile]), from: c.from, called: tile });
   t.log = `${name} 槓 ${tileName(tile)}`;
   kanDraw(t, j);
 }
@@ -249,7 +253,7 @@ function kanDraw(t, j) {
 function doAnkan(t, i, tile) {
   const h = t.h, p = h.p[i];
   if (h.stage !== "turn" || h.turn !== i || !h.opts.ankan.includes(tile)) return false;
-  removeTiles(p.hand, [tile, tile, tile, tile]); p.melds.push({ k: "ankan", tiles: [tile, tile, tile, tile] });
+  const got = removeKinds(p.hand, [tile, tile, tile, tile]); p.melds.push({ k: "ankan", tiles: sortTiles(got) });
   h.noCalls = false; for (const q of h.p) q.ippatsu = false;
   h.drawn = null; t.log = `${t.seats[i].name} 暗槓`;
   kanDraw(t, i); return true;
@@ -257,14 +261,14 @@ function doAnkan(t, i, tile) {
 function doKakan(t, i, tile) {
   const h = t.h, p = h.p[i];
   if (h.stage !== "turn" || h.turn !== i || !h.opts.kakan.includes(tile)) return false;
-  removeTiles(p.hand, [tile]); h.drawn = null;
-  t.log = `${t.seats[i].name} 加槓 ${tileName(tile)}`;
-  openClaim(t, i, tile, "chankan");                               // 先看有沒有人搶槓
+  const [real] = removeKinds(p.hand, [tile]); h.drawn = null;
+  t.log = `${t.seats[i].name} 加槓 ${tileName(real)}`;
+  openClaim(t, i, real, "chankan");                               // 先看有沒有人搶槓
   return true;
 }
 function finishKakan(t, i, tile) {
   const h = t.h, p = h.p[i];
-  const m = p.melds.find((x) => x.k === "pon" && x.tiles[0] === tile);
+  const m = p.melds.find((x) => x.k === "pon" && kindOf(x.tiles[0]) === kindOf(tile));
   m.k = "kakan"; m.tiles.push(tile);
   h.noCalls = false; for (const q of h.p) q.ippatsu = false;
   kanDraw(t, i);
@@ -361,8 +365,8 @@ function finishGame(t) {
 // ---------------------------------------------------------------- 電腦
 function visibleCounts(t, i) {
   const h = t.h, c = toCounts(h.p[i].hand);
-  for (const p of h.p) { for (const r of p.river) c[r.t]++; for (const m of p.melds) for (const x of m.tiles) c[x]++; }
-  for (const d of h.dora) c[d]++;
+  for (const p of h.p) { for (const r of p.river) c[kindOf(r.t)]++; for (const m of p.melds) for (const x of m.tiles) c[kindOf(x)]++; }
+  for (const d of h.dora) c[kindOf(d)]++;
   return c;
 }
 function evalDiscards(t, i) {
@@ -370,16 +374,18 @@ function evalDiscards(t, i) {
   const c = toCounts(p.hand), vis = visibleCounts(t, i);
   const danger = jp ? h.p.map((q, k) => (k !== i && q.riichi ? k : -1)).filter((k) => k >= 0) : [];
   const res = [];
-  for (const k of new Set(p.hand)) {
+  for (const k0 of new Set(p.hand)) {
+    const k = kindOf(k0);
     c[k]--;
     const sh = shanten(c, need, jp);
     let uke = 0;
     for (let x = 0; x < 34; x++) { if (c[x] >= 4) continue; c[x]++; if (shanten(c, need, jp) < sh) uke += Math.max(0, 4 - vis[x]); c[x]--; }
     c[k]++;
-    const safe = danger.length && danger.every((d) => h.p[d].river.some((r) => r.t === k));
+    const safe = danger.length && danger.every((d) => h.p[d].river.some((r) => kindOf(r.t) === k));
     let score = -sh * 1000 + uke * 4 + (isHonor(k) ? 2 : 0) + (k < 27 && (k % 9 === 0 || k % 9 === 8) ? 1 : 0);
     if (danger.length && sh >= 1) score += safe ? 3000 : 0;
-    res.push({ k, sh, score });
+    if (isAka(k0)) score -= 6;                                      // 一樣的牌先打普通的，留著赤五
+    res.push({ k: k0, sh, score });
   }
   return res.sort((a, b) => b.score - a.score);
 }
@@ -393,11 +399,11 @@ function botTurn(t, i) {
 }
 function hasYakuhaiMeld(t, i) {
   const p = t.h.p[i], sw = 27 + seatW(t, i), rw = 27 + (t.g.round % 4);
-  return p.melds.some((m) => m.k !== "chi" && (isDragon(m.tiles[0]) || m.tiles[0] === sw || m.tiles[0] === rw));
+  return p.melds.some((m) => { const k = kindOf(m.tiles[0]); return m.k !== "chi" && (isDragon(k) || k === sw || k === rw); });
 }
 function botClaim(t, i, o) {
   if (o.ron) return { a: "ron" };
-  const h = t.h, p = h.p[i], jp = t.rule === "jp", tile = o.tile;
+  const h = t.h, p = h.p[i], jp = t.rule === "jp", tile = kindOf(o.tile);
   const c = toCounts(p.hand), need = needOf(t, p);
   const now = shanten(c, need, jp && !p.melds.length);
   const after = (rm) => {                                          // 叫牌後（再打一張最好的）的向聽數
@@ -550,6 +556,7 @@ export function handleMahjong(ws, m) {
     const len = Number(m.len);
     if (t.R.lens.includes(len)) t.cfg.len = len;
     if (t.rule === "tw") { const st = TW_STAKES[Number(m.stake)]; if (st) { t.cfg.base = st[0]; t.cfg.tai = st[1]; } }
+    if (t.rule === "jp" && m.aka !== undefined) t.cfg.aka = !!m.aka;
     t.log = `${nameOf(ws)} 調整設定`; push(t);
   } else if (m.t === "mstart") {
     if (mine < 0 || t.started) return true;
