@@ -278,6 +278,7 @@ setInterval(() => { for (const room of rooms.values()) if (room.game === "horse"
 export function listRooms() {
   const out = [...listPokerTables()];
   for (const room of rooms.values()) {
+    if (room.game === "forge") continue;                        // 鍛造不是賭博，不列在旁觀大廳
     const players = whoList(room);
     if (!players.length) continue;
     const h = room.h;
