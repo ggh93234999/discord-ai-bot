@@ -131,3 +131,158 @@ def bazi_chart(title: str, sub: str, rows: list[dict], wx: dict, count: dict, da
     out = _tmp("bazi_")
     img.save(out, optimize=True)
     return out
+
+
+def _wrap(d, text, font, width):
+    """依寬度把中文斷行"""
+    lines, cur = [], ""
+    for ch in text:
+        if d.textlength(cur + ch, font=font) > width:
+            lines.append(cur); cur = ch
+        else:
+            cur += ch
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _paper(W, H, top="#3a0d0d", bottom="#1c0606"):
+    img = Image.new("RGB", (W, H), top)
+    d = ImageDraw.Draw(img)
+    t0, t1 = ImageColor_get(top), ImageColor_get(bottom)
+    for y in range(H):
+        k = y / H
+        d.line([(0, y), (W, y)], fill=tuple(int(a + (b - a) * k) for a, b in zip(t0, t1)))
+    return img, d
+
+
+def ImageColor_get(c):
+    from PIL import ImageColor
+    return ImageColor.getrgb(c)
+
+
+# ---------------------------------------------------------------- 擲筊
+def _block(img, cx, cy, flat_up: bool, scale=1.0):
+    """畫一個筊杯（半月形）：平面朝上是淺色平面，凸面朝上是深紅色、有反光"""
+    w, h = int(150 * scale), int(80 * scale)
+    layer = Image.new("RGBA", (w + 20, h + 20), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    box = [10, 10 - h, 10 + w, 10 + h]                       # 下半個橢圓 = 半月形
+    if flat_up:
+        d.pieslice(box, 0, 180, fill="#e8574a", outline="#7a1410", width=3)
+        d.pieslice([30, 10 - h + 18, w - 10, 10 + h - 18], 0, 180, fill="#f28b7e")
+        d.line([(10, 10), (10 + w, 10)], fill="#7a1410", width=4)
+    else:
+        d.pieslice(box, 0, 180, fill="#b3221a", outline="#5c0a07", width=3)
+        d.arc([40, 10 - h + 30, w - 20, 10 + h - 22], 20, 80, fill="#ff9e8f", width=6)   # 反光
+    img.paste(layer, (int(cx - w / 2 - 10), int(cy - h / 2)), layer)
+
+
+def jiaobei_img(results: list[int], question: str) -> str:
+    """results：每次的結果，0 聖筊、1 笑筊、2 陰筊"""
+    names = ["聖筊", "笑筊", "陰筊"]
+    colors = ["#ffd54f", "#9be7a8", "#90a4ae"]
+    n = len(results)
+    W, H = max(520, 300 * n + 60), 400
+    img, d = _paper(W, H)
+    _center(d, (W // 2, 42), "擲筊" + (f"｜{question}" if question else ""), _font(30), "#f3d98b")
+    for k, r in enumerate(results):
+        cx = 30 + 300 * k + 150 + (W - 60 - 300 * n) // 2
+        d.rounded_rectangle([cx - 135, 90, cx + 135, 330], 18, fill="#2a0b0b", outline="#6d2a1c", width=2)
+        _center(d, (cx, 118), f"第 {k + 1} 擲", _font(22, weight="Medium"), "#d9c7a6")
+        a_flat, b_flat = (True, False) if r == 0 else (True, True) if r == 1 else (False, False)
+        _block(img, cx - 62, 200, a_flat, 0.75)
+        _block(img, cx + 62, 200, b_flat, 0.75)
+        d = ImageDraw.Draw(img)
+        _center(d, (cx - 62, 262), "平" if a_flat else "凸", _font(18, weight="Regular"), "#bfa98a")
+        _center(d, (cx + 62, 262), "平" if b_flat else "凸", _font(18, weight="Regular"), "#bfa98a")
+        _center(d, (cx, 302), names[r], _font(32), colors[r])
+    sheng = results.count(0)
+    verdict = "三聖筊，神明明確同意" if n == 3 and sheng == 3 else f"{sheng} 個聖筊"
+    _center(d, (W // 2, 366), verdict, _font(26), "#ffd54f" if n == 3 and sheng == 3 else "#e8e0cc")
+    out = _tmp("jiao_")
+    img.save(out, optimize=True)
+    return out
+
+
+# ---------------------------------------------------------------- 籤詩（直式籤紙）
+def qian_img(n: int, gz: str, attr: str, poem: list[str], story: str, question: str) -> str:
+    import re
+    cols = []
+    for line in poem:
+        cols += [p for p in re.split(r"[，。；！？]", line) if p]
+    W, H = 560, 860
+    img = Image.new("RGB", (W, H), "#7a1d16")
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([24, 24, W - 24, H - 24], 10, fill="#f4e2b0", outline="#b8892e", width=4)
+    d.rectangle([40, 40, W - 40, H - 40], outline="#c0392b", width=2)
+    _center(d, (W // 2, 86), "天上聖母　六十甲子籤", _font(30, serif=True), "#b0221a")
+    _center(d, (W // 2, 140), f"第 {n} 籤　{gz}", _font(40, serif=True), "#2a1a0e")
+    d.line([(70, 178), (W - 70, 178)], fill="#c0392b", width=2)
+    # 直式：由右往左，每行 7 字
+    fs = _font(46, serif=True)
+    colw, y0 = 92, 210
+    xs = [W // 2 + int(colw * (len(cols) - 1) / 2) - colw * i for i in range(len(cols))]
+    for x, col in zip(xs, cols):
+        for j, ch in enumerate(col):
+            _center(d, (x, y0 + 30 + j * 56), ch, fs, "#1d120a")
+    y = y0 + 30 + 7 * 56 + 10
+    d.line([(70, y), (W - 70, y)], fill="#c0392b", width=2)
+    _center(d, (W // 2, y + 34), attr, _font(22, weight="Medium"), "#7a3b16")
+    if story:
+        f = _font(18, weight="Regular")
+        lines = _wrap(d, "典故：" + story, f, W - 140)[:4]
+        for k, ln in enumerate(lines):
+            d.text((70, y + 70 + k * 28), ln, font=f, fill="#5a4630")
+    if question:
+        _center(d, (W // 2, H - 64), f"問：{question}", _font(20, weight="Medium"), "#7a1d16")
+    out = _tmp("qian_")
+    img.save(out, optimize=True)
+    return out
+
+
+# ---------------------------------------------------------------- 易經卦象
+def _hexagram(d, cx, top, lines, vals=None, w=200, gap=34, hl=None):
+    """lines 由下往上（1 陽 0 陰）；vals 有的話標出變爻"""
+    for k in range(6):
+        y = top + (5 - k) * gap
+        moving = vals is not None and vals[k] in (6, 9)
+        col = "#ffcf5c" if moving else (hl or "#e8e0cc")
+        if lines[k]:
+            d.rounded_rectangle([cx - w // 2, y, cx + w // 2, y + 18], 4, fill=col)
+        else:
+            d.rounded_rectangle([cx - w // 2, y, cx - 18, y + 18], 4, fill=col)
+            d.rounded_rectangle([cx + 18, y, cx + w // 2, y + 18], 4, fill=col)
+        if moving:
+            mark = "○" if vals[k] == 9 else "×"
+            d.text((cx + w // 2 + 14, y + 9), mark, font=_font(20), fill="#ffcf5c", anchor="lm")
+
+
+def iching_img(h1: dict, base: list[int], vals: list[int], h2: dict | None, rel: list[int] | None, nature: dict, question: str, focus: str) -> str:
+    W = 900 if h2 else 560
+    H = 760
+    img, d = _paper(W, H, "#14202a", "#0b1218")
+    _center(d, (W // 2, 42), "易經卜卦" + (f"｜{question}" if question else ""), _font(30), "#f3d98b")
+    cols = [(h1, base, vals, "本卦")] + ([(h2, rel, None, "之卦")] if h2 else [])
+    cxs = [W // 2] if not h2 else [W // 4 + 20, 3 * W // 4 - 20]
+    for (h, lines, vv, label), cx in zip(cols, cxs):
+        _center(d, (cx, 100), label, _font(22, weight="Medium"), "#9fb3c0")
+        _center(d, (cx, 146), f"{h['name']}", _font(48, serif=True), "#ffffff")
+        _center(d, (cx, 196), f"第 {h['n']} 卦　" + (f"{h['upper']}為{nature[h['upper']]}" if h['upper'] == h['lower'] else f"{nature[h['upper']]}{nature[h['lower']]}{h['name']}"), _font(20, weight="Regular"), "#cfd8dc")
+        _hexagram(d, cx, 228, lines, vv)
+        _center(d, (cx, 450), f"上{h['upper']}（{nature[h['upper']]}）　下{h['lower']}（{nature[h['lower']]}）", _font(18, weight="Regular"), "#9fb3c0")
+    if h2:
+        _center(d, (W // 2, 320), "→", _font(48), "#ffcf5c")
+    f = _font(21, serif=True)
+    y = 490
+    for txt in [h1["gua"]] + ([h2["gua"]] if h2 else []):
+        for ln in _wrap(d, txt, f, W - 100)[:3]:
+            d.text((50, y), ln, font=f, fill="#e8e0cc"); y += 32
+        y += 8
+    fsm = _font(18, weight="Regular")
+    for ln in _wrap(d, focus, fsm, W - 100)[:3]:
+        d.text((50, y), ln, font=fsm, fill="#ffcf5c"); y += 28
+    img = img.crop((0, 0, W, min(H, y + 30)))
+    out = _tmp("iching_")
+    img.save(out, optimize=True)
+    return out

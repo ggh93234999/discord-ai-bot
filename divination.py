@@ -125,6 +125,16 @@ SPREADS = {
 }
 
 
+def _img(fn, *a) -> str:
+    """畫圖失敗不影響占卜本身；成功回傳給 bot 用的 [[FILE:路徑]] 標記"""
+    try:
+        import drawimg
+        return "\n[[FILE:" + getattr(drawimg, fn)(*a) + "]]"
+    except Exception as e:
+        logging.getLogger("discord-ai-bot.divination").warning("%s 圖片失敗：%r", fn, e)
+        return ""
+
+
 def tarot(spread: str, question: str) -> str:
     pos = SPREADS.get(spread) or SPREADS["three"]
     cards = RNG.sample(range(78), len(pos))
@@ -168,7 +178,8 @@ def jiaobei(times: int, question: str) -> str:
         lines.append(f"結果：{verdict}")
     head = "🙏 **擲筊**" + (f"｜問：{question}" if question else "")
     return (head + "\n" + "\n".join(lines) + DIVIDER + "\n".join(f"{n}：{d}" for n, d in JIAO) +
-            "\n一般習慣：連續三個聖筊才算神明明確答應；出現陰筊通常表示不行或時機未到；笑筊表示問法不清楚、或心裡其實已有答案，可以換個方式再問。")
+            "\n一般習慣：連續三個聖筊才算神明明確答應；出現陰筊通常表示不行或時機未到；笑筊表示問法不清楚、或心裡其實已有答案，可以換個方式再問。" +
+            _img("jiaobei_img", res, question))
 
 
 # ---------------------------------------------------------------- 抽籤詩（天上聖母六十甲子籤）
@@ -189,7 +200,7 @@ def qian(question: str) -> str:
     detail = (f"籤詩：{q['poem'][0]}{q['poem'][1]}\n籤頭屬性：{q['attr']}\n卦頭故事：{q['story'] or '（無）'}\n"
               "解讀方式：先用白話解釋籤詩意思，再針對對方問的事（感情、工作、考試、財運、健康、尋物等）給具體建議；"
               "可以提一下卦頭故事的寓意。不要誇大或嚇人，健康、法律、金錢的重大決定要提醒對方以專業意見為準。")
-    return card + DIVIDER + detail
+    return card + DIVIDER + detail + _img("qian_img", q["n"], q["gz"], q["attr"], q["poem"], q["story"], question)
 
 
 # ---------------------------------------------------------------- 易經（三錢法起卦）
@@ -248,7 +259,7 @@ def iching(question: str) -> str:
     detail.append("看法：" + focus)
     detail.append("解讀方式：先說明卦名和卦象（上下卦代表的自然現象）的意思，再用白話解釋該看的卦辭／爻辭，"
                   "最後針對對方的問題給建議；原文要引用時照上面的字，不要自己改字。")
-    return card + DIVIDER + "\n".join(detail)
+    return card + DIVIDER + "\n".join(detail) + _img("iching_img", h1, base, vals, h2, rel if moving else None, TRI_NATURE, question, focus)
 
 
 # ---------------------------------------------------------------- 給模型用的工具
