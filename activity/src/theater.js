@@ -12,6 +12,7 @@ export function mountTheater() {
     root.innerHTML = `
       <div class="game slots theater">
         <header><button class="back">← 選單</button><h2>一起看影片</h2><span class="watch"></span></header>
+        <div class="tvstage">
         <div class="tvwrap">
           <video class="tv" playsinline preload="auto"></video>
           <div class="tvempty">貼上 YouTube 連結或打關鍵字，加入清單後大家會一起看</div>
@@ -26,6 +27,7 @@ export function mountTheater() {
           <button class="tb mute" title="靜音">🔊</button>
           <input class="tvvol" type="range" min="0" max="100" value="${lsGet("tvvol", "80")}">
           <button class="tb full" title="全螢幕">⛶</button>
+        </div>
         </div>
         <div class="tvnow"></div>
         <form class="tvadd"><input class="tvq" maxlength="300" placeholder="YouTube 網址，或直接打關鍵字搜尋" autocomplete="off"><button class="mb">加入清單</button></form>
@@ -117,9 +119,31 @@ export function mountTheater() {
     seek.addEventListener("change", () => { seeking = false; const c = st && st.cur; if (c && c.dur) send({ t: "tseek", pos: (Number(seek.value) / 1000) * c.dur }); });
     $(".mute").addEventListener("click", () => { video.muted = !video.muted; lsSet("tvmute", video.muted ? "1" : "0"); $(".mute").textContent = video.muted ? "🔇" : "🔊"; });
     $(".tvvol").addEventListener("input", (e) => { video.volume = Number(e.target.value) / 100; lsSet("tvvol", e.target.value); if (video.muted && video.volume > 0) $(".mute").click(); });
-    $(".full").addEventListener("click", () => { const w = $(".tvwrap"); (w.requestFullscreen || w.webkitRequestFullscreen || (() => {})).call(w); });
+    // 全螢幕：先試瀏覽器原生全螢幕；Discord 內嵌畫面常常不允許，就改用「把影片鋪滿整個活動視窗」，
+    // 再搭配 Discord 自己的活動全螢幕／彈出視窗按鈕，就是真正的全螢幕。
+    const stage = $(".tvstage"), fullBtn = $(".full");
+    let idleT = 0;
+    const isFs = () => stage.classList.contains("fs");
+    const showBar = () => { stage.classList.remove("idle"); clearTimeout(idleT); if (isFs()) idleT = setTimeout(() => stage.classList.add("idle"), 2500); };
+    function enterFs() {
+      stage.classList.add("fs"); document.body.classList.add("tv-fs"); fullBtn.textContent = "🗗"; fullBtn.title = "離開全螢幕"; showBar();
+      const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+      if (req && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) { try { const p = req.call(stage); if (p && p.catch) p.catch(() => {}); } catch {} }
+    }
+    function exitFs() {
+      stage.classList.remove("fs", "idle"); document.body.classList.remove("tv-fs"); fullBtn.textContent = "⛶"; fullBtn.title = "全螢幕"; clearTimeout(idleT);
+      if (document.fullscreenElement || document.webkitFullscreenElement) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch {} }
+    }
+    fullBtn.addEventListener("click", () => (isFs() ? exitFs() : enterFs()));
+    video.addEventListener("dblclick", () => (isFs() ? exitFs() : enterFs()));
+    stage.addEventListener("mousemove", showBar);
+    stage.addEventListener("touchstart", showBar, { passive: true });
+    const onFsChange = () => { if (!(document.fullscreenElement || document.webkitFullscreenElement) && isFs() && stage.dataset.native === "1") exitFs(); stage.dataset.native = document.fullscreenElement ? "1" : ""; };
+    document.addEventListener("fullscreenchange", onFsChange);
+    const onKey = (e) => { if (e.key === "Escape" && isFs()) exitFs(); };
+    document.addEventListener("keydown", onKey);
     $(".tvadd").addEventListener("submit", (e) => { e.preventDefault(); const q = $(".tvq").value.trim(); if (!q) return; send({ t: "tadd", q }); $(".tvq").value = ""; msgEl.className = "tvmsg"; });
-    function cleanup() { closed = true; clearInterval(timer); clearTimeout(startTimer); try { video.pause(); video.removeAttribute("src"); video.load(); } catch {} try { ws && ws.close(); } catch {} }
+    function cleanup() { document.removeEventListener("fullscreenchange", onFsChange); document.removeEventListener("keydown", onKey); document.body.classList.remove("tv-fs"); closed = true; clearInterval(timer); clearTimeout(startTimer); try { video.pause(); video.removeAttribute("src"); video.load(); } catch {} try { ws && ws.close(); } catch {} }
     $(".back").addEventListener("click", () => { cleanup(); back(); });
     timer = setInterval(tick, 500);
     connect();

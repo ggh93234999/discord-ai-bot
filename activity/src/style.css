@@ -581,3 +581,12 @@ body.mj-myturn{background:#16202c}
 .theater .tvviewers{width:100%;font-size:12px;color:#999}
 .theater .tvname{font-size:13px;color:#aaa}
 .theater .tvname input{background:#1e1f22;color:#fff;border:1px solid #444;border-radius:6px;padding:4px 6px;width:140px}
+/* 一起看影片：全螢幕（原生全螢幕不能用時，影片鋪滿整個活動視窗） */
+.theater .tvstage{width:100%;display:flex;flex-direction:column;gap:8px}
+.theater .tvstage.fs{position:fixed;inset:0;z-index:9999;background:#000;gap:0}
+.theater .tvstage.fs .tvwrap{flex:1;aspect-ratio:auto;border-radius:0;height:100%}
+.theater .tvstage.fs .tv{object-fit:contain}
+.theater .tvstage.fs .tvbar{position:absolute;left:0;right:0;bottom:0;padding:24px 12px 12px;background:linear-gradient(transparent,rgba(0,0,0,.85));transition:opacity .3s}
+.theater .tvstage.fs.idle .tvbar{opacity:0;pointer-events:none}
+.theater .tvstage.fs.idle{cursor:none}
+body.tv-fs{overflow:hidden}
