@@ -547,3 +547,37 @@ body.mj-myturn{background:#16202c}
 .mj .myk.on{background:rgba(255,213,79,.25)!important}
 .mj .mypop{background:#22303f;border:1px solid #4a6aa0;border-radius:8px;padding:6px 8px;margin:4px auto;max-width:420px;font-size:13px;text-align:left;line-height:1.5}
 .mj .mypop em{font-style:normal;color:#ffe08a}
+
+/* ---------------- 一起看影片 */
+.theater .tvwrap{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.theater .tv{width:100%;height:100%;background:#000}
+.theater .tvwrap:fullscreen{border-radius:0}
+.theater .tvempty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:#aaa;font-size:14px}
+.theater .tvempty[hidden],.theater .tvunmute[hidden],.theater .tvload[hidden]{display:none}
+.theater .tvunmute{position:absolute;inset:auto;background:rgba(0,0,0,.75);color:#fff;border:2px solid #ffd54f;border-radius:12px;padding:14px 20px;font-size:18px;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center}
+.theater .tvunmute small{font-size:12px;color:#ccc}
+.theater .tvload{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.7);color:#ffd54f;border-radius:8px;padding:4px 10px;font-size:13px}
+.theater .tvbar{width:100%;display:flex;align-items:center;gap:5px}
+.theater .tb{background:#2c2d33;color:#fff;border:0;border-radius:8px;padding:6px 8px;font-size:15px;cursor:pointer;min-width:34px;flex-shrink:0}
+.theater .tb:hover{background:#3a3b42}
+.theater .tvtime{font-size:12px;color:#ccc;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.theater .tvseek{flex:1;min-width:50px}
+.theater .tvvol{width:70px;flex-shrink:1;min-width:40px}
+@media (max-width:420px){.theater .tvvol{display:none}}
+.theater .tvnow{width:100%;font-size:14px;min-height:1.3em}
+.theater .tvnow small{color:#999;margin-left:6px}
+.theater .tvadd{width:100%;display:flex;gap:6px}
+.theater .tvq{flex:1;min-width:0;background:#1e1f22;color:#fff;border:1px solid #444;border-radius:8px;padding:8px 10px;font-size:14px}
+.theater .mb{background:#2f6f4f;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;white-space:nowrap}
+.theater .tvmsg{width:100%;font-size:13px;color:#9fd;min-height:1.2em}
+.theater .tvmsg.err{color:#ff8a80}
+.theater .tvqueue{width:100%;display:flex;flex-direction:column;gap:4px}
+.theater .tvqh{font-size:13px;color:#aaa}
+.theater .tvqi{display:flex;align-items:center;gap:8px;background:#1b1c20;border-radius:8px;padding:6px 8px}
+.theater .tvqi .n{color:#888;width:18px;text-align:right}
+.theater .tvqi .tt{flex:1;min-width:0;display:flex;flex-direction:column;font-size:14px;overflow:hidden}
+.theater .tvqi .tt small{color:#999;font-size:12px}
+.theater .tvqi .tb{padding:4px 8px;font-size:13px;min-width:0}
+.theater .tvviewers{width:100%;font-size:12px;color:#999}
+.theater .tvname{font-size:13px;color:#aaa}
+.theater .tvname input{background:#1e1f22;color:#fff;border:1px solid #444;border-radius:6px;padding:4px 6px;width:140px}

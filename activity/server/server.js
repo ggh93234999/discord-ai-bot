@@ -13,6 +13,7 @@ import * as chessEng from "./chess.js";
 import * as xqEng from "./xq.js";
 import { handlePoker, pokerClose } from "./poker.js";
 import { handleMahjong, mjClose } from "./mahjong.js";
+import { handleTheater, theaterClose, serveVideo } from "./theater.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 
 const PORT = Number(process.env.PORT || 3101);
@@ -187,6 +188,7 @@ function place(room, role, m) {
 
 
 const httpServer = http.createServer((req, res) => {
+  if (req.url.startsWith("/api/tv/") && serveVideo(req, res)) return;
   if (req.url.startsWith("/api/")) return handleApi(req, res).catch(() => { try { res.writeHead(500); res.end(); } catch {} });
   res.writeHead(404); res.end();
 });
@@ -254,6 +256,7 @@ wss.on("connection", (ws, req) => {
     if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
+    if (typeof m.t === "string" && /^(tjoin|tname|tadd|tplay|tpause|tseek|tskip|tremove|tup)$/.test(m.t)) { handleTheater(ws, m).catch(() => {}); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
       if (ws.room || ws.multi) return;
       joinMulti(ws, m.game, String(m.room || "default"));
@@ -341,6 +344,7 @@ wss.on("connection", (ws, req) => {
     casinoClose(ws);
     pokerClose(ws);
     mjClose(ws);
+    theaterClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
     if (!room) return;

@@ -194,6 +194,14 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 - 時限：輪到自己 20 秒（超時打出摸到的牌，能自摸就自摸），叫牌 9 秒（超時算過）。
 - 測試：`mahjong.js` 有 `_simGame(rule, cfg, greedy)` 可以讓 4 個電腦直接打完一整場（greedy 會什麼都叫、能槓就槓），用來檢查點數守恆和罕見流程。
 
+### 一起看影片（Activity）
+遊戲間「🎬 影音」裡的「📺 一起看影片」：同一個 Activity 的人同步看 YouTube。後端 `activity/server/theater.js`，前端 `activity/src/theater.js`。
+- 貼 YouTube 連結（watch、youtu.be、shorts 都可以）或直接打關鍵字（搜尋第一個結果）加入清單；清單可移除、移到下一部、跳過。直播和超過 3 小時的影片不收。
+- 伺服器用 yt-dlp 把影片下載成 720p H.264＋AAC 的 mp4（`video_cache/`，已 `.gitignore`，超過 30 GB 自動刪最久沒看的），從 `/api/tv/<影片ID>.mp4` 串流（支援 Range，可以拖進度）。下載好才開始播，清單接下來兩部會先下載。
+- 播放／暫停／拖進度／換片由伺服器統一記錄，每 5 秒推一次狀態，前端誤差超過 1～1.5 秒就自動跳過去校正。音量、靜音、全螢幕各自調。
+- 瀏覽器規定沒按過畫面不能自動放聲音，被擋時會出現「🔊 點一下開始播放」。
+- 每個觀眾都是從家裡的伺服器拿影片（720p 約 2～4 Mbps／人），人多時注意家裡網路的上傳頻寬。
+
 ### 賽馬（Activity 版）
 所有人共用同一場；伺服器決定名次、每人畫面一致。10 匹馬的能力值、出賽、勝場、近 5 場存在 `activity/server/horses.json`（所有人共用，已 `.gitignore`；初始以 1000 場模擬當基本資料）。每匹有跑法（先行／逃馬／追込／穩定／爆發）和毛色，會影響動畫。下注頁每匹馬顯示戰鬥卡：能力雷達圖、歷史戰績、近 5 場、當天狀態、倍率；**不顯示本場勝率**，要自己判斷。
 

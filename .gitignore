@@ -22,3 +22,4 @@ discord-bot.service
 # LF2 連線版（含原版素材）
 lf2-online/
 dm_users.json
+activity/server/video_cache/

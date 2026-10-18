@@ -9,6 +9,7 @@ import { mountBoard } from "./chessui.js";
 import { mountPinball } from "./pinball.js";
 import { mountPoker } from "./poker.js";
 import { mountMahjong } from "./mahjong.js";
+import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
@@ -39,6 +40,7 @@ const CATS = [
   { id: "casino", icon: "🎰", name: "賭場", note: "練習幣或真代幣，每個遊戲裡都有 📖 規則" },
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
   { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
+  { id: "media", icon: "🎬", name: "影音", note: "大家一起看" },
 ];
 const GAMES = [
   { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
@@ -55,6 +57,7 @@ const GAMES = [
   { id: "mjtw", cat: "casino", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
   { id: "mjjp", cat: "casino", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
+  { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
   { id: "forgeboard", cat: "forge", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
