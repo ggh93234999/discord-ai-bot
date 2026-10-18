@@ -7,13 +7,14 @@ import { fileURLToPath } from "node:url";
 
 export const FORGE_MAX = 100;
 const RTP = 0.95, BOOST = Number(process.env.FBOOST || 1.01), TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
-// 成功率：第 1 階 96%，一路降到第 99 階 88%（前面降得比較快，所以大約第 14 階開始「賣掉就賺」）
-const pTarget = (n) => (n === 0 ? 0.97 : 0.96 - 0.08 * Math.pow((n - 1) / 98, 0.6));
-// 鍛造費佔賣價的比例：前期 3% 慢慢升到約 5%，50 階以後 2%
+// 成功率：前 49 階約 99%→98%，50 階以後 94%→91.5%；從零一路成功到 100 階的機率約 1%
+const PL0 = Number(process.env.FPL0 || 0.94), PL1 = Number(process.env.FPL1 || 0.915);
+const pTarget = (n) => (n === 0 ? 0.97 : n < 50 ? 0.99 - 0.01 * ((n - 1) / 48) : PL0 - (PL0 - PL1) * ((n - 50) / 49));
+// 鍛造費佔賣價的比例：前期 3% 慢慢升到約 5%，50 階以後 7%→8%
 // 每一步的期望回收率：第 1~49 階略大於 1（101%），讓「一路鍛到 50 階再賣」的期望淨值為正；50 階以後回到 95%，所以 50 階是最佳停手點
 const rr = (n) => (n < 50 ? BOOST : RTP);
-const ALATE = Number(process.env.FALATE || 0.02);
-const alpha = (n) => (n < 50 ? 0.03 + 0.05 * (n / 99) : ALATE);
+const ALATE = Number(process.env.FALATE || 0.07);
+const alpha = (n) => (n < 50 ? 0.03 + 0.05 * (n / 99) : ALATE + (0.08 - ALATE) * ((n - 50) / 49));
 function build(C0) {
   const V = [0], C = [C0], P = [];
   V[1] = Math.floor(RTP * C0 / 0.97);
