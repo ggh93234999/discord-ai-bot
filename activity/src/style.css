@@ -438,3 +438,5 @@ body.pk-myturn .game.poker{background:#16296b}
 .fbinfo{display:flex;flex-direction:column;min-width:0}.fbinfo b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fbinfo small{opacity:.75;font-size:12px}
 .fbval{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#ffd86b}.fbval small{display:block;opacity:.65;font-size:11px;font-weight:400;color:#ece7dc}
 .fbtotal{text-align:center;font-size:12px;opacity:.6;margin-top:4px}
+
+.fgsnd{background:none;border:0;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
