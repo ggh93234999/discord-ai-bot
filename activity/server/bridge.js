@@ -90,6 +90,19 @@ function doBid(t, i, bid) {
   setTurn(t, (i + 1) % 4);
   return true;
 }
+// 點數太少（A4 K3 Q2 J1 加起來 4 點以下）可以要求重洗：叫牌結束前誰都可以喊，整副重發、同一個人先叫
+export const REDEAL_MAX = 4;
+const hcpOf = (hand) => hand.reduce((s, c) => s + (HCP[rankOf(c)] || 0), 0);
+function doRedeal(t, i) {
+  const h = t.h;
+  if (h.stage !== "bid") return false;
+  const p = hcpOf(h.hands[i]);
+  if (p > REDEAL_MAX) return false;
+  t.g.redeals++;
+  startHand(t, true);
+  t.log = `${t.seats[i].name} 只有 ${p} 點，要求重洗｜` + t.log;
+  return true;
+}
 function startPlay(t) {
   const h = t.h, c = h.high, dt = teamOf(c.seat);
   h.contract = c; h.trump = c.s === 4 ? -1 : c.s; h.stage = "play";
@@ -223,6 +236,7 @@ function botCard(t, i) {
 }
 function botAct(t, i) {
   const h = t.h;
+  if (h.stage === "bid" && t.seats[i].bot && hcpOf(h.hands[i]) <= REDEAL_MAX) return doRedeal(t, i);   // 電腦點數太少一定喊重洗
   if (h.stage === "bid") return doBid(t, i, botBid(t, i));
   if (h.stage === "play") return doPlay(t, i, botCard(t, i));
   return false;
@@ -239,7 +253,8 @@ function view(t, ws) {
     Object.assign(v, { stage: h.stage, turn: h.turn, first: h.first, bids: h.bids, high: h.high, contract: h.contract, trump: h.trump, need: h.need, tricks: h.tricks,
       trick: h.trick, lastTrick: h.lastTrick, winner: h.stage === "trick" ? h.winner : -1, deadline: h.deadline });
     if (you >= 0) {
-      v.hand = h.hands[you];
+      v.hand = h.hands[you]; v.hcp = hcpOf(h.hands[you]);
+      v.canRedeal = h.stage === "bid" && v.hcp <= REDEAL_MAX;
       if (h.turn === you && h.stage === "play") v.legal = legalCards(t, you);
     }
   }
@@ -342,6 +357,7 @@ export function handleBridge(ws, m) {
     if (a === "bid") ok = doBid(t, mine, { l: m.l, s: m.s });
     else if (a === "pass") ok = doBid(t, mine, null);
     else if (a === "play") ok = doPlay(t, mine, m.c);
+    else if (a === "redeal") ok = doRedeal(t, mine);
     if (ok) push(t);
   }
   return true;

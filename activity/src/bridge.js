@@ -146,7 +146,7 @@ export function mountBridge(opts = {}) {
         const legal = new Set(st.legal || []);
         const hand = `<div class="brhand${myTurn && st.stage === "play" ? " act" : ""}">${(st.hand || []).map((c) => card(c, `big${myTurn && st.stage === "play" && legal.has(c) ? " can" : ""}`, `data-c="${c}"`)).join("")}</div>`;
         let ctl;
-        if (st.stage === "bid") ctl = myTurn ? bidPanel() : `<div class="mhint">等 ${nm(st.turn)} 叫牌…</div>`;
+        if (st.stage === "bid") ctl = (myTurn ? bidPanel() : `<div class="mhint">等 ${nm(st.turn)} 叫牌…</div>`) + `<div class="mhint brhcp">你的大牌點 ${st.hcp} 點（A 4、K 3、Q 2、J 1）${st.canRedeal ? `<button class="mb brredeal">🔄 要求重洗</button>` : ""}</div>`;
         else ctl = `<div class="mhint">${myTurn && st.stage === "play" ? (st.trick.length ? "輪到你出牌（要跟同花色，沒有才可以王吃或墊牌）" : "輪到你先出一張") : st.stage === "trick" ? "" : `等 ${nm(st.turn)} 出牌…`}</div>`;
         below = `${st.stage === "bid" ? bidsHTML() : ""}${ctl}${hand}`;
       } else if (play) {
@@ -156,6 +156,7 @@ export function mountBridge(opts = {}) {
       body.querySelectorAll(".brhand .bc.can").forEach((el) => el.addEventListener("click", () => send({ t: "bract", a: "play", c: Number(el.dataset.c) })));
       body.querySelectorAll(".brb[data-l]:not([disabled])").forEach((el) => el.addEventListener("click", () => send({ t: "bract", a: "bid", l: Number(el.dataset.l), s: Number(el.dataset.s) })));
       const pb = body.querySelector(".brpass"); pb && pb.addEventListener("click", () => send({ t: "bract", a: "pass" }));
+      const rb = body.querySelector(".brredeal"); rb && rb.addEventListener("click", () => send({ t: "bract", a: "redeal" }));
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "brsit", seat: Number(el.dataset.sit) })));
       const sb = body.querySelector(".stand"); sb && sb.addEventListener("click", () => send({ t: "brstand" }));
     }
