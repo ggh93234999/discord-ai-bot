@@ -43,7 +43,13 @@ export function createBetLog(host, { send }) {
     c.list.push(e); if (c.list.length > 100) c.list.shift();
   };
   tg.addEventListener("click", () => { body.hidden = !body.hidden; tg.textContent = body.hidden ? "展開" : "收合"; });
-  clr.addEventListener("click", () => { if (confirm("清除練習模式的紀錄？")) { practice = { stats: { n: 0, bet: 0, back: 0, wins: 0 }, list: [] }; savePractice(practice); render(); } });
+  // 兩段確認：Discord 內嵌畫面會擋掉 confirm() 對話框，所以改成「再按一次確認」
+  let armed = 0;
+  clr.addEventListener("click", () => {
+    if (armed) { clearTimeout(armed); armed = 0; clr.textContent = "清除"; practice = { stats: { n: 0, bet: 0, back: 0, wins: 0 }, list: [] }; savePractice(practice); render(); return; }
+    clr.textContent = "再按一次確認清除";
+    armed = setTimeout(() => { armed = 0; clr.textContent = "清除"; }, 3000);
+  });
   render();
 
   return {
