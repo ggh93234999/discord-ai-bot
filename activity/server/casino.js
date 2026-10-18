@@ -7,7 +7,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, betLimit } from "./bet.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, getSword, setSword, noteBest, forgeSave, forgeView } from "./forge.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
@@ -418,6 +418,7 @@ async function handleForge(ws, m) {
       const cost = FC[tier], p = FP[tier];
       const r = await stakeBig(ws, real, cost, "鍛造");        // 真代幣超過單筆上限就分成幾筆扣
       if (!r.ok) { fail(ws, r); return true; }
+      if (real) addXp(key, cost);                                      // 記錄真代幣鍛造總花費（鍛造經驗）
       const ekey = "f:" + randomBytes(5).toString("hex");
       if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: cost });   // 伺服器在中途重啟會把這筆費用退回
       const ok = rnd(10000) < Math.round(p * 10000);

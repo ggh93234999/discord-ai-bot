@@ -83,6 +83,7 @@ export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }
     const t = st.tier;
     stage.innerHTML = `<div class="fg${fx ? " " + fx : ""}">
       <div class="fgtop"><b>${t ? `第 ${t} 階` : "沒有劍"}</b><span>${esc(swordName(t))}</span><em>最高紀錄 ${st.best || 0} 階</em></div>
+      ${st.xp != null ? `<div class="fgxp">鍛造經驗 <b>${money(st.xp)}</b><small>（真代幣累計鍛造費）</small></div>` : ""}
       <div class="fgslots">${(st.slots || []).map((x, i) => `<button type="button" class="fgslot${i === sel ? " sel" : ""}${x ? "" : " empty"}" data-i="${i}"><span class="mini">${x ? swordSvg(x, "s" + i) : "＋"}</span><small>${i + 1}號${x ? ` · ${x}階` : " · 空"}</small></button>`).join("")}</div>
       <div class="fgsw">${swordSvg(t, "m")}</div>
       <div class="fgstats">

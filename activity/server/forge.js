@@ -42,8 +42,8 @@ export const FORGE_PRACTICE_START = 100_000;  // 鍛造的練習幣起始金額�
 
 // ---- 存檔：每個身分一把劍。key：p:<id>（練習幣）、r:<uid>（真代幣，練習和真代幣的劍分開）
 const FFILE = fileURLToPath(new URL("./forge.json", import.meta.url));
-let db = { sw: {}, best: {} };
-try { db = { sw: {}, best: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
+let db = { sw: {}, best: {}, xp: {} };
+try { db = { sw: {}, best: {}, xp: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
 let saveT = 0;
 export function forgeSave(now = false) {
   const w = () => { try { fs.writeFileSync(FFILE, JSON.stringify(db)); } catch (e) { console.log("鍛造存檔失敗", e.message); } };
@@ -60,6 +60,9 @@ function slotsOf(key) {
 }
 export const getSword = (key, i = 0) => slotsOf(key)[i] || null;
 export const setSword = (key, i, s) => { slotsOf(key)[i] = s || null; };
+// 鍛造經驗：真代幣模式下累計付出的鍛造費（成功或失敗都算，劍碎了也保留）
+export const xpOf = (key) => (db.xp && db.xp[key]) || 0;
+export function addXp(key, n) { if (!db.xp) db.xp = {}; db.xp[key] = (db.xp[key] || 0) + n; }
 export const bestOf = (key) => db.best[key] || 0;
 export function noteBest(key, tier) { if (tier > (db.best[key] || 0)) db.best[key] = tier; }
 
@@ -70,7 +73,7 @@ export function forgeView(key, real, slot = 0) {
   const maxed = tier >= FORGE_MAX;
   const sell = (t) => (real ? Math.min(V[t], REAL_SELL_MAX) : V[t]);
   return {
-    t: "fstate", real, slot, slots: slotsOf(key).map((x) => (x ? x.tier : 0)), tier, sell: sell(tier), best: bestOf(key), max: FORGE_MAX,
+    t: "fstate", real, slot, slots: slotsOf(key).map((x) => (x ? x.tier : 0)), tier, sell: sell(tier), best: bestOf(key), xp: real ? xpOf(key) : null, max: FORGE_MAX,
     cost: maxed ? 0 : C[tier], p: maxed ? 0 : P[tier], nextSell: maxed ? 0 : sell(tier + 1), spent: s ? s.spent : 0, forged: s ? s.forged : 0,
   };
 }
