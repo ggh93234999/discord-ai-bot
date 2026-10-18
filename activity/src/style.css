@@ -630,3 +630,7 @@ body.tv-fs{overflow:hidden}
 /* 筒子、條子的圖案 */
 .mt .mts{width:84%;height:88%;display:block}
 .mt.kp,.mt.ks{padding:0}
+
+/* 同房玩家：目前餘額 */
+.watchbox .mbal{font-size:11px;color:#bbb;font-variant-numeric:tabular-nums;margin-left:4px;white-space:nowrap}
+.watchbox .mbal.real{color:#ffd54f}

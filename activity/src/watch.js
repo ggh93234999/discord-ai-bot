@@ -44,7 +44,8 @@ export function createWatch(root, { title = "👀 同房玩家" } = {}) {
       if (p.hand) inner = `<div><small>🃏 思考中…　押 ${money(p.hand.bet)}</small></div><div>${cards([p.hand.dealerUp], true)}<small> 莊</small></div><div>${cards(p.hand.player)}<small> 他 ${p.hand.pv}</small></div>`;
       else if (p.last) inner = body(p.last);
       else inner = `<small>還沒開始玩</small>`;
-      return `<div class="mrow${fresh}"><div class="mname">${tag} ${esc(p.name)}</div><div class="mbody">${inner}</div></div>`;
+      const bal = p.bal == null ? "" : ` <span class="mbal${p.real ? " real" : ""}" title="${p.real ? "真代幣餘額" : "練習幣餘額"}">${money(p.bal)}</span>`;
+      return `<div class="mrow${fresh}"><div class="mname">${tag} ${esc(p.name)}${bal}</div><div class="mbody">${inner}</div></div>`;
     }).join("");
     box.innerHTML = `<h3>${title}<small>${others.length ? ` ${others.length} 人` : ""}</small></h3>` +
       (rows || `<div class="mempty">目前只有你一個人。朋友在同一個 Activity 裡玩這個遊戲時，他們的每一把會即時出現在這裡，你也可以什麼都不玩、純旁觀。</div>`);

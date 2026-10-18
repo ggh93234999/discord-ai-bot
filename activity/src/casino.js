@@ -77,7 +77,7 @@ export function mountCasino(game, opts = {}) {
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
       ws.onopen = () => {
-        retry = 0; send({ t: "cjoin", game, room: spectate ? spectate.room : env.instanceId, spectate: !!spectate });
+        retry = 0; send({ t: "cjoin", game, room: spectate ? spectate.room : env.instanceId, spectate: !!spectate }); if (!spectate && real()) send({ t: "cmode", real: true });
         if (session) send({ t: "bauth", token: session.token });
       };
       ws.onmessage = (e) => {
@@ -113,7 +113,7 @@ export function mountCasino(game, opts = {}) {
     // ---- 模式切換／登入（和老虎機相同）
     const modeBtns = root.querySelectorAll(".mode");
     function setMode(m) {
-      mode = m;
+      mode = m; send({ t: "cmode", real: m === "real" });
       modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m));
       gameEl.classList.toggle("realmode", m === "real"); blog.setMode(m === "real");
       $(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";

@@ -8,7 +8,7 @@ import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
-import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow } from "./casino.js";
+import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./casino.js";
 import * as chessEng from "./chess.js";
 import * as xqEng from "./xq.js";
 import { handlePoker, pokerClose } from "./poker.js";
@@ -234,7 +234,7 @@ wss.on("connection", (ws, req) => {
       (async () => {
         try {
           const r = slotSpin(kind), back = Math.floor(bet * r.mult);     // 結果先由伺服器決定，再去結算
-          const st = await botSettle(u.uid, u.name, bet, back);
+          const st = noteReal(ws, await botSettle(u.uid, u.name, bet, back));
           if (!st.ok) send(ws, { t: "slotinit", real: true, balance: st.balance ?? null, broke: st.error === "insufficient", error: st.error });
           else { send(ws, { t: "slot", real: true, kind, bet, back, balance: st.balance, ...r }); casinoFeed(ws, { g: "slots", real: true, kind, bet, back, grid: r.grid, nwin: r.wins.length }); }
         } catch { send(ws, { t: "slotinit", real: true, error: "bot_down", balance: null }); }
@@ -254,7 +254,7 @@ wss.on("connection", (ws, req) => {
       casinoFeed(ws, { g: "slots", real: false, kind, bet, back, grid: r.grid, nwin: r.wins.length });
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
-    if (typeof m.t === "string" && /^(cjoin|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
+    if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
     if (typeof m.t === "string" && /^(tjoin|tname|tadd|tqual|tplay|tpause|tseek|tspeed|tskip|tremove|tup)$/.test(m.t)) { handleTheater(ws, m).catch(() => {}); return; }

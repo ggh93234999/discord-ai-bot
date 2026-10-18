@@ -70,7 +70,7 @@ export function mountSlots(root, { env, back }) {
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
     ws.onopen = () => {
-      retry = 0; send({ t: "slotjoin" }); send({ t: "cjoin", game: "slots", room: env.instanceId });
+      retry = 0; send({ t: "slotjoin" }); send({ t: "cjoin", game: "slots", room: env.instanceId }); if (mode === "real") send({ t: "cmode", real: true });
       if (session) send({ t: "bauth", token: session.token });
     };
     ws.onmessage = (e) => {
@@ -111,7 +111,7 @@ export function mountSlots(root, { env, back }) {
 
   const modeBtns = root.querySelectorAll(".mode");
   function setMode(m) {
-    mode = m;
+    mode = m; send({ t: "cmode", real: m === "real" });
     modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m));
     gameEl.classList.toggle("realmode", m === "real"); blog.setMode(m === "real");
     root.querySelector(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";

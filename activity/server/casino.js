@@ -7,7 +7,7 @@ import { listMjTables } from "./mahjong.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { botSettle, botPay, botRole, betLimit } from "./bet.js";
+import { botSettle, botPay, botRole, botInfo, betLimit } from "./bet.js";
 import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, realKeys, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
@@ -44,10 +44,12 @@ export async function recoverCasinoEscrow() {
 }
 
 // ---- 錢包：real=true 走機器人，否則練習幣
+// 記下真代幣餘額（同房玩家面板要顯示）
+export function noteReal(ws, r) { if (ws && r && typeof r.balance === "number") ws.crbal = r.balance; return r; }
 async function stake(ws, real, bet, why) {
   if (real) {
     const u = ws.user; if (!u) return { ok: false, error: "need_login" };
-    try { return await botSettle(u.uid, u.name, bet, 0, why); } catch { return { ok: false, error: "bot_down" }; }
+    try { return noteReal(ws, await botSettle(u.uid, u.name, bet, 0, why)); } catch { return { ok: false, error: "bot_down" }; }
   }
   const bal = ws.cprac ?? PRACTICE_START;
   if (bal < bet) return { ok: false, error: "insufficient", balance: bal };
@@ -58,7 +60,7 @@ async function stake(ws, real, bet, why) {
 async function payTo(b, amount, why) {
   if (amount <= 0) return { ok: true, balance: b.real ? undefined : b.ws.cprac };
   if (b.real) {
-    try { return await botPay(b.uid, b.name, amount, why); } catch { console.log("派彩失敗", b.uid, amount, why); return { ok: false, error: "bot_down" }; }
+    try { return noteReal(b.ws, await botPay(b.uid, b.name, amount, why)); } catch { console.log("派彩失敗", b.uid, amount, why); return { ok: false, error: "bot_down" }; }
   }
   b.ws.cprac = (b.ws.cprac ?? PRACTICE_START) + amount;
   return { ok: true, balance: b.ws.cprac };
@@ -66,7 +68,7 @@ async function payTo(b, amount, why) {
 async function settleOnce(ws, real, bet, back, why) {
   if (real) {
     const u = ws.user; if (!u) return { ok: false, error: "need_login" };
-    try { return await botSettle(u.uid, u.name, bet, back, why); } catch { return { ok: false, error: "bot_down" }; }
+    try { return noteReal(ws, await botSettle(u.uid, u.name, bet, back, why)); } catch { return { ok: false, error: "bot_down" }; }
   }
   const bal = ws.cprac ?? PRACTICE_START;
   if (bal < bet) return { ok: false, error: "insufficient", balance: bal };
@@ -85,7 +87,8 @@ function roomOf(game, id) {
   return rooms.get(key);
 }
 function whoList(room) {
-  return [...room.members].filter((w) => !w.cspec).map((w) => ({ id: w.cid, name: nameOf(w), real: !!w.creal, last: w.clast || null, hand: w.chand || null }));
+  const balOf = (w) => (w.creal ? w.crbal : room.game === "slots" ? w.practice : w.cprac) ?? null;     // 目前模式的餘額
+  return [...room.members].filter((w) => !w.cspec).map((w) => ({ id: w.cid, name: nameOf(w), real: !!w.creal, bal: balOf(w), last: w.clast || null, hand: w.chand || null }));
 }
 function pushWho(room) { const m = { t: "cwho", list: whoList(room), watchers: [...room.members].filter((w) => w.cspec).length }; for (const w of room.members) out(w, m); }
 // ---- 賭博紀錄：每把結束記一筆。賭注模式（真代幣）依 Discord 身分存檔，換裝置也看得到；練習模式只回傳給當事人，由前端存在自己的瀏覽器
@@ -309,6 +312,13 @@ const fail = (ws, r, extra = {}) => out(ws, { t: "cerr", error: r.error || "erro
 export async function handleCasino(ws, m) {
   if (m.t === "clogq") { sendLog(ws); return true; }
   if (m.t === "clist") { out(ws, { t: "clist", rooms: listRooms() }); return true; }
+  // 切換練習／真代幣模式：同房玩家面板跟著顯示該模式的餘額
+  if (m.t === "cmode") {
+    ws.creal = !!m.real && !!ws.user;
+    if (ws.creal) { try { noteReal(ws, await botInfo(ws.user.uid)); } catch {} }
+    if (ws.cr) pushWho(ws.cr);
+    return true;
+  }
   if (m.t === "cjoin") {
     const game = CASINO_GAMES.includes(m.game) ? m.game : "coin";
     leave(ws);
@@ -322,7 +332,7 @@ export async function handleCasino(ws, m) {
     if (game === "horse") { out(ws, horseView(room)); casinoReclaim(ws); }
     return true;
   }
-  if (m.t === "creset") { if (!ws.bj) ws.cprac = ws.cr && ws.cr.game === "forge" ? FORGE_PRACTICE_START : PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); return true; }
+  if (m.t === "creset") { if (!ws.bj) ws.cprac = ws.cr && ws.cr.game === "forge" ? FORGE_PRACTICE_START : PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); if (ws.cr) pushWho(ws.cr); return true; }
   if (m.t === "fboard") { out(ws, forgeBoard(!!m.real)); return true; }
   if (m.t === "fget" || m.t === "fforge" || m.t === "fsell") return handleForge(ws, m);
   if (!["cplay", "cbj", "chorse"].includes(m.t)) return false;
@@ -472,7 +482,7 @@ async function handleForge(ws, m) {
         const ekey = "f:" + randomBytes(5).toString("hex");
         eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: amt });          // 先記下，賣出中途重啟就補發
         setSword(key, slot, null); forgeSave(true);
-        let r; try { r = await botPay(ws.user.uid, ws.user.name, amt, "鍛造賣劍"); } catch { r = { ok: false }; }
+        let r; try { r = noteReal(ws, await botPay(ws.user.uid, ws.user.name, amt, "鍛造賣劍")); } catch { r = { ok: false }; }
         if (!r || !r.ok) { setSword(key, slot, s); forgeSave(true); edel(ekey); out(ws, { t: "cerr", error: "bot_down" }); return true; }
         edel(ekey);
         syncRole(key, ws);
