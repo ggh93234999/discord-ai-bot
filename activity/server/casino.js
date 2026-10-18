@@ -7,7 +7,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botRole, betLimit } from "./bet.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, maxTier, roleBand, getRoleBand, setRoleBand, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
@@ -399,14 +399,14 @@ async function stakeBig(ws, real, cost, why) {
   return r;
 }
 // ---- 鍛造：每個身分一把劍（存在 forge.json）。練習幣用連線的練習幣，真代幣用機器人錢包。
-// 鍛造身分組：手上最高階的劍所在區間變了才通知機器人（失敗的話下次再試）
+// 鍛造身分組：手上每把劍所在區間的組合變了才通知機器人（失敗的話下次再試）
 async function syncRole(key, ws) {
   try {
     if (!ws.user) return;
-    const t = maxTier(key), band = roleBand(t);
-    if (band === getRoleBand(key)) return;
-    const r = await botRole(ws.user.uid, t);
-    if (r && r.ok) { setRoleBand(key, band); forgeSave(); }
+    const sig = roleSig(key);
+    if (sig === getRoleSig(key)) return;
+    const r = await botRole(ws.user.uid, swordTiers(key));
+    if (r && r.ok) { setRoleSig(key, sig); forgeSave(); }
   } catch {}
 }
 async function handleForge(ws, m) {

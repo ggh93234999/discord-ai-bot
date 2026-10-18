@@ -63,11 +63,11 @@ export const setSword = (key, i, s) => { slotsOf(key)[i] = s || null; };
 // 鍛造經驗：真代幣模式下累計付出的鍛造費（成功或失敗都算，劍碎了也保留）
 export const xpOf = (key) => (db.xp && db.xp[key]) || 0;
 export function addXp(key, n) { if (!db.xp) db.xp = {}; db.xp[key] = (db.xp[key] || 0) + n; }
-// 目前擁有的劍裡最高的階數，以及上一次同步給 Discord 身分組的「區間」（避免重複呼叫）
-export const maxTier = (key) => slotsOf(key).reduce((m, x) => Math.max(m, x ? x.tier : 0), 0);
-export const roleBand = (tier) => (tier >= 30 ? Math.min(10, Math.floor(tier / 10)) : 0);
-export const getRoleBand = (key) => (db.rl && db.rl[key]) || 0;
-export function setRoleBand(key, b) { if (!db.rl) db.rl = {}; db.rl[key] = b; }
+// 目前每把劍的階數；以及這些劍對應的「身分組區間」簽名（有變才通知 Discord，避免重複呼叫）
+export const swordTiers = (key) => slotsOf(key).filter(Boolean).map((x) => x.tier);
+export const roleSig = (key) => [...new Set(swordTiers(key).filter((t) => t >= 30).map((t) => Math.min(10, Math.floor(t / 10))))].sort((a, b) => a - b).join(",");
+export const getRoleSig = (key) => (db.rl && db.rl[key]) || "";
+export function setRoleSig(key, v) { if (!db.rl) db.rl = {}; db.rl[key] = v; }
 export const bestOf = (key) => db.best[key] || 0;
 export function noteBest(key, tier) { if (tier > (db.best[key] || 0)) db.best[key] = tier; }
 
