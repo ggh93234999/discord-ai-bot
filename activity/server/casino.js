@@ -4,6 +4,7 @@
 // 真代幣押注中（21 點一手、賽馬一回合）會記在 casino_escrow.json，伺服器若在途中重啟，啟動時全額退回。
 import { listPokerTables } from "./poker.js";
 import { listMjTables } from "./mahjong.js";
+import { listBridgeTables } from "./bridge.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -285,7 +286,7 @@ setInterval(() => { for (const room of rooms.values()) if (room.game === "horse"
 
 // 旁觀大廳：有人（非旁觀者）在玩的房間
 export function listRooms() {
-  const out = [...listPokerTables(), ...listMjTables()];
+  const out = [...listPokerTables(), ...listMjTables(), ...listBridgeTables()];
   for (const room of rooms.values()) {
     if (room.game === "forge") continue;                        // 鍛造不是賭博，不列在旁觀大廳
     const players = whoList(room);

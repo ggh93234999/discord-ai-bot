@@ -651,3 +651,68 @@ body.tv-fs{overflow:hidden}
 .poker .pmybest .pmbc.c3,.poker .pmybest .pmbc.c4,.poker .pmybest .pmbc.c5{color:#ffd54f}
 .poker .pmybest .pmbc.c6,.poker .pmybest .pmbc.c7,.poker .pmybest .pmbc.c8{color:#ff8a65;text-shadow:0 0 8px rgba(255,138,101,.6)}
 .poker .pcard.best{box-shadow:0 0 0 2px #ffd54f,0 0 10px rgba(255,213,79,.7);transform:translateY(-3px)}
+
+/* ================= 橋牌 ================= */
+.br .brbody{width:100%;display:flex;flex-direction:column;align-items:center;gap:8px}
+.br .brlog{font-size:12px;color:#aaa;text-align:center;min-height:16px}
+.br .w{border-radius:4px;padding:0 5px;font-weight:700;font-size:12px}
+.br .w.t0{background:#ffd54f;color:#111}.br .w.t1{background:#90caf9;color:#111}
+.br .brlobby{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:520px}
+.br .brseats{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto;gap:8px;width:100%}
+.br .brls{position:relative;background:#1f3d2c;border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;min-height:24px;justify-content:center}
+.br .brls.empty{background:transparent;border:1px dashed rgba(255,255,255,.3)}
+.br .brls.me{outline:2px solid #ffd54f}
+.br .brls.p2{grid-column:2;grid-row:1}.br .brls.p1{grid-column:1;grid-row:2}.br .brls.p3{grid-column:3;grid-row:2}.br .brls.p0{grid-column:2;grid-row:3}
+.br .brlobby small{color:#aaa;text-align:center}
+.br .brtable{width:100%;display:grid;grid-template-columns:1fr 2.2fr 1fr;grid-template-rows:auto minmax(190px,auto) auto;gap:6px;background:radial-gradient(ellipse at center,#1d7a4c,#11502f);border:6px solid #5d3a1a;border-radius:16px;padding:8px;box-sizing:border-box}
+.br .brseat{position:relative;background:rgba(0,0,0,.28);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:13px;border:2px solid transparent;min-width:0}
+.br .brseat.r2{grid-column:2;grid-row:1}.br .brseat.r1{grid-column:1;grid-row:2}.br .brseat.r3{grid-column:3;grid-row:2}.br .brseat.r0{grid-column:2;grid-row:3}
+.br .brseat.turn{border-color:#ffd54f;box-shadow:0 0 12px rgba(255,213,79,.5)}
+.br .brseat.me{background:rgba(255,213,79,.12)}
+.br .brname{display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:center}
+.br .brname b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px}
+.br .brdecl{background:#c62828;color:#fff;border-radius:4px;padding:0 4px;font-size:11px}
+.br .brsub{display:flex;gap:8px;align-items:center;color:#ddd;font-size:12px;flex-wrap:wrap;justify-content:center}
+.br .brsub em{font-style:normal;color:#ffe08a}
+.br .brcnt{display:inline-flex;align-items:center;gap:3px}
+.br .brwon{background:rgba(255,255,255,.12);border-radius:8px;padding:0 6px}
+.br .brbub{background:#fff;color:#111;border-radius:10px;padding:1px 8px;font-weight:700;font-size:14px}
+.br .brmid{grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.br .brinfo{text-align:center;font-size:13px;color:#eee;display:flex;flex-direction:column;align-items:center;gap:2px}
+.br .brct{font-size:16px;font-weight:700;color:#fff}
+.br .brsm{font-size:12px;color:#cfe}
+.br .brtm{font-size:12px;color:#ddd}.br .brtm b{font-size:16px;color:#fff;margin-left:4px}.br .brtm.decl span{color:#ffd54f}
+.br .brtimer{font-size:13px;color:#ffd54f;min-height:16px}.br .brtimer.urgent{color:#ff5252;font-weight:700}
+.br .brtrick{position:relative;width:240px;height:150px;max-width:100%}
+.br .brrl{font-size:13px;margin:4px 0;color:#eee;line-height:1.6}
+.br .brplay{position:absolute;transition:transform .2s}
+.br .brplay.r0{left:50%;bottom:0;transform:translateX(-50%)}.br .brplay.r2{left:50%;top:0;transform:translateX(-50%)}
+.br .brplay.r1{left:0;top:50%;transform:translateY(-50%)}.br .brplay.r3{right:0;top:50%;transform:translateY(-50%)}
+.br .brplay.win .bc{box-shadow:0 0 0 3px #ffd54f,0 0 14px rgba(255,213,79,.8)}
+.br .brlast{font-size:11px;color:#bcd;display:flex;align-items:center;gap:2px}
+.br .bc{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:40px;height:56px;border-radius:6px;background:#fff;color:#111;box-shadow:0 1px 3px rgba(0,0,0,.5);line-height:1;user-select:none}
+.br .bc b{font-size:17px;font-weight:700}.br .bc i{font-style:normal;font-size:20px}
+.br .bc.s0{color:#2e7d32}.br .bc.s1{color:#e65100}.br .bc.s2{color:#d32f2f}.br .bc.s3{color:#111}
+.br .bc.back{background:repeating-linear-gradient(45deg,#3a56b0,#3a56b0 4px,#2c4291 4px,#2c4291 8px)}
+.br .bc.xs{width:16px;height:22px;border-radius:3px}.br .bc.xs b{font-size:9px}.br .bc.xs i{font-size:9px}
+.br .bc.xs.win{box-shadow:0 0 0 2px #ffd54f}
+.br .bc.big{width:48px;height:68px}.br .bc.big b{font-size:20px}.br .bc.big i{font-size:24px}
+.br .brhand{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;width:100%;padding-top:8px}
+.br .brhand.act .bc:not(.can){filter:brightness(.6)}
+.br .brhand .bc.can{cursor:pointer;transition:transform .12s}
+.br .brhand .bc.can:hover{transform:translateY(-8px)}
+.br .bs.s0{color:#43a047}.br .bs.s1{color:#ff7043}.br .bs.s2{color:#ef5350}.br .bs.s3{color:#eceff1}.br .bs.s4{color:#ffd54f;font-size:.85em}
+.br .brbub .bs.s3,.br .brb .bs.s3{color:#111}.br .brbub .bs.s4{color:#b8860b}
+.br .bpass{color:#9e9e9e;font-size:.9em}
+.br .brbids{width:100%;max-width:420px;background:rgba(0,0,0,.25);border-radius:8px;padding:6px;box-sizing:border-box;font-size:13px}
+.br .brbh,.br .brbg{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;text-align:center}
+.br .brbh span{font-size:11px;color:#ccc;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.br .brbh span.t0{color:#ffd54f}.br .brbh span.t1{color:#90caf9}
+.br .brbg span{padding:2px 0;border-radius:4px}.br .brbg span.hi{background:rgba(255,213,79,.25)}.br .brbg span.now{color:#ffd54f}
+.br .brpanel{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.br .brbgrid{display:flex;flex-direction:column;gap:3px}
+.br .brbr{display:flex;gap:3px}
+.br .brb{width:52px;padding:6px 0;border-radius:6px;border:0;background:#f5f5f5;color:#111;font-weight:700;font-size:15px;cursor:pointer}
+.br .brb:hover{background:#ffe082}.br .brb.off{opacity:.25;cursor:default}
+.br .brres{max-width:520px}
+@media (max-width:520px){.br .bc.big{width:38px;height:54px}.br .bc.big b{font-size:16px}.br .bc.big i{font-size:19px}.br .brtrick{width:150px;height:130px}.br .bc{width:34px;height:48px}.br .brb{width:46px;font-size:13px}}

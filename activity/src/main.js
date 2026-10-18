@@ -9,6 +9,7 @@ import { mountBoard } from "./chessui.js";
 import { mountPinball } from "./pinball.js";
 import { mountPoker } from "./poker.js";
 import { mountMahjong } from "./mahjong.js";
+import { mountBridge } from "./bridge.js";
 import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
@@ -56,6 +57,7 @@ const GAMES = [
   { id: "poker", cat: "casino", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
   { id: "mjtw", cat: "casino", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
   { id: "mjjp", cat: "casino", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
+  { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
