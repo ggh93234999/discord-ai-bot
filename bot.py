@@ -33,6 +33,7 @@ import aliases
 import channels
 import economy
 import extras
+import divination
 import models
 import music
 import vstatus
@@ -94,6 +95,8 @@ TOOL_GUIDE = (
     "一般聊天、常識、數學、不需要即時資訊的問題就直接回答，不要搜尋。"
     "沒有呼叫工具的回覆，絕對不要放任何網址或假裝有來源。"
     "要你隨機選數字、骰骰子、抽號碼時，一定要呼叫 random_number，不能自己編數字。"
+    "有人要占卜、算命、抽塔羅、抽籤、擲筊、卜卦時，一定要呼叫 divination，結果以工具為準，絕對不能自己編牌或編籤；"
+    "結果卡會由程式貼在你的回覆上面，你不用重抄，直接用溫和、有趣的口吻解讀，回答對方真正想問的事。"
     "在伺服器裡你還有 music 工具，可以在使用者所在的語音頻道放 YouTube 音樂、跳過、暫停、停止、看佇列；"
     "有人叫你放歌就直接用它，放歌後簡短回一句就好，不用附來源網址。"
     "你還有 create_channel 工具可以開文字／語音頻道；有人明確要你開頻道才用，權限由程式檢查，你照工具結果回報就好。"
@@ -550,6 +553,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return await channels.run_tool(msg, args)
         if name == "random_number":
             return extras.run_tool(args)
+        if name == "divination":
+            return divination.run_tool(args)
         if name == "music_status":
             return music.real_state(msg.guild if msg else None)
         if name == "music":
@@ -579,6 +584,8 @@ def tool_status(name: str, args_json: str) -> str:
         return "🔎 確認播放狀態"
     if name == "random_number":
         return "🎲 抽數字"
+    if name == "divination":
+        return {"tarot": "🔮 洗牌、抽塔羅…", "jiaobei": "🙏 擲筊中…", "qian": "🏮 搖籤筒…", "iching": "☯️ 擲錢起卦…"}.get(args.get("kind"), "🔮 占卜中…")
     if name == "create_channel":
         return channels.tool_status(args)
     if name == "set_voice_status":
@@ -689,7 +696,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL] + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL] + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = False
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
     big_playlist = False
@@ -743,7 +750,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
                 play_calls += 1
                 if result.startswith("📃"):
                     big_playlist = True
-            if actions is not None and name in ACTION_TOOLS:
+            if actions is not None and (name in ACTION_TOOLS or name == "divination"):
                 actions.append({"name": name, "arguments": args, "result": result})
             messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": result})
     # 沒開工具，或工具輪數用完：不給工具，直接要答案
@@ -836,10 +843,15 @@ async def on_message(msg: discord.Message):
                 if not conversation:
                     return
                 reply = await ask_model(conversation, on_status=on_status, msg=msg, actions=actions)
-                if actions:
+                acts = [a for a in actions if a["name"] != "divination"]
+                cards = [divination.split_card(a["result"])[0] for a in actions if a["name"] == "divination"]
+                if cards:
+                    # 占卜結果（抽到的牌／籤／卦）由程式貼在最上面，模型只負責解讀
+                    reply = "\n\n".join(cards) + ("\n\n" + reply if reply else "")
+                if acts:
                     # 真正的執行結果由程式附上（-# 是 Discord 的小字），模型講錯也看得出來
                     reply = (reply + "\n" if reply else "") + "\n".join(
-                        "-# ⚙️ " + line for a in actions for line in a["result"].splitlines() if line.strip())
+                        "-# ⚙️ " + line for a in acts for line in a["result"].splitlines() if line.strip())
             except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
                 log.warning("模型連不到：%r", e)
                 reply = OFFLINE_REPLY
@@ -947,6 +959,7 @@ async def cmd_help(interaction: discord.Interaction):
     e.add_field(
         name="我會做的事",
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
+              "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
               "・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
