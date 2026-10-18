@@ -138,10 +138,11 @@ def bazi(y, mo, d, hh, mi, tzname, lon, gender):
         count[WX[r["gz"][1]]] += 1
     lun = Solar.fromYmdHms(local.year, local.month, local.day, local.hour, local.minute, 0).getLunar()
     lunar_txt = t(f"{lun.getYearInGanZhi()}年 {lun.getMonthInChinese()}月{lun.getDayInChinese()}")
-    yun_txt, yun_detail = "", ""
+    yun_txt, yun_detail, yun_list = "", "", None
     if gender in ("male", "female"):
         yun = ec_abs.getYun(1 if gender == "male" else 0)
         dy = [x for x in yun.getDaYun()[1:9]]
+        yun_list = [(x.getGanZhi(), x.getStartAge()) for x in dy]
         yun_txt = f"起運：出生後約 {yun.getStartYear()} 年 {yun.getStartMonth()} 個月 {yun.getStartDay()} 天\n大運：" + "　".join(f"{x.getGanZhi()}({x.getStartAge()}歲)" for x in dy)
         yun_detail = "大運（干支／起始虛歲／起始年）：" + "、".join(f"{x.getGanZhi()} {x.getStartAge()} 歲 {x.getStartYear()} 年" for x in dy)
     # 卡片（等寬排版）
@@ -163,7 +164,9 @@ def bazi(y, mo, d, hh, mi, tzname, lon, gender):
               "\n五行數量（只算天干地支本身）：" + "、".join(f"{k}{v}" for k, v in count.items()) +
               (f"\n{yun_detail}" if yun_detail else "") +
               f"\n時間：當地 {local:%Y-%m-%d %H:%M}（{tzname}），真太陽時 {true_solar:%H:%M}（差 {tdiff:+.0f} 分鐘），日柱與時柱用真太陽時；子時用早晚子時（23 點後日柱不換日）。")
-    return card, detail
+    img = {"rows": rows, "count": count, "dm": f"{dg}{WX[dg]}", "yun": yun_list,
+           "sub": f"{local:%Y-%m-%d} {'%02d:%02d' % (hh, mi) if known else '時間不明'}　農曆 {lunar_txt}　生肖 {t(lun.getYearShengXiao())}"}
+    return card, detail, img
 
 
 # ---------------------------------------------------------------- 星盤
@@ -292,8 +295,14 @@ async def run(session: aiohttp.ClientSession, args: dict) -> tuple[str, list[str
         head += f"\n（農曆 {args.get('date')}{'（閏月）' if args.get('leap_month') else ''} 換算成國曆）"
     cards, details, files = [head], [], []
     if kind in ("bazi", "both"):
-        c, dt = bazi(y, mo, d, hh, mi, tzname, lon, args.get("gender"))
+        c, dt, im = bazi(y, mo, d, hh, mi, tzname, lon, args.get("gender"))
         cards.append("**🀄 八字**\n" + c); details.append(dt)
+        try:
+            import drawimg
+            files.append(await asyncio.to_thread(drawimg.bazi_chart, f"{name + '的' if name else ''}八字命盤", im["sub"] + f"　{place}",
+                                                 im["rows"], WX, im["count"], im["dm"], im["yun"]))
+        except Exception as e:
+            print("八字圖片失敗", repr(e))
     if kind in ("astro", "both"):
         out = tempfile.NamedTemporaryFile(prefix="natal_", suffix=".png", delete=False).name
         c, dt, svg = await asyncio.to_thread(astro, name, y, mo, d, hh, mi, place, lat, lon, tzname, out)

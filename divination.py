@@ -6,6 +6,7 @@ run_tool() 回傳的文字分兩段：DIVIDER 前面是給大家看的「結果�
 籤詩和《周易》原文取自維基文庫（divination_data/），塔羅牌義是自己整理的常見解釋。
 """
 import json
+import logging
 import secrets
 from pathlib import Path
 
@@ -127,17 +128,24 @@ SPREADS = {
 def tarot(spread: str, question: str) -> str:
     pos = SPREADS.get(spread) or SPREADS["three"]
     cards = RNG.sample(range(78), len(pos))
-    card_lines, detail = [], []
+    card_lines, detail, drawn = [], [], []
     for p, i in zip(pos, cards):
         name, up, rev = TAROT[i]
         reversed_ = RNG.random() < 0.5
+        drawn.append((i, reversed_))
         card_lines.append(f"**{p}**：{name}（{'逆位' if reversed_ else '正位'}）")
         suit = next((s for s, _ in SUITS if name.startswith(s)), None)
         theme = f"；花色主題：{dict(SUITS)[suit]}" if suit else "（大阿爾克那，代表較重大的課題）"
         detail.append(f"{p}：{name}{'逆位' if reversed_ else '正位'} — 牌義：{rev if reversed_ else up}{theme}")
     head = f"🔮 **塔羅占卜**" + (f"｜問：{question}" if question else "")
+    img = ""
+    try:
+        import drawimg
+        img = "\n[[FILE:" + drawimg.tarot_spread([(p, i, TAROT[i][0], rv) for p, (i, rv) in zip(pos, drawn)], "塔羅占卜" + (f"｜{question}" if question else "")) + "]]"
+    except Exception as e:
+        logging.getLogger("discord-ai-bot.divination").warning("塔羅圖片失敗：%r", e)
     return (head + "\n" + "\n".join(card_lines) + DIVIDER + "\n".join(detail) +
-            "\n解讀方式：依牌陣位置逐張說明，再把整體串成一個故事回答問題；逆位通常是能量受阻、不足或過度，不一定是壞事。")
+            "\n解讀方式：依牌陣位置逐張說明，再把整體串成一個故事回答問題；逆位通常是能量受阻、不足或過度，不一定是壞事。" + img)
 
 
 # ---------------------------------------------------------------- 擲筊
