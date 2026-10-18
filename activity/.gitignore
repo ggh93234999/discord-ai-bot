@@ -23,4 +23,5 @@ LF2_HEADLESS_API.md
 server/casino_escrow.json
 server/casino_state.json
 server/horses.json
+server/forge.json
 server/casino_log.json

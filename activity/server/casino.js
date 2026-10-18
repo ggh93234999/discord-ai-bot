@@ -7,9 +7,10 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, betLimit } from "./bet.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, getSword, setSword, noteBest, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
-export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse"];
+export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
 const PRACTICE_START = 1000;
 const BET_MS = 30000, RESULT_MS = 10000;
 const rnd = (n) => randomInt(n);
@@ -97,6 +98,7 @@ function logLabel(e) {
   if (e.g === "dice") return `你 ${e.me}　莊家 ${e.bot}`;
   if (e.g === "bj") return `${e.pv} 比 ${e.dv}　${String(e.text || "").replace(/^[^\u4e00-\u9fa5A-Za-z]+/, "")}`;
   if (e.g === "horse") return `${(e.idx ?? 0) + 1}號 ${e.name || ""}${e.win === e.idx ? "（冠軍）" : ""}`;
+  if (e.g === "forge") return e.text || "";
   if (e.g === "slots") return `${{ 1: "3 格", 3: "3×3", 4: "4×4" }[e.kind] || ""}${e.nwin ? `　中 ${e.nwin} 線` : ""}`;
   return "";
 }
@@ -314,6 +316,7 @@ export async function handleCasino(ws, m) {
     return true;
   }
   if (m.t === "creset") { if (!ws.bj) ws.cprac = PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); return true; }
+  if (m.t === "fget" || m.t === "fforge" || m.t === "fsell") return handleForge(ws, m);
   if (!["cplay", "cbj", "chorse"].includes(m.t)) return false;
   if (ws.cspec) return true;                       // 旁觀者不能玩
   if (ws.cbusy) return true;
@@ -380,5 +383,58 @@ export async function handleCasino(ws, m) {
     }
   } catch (e) { console.log("casino 錯誤", e && e.message); }
   finally { ws.cbusy = false; }
+  return true;
+}
+
+// ---- 鍛造：每個身分一把劍（存在 forge.json）。練習幣用連線的練習幣，真代幣用機器人錢包。
+async function handleForge(ws, m) {
+  const real = !!m.real;
+  let id;
+  if (real) { if (!ws.user) { out(ws, { t: "cerr", error: "need_login" }); return true; } id = ws.user.uid; }
+  else id = ws.user ? ws.user.uid : "g" + (String(m.pid || "").replace(/[^\w-]/g, "").slice(0, 40) || ws.cid || "x");
+  const key = (real ? "r:" : "p:") + id;
+  const bal = () => (real ? undefined : ws.cprac ?? PRACTICE_START);
+  if (m.t === "fget") { out(ws, { ...forgeView(key, real), balance: bal() }); return true; }
+  if (ws.cspec || ws.fbusy) return true;
+  ws.fbusy = true;
+  try {
+    const s = getSword(key), tier = s ? s.tier : 0;
+    const sellOf = (t) => (real ? Math.min(FV[t], REAL_SELL_MAX) : FV[t]);
+    if (m.t === "fforge") {
+      if (tier >= FORGE_MAX) return true;
+      const cost = FC[tier], p = FP[tier];
+      if (real && cost > betLimit()) { out(ws, { t: "cerr", error: "over_limit", balance: undefined }); return true; }
+      const r = await stake(ws, real, cost, "鍛造");
+      if (!r.ok) { fail(ws, r); return true; }
+      const ekey = "f:" + randomBytes(5).toString("hex");
+      if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: cost });   // 伺服器在中途重啟會把這筆費用退回
+      const ok = rnd(10000) < Math.round(p * 10000);
+      const lost = ok ? 0 : sellOf(tier);
+      if (ok) { setSword(key, { tier: tier + 1, spent: (s ? s.spent : 0) + cost, forged: (s ? s.forged : 0) + 1 }); noteBest(key, tier + 1); }
+      else setSword(key, null);
+      forgeSave(true);
+      if (real) edel(ekey);
+      casinoFeed(ws, { g: "forge", real, bet: cost, back: 0, text: ok ? `升到 ${tier + 1} 階` : `第 ${tier + 1} 階失敗，${tier ? `${tier} 階的劍碎了` : "原料報銷"}` });
+      out(ws, { ...forgeView(key, real), t: "fres", ok, prev: tier, paid: cost, lost, balance: r.balance });
+    } else if (m.t === "fsell") {
+      if (!s) return true;
+      const amt = sellOf(tier);
+      if (real) {
+        const ekey = "f:" + randomBytes(5).toString("hex");
+        eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: amt });          // 先記下，賣出中途重啟就補發
+        setSword(key, null); forgeSave(true);
+        let r; try { r = await botPay(ws.user.uid, ws.user.name, amt, "鍛造賣劍"); } catch { r = { ok: false }; }
+        if (!r || !r.ok) { setSword(key, s); forgeSave(true); edel(ekey); out(ws, { t: "cerr", error: "bot_down" }); return true; }
+        edel(ekey);
+        casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
+        out(ws, { ...forgeView(key, real), t: "fres", sold: true, prev: tier, got: amt, balance: r.balance });
+      } else {
+        ws.cprac = (ws.cprac ?? PRACTICE_START) + amt; setSword(key, null); forgeSave(true);
+        casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
+        out(ws, { ...forgeView(key, real), t: "fres", sold: true, prev: tier, got: amt, balance: ws.cprac });
+      }
+    }
+  } catch (e) { console.log("鍛造錯誤", e && e.message); }
+  finally { ws.fbusy = false; }
   return true;
 }

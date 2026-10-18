@@ -357,3 +357,27 @@ body.pk-myturn .game.poker{background:#16296b}
 .poker .pcfgbox{display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:8px}
 .poker .pcfgbox input[type=number]{width:70px;padding:3px 6px;border-radius:6px;border:1px solid #666;background:#1b1e26;color:#fff;text-align:center}
 .poker .pcfgbox small{opacity:.65;max-width:320px}
+/* 鍛造 */
+.casino .fg{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;position:relative}
+.casino .fgtop{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;justify-content:center}.casino .fgtop b{font-size:20px}.casino .fgtop span{color:#ffd54f;font-size:16px}.casino .fgtop em{font-style:normal;font-size:12px;opacity:.7}
+.casino .fgsw{width:200px;height:300px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:radial-gradient(#252a38,#12141c)}
+.casino .fgsw svg,.casino .fgsw .fsw{width:100%;height:100%}
+.casino .fgstats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%;max-width:420px;text-align:center}
+.casino .fgstats div{background:#20232c;border-radius:8px;padding:5px 2px}.casino .fgstats small{display:block;font-size:11px;opacity:.7}.casino .fgstats b{font-size:15px;color:#ffe08a}
+.casino .fgmsg{min-height:1.5em;text-align:center;font-size:14px}.casino .fgmsg .ok{color:#7ee787}.casino .fgmsg .bad{color:#ff8a80}
+.casino .fgbook{width:100%;max-width:440px;font-size:13px}.casino .fgbook summary{cursor:pointer;text-align:center;color:#b0bec5}
+.casino .fgbookg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}.casino .fgbookg div{background:#1b1e26;border-radius:8px;padding:4px;text-align:center}.casino .fgbookg div.cur{outline:2px solid #e0a526}
+.casino .fgbookg svg{width:100%;height:90px}.casino .fgbookg small{font-size:10px;opacity:.85;line-height:1.2}
+.casino .fg.hammer .fgsw{animation:fghit .12s 6}
+@keyframes fghit{0%{transform:translateY(0)}50%{transform:translateY(6px) rotate(-1deg)}100%{transform:translateY(0)}}
+.casino .fg.up .fgsw{animation:fgup .9s}
+@keyframes fgup{0%{filter:brightness(3);transform:scale(1.12)}100%{filter:none;transform:scale(1)}}
+.casino .fg.fail .fgsw{animation:fgfail .5s}
+@keyframes fgfail{0%{filter:grayscale(1) brightness(.5)}100%{filter:none}}
+.casino .fgsw.shatter{position:relative;overflow:hidden}.casino .fgsw.shatter .half{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.casino .fgsw.shatter .l{clip-path:polygon(0 0,60% 0,40% 100%,0 100%);animation:fgl 1.2s forwards}.casino .fgsw.shatter .r{clip-path:polygon(60% 0,100% 0,100% 100%,40% 100%);animation:fgr 1.2s forwards}
+@keyframes fgl{to{transform:translate(-40px,60px) rotate(-18deg);opacity:0}}@keyframes fgr{to{transform:translate(40px,80px) rotate(22deg);opacity:0}}
+.fsw-pulse{animation:fswp 2.2s ease-in-out infinite}@keyframes fswp{50%{opacity:.45}}
+.fsw-twk{animation:fswt 1.8s ease-in-out infinite}@keyframes fswt{0%,100%{opacity:0;transform:scale(.3)}50%{opacity:1;transform:scale(1.2)}}
+.fsw-spin{animation:fsws 14s linear infinite}.fsw-spin2{animation:fsws 22s linear infinite reverse}@keyframes fsws{to{transform:rotate(360deg)}}
+.fsw-flame{animation:fswf .9s ease-in-out infinite alternate}@keyframes fswf{to{transform:translateY(-6px) scale(.8);opacity:.35}}

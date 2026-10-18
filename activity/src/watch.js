@@ -15,6 +15,7 @@ function body(e) {
   if (e.g === "coin") return `<div>押${e.pick === "heads" ? "正面" : "反面"} → 開出${e.res === "heads" ? "正面" : "反面"}　${outcome(e)}</div>`;
   if (e.g === "dice") return `<div>你 ${die(e.me[0])}${die(e.me[1])} ${e.me[0] + e.me[1]} 點 vs 莊 ${die(e.bot[0])}${die(e.bot[1])} ${e.bot[0] + e.bot[1]} 點　${outcome(e)}</div>`;
   if (e.g === "bj") return `<div>${cards(e.dealer)}<small> 莊 ${e.dv}</small></div><div>${cards(e.player)}<small> 他 ${e.pv}</small></div><div>${esc(e.text)}　${outcome(e)}</div>`;
+  if (e.g === "forge") return `<div>⚒ ${esc(e.text || "")}</div>`;
   if (e.g === "horse") return `<div>押 ${e.idx + 1} 號 ${esc(e.name)}（${e.win === e.idx ? "奪冠" : "沒贏"}）　${outcome(e)}</div>`;
   return "";
 }

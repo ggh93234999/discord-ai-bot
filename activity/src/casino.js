@@ -7,18 +7,20 @@ import { createWatch, entryHtml } from "./watch.js";
 import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
 import { horseCards } from "./horsecards.js";
+import { createForge } from "./forgeui.js";
 
 const BETS = [10, 50, 100, 500];
 const ERR = {
   insufficient: "代幣不夠，選小一點的賭注", bot_down: "機器人暫時連不上，稍後再試", need_login: "要先登入才能用賭注模式",
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
-  error: "發生錯誤，再試一次",
+  error: "發生錯誤，再試一次", over_limit: "這一階的鍛造費超過賭注模式的單筆上限，只能賣掉這把劍",
 };
-const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", slots: "老虎機" };
+const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", slots: "老虎機", forge: "鍛造" };
 const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
   dice: "你和莊家各擲兩顆骰子比點數，大的贏（拿回 2 倍），一樣退錢",
   bj: "點數最接近 21 不爆牌就贏；贏拿 2 倍，Blackjack 拿 2.5 倍，平手退錢",
+  forge: "每升一階要付鍛造費，有機率成功，也可能劍碎（全部歸零）；階數越高賣價越高，隨時可以賣掉。共 100 階，劍會幫你存起來",
   horse: "全房一起押：下注時間內選馬下注，時間到大家一起看比賽，押中拿 賭注×賠率",
 };
 const dieFace = (n) => "⚀⚁⚂⚃⚄⚅"[n - 1];
@@ -68,6 +70,10 @@ export function mountCasino(game, opts = {}) {
     const real = () => mode === "real";
     const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 
+    const forgePid = () => { try { let p = localStorage.getItem("forgepid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("forgepid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
+    const forge = game === "forge" && !spectate ? createForge({ stage, ctl, statusEl, send: (o) => send(o), getReal: () => real(), setBal: (m) => setBal(m), pid: forgePid() }) : null;
+    if (game === "forge") betsEl.hidden = true;
+
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));
       ws.onopen = () => {
@@ -77,7 +83,9 @@ export function mountCasino(game, opts = {}) {
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
         if (blog.onMsg(m)) return;
-        if (m.t === "cinit") { practiceBal = m.balance; you = m.you; watch.setYou(you); showBalance(); statusEl.textContent = spectate ? "旁觀中" : game === "horse" ? "選一匹馬，下注吧" : "選賭注，開始吧"; }
+        if (m.t === "cinit") { practiceBal = m.balance; you = m.you; watch.setYou(you); showBalance(); statusEl.textContent = spectate ? "旁觀中" : game === "horse" ? "選一匹馬，下注吧" : game === "forge" ? "鍛一把好劍吧" : "選賭注，開始吧"; if (forge) forge.refresh(); }
+        else if (m.t === "fstate") { if (forge) forge.onState(m); }
+        else if (m.t === "fres") { if (forge) forge.onRes(m); }
         else if (m.t === "cwho") { watch.update(m.list); if (spectate) specUpdate(m); }
         else if (m.t === "cres") onRes(m);
         else if (m.t === "hstate") onHorse(m);
@@ -98,7 +106,7 @@ export function mountCasino(game, opts = {}) {
     }
     function setBal(m) { if (m.balance == null) return; if (m.real) realBal = m.balance; else practiceBal = m.balance; showBalance(); }
     function onErr(m) {
-      busy = false; if (m.balance != null) { if (real()) realBal = m.balance; else practiceBal = m.balance; showBalance(); }
+      busy = false; if (forge) forge.busyReset(); if (m.balance != null) { if (real()) realBal = m.balance; else practiceBal = m.balance; showBalance(); }
       statusEl.textContent = ERR[m.error] || ERR.error; draw();
     }
 
@@ -109,7 +117,7 @@ export function mountCasino(game, opts = {}) {
       modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m));
       gameEl.classList.toggle("realmode", m === "real"); blog.setMode(m === "real");
       $(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";
-      showBalance(); draw();
+      showBalance(); draw(); if (forge) forge.refresh();
       statusEl.textContent = m === "real" ? `賭注模式：${session ? session.name : ""}，用的是真代幣！` : "練習模式：選賭注，開始吧";
     }
     function askConfirm(text, onYes) {
@@ -169,6 +177,7 @@ export function mountCasino(game, opts = {}) {
 
     // ---- 控制鈕
     function draw() {
+      if (game === "forge") return;
       ctl.innerHTML = "";
       if (game === "coin") {
         const row = document.createElement("div"); row.className = "cpick";

@@ -1,0 +1,49 @@
+// 鍛造（賭場遊戲）：每升一階要付鍛造費，有機率成功或「劍碎」（全部歸零）；隨時可以賣掉現在的劍。共 100 階。
+// 數字全部由這個檔案算好，前端只負責畫。每一步的期望回收率（RTP）固定壓在 95% 以下，
+// 所以不管怎麼停手，長期都不可能靠鍛造賺代幣：   p(n) × 賣價(n+1) ≤ 0.95 × (賣價(n) + 鍛造費(n))
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
+export const FORGE_MAX = 100;
+const C0 = 20, ALPHA = 0.08, RTP = 0.95;
+const pTarget = (n) => 0.99 - 0.12 * Math.pow(n / 99, 1.4);
+
+// V[n] = 第 n 階的賣價；C[n] = 從第 n 階鍛到 n+1 階的費用（n=0 表示「買劍」）；P[n] = 成功率
+export const V = [0], C = [], P = [];
+C[0] = C0;
+V[1] = Math.floor(RTP * C0 / 0.97);
+for (let n = 1; n < FORGE_MAX; n++) {
+  C[n] = Math.max(1, Math.ceil(V[n] * ALPHA));
+  V[n + 1] = Math.max(V[n] + 1, Math.floor(RTP * (V[n] + C[n]) / pTarget(n)));
+}
+for (let n = 0; n < FORGE_MAX; n++) {
+  const cap = RTP * (V[n] + C[n]) / V[n + 1];
+  P[n] = Math.floor(1000 * Math.min(n === 0 ? 0.97 : pTarget(n), cap, 0.99)) / 1000;
+}
+export const REAL_SELL_MAX = 50000;       // 賭注模式單把劍最多賣這麼多（避免一把劍把機器人錢包抽乾）
+
+// ---- 存檔：每個身分一把劍。key：p:<id>（練習幣）、r:<uid>（真代幣，練習和真代幣的劍分開）
+const FFILE = fileURLToPath(new URL("./forge.json", import.meta.url));
+let db = { sw: {}, best: {} };
+try { db = { sw: {}, best: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
+let saveT = 0;
+export function forgeSave(now = false) {
+  const w = () => { try { fs.writeFileSync(FFILE, JSON.stringify(db)); } catch (e) { console.log("鍛造存檔失敗", e.message); } };
+  if (now) { clearTimeout(saveT); w(); return; }
+  clearTimeout(saveT); saveT = setTimeout(w, 800);
+}
+export const getSword = (key) => db.sw[key] || null;
+export const setSword = (key, s) => { if (s) db.sw[key] = s; else delete db.sw[key]; };
+export const bestOf = (key) => db.best[key] || 0;
+export function noteBest(key, tier) { if (tier > (db.best[key] || 0)) db.best[key] = tier; }
+
+// 玩家看到的目前狀態（含下一步的費用、成功率、成功後賣價）
+export function forgeView(key, real) {
+  const s = getSword(key), tier = s ? s.tier : 0;
+  const maxed = tier >= FORGE_MAX;
+  const sell = (t) => (real ? Math.min(V[t], REAL_SELL_MAX) : V[t]);
+  return {
+    t: "fstate", real, tier, sell: sell(tier), best: bestOf(key), max: FORGE_MAX,
+    cost: maxed ? 0 : C[tier], p: maxed ? 0 : P[tier], nextSell: maxed ? 0 : sell(tier + 1), spent: s ? s.spent : 0, forged: s ? s.forged : 0,
+  };
+}

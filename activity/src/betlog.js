@@ -1,6 +1,6 @@
 // 賭博紀錄面板：每一把的賭注、拿回多少、輸贏，加上累計統計。
 // 練習模式的紀錄存在這個瀏覽器（localStorage）；賭注模式的紀錄存在伺服器、依 Discord 身分，換裝置也在。
-const G = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"] };
+const G = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], forge: ["⚒️", "鍛造"] };
 const KEY = "betlog_practice";
 const money = (n) => Math.round(n).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
