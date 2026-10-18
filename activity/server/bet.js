@@ -49,6 +49,8 @@ async function bot(path, body) {
 export let maxBet = 1000;
 export const betLimit = () => maxBet;
 export const botInfo = async (uid) => { const r = await bot("/wallet/info", { gid: GUILD_ID, uid }); if (r && r.max_bet) maxBet = r.max_bet; return r; };
+// 鍛造身分組：告訴機器人這個人現在手上最高階的劍（機器人負責建立／指派／移除身分組）
+export const botRole = (uid, tier) => bot("/forge/role", { gid: GUILD_ID, uid, tier });
 export const botSettle = (uid, name, bet, back, why) => bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet, back, why });
 // 派彩：優先用機器人的 /wallet/pay；機器人還沒更新（沒有這個介面）時，改用 settle 湊出同樣的淨額（押 1 拿回 amount+1）
 export async function botPay(uid, name, amount, why) {

@@ -6,8 +6,8 @@ import { listPokerTables } from "./poker.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { botSettle, botPay, betLimit } from "./bet.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
+import { botSettle, botPay, botRole, betLimit } from "./bet.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, maxTier, roleBand, getRoleBand, setRoleBand, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
@@ -399,6 +399,16 @@ async function stakeBig(ws, real, cost, why) {
   return r;
 }
 // ---- 鍛造：每個身分一把劍（存在 forge.json）。練習幣用連線的練習幣，真代幣用機器人錢包。
+// 鍛造身分組：手上最高階的劍所在區間變了才通知機器人（失敗的話下次再試）
+async function syncRole(key, ws) {
+  try {
+    if (!ws.user) return;
+    const t = maxTier(key), band = roleBand(t);
+    if (band === getRoleBand(key)) return;
+    const r = await botRole(ws.user.uid, t);
+    if (r && r.ok) { setRoleBand(key, band); forgeSave(); }
+  } catch {}
+}
 async function handleForge(ws, m) {
   const real = !!m.real;
   let id;
@@ -407,7 +417,7 @@ async function handleForge(ws, m) {
   const key = (real ? "r:" : "p:") + id;
   const bal = () => (real ? undefined : ws.cprac ?? FORGE_PRACTICE_START);
   const slot = Number.isInteger(m.slot) && m.slot >= 0 && m.slot < FORGE_SLOTS ? m.slot : 0;
-  if (m.t === "fget") { out(ws, { ...forgeView(key, real, slot), balance: bal() }); return true; }
+  if (m.t === "fget") { out(ws, { ...forgeView(key, real, slot), balance: bal() }); if (real) syncRole(key, ws); return true; }
   if (ws.cspec || ws.fbusy) return true;
   ws.fbusy = true;
   try {
@@ -427,6 +437,7 @@ async function handleForge(ws, m) {
       else setSword(key, slot, null);
       forgeSave(true);
       if (real) edel(ekey);
+      if (real) syncRole(key, ws);
       casinoFeed(ws, { g: "forge", real, bet: cost, back: 0, text: ok ? `升到 ${tier + 1} 階` : `第 ${tier + 1} 階失敗，${tier ? `${tier} 階的劍碎了` : "原料報銷"}` });
       out(ws, { ...forgeView(key, real, slot), t: "fres", ok, prev: tier, paid: cost, lost, balance: r.balance });
     } else if (m.t === "fsell") {
@@ -439,6 +450,7 @@ async function handleForge(ws, m) {
         let r; try { r = await botPay(ws.user.uid, ws.user.name, amt, "鍛造賣劍"); } catch { r = { ok: false }; }
         if (!r || !r.ok) { setSword(key, slot, s); forgeSave(true); edel(ekey); out(ws, { t: "cerr", error: "bot_down" }); return true; }
         edel(ekey);
+        syncRole(key, ws);
         casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real, slot), t: "fres", sold: true, prev: tier, got: amt, balance: r.balance });
       } else {

@@ -604,10 +604,56 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             log.info("Activity %s派彩：%s +%s → 餘額 %s", str(d.get("why") or "")[:20], name, amount, new)
             return web.json_response({"ok": True, "balance": new})
 
+        # 鍛造身分組：依「目前擁有的最高階劍」給 30/40/…/100 階各一個身分，同時只保留一個
+        FORGE_ROLES = [
+            (30, "鑄劍學徒", 0x8D8D8D), (40, "百煉匠", 0xB08D57), (50, "鑄劍師", 0x9BB7C9), (60, "名匠", 0x4AA3A0),
+            (70, "劍宗", 0x6A5ACD), (80, "劍聖", 0xD4A017), (90, "劍仙", 0xE0592A), (100, "神鑄", 0xC0392B),
+        ]
+
+        async def forge_role(request):
+            p = await parse(request)
+            if not p:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            gid, uid, d = p
+            try:
+                tier = int(d.get("tier") or 0)
+            except Exception:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            g = client.get_guild(gid)
+            if g is None:
+                return web.json_response({"ok": False, "error": "no_guild"})
+            want = None
+            for t, name, col in FORGE_ROLES:
+                if tier >= t:
+                    want = name
+            try:
+                member = g.get_member(uid) or await g.fetch_member(uid)
+                have = {r.name: r for r in g.roles}
+                for t, name, col in FORGE_ROLES:     # 缺的身分組先建好
+                    if name not in have and name == want:
+                        have[name] = await g.create_role(name=name, colour=discord.Colour(col), hoist=True, reason="鍛造身分組")
+                mine = {r.name for r in member.roles}
+                drop = [have[n] for _, n, _ in FORGE_ROLES if n in have and n in mine and n != want]
+                if drop:
+                    await member.remove_roles(*drop, reason="鍛造最高階改變")
+                if want and want not in mine:
+                    await member.add_roles(have[want], reason="鍛造 %s 階" % tier)
+                log.info("鍛造身分組：%s（%s 階）→ %s", member.display_name, tier, want or "無")
+                return web.json_response({"ok": True, "role": want})
+            except discord.Forbidden:
+                log.warning("鍛造身分組：沒有權限（需要「管理身分組」，機器人的身分組要在這些身分組之上）")
+                return web.json_response({"ok": False, "error": "forbidden_role"})
+            except discord.NotFound:
+                return web.json_response({"ok": False, "error": "no_member"})
+            except Exception:
+                log.exception("鍛造身分組出錯")
+                return web.json_response({"ok": False, "error": "role_failed"})
+
         app = web.Application(middlewares=[auth])
         app.router.add_post("/wallet/info", info)
         app.router.add_post("/wallet/settle", settle)
         app.router.add_post("/wallet/pay", pay)
+        app.router.add_post("/forge/role", forge_role)
         runner = web.AppRunner(app)
         await runner.setup()
         await web.TCPSite(runner, "127.0.0.1", 3107).start()
