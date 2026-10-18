@@ -73,11 +73,31 @@ export function swordSvg(t, uid = "s", opts = {}) {
 const money = (n) => Number(n).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+// 防止破壞卷圖示：捲起的羊皮紙＋紅色封蠟＋盾牌
+export function scrollIcon(uid = "sc", w = 40) {
+  const h = Math.round(w * 1.2);
+  return `<svg class="scico" viewBox="0 0 60 72" width="${w}" height="${h}" aria-hidden="true">
+    <defs><linearGradient id="${uid}p" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cdbb92"/><stop offset=".5" stop-color="#f1e6c8"/><stop offset="1" stop-color="#cdbb92"/></linearGradient>
+    <linearGradient id="${uid}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a4a22"/><stop offset=".5" stop-color="#b9783a"/><stop offset="1" stop-color="#6a3c1a"/></linearGradient></defs>
+    <rect x="9" y="8" width="42" height="54" fill="url(#${uid}p)" stroke="#6b5a36" stroke-width="1.2"/>
+    <rect x="4" y="3" width="52" height="9" rx="4.5" fill="url(#${uid}r)" stroke="#3e2410" stroke-width="1"/>
+    <rect x="4" y="58" width="52" height="9" rx="4.5" fill="url(#${uid}r)" stroke="#3e2410" stroke-width="1"/>
+    <path d="M30 20 L44 25 V36 C44 45 37.5 50 30 54 C22.5 50 16 45 16 36 V25 Z" fill="#b3261e" stroke="#4a0f0b" stroke-width="1.4"/>
+    <path d="M30 24 L40 27.5 V36 C40 42.5 35.5 46.5 30 49.5 Z" fill="#d94b3d" opacity=".75"/>
+    <path d="M30 28 V44 M24 34 H36" stroke="#f6e9c9" stroke-width="2.4" stroke-linecap="round"/>
+  </svg>`;
+}
+
 export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }) {
-  let st = null, busy = false, last = "", sel = 0;
+  let st = null, busy = false, last = "", sel = 0, useScroll = false;
   const $ = (s) => stage.querySelector(s);
   function refresh() { send({ t: "fget", real: getReal(), pid, slot: sel }); }
 
+  function scrollRow(t) {
+    if (!st || t >= st.max) return "";
+    if (!t || t < (st.scrollMin || 30)) return `<div class="fgscroll off">${scrollIcon("so", 26)}<span>防止破壞卷：${st.scrollMin || 30} 階以上才能使用</span></div>`;
+    return `<label class="fgscroll${useScroll ? " on" : ""}">${scrollIcon("sn", 34)}<span class="sctxt"><b>防止破壞卷</b><small>多花 ${money(st.scroll)}，失敗時劍不會碎、留在 ${t} 階</small></span><input type="checkbox" id="fgscr"${useScroll ? " checked" : ""}></label>`;
+  }
   function render(fx) {
     if (!st) { stage.innerHTML = `<div class="fg"><div class="fgmsg">讀取中…</div></div>`; ctl.innerHTML = ""; return; }
     const t = st.tier;
@@ -92,21 +112,24 @@ export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }
         <div><small>成功率</small><b>${st.max <= t ? "—" : (st.p * 100).toFixed(1).replace(/\.0$/, "") + "%"}</b></div>
         <div><small>成功後賣價</small><b>${st.max <= t ? "—" : money(st.nextSell)}</b></div>
       </div>
+      ${scrollRow(t)}
       <div class="fgmsg" id="fgmsg">${last}</div>
       <details class="fgbook"><summary>📖 劍譜（各材質的最高階）</summary><div class="fgbookg">${[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((k) => `<div class="${t === k ? "cur" : ""}">${swordSvg(k, "k" + k)}<small>${k} 階<br>${esc(swordName(k))}</small></div>`).join("")}</div></details>
     </div>`;
     stage.querySelectorAll(".fgslot").forEach((b) => b.addEventListener("click", () => { if (busy) return; sel = +b.dataset.i; last = ""; send({ t: "fget", real: getReal(), pid, slot: sel }); }));
+    const scr = stage.querySelector("#fgscr"); if (scr) scr.addEventListener("change", () => { useScroll = scr.checked; render(); });
     ctl.innerHTML = "";
     const mk = (label, cls, fn, dis) => { const b = document.createElement("button"); b.className = "spin " + cls; b.textContent = label; b.disabled = !!dis; b.addEventListener("click", fn); ctl.append(b); };
     const maxed = t >= st.max;
-    mk(maxed ? "已經是最高階" : t ? `🔨 鍛造（${money(st.cost)}）` : `🔨 打造新劍（${money(st.cost)}）`, "", () => act("fforge"), busy || maxed);
+    const withScroll = useScroll && t >= (st.scrollMin || 30) && !maxed, total = st.cost + (withScroll ? st.scroll : 0);
+    mk(maxed ? "已經是最高階" : t ? `${withScroll ? "🛡 " : "🔨 "}鍛造${withScroll ? "（含卷軸 " : "（"}${money(total)}）` : `🔨 打造新劍（${money(st.cost)}）`, "", () => act("fforge"), busy || maxed);
     if (t) mk(`💰 賣掉（${money(st.sell)}）`, "alt", () => act("fsell"), busy);
   }
   function act(type) {
     if (busy) return;
     busy = true; statusEl.textContent = type === "fforge" ? "鍛造中…" : "…";
     const g = stage.querySelector(".fg"); if (g && type === "fforge") g.classList.add("hammer");
-    send({ t: type, real: getReal(), pid, slot: sel });
+    send({ t: type, real: getReal(), pid, slot: sel, scroll: type === "fforge" && useScroll });
   }
   function onState(m) {
     st = m; if (m.slot != null) sel = m.slot; if (m.balance != null) setBal({ real: false, balance: m.balance });
@@ -119,6 +142,9 @@ export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }
     if (m.ok) {
       last = `<span class="ok">✨ 成功！升到 ${m.tier} 階「${esc(swordName(m.tier))}」（花了 ${money(m.paid)}）</span>`; statusEl.textContent = "成功了，要繼續賭嗎？";
       render("up");
+    } else if (m.saved) {
+      last = `<span class="ok">🛡 失敗了，但防止破壞卷保住了 ${m.prev} 階的劍（花了 ${money(m.paid)}，含卷軸 ${money(m.scrollCost)}）</span>`; statusEl.textContent = "卷軸擋下了這次破壞";
+      render("saved");
     } else {
       last = `<span class="bad">💥 失敗，${m.prev ? `${m.prev} 階的劍碎了（損失賣價 ${money(m.lost)}）` : "原料報銷了"}（花了 ${money(m.paid)}）</span>`; statusEl.textContent = "劍碎了…";
       // 先顯示碎掉的舊劍，再回到空鐵砧

@@ -411,3 +411,15 @@ body.pk-myturn .game.poker{background:#16296b}
 .casino.forge.realmode .fgstats > div { background:rgba(60,6,10,.72); }
 @keyframes fgblood { 0%,100%{ box-shadow:inset 0 0 90px 18px rgba(190,10,20,.45); } 50%{ box-shadow:inset 0 0 120px 30px rgba(235,20,25,.7); } }
 @media (prefers-reduced-motion: reduce){ .casino.forge.realmode{ animation:none } }
+
+/* 防止破壞卷 */
+.fgscroll{display:flex;align-items:center;gap:10px;width:100%;max-width:420px;margin:2px auto;padding:6px 10px;border:1px solid #6b5a36;border-radius:10px;background:rgba(40,30,16,.6);color:#f1e6c8;cursor:pointer}
+.fgscroll.off{cursor:default;opacity:.7;font-size:12px;border-style:dashed}
+.fgscroll.on{border-color:#e6b84a;background:rgba(120,80,10,.55);box-shadow:0 0 10px rgba(230,184,74,.45)}
+.fgscroll .sctxt{display:flex;flex-direction:column;flex:1;min-width:0}
+.fgscroll .sctxt small{opacity:.8;font-size:12px}
+.fgscroll input{width:20px;height:20px;accent-color:#e6b84a}
+.fgscroll .scico{flex:none}
+.fg.saved .fgsw{animation:fgsaved .7s ease-out}
+@keyframes fgsaved{0%{filter:drop-shadow(0 0 0 #e6b84a)}40%{filter:drop-shadow(0 0 18px #ffd86b)}100%{filter:none}}
+@media (prefers-reduced-motion: reduce){.fg.saved .fgsw{animation:none}}

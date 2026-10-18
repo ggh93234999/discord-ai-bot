@@ -7,7 +7,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botRole, betLimit } from "./bet.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, getSword, setSword, noteBest, addXp, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
@@ -425,21 +425,26 @@ async function handleForge(ws, m) {
     const sellOf = (t) => (real ? Math.min(FV[t], REAL_SELL_MAX) : FV[t]);
     if (m.t === "fforge") {
       if (tier >= FORGE_MAX) return true;
-      const cost = FC[tier], p = FP[tier];
-      const r = await stakeBig(ws, real, cost, "鍛造");        // 真代幣超過單筆上限就分成幾筆扣
+      const useScroll = !!m.scroll && !!s && tier >= SCROLL_MIN;       // 防止破壞卷：30 階以上才能用
+      const scrollCost = useScroll ? SC[tier] : 0;
+      const cost = FC[tier] + scrollCost, p = FP[tier];
+      const r = await stakeBig(ws, real, cost, useScroll ? "鍛造（防止破壞卷）" : "鍛造");        // 真代幣超過單筆上限就分成幾筆扣
       if (!r.ok) { fail(ws, r); return true; }
       if (real) addXp(key, cost);                                      // 記錄真代幣鍛造總花費（鍛造經驗）
       const ekey = "f:" + randomBytes(5).toString("hex");
       if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: cost });   // 伺服器在中途重啟會把這筆費用退回
       const ok = rnd(10000) < Math.round(p * 10000);
-      const lost = ok ? 0 : sellOf(tier);
-      if (ok) { setSword(key, slot, { tier: tier + 1, spent: (s ? s.spent : 0) + cost, forged: (s ? s.forged : 0) + 1 }); noteBest(key, tier + 1); }
+      const saved = !ok && useScroll;                                  // 失敗但卷軸保住了劍
+      const lost = ok || saved ? 0 : sellOf(tier);
+      const spent = (s ? s.spent : 0) + cost, forged = (s ? s.forged : 0) + 1;
+      if (ok) { setSword(key, slot, { tier: tier + 1, spent, forged }); noteBest(key, tier + 1); }
+      else if (saved) setSword(key, slot, { tier, spent, forged });
       else setSword(key, slot, null);
       forgeSave(true);
       if (real) edel(ekey);
       if (real) syncRole(key, ws);
-      casinoFeed(ws, { g: "forge", real, bet: cost, back: 0, text: ok ? `升到 ${tier + 1} 階` : `第 ${tier + 1} 階失敗，${tier ? `${tier} 階的劍碎了` : "原料報銷"}` });
-      out(ws, { ...forgeView(key, real, slot), t: "fres", ok, prev: tier, paid: cost, lost, balance: r.balance });
+      casinoFeed(ws, { g: "forge", real, bet: cost, back: 0, text: ok ? `升到 ${tier + 1} 階${useScroll ? "（用了卷軸）" : ""}` : saved ? `第 ${tier + 1} 階失敗，卷軸保住了 ${tier} 階的劍` : `第 ${tier + 1} 階失敗，${tier ? `${tier} 階的劍碎了` : "原料報銷"}` });
+      out(ws, { ...forgeView(key, real, slot), t: "fres", ok, saved, scrolled: useScroll, scrollCost, prev: tier, paid: cost, lost, balance: r.balance });
     } else if (m.t === "fsell") {
       if (!s) return true;
       const amt = sellOf(tier);

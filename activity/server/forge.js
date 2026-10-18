@@ -37,6 +37,10 @@ const T = build(lo);
 T.C[FORGE_MAX - 1] += TOTAL_COST - T.sum;
 // V[n] = 第 n 階的賣價；C[n] = 從第 n 階鍛到 n+1 階的費用（n=0 表示「買劍」）；P[n] = 成功率
 export const V = T.V, C = T.C, P = T.P;
+// 防止破壞卷：SCROLL_MIN 階以上才能用，可無限次使用；失敗時劍留在原階。
+// 卷軸價 SC[n]（目前在第 n 階）＝ max(失敗平均損失×1.15, 6×成功率×賣價增加−鍛造費)，使每步都用卷軸的回收率約 1/6
+export const SCROLL_MIN = 30;
+export const SC = V.map((v, n) => (n >= SCROLL_MIN && n < FORGE_MAX ? Math.max(Math.ceil((1 - P[n]) * V[n] * 1.15), Math.round(6 * P[n] * (V[n + 1] - V[n]) - C[n])) : 0));
 export const REAL_SELL_MAX = Infinity;         // 賭注模式單把劍賣出沒有上限（保留這個常數方便之後要設上限時使用）
 export const FORGE_PRACTICE_START = 100_000;  // 鍛造的練習幣起始金額（一般賭場遊戲只有 1000，不夠鍛）
 
@@ -79,6 +83,7 @@ export function forgeView(key, real, slot = 0) {
   const sell = (t) => (real ? Math.min(V[t], REAL_SELL_MAX) : V[t]);
   return {
     t: "fstate", real, slot, slots: slotsOf(key).map((x) => (x ? x.tier : 0)), tier, sell: sell(tier), best: bestOf(key), xp: real ? xpOf(key) : null, max: FORGE_MAX,
+    scroll: !maxed && tier >= SCROLL_MIN ? SC[tier] : 0, scrollMin: SCROLL_MIN,
     cost: maxed ? 0 : C[tier], p: maxed ? 0 : P[tier], nextSell: maxed ? 0 : sell(tier + 1), spent: s ? s.spent : 0, forged: s ? s.forged : 0,
   };
 }
