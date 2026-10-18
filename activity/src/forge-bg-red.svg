@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <filter id="paper" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.06" numOctaves="4" seed="5" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.9  0 0 0 0 0.3  0 0 0 0 0.25  0 0 0 0.10 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <filter id="wash" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.01 0.025" numOctaves="3" seed="9" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="44"/>
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="glow"><feGaussianBlur stdDeviation="10"/></filter>
+    <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="4" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="6"/></filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a060a"/><stop offset="0.5" stop-color="#5a0b10"/><stop offset="1" stop-color="#160204"/></linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.4" r="0.8"><stop offset="0.45" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.65"/></radialGradient>
+  </defs>
+  <rect width="600" height="900" fill="url(#sky)"/>
+  <rect width="600" height="900" fill="#fff" filter="url(#paper)"/>
+  <circle cx="400" cy="210" r="170" fill="#ff1a1a" opacity="0.28" filter="url(#glow)"/>
+  <circle cx="400" cy="210" r="112" fill="#d3121a" opacity="0.8" filter="url(#glow)"/>
+  <circle cx="400" cy="210" r="86" fill="#ff3b2e" opacity="0.7" filter="url(#glow)"/>
+  <g filter="url(#wash)">
+    <path d="M-60 520 L60 400 L150 470 L260 350 L360 450 L450 380 L560 470 L680 400 L680 640 L-60 640Z" fill="#7a1217" opacity="0.5"/>
+    <path d="M-60 640 L80 540 L190 610 L320 500 L430 590 L560 520 L680 600 L680 760 L-60 760Z" fill="#4a0a0e" opacity="0.7"/>
+    <path d="M-60 780 L100 700 L230 760 L370 690 L500 760 L680 700 L680 960 L-60 960Z" fill="#1a0306" opacity="0.92"/>
+  </g>
+  <g filter="url(#soft)" fill="#ff5a4a">
+    <ellipse cx="170" cy="560" rx="230" ry="22" opacity="0.22"/>
+    <ellipse cx="460" cy="660" rx="260" ry="20" opacity="0.2"/>
+    <ellipse cx="300" cy="790" rx="340" ry="18" opacity="0.18"/>
+  </g>
+  <g filter="url(#rough)" stroke="#07090a" stroke-linecap="round" fill="none" opacity="0.92">
+    <path d="M-10 90 C60 110 130 90 200 130 C240 150 270 140 300 170" stroke-width="7"/>
+    <path d="M70 108 l-40 -22 M130 106 l-36 24 M190 128 l-30 -26 M240 146 l-26 20" stroke-width="3"/>
+  </g>
+  <g filter="url(#rough)" fill="#c00f14" opacity="0.9">
+    <path d="M40 0 h14 v70 q0 12 -7 12 q-7 0 -7 -12z"/>
+    <path d="M150 0 h10 v120 q0 10 -5 10 q-5 0 -5 -10z"/>
+    <path d="M270 0 h12 v48 q0 10 -6 10 q-6 0 -6 -10z"/>
+    <path d="M420 0 h16 v96 q0 13 -8 13 q-8 0 -8 -13z"/>
+    <path d="M520 0 h10 v60 q0 9 -5 9 q-5 0 -5 -9z"/>
+  </g>
+  <g filter="url(#rough)" fill="#ff2a1f" opacity="0.9">
+    <circle cx="90" cy="100" r="9"/><circle cx="210" cy="150" r="6"/><circle cx="340" cy="80" r="8"/><circle cx="480" cy="140" r="7"/><circle cx="560" cy="90" r="5"/>
+    <circle cx="120" cy="620" r="3"/><circle cx="480" cy="540" r="2.6"/><circle cx="330" cy="690" r="3.2"/><circle cx="520" cy="740" r="2.4"/><circle cx="60" cy="740" r="2.8"/><circle cx="260" cy="600" r="2"/><circle cx="410" cy="470" r="2.4"/><circle cx="200" cy="500" r="2"/>
+  </g>
+  <rect width="600" height="900" fill="url(#vig)"/>
+</svg>

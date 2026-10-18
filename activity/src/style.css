@@ -404,3 +404,10 @@ body.pk-myturn .game.poker{background:#16296b}
 /* 鍛造頁面：水墨夜景背景，不顯示賭博紀錄 */
 .casino.forge { background:#14110f url("./forge-bg.svg") center/cover no-repeat; border-radius:14px; padding:6px 8px 16px; }
 .casino.forge .betlog { display:none !important; }
+
+/* 鍛造・賭注模式：血紅色背景，邊緣暗紅脈動，給人殺紅眼的感覺 */
+.casino.forge.realmode { background:#2a0508 url("./forge-bg-red.svg") center/cover no-repeat; box-shadow:inset 0 0 90px 18px rgba(190,10,20,.55); animation:fgblood 2.6s ease-in-out infinite; }
+.casino.forge.realmode .fgtop b { color:#ffb4a8; } .casino.forge.realmode .fgmsg { color:#ffd9d4; }
+.casino.forge.realmode .fgstats > div { background:rgba(60,6,10,.72); }
+@keyframes fgblood { 0%,100%{ box-shadow:inset 0 0 90px 18px rgba(190,10,20,.45); } 50%{ box-shadow:inset 0 0 120px 30px rgba(235,20,25,.7); } }
+@media (prefers-reduced-motion: reduce){ .casino.forge.realmode{ animation:none } }
