@@ -13,7 +13,7 @@ const BETS = [10, 50, 100, 500];
 const ERR = {
   insufficient: "代幣不夠，選小一點的賭注", bot_down: "機器人暫時連不上，稍後再試", need_login: "要先登入才能用賭注模式",
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
-  error: "發生錯誤，再試一次", over_limit: "這一階的鍛造費超過賭注模式的單筆上限，只能賣掉這把劍",
+  error: "發生錯誤，再試一次", 
 };
 const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", slots: "老虎機", forge: "鍛造" };
 const HINTS = {

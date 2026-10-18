@@ -1,26 +1,35 @@
 // 鍛造（賭場遊戲）：每升一階要付鍛造費，有機率成功或「劍碎」（全部歸零）；隨時可以賣掉現在的劍。共 100 階。
 // 數字全部由這個檔案算好，前端只負責畫。每一步的期望回收率（RTP）固定壓在 95% 以下，
 // 所以不管怎麼停手，長期都不可能靠鍛造賺代幣：   p(n) × 賣價(n+1) ≤ 0.95 × (賣價(n) + 鍛造費(n))
+// 從零一路成功到 100 階，鍛造費總共剛好 100 萬。
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const FORGE_MAX = 100;
-const C0 = 20, ALPHA = 0.08, RTP = 0.95;
+const ALPHA = 0.08, RTP = 0.95, TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
 const pTarget = (n) => 0.99 - 0.12 * Math.pow(n / 99, 1.4);
-
+function build(C0) {
+  const V = [0], C = [C0], P = [];
+  V[1] = Math.floor(RTP * C0 / 0.97);
+  for (let n = 1; n < FORGE_MAX; n++) {
+    C[n] = Math.max(1, Math.ceil(V[n] * ALPHA));
+    V[n + 1] = Math.max(V[n] + 1, Math.floor(RTP * (V[n] + C[n]) / pTarget(n)));
+  }
+  for (let n = 0; n < FORGE_MAX; n++) {
+    const cap = RTP * (V[n] + C[n]) / V[n + 1];
+    P[n] = Math.floor(1000 * Math.min(n === 0 ? 0.97 : pTarget(n), cap, 0.99)) / 1000;
+  }
+  return { V, C, P, sum: C.reduce((a, b) => a + b, 0) };
+}
+// 用二分法找打造費 C0，讓全部鍛造費加起來剛好不超過 TOTAL_COST，剩下的零頭加在最後一階（多收一點只會讓莊家更有利）
+let lo = 20, hi = 100000;
+while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (build(mid).sum <= TOTAL_COST) lo = mid; else hi = mid - 1; }
+const T = build(lo);
+T.C[FORGE_MAX - 1] += TOTAL_COST - T.sum;
 // V[n] = 第 n 階的賣價；C[n] = 從第 n 階鍛到 n+1 階的費用（n=0 表示「買劍」）；P[n] = 成功率
-export const V = [0], C = [], P = [];
-C[0] = C0;
-V[1] = Math.floor(RTP * C0 / 0.97);
-for (let n = 1; n < FORGE_MAX; n++) {
-  C[n] = Math.max(1, Math.ceil(V[n] * ALPHA));
-  V[n + 1] = Math.max(V[n] + 1, Math.floor(RTP * (V[n] + C[n]) / pTarget(n)));
-}
-for (let n = 0; n < FORGE_MAX; n++) {
-  const cap = RTP * (V[n] + C[n]) / V[n + 1];
-  P[n] = Math.floor(1000 * Math.min(n === 0 ? 0.97 : pTarget(n), cap, 0.99)) / 1000;
-}
-export const REAL_SELL_MAX = 50000;       // 賭注模式單把劍最多賣這麼多（避免一把劍把機器人錢包抽乾）
+export const V = T.V, C = T.C, P = T.P;
+export const REAL_SELL_MAX = 3_000_000;       // 賭注模式單把劍賣出上限（正常算出來的最高賣價約 205 萬，這只是保險）
+export const FORGE_PRACTICE_START = 100_000;  // 鍛造的練習幣起始金額（一般賭場遊戲只有 1000，不夠鍛）
 
 // ---- 存檔：每個身分一把劍。key：p:<id>（練習幣）、r:<uid>（真代幣，練習和真代幣的劍分開）
 const FFILE = fileURLToPath(new URL("./forge.json", import.meta.url));

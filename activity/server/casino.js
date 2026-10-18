@@ -7,7 +7,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, betLimit } from "./bet.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, getSword, setSword, noteBest, forgeSave, forgeView } from "./forge.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, FORGE_PRACTICE_START, getSword, setSword, noteBest, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
@@ -308,14 +308,14 @@ export async function handleCasino(ws, m) {
     const room = roomOf(game, String(m.room || "default").slice(0, 80));
     ws.cid ||= randomBytes(3).toString("hex");
     ws.cspec = !!m.spectate;
-    ws.cr = room; room.members.add(ws); ws.cprac = ws.cprac ?? PRACTICE_START;
+    ws.cr = room; room.members.add(ws); ws.cprac = ws.cprac ?? (game === "forge" ? FORGE_PRACTICE_START : PRACTICE_START);
     if (game === "horse" && !room.h) horseNew(room);
     out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid });
     pushWho(room);
     if (game === "horse") { out(ws, horseView(room)); casinoReclaim(ws); }
     return true;
   }
-  if (m.t === "creset") { if (!ws.bj) ws.cprac = PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); return true; }
+  if (m.t === "creset") { if (!ws.bj) ws.cprac = ws.cr && ws.cr.game === "forge" ? FORGE_PRACTICE_START : PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); return true; }
   if (m.t === "fget" || m.t === "fforge" || m.t === "fsell") return handleForge(ws, m);
   if (!["cplay", "cbj", "chorse"].includes(m.t)) return false;
   if (ws.cspec) return true;                       // 旁觀者不能玩
@@ -386,6 +386,18 @@ export async function handleCasino(ws, m) {
   return true;
 }
 
+// 真代幣一次要扣的錢超過單筆上限時，分成幾筆扣；中途失敗就把已經扣掉的退回
+async function stakeBig(ws, real, cost, why) {
+  if (!real) return stake(ws, real, cost, why);
+  const lim = Math.max(1, betLimit()); let left = cost, paid = 0, r = { ok: true };
+  while (left > 0) {
+    const part = Math.min(left, lim);
+    r = await stake(ws, real, part, why);
+    if (!r.ok) { if (paid > 0) { try { await botPay(ws.user.uid, ws.user.name, paid, "鍛造扣款失敗退回"); } catch {} } return r; }
+    paid += part; left -= part;
+  }
+  return r;
+}
 // ---- 鍛造：每個身分一把劍（存在 forge.json）。練習幣用連線的練習幣，真代幣用機器人錢包。
 async function handleForge(ws, m) {
   const real = !!m.real;
@@ -393,7 +405,7 @@ async function handleForge(ws, m) {
   if (real) { if (!ws.user) { out(ws, { t: "cerr", error: "need_login" }); return true; } id = ws.user.uid; }
   else id = ws.user ? ws.user.uid : "g" + (String(m.pid || "").replace(/[^\w-]/g, "").slice(0, 40) || ws.cid || "x");
   const key = (real ? "r:" : "p:") + id;
-  const bal = () => (real ? undefined : ws.cprac ?? PRACTICE_START);
+  const bal = () => (real ? undefined : ws.cprac ?? FORGE_PRACTICE_START);
   if (m.t === "fget") { out(ws, { ...forgeView(key, real), balance: bal() }); return true; }
   if (ws.cspec || ws.fbusy) return true;
   ws.fbusy = true;
@@ -403,8 +415,7 @@ async function handleForge(ws, m) {
     if (m.t === "fforge") {
       if (tier >= FORGE_MAX) return true;
       const cost = FC[tier], p = FP[tier];
-      if (real && cost > betLimit()) { out(ws, { t: "cerr", error: "over_limit", balance: undefined }); return true; }
-      const r = await stake(ws, real, cost, "鍛造");
+      const r = await stakeBig(ws, real, cost, "鍛造");        // 真代幣超過單筆上限就分成幾筆扣
       if (!r.ok) { fail(ws, r); return true; }
       const ekey = "f:" + randomBytes(5).toString("hex");
       if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: cost });   // 伺服器在中途重啟會把這筆費用退回
@@ -429,7 +440,7 @@ async function handleForge(ws, m) {
         casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real), t: "fres", sold: true, prev: tier, got: amt, balance: r.balance });
       } else {
-        ws.cprac = (ws.cprac ?? PRACTICE_START) + amt; setSword(key, null); forgeSave(true);
+        ws.cprac = (ws.cprac ?? FORGE_PRACTICE_START) + amt; setSword(key, null); forgeSave(true);
         casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real), t: "fres", sold: true, prev: tier, got: amt, balance: ws.cprac });
       }
