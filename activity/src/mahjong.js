@@ -2,6 +2,7 @@
 // 洗牌、判定、計分都在伺服器（server/mahjong.js），這裡只畫牌桌和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { GUIDE, guideItem, parseTiles } from "./mjguide.js";
 
 const NUM = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const HON = ["東", "南", "西", "北", "白", "發", "中"];
@@ -28,14 +29,25 @@ export function mountMahjong(rule, opts = {}) {
   return function (root, { env, back }) {
     root.innerHTML = `
       <div class="game slots mj mj-${rule}">
-        <header><button class="back">← 選單</button><h2>${TITLE}</h2><span class="watch"></span></header>
+        <header><button class="back">← 選單</button><h2>${TITLE}</h2><button class="mjgbtn">📘 ${rule === "jp" ? "役表" : "台數表"}</button><span class="watch"></span></header>
+        <div class="mjguide" hidden></div>
         <div class="status">連線中…</div>
         <div class="mjbody"></div>
         <div class="mjlog"></div>
       </div>`;
     attachRules(root.querySelector(".game"), "mj" + rule);
     const $ = (s) => root.querySelector(s);
-    const statusEl = $(".status"), body = $(".mjbody"), logEl = $(".mjlog"), watchEl = $(".watch");
+    const statusEl = $(".status"), body = $(".mjbody"), logEl = $(".mjlog"), watchEl = $(".watch"), guideEl = $(".mjguide");
+    let popName = "", popFor = "";
+    const exHTML = (ex) => ex ? `<div class="mgex">${ex.split("|").map((part) => parseTiles(part).map((t) => tile(t, "sm")).join("")).join('<span class="mgsep"></span>')}</div>` : "";
+    function renderGuide() {
+      const G = GUIDE[rule];
+      guideEl.innerHTML = `<div class="mghead"><b>${G.title}</b><button class="mb ghost mgclose">收起</button></div><p class="mgintro">${G.intro}</p>
+        ${G.groups.map((g) => `<details class="mggrp"${g === G.groups[0] ? " open" : ""}><summary>${g.name}（${g.items.length}）</summary>${g.items.map(([n, v, d, ex]) => `<div class="mgit"><div class="mgt"><b>${n}</b><span>${v}</span></div><div class="mgd">${d}</div>${exHTML(ex)}</div>`).join("")}</details>`).join("")}
+        <p class="mgintro">範例牌型中間的空隙後面是吃碰槓亮出來的牌。</p>`;
+      guideEl.querySelector(".mgclose").addEventListener("click", () => { guideEl.hidden = true; });
+    }
+    $(".mjgbtn").addEventListener("click", () => { if (guideEl.hidden) { renderGuide(); guideEl.hidden = false; guideEl.scrollIntoView({ block: "start" }); } else guideEl.hidden = true; });
     let ws = null, closed = false, retry = 0, st = null, timer = 0, riichiMode = false, lastSig = "";
     const pid = getPid();
     const room = spectate ? spectate.room : env.instanceId;
@@ -151,6 +163,7 @@ export function mountMahjong(rule, opts = {}) {
       }));
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "msit", seat: Number(el.dataset.sit) })));
       const sb = body.querySelector(".stand"); sb && sb.addEventListener("click", () => send({ t: "mstand" }));
+      body.querySelectorAll(".myk").forEach((el) => el.addEventListener("click", () => { popName = popName === el.dataset.y ? "" : el.dataset.y; render(); }));
       tickStatus();
     }
     function resultHTML(r) {
@@ -164,8 +177,13 @@ export function mountMahjong(rule, opts = {}) {
       let hl = false;
       const handT = r.hand.map((t) => { const w = !hl && t === r.tile; if (w) hl = true; return tile(t, `sm${w ? " win" : ""}`); }).join("") + (r.melds || []).map(meldHTML).join("") + (r.flowers || []).map((f) => tile(f, "xs")).join("");
       let detail;
-      if (rule === "jp") detail = `<div class="mrl">${r.yaku.map(([n, v]) => `<span>${n} ${v === "役滿" ? "役滿" : v + " 翻"}</span>`).join("")}</div><div class="mrs">${r.yakuman ? r.label : `${r.han} 翻 ${r.fu} 符${r.label ? "　" + r.label : ""}`}</div>`;
-      else detail = `<div class="mrl">${r.list.length ? r.list.map(([n, v]) => `<span>${n} ${v} 台</span>`).join("") : "<span>沒有台（屁胡）</span>"}</div><div class="mrs">${r.pays.map((p) => `${nm(p.seat)} 付 ${p.amount.toLocaleString()}（${p.tai} 台）`).join("　")}</div>`;
+      const key = r.label0 + r.kind + r.winner;
+      if (popFor !== key) { popFor = key; popName = ""; }
+      const yk = (n, txt) => `<span class="myk${popName === n ? " on" : ""}" data-y="${esc(n)}">${txt}</span>`;
+      const it = popName ? guideItem(rule, popName) : null;
+      const pop = it ? `<div class="mypop"><b>${it[0]}</b>　<em>${it[1]}</em><div>${it[2]}</div>${exHTML(it[3])}</div>` : "";
+      if (rule === "jp") detail = `<div class="mrl">${r.yaku.map(([n, v]) => yk(n, `${n} ${v === "役滿" ? "役滿" : v + " 翻"}`)).join("")}</div>${pop}<div class="mrs">${r.yakuman ? r.label : `${r.han} 翻 ${r.fu} 符${r.label ? "　" + r.label : ""}`}</div>`;
+      else detail = `<div class="mrl">${r.list.length ? r.list.map(([n, v]) => yk(n, `${n} ${v} 台`)).join("") : "<span>沒有台（屁胡）</span>"}</div>${pop}<div class="mrs">${r.pays.map((p) => `${nm(p.seat)} 付 ${p.amount.toLocaleString()}（${p.tai} 台）`).join("　")}</div>`;
       return `<div class="mresult"><h3>${r.label0}　${title}！</h3><div class="mrhand">${handT}</div>${detail}<div class="mdelta">${deltas}</div>${r.gameOver ? "<div class='mrl'>這場打完了，馬上公布名次</div>" : ""}</div>`;
     }
     function tickStatus() {

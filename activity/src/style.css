@@ -527,3 +527,20 @@ body.pk-myturn .game.poker{background:#16296b}
 .mj .mjfinal .fr em{margin-left:auto;font-style:normal;color:#ffe08a}
 .mj .mjfinal .fr.top{background:rgba(255,213,79,.12);border-radius:6px}
 body.mj-myturn{background:#16202c}
+.mj .mjgbtn{margin-left:auto;margin-right:6px;background:#2a3a5a;color:#fff;border:1px solid #4a6aa0;border-radius:14px;padding:3px 10px;font-size:13px;cursor:pointer}
+.mj .mjguide{width:100%;background:#17202c;border:1px solid #33475f;border-radius:12px;padding:10px;box-sizing:border-box;text-align:left}
+.mj .mjguide[hidden]{display:none}
+.mj .mghead{display:flex;align-items:center;justify-content:space-between;font-size:16px}
+.mj .mgintro{font-size:13px;color:#bbb;line-height:1.5;margin:6px 0}
+.mj .mggrp{border-top:1px solid #2c3a4c;padding:4px 0}
+.mj .mggrp summary{cursor:pointer;font-weight:700;color:#ffd54f;padding:4px 0}
+.mj .mgit{padding:6px 4px;border-bottom:1px dashed #2c3a4c}
+.mj .mgt{display:flex;gap:8px;align-items:baseline}
+.mj .mgt span{color:#ffe08a;font-size:12px}
+.mj .mgd{font-size:13px;color:#ddd;line-height:1.5;margin-top:2px}
+.mj .mgex{display:flex;flex-wrap:wrap;gap:1px;margin-top:4px;align-items:center}
+.mj .mgsep{width:8px}
+.mj .myk{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.mj .myk.on{background:rgba(255,213,79,.25)!important}
+.mj .mypop{background:#22303f;border:1px solid #4a6aa0;border-radius:8px;padding:6px 8px;margin:4px auto;max-width:420px;font-size:13px;text-align:left;line-height:1.5}
+.mj .mypop em{font-style:normal;color:#ffe08a}

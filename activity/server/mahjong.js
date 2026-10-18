@@ -49,7 +49,7 @@ function startHand(t) {
   const R = t.R, g = t.g;
   g.handNo++;
   const wall = newWall(R.flowers);
-  const h = { wall, dead: [], dora: [], ura: [], p: [], turn: g.dealer, stage: "turn", drawn: null, noCalls: true, kans: 0, rinshan: false, claim: null, opts: null, deadline: 0, last: null };
+  const h = { dealer: g.dealer, wall, dead: [], dora: [], ura: [], p: [], turn: g.dealer, stage: "turn", drawn: null, noCalls: true, kans: 0, rinshan: false, claim: null, opts: null, deadline: 0, last: null };
   if (t.rule === "jp") { h.dead = wall.splice(-14); h.dora = [h.dead[4]]; h.ura = [h.dead[9]]; }
   for (let i = 0; i < 4; i++) h.p.push({ hand: [], melds: [], flowers: [], river: [], riichi: 0, ippatsu: false, firstDone: false, tempFuriten: false, riichiFuriten: false });
   t.h = h; t.result = null; t.phase = "play";
@@ -420,11 +420,11 @@ function view(t, ws) {
   const you = t.seats.findIndex((s) => s && s.ws === ws && !ws.mspec);
   const h = t.h, g = t.g;
   const v = { t: "mstate", rule: t.rule, phase: t.phase, started: t.started, cfg: t.cfg, stakes: t.rule === "tw" ? TW_STAKES : null, you, log: t.log, now: Date.now(),
-    watchers: [...t.members].filter((w) => w.mspec).length, final: t.final, round: g ? roundLabel(t) : "", dealer: g ? g.dealer : -1, honba: g ? g.honba : 0, sticks: g ? g.sticks : 0, lian: g ? g.lian : 0 };
+    watchers: [...t.members].filter((w) => w.mspec).length, final: t.final, round: g ? roundLabel(t) : "", dealer: h ? h.dealer : g ? g.dealer : -1, honba: g ? g.honba : 0, sticks: g ? g.sticks : 0, lian: g ? g.lian : 0 };
   v.seats = t.seats.map((s, i) => {
     if (!s) return null;
     const o = { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points };
-    if (h && g) { const p = h.p[i]; Object.assign(o, { wind: WINDS[seatW(t, i)], melds: p.melds, flowers: p.flowers, river: p.river, riichi: p.riichi, count: p.hand.length }); }
+    if (h && g) { const p = h.p[i]; Object.assign(o, { wind: WINDS[(i - h.dealer + 4) % 4], melds: p.melds, flowers: p.flowers, river: p.river, riichi: p.riichi, count: p.hand.length }); }
     return o;
   });
   if (h && t.phase === "play") {
