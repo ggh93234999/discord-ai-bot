@@ -1,4 +1,4 @@
-// 鍛造（賭場遊戲）的畫面：100 階的劍（程式畫的 SVG，越高階越華麗）＋鍛造／賣劍操作。所有數字和亂數都在伺服器（forge.js / casino.js）。
+// 鍛造（獨立玩法）的畫面：100 階的劍（程式畫的 SVG，越高階越華麗）＋鍛造／賣劍操作。所有數字和亂數都在伺服器（forge.js / casino.js）。
 import { sfx, sfxOn, setSfx } from "./forgesfx.js";
 const RANKS = ["木劍", "青銅劍", "鐵劍", "鋼劍", "銀劍", "黃金劍", "秘銀劍", "精金劍", "龍鋼劍", "神劍"];
 const EPI = ["學徒", "尋常", "精良", "百煉", "名匠", "傳世", "無雙", "絕世", "神鑄", "至尊"];
@@ -143,7 +143,7 @@ export function createForge({ stage, ctl, statusEl, send, getReal, setBal, pid }
     if (m.balance != null) setBal({ real: m.real, balance: m.balance });
     if (m.sold) { last = `<span class="ok">💰 賣掉 ${m.prev} 階的劍，拿到 ${money(m.got)}</span>`; statusEl.textContent = "賣出了"; sfx.sell(); render("sold"); return; }
     if (m.ok) {
-      last = `<span class="ok">✨ 成功！升到 ${m.tier} 階「${esc(swordName(m.tier))}」（花了 ${money(m.paid)}）</span>`; statusEl.textContent = "成功了，要繼續賭嗎？";
+      last = `<span class="ok">✨ 成功！升到 ${m.tier} 階「${esc(swordName(m.tier))}」（花了 ${money(m.paid)}）</span>`; statusEl.textContent = "成功了，要繼續鍛造嗎？";
       sfx.success(m.tier); render("up");
     } else if (m.saved) {
       last = `<span class="ok">🛡 失敗了，但防止破壞卷保住了 ${m.prev} 階的劍（花了 ${money(m.paid)}，含卷軸 ${money(m.scrollCost)}）</span>`; statusEl.textContent = "卷軸擋下了這次破壞";

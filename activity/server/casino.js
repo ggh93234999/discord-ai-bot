@@ -445,7 +445,6 @@ async function handleForge(ws, m) {
       forgeSave(true);
       if (real) edel(ekey);
       if (real) syncRole(key, ws);
-      casinoFeed(ws, { g: "forge", real, bet: cost, back: 0, text: ok ? `升到 ${tier + 1} 階${useScroll ? "（用了卷軸）" : ""}` : saved ? `第 ${tier + 1} 階失敗，卷軸保住了 ${tier} 階的劍` : `第 ${tier + 1} 階失敗，${tier ? `${tier} 階的劍碎了` : "原料報銷"}` });
       out(ws, { ...forgeView(key, real, slot), t: "fres", ok, saved, scrolled: useScroll, scrollCost, prev: tier, paid: cost, lost, balance: r.balance });
     } else if (m.t === "fsell") {
       if (!s) return true;
@@ -458,11 +457,9 @@ async function handleForge(ws, m) {
         if (!r || !r.ok) { setSword(key, slot, s); forgeSave(true); edel(ekey); out(ws, { t: "cerr", error: "bot_down" }); return true; }
         edel(ekey);
         syncRole(key, ws);
-        casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real, slot), t: "fres", sold: true, prev: tier, got: amt, balance: r.balance });
       } else {
         ws.cprac = (ws.cprac ?? FORGE_PRACTICE_START) + amt; setSword(key, slot, null); forgeSave(true);
-        casinoFeed(ws, { g: "forge", real, bet: 0, back: amt, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real, slot), t: "fres", sold: true, prev: tier, got: amt, balance: ws.cprac });
       }
     }

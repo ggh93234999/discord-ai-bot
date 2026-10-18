@@ -1,4 +1,4 @@
-// 神兵榜：全服玩家「目前擁有的最高階劍」排行，分賭注模式（真代幣）和練習模式兩張榜。
+// 神兵榜：全服玩家「目前擁有的最高階劍」排行，分真代幣模式（真代幣）和練習模式兩張榜。
 import { wsUrl } from "./gomoku.js";
 import { swordName, swordSvg } from "./forgeui.js";
 
@@ -12,7 +12,7 @@ export function mountForgeBoard(root, { env, back }) {
   root.innerHTML = `
     <div class="game fboard">
       <header><button class="back">← 選單</button><h2>🏆 神兵榜</h2><span></span></header>
-      <div class="fbtabs"><button class="tab on" data-r="1">💰 賭注模式</button><button class="tab" data-r="0">🎮 練習模式</button></div>
+      <div class="fbtabs"><button class="tab on" data-r="1">💰 真代幣模式</button><button class="tab" data-r="0">🎮 練習模式</button></div>
       <div class="fbhint">依每個人「目前手上最高階的劍」排名，劍碎或賣掉就會掉榜。</div>
       <div class="fblist"></div>
     </div>`;
@@ -27,7 +27,7 @@ export function mountForgeBoard(root, { env, back }) {
   function render() {
     const d = data[real];
     if (!d) { listEl.innerHTML = `<div class="mempty">讀取中…</div>`; return; }
-    if (!d.rows.length) { listEl.innerHTML = `<div class="mempty">${real ? "賭注模式" : "練習模式"}還沒有人有劍。去鍛造一把吧！</div>`; return; }
+    if (!d.rows.length) { listEl.innerHTML = `<div class="mempty">${real ? "真代幣模式" : "練習模式"}還沒有人有劍。去鍛造一把吧！</div>`; return; }
     listEl.innerHTML = d.rows.map((r, i) => `
       <div class="fbrow${i < 3 ? " top" + (i + 1) : ""}">
         <span class="fbrank">${MEDAL[i] || i + 1}</span>
