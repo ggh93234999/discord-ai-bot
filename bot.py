@@ -98,9 +98,12 @@ TOOL_GUIDE = (
     "沒有呼叫工具的回覆，絕對不要放任何網址或假裝有來源。"
     "要你隨機選數字、骰骰子、抽號碼時，一定要呼叫 random_number，不能自己編數字。"
     "有人要占卜、算命、抽塔羅、抽籤、擲筊、卜卦時，一定要呼叫 divination，結果以工具為準，絕對不能自己編牌或編籤；"
-    "結果卡會由程式貼在你的回覆上面，你不用重抄，直接用溫和、有趣的口吻解讀，回答對方真正想問的事。"
+    "結果卡會由程式貼在你的回覆上面，你不用重抄牌名或籤號，但一定要接著完整解讀，回答對方真正想問的事。"
     "有人要排八字、命盤、星盤、看上升星座時，呼叫 fortune_chart（要出生日期，時間、出生地、性別有就填，缺的資料先問）；"
     "命盤卡和星盤圖會由程式貼出，你只要解讀，不要自己排盤或編干支、星座。"
+    "【占卜、算命的回覆不受「簡短」限制】塔羅、籤詩、擲筊、易經、八字、星盤都要完整解釋：逐張牌／逐句籤詩／每個重點（日主、五行、十神、大運、三巨頭、行星宮位相位）說明意思，"
+    "再串起來回答對方的問題、給具體建議，可以分成幾段、用小標題或條列讓它好讀，大約 400～900 字（八字＋星盤一起排可以更長）。"
+    "絕對不能只說一句「結果在上面」或只貼圖不解釋。"
     "在伺服器裡你還有 music 工具，可以在使用者所在的語音頻道放 YouTube 音樂、跳過、暫停、停止、看佇列；"
     "有人叫你放歌就直接用它，放歌後簡短回一句就好，不用附來源網址。"
     "你還有 create_channel 工具可以開文字／語音頻道；有人明確要你開頻道才用，權限由程式檢查，你照工具結果回報就好。"
@@ -113,7 +116,7 @@ TOOL_GUIDE = (
     "工具真正的執行結果會由程式自動附在你的訊息下面給大家看，你不要自己寫結果、不要自己編頻道連結。"
     "看對話紀錄時，只有真的出現工具呼叫和工具結果的，才代表你做過；你嘴巴說過但沒有工具紀錄的，等於沒做。"
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
-    "因為結果會自動附上，你自己的回覆簡短一句就好。"
+    "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
     "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
 OFFLINE_REPLY = "⚠️ 模型那台電腦現在沒開或連不到，晚點再試。"
@@ -660,6 +663,7 @@ def clean_text(text: str | None) -> str:
 
 ACTION_TOOLS = {"music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
 CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
+CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
 FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
 CLAIM_RE = re.compile(
     r"(建好|開好|建立好|創好|已經?(建立|開(?!始|心|學)|建|創|封存|解除|刪|移除|清空|鎖|隱藏|放(?!學|假)|播|加入|跳過|暫停|停止)|"
@@ -686,6 +690,11 @@ TITLE_NUDGE = (
     "（系統檢查）你提到了歌名，但這一輪沒有呼叫 music 工具，所以沒有任何歌被點進佇列。"
     "如果使用者要聽歌，現在每首各呼叫一次 music play；如果只是在推薦，就明講是推薦、還沒點，不要說已經排了或在播。"
 )
+CARD_NUDGE = (
+    INTERNAL +
+    "（系統檢查）你剛才的占卜／命盤解讀太短了。結果卡已經貼給使用者，但他需要你完整解釋：逐張牌、逐句籤詩或命盤的每個重點說明意思，"
+    "再串起來回答他問的事、給具體建議，可以分段、條列，約 400～900 字。請直接重寫完整的解讀。"
+)
 NUDGE = (
     INTERNAL +
     "（系統檢查）你剛才的回覆說已經完成某個動作，但你這一輪並沒有呼叫任何工具，所以實際上什麼都沒發生。"
@@ -710,13 +719,21 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
     tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = False
+    used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
     big_playlist = False
     for _ in range((MAX_TOOL_ROUNDS + 1) if tools else 0):
-        reply = await call_model(messages, use_tools=tools)
+        reply = await call_model(messages, use_tools=tools, max_tokens=CARD_MAX_TOKENS if used_card else None)
         calls = reply.get("tool_calls") or []
         if not calls:
             text = ACTION_LINE_RE.sub("", clean_text(reply.get("content"))).strip()
+            if used_card and not card_nudged and len(text) < 250:
+                # 占卜／命盤只回一兩句：退回去要它完整解讀一次
+                log.info("占卜解讀太短（%d 字），要求完整解讀", len(text))
+                card_nudged = True
+                messages.append({"role": "assistant", "content": text})
+                messages.append({"role": "user", "content": CARD_NUDGE})
+                continue
             if not nudged and not used_action and msg is not None and CLAIM_RE.search(text):
                 # 嘴巴說做了、其實沒呼叫工具 → 退回去重來一次
                 log.info("偵測到沒呼叫工具卻說完成：%s", text[:80])
@@ -762,11 +779,13 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
                 play_calls += 1
                 if result.startswith("📃"):
                     big_playlist = True
+            if name in CARD_TOOLS:
+                used_card = True
             if actions is not None and (name in ACTION_TOOLS or name in CARD_TOOLS):
                 actions.append({"name": name, "arguments": args, "result": result})
             messages.append({"role": "tool", "tool_call_id": c.get("id", ""), "content": FILE_RE.sub("", result).strip()})
     # 沒開工具，或工具輪數用完：不給工具，直接要答案
-    reply = await call_model(messages, use_tools=False)
+    reply = await call_model(messages, use_tools=False, max_tokens=CARD_MAX_TOKENS if used_card else None)
     return strip_meta(ACTION_LINE_RE.sub("", clean_text(reply.get("content"))).strip())
 
 
