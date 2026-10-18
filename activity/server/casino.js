@@ -305,7 +305,7 @@ export async function handleCasino(ws, m) {
   if (m.t === "cjoin") {
     const game = CASINO_GAMES.includes(m.game) ? m.game : "coin";
     leave(ws);
-    const room = roomOf(game, String(m.room || "default").slice(0, 80));
+    const room = roomOf(game, game === "horse" ? "global" : String(m.room || "default").slice(0, 80));   // 賽馬所有人共用同一場，不分房間
     ws.cid ||= randomBytes(3).toString("hex");
     ws.cspec = !!m.spectate;
     ws.cr = room; room.members.add(ws); ws.cprac = ws.cprac ?? (game === "forge" ? FORGE_PRACTICE_START : PRACTICE_START);

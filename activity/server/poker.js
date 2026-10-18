@@ -152,7 +152,7 @@ function view(t, ws) {
   const mine = t.seats.findIndex((s) => s && s.ws === ws);
   const showAll = t.phase === "result" && t.result && t.result.showdown;
   return {
-    t: "pstate", phase: t.phase, board: t.board, dealer: t.dealer, curBet: t.curBet, minRaise: t.minRaise, bb: t.bb, sb: t.sb, cfg: t.cfg, lvl: t.lvl ? { next: t.lvl.next, left: t.lvl.left } : null,
+    t: "pstate", started: !!t.started, phase: t.phase, board: t.board, dealer: t.dealer, curBet: t.curBet, minRaise: t.minRaise, bb: t.bb, sb: t.sb, cfg: t.cfg, lvl: t.lvl ? { next: t.lvl.next, left: t.lvl.left } : null,
     toAct: t.toAct, deadline: t.deadline, nextAt: t.phase === "result" ? t.nextAt : 0, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
     watchers: [...t.members].filter((w) => w.pspec).length, result: t.result,
     seats: t.seats.map((s, i) => s && ({
@@ -201,7 +201,7 @@ function startHand(t) {
       else { s.chips = START; s.last = "補充籌碼"; }
     }
   }
-  if (players.length < 2) { t.phase = "wait"; t.toAct = -1; t.log = "等玩家入座…（可以加電腦）"; return; }
+  if (players.length < 2) { t.started = false; t.phase = "wait"; t.toAct = -1; t.log = "等玩家入座…（可以加電腦）"; return; }
   t.handNo++; t.deck = newDeck(); t.board = []; t.result = null; t.phase = "preflop";
   for (const i of players) { const s = t.seats[i]; Object.assign(s, { hole: [t.deck.pop(), t.deck.pop()], bet: 0, total: 0, folded: false, allin: false, acted: false, inHand: true, last: "", score: null }); }
   // 按鈕往下一位
@@ -321,9 +321,9 @@ function tick() {
     if (!t.members.size) { if (now - (t.emptyAt || (t.emptyAt = now)) > 120000) tables.delete(t.id); continue; }
     t.emptyAt = 0;
     const humans = t.seats.filter((s) => s && !s.bot);
-    if (!humans.length && t.phase !== "wait") { t.phase = "wait"; t.toAct = -1; t.seats.forEach((s, i) => { if (s) t.seats[i] = null; }); t.log = "等玩家入座…"; push(t); continue; }
-    if (t.phase === "wait") { if (t.seats.filter(Boolean).length >= 2) startHand(t), push(t); continue; }
-    if (t.phase === "result") { if (now >= t.nextAt) { t.phase = "wait"; for (const s of t.seats) if (s) { s.inHand = false; s.last = ""; s.hole = []; } removeAway(t); if (t.seats.filter(Boolean).length >= 2) startHand(t); else t.log = "等玩家入座…（可以加電腦）"; push(t); } continue; }
+    if (!humans.length && t.phase !== "wait") { t.started = false; t.phase = "wait"; t.toAct = -1; t.seats.forEach((s, i) => { if (s) t.seats[i] = null; }); t.log = "等玩家入座…"; push(t); continue; }
+    if (t.phase === "wait") { if (t.started && t.seats.filter(Boolean).length >= 2) startHand(t), push(t); continue; }   // 要有人按「開始」才發第一手
+    if (t.phase === "result") { if (now >= t.nextAt) { t.phase = "wait"; for (const s of t.seats) if (s) { s.inHand = false; s.last = ""; s.hole = []; } removeAway(t); if (t.seats.filter(Boolean).length >= 2) startHand(t); else { t.started = false; t.log = "等玩家入座…（可以加電腦）"; } push(t); } continue; }
     if (t.toAct < 0) { if (t.nextAt && now >= t.nextAt) { t.nextAt = 0; if (live(t).length > 1 && t.phase !== "river") endRoundAuto(t); else if (t.phase === "river") finish(t, true); } continue; }
     const s = t.seats[t.toAct];
     if (now < t.deadline) continue;
@@ -387,6 +387,9 @@ export function handlePoker(ws, m) {
     if (s.inHand && t.phase !== "result" && t.phase !== "wait") s.removeAfter = true;   // 這手打完才請下桌
     else t.seats[i] = null;
     push(t);
+  } else if (m.t === "pstart") {
+    if (mine < 0 || t.phase !== "wait" || t.seats.filter(Boolean).length < 2) return true;
+    t.started = true; t.log = `${nameOf(ws)} 按下開始`; startHand(t); push(t);
   } else if (m.t === "pname") {
     const nm = cleanName(m.name); if (!nm) return true;
     ws.pname = nm; if (mine >= 0) t.seats[mine].name = nm; push(t);
@@ -402,7 +405,7 @@ export function handlePoker(ws, m) {
     for (const x of t.seats) if (x) Object.assign(x, { chips: START, hole: [], bet: 0, total: 0, folded: false, allin: false, acted: false, inHand: false, last: "", score: null, removeAfter: false });
     t.board = []; t.result = null; t.toAct = -1; t.deadline = 0; t.curBet = 0; t.handNo = 0; t.lvlBase = 0; t.phase = "wait";
     t.log = `${nameOf(ws)} 重開牌局，大家籌碼回到 ${START}`;
-    startHand(t); push(t);
+    t.started = true; startHand(t); push(t);
   } else if (m.t === "pact") {
     if (mine < 0 || t.toAct !== mine) return true;
     act(t, mine, String(m.a), m.amt); push(t);

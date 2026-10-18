@@ -147,7 +147,7 @@ export function mountPoker(opts = {}) {
       const myTurn = st.toAct === st.you;
       const toCall = Math.max(0, st.curBet - me.bet);
       const maxTo = me.bet + me.chips, minTo = Math.min(maxTo, st.curBet + st.minRaise);
-      const key = [st.handNo, st.phase, myTurn, st.curBet, me.chips, me.bet, st.seats.filter(Boolean).length].join("|");
+      const key = [st.started, st.handNo, st.phase, myTurn, st.curBet, me.chips, me.bet, st.seats.filter(Boolean).length].join("|");
       if (key === ctlKey) return;
       ctlKey = key;
       const seatedCount = st.seats.filter(Boolean).length;
@@ -163,11 +163,12 @@ export function mountPoker(opts = {}) {
         if (canRaise && minTo < maxTo) h += `<div class="prow amt">自訂金額 <input type="number" class="rn" inputmode="numeric" min="${minTo}" max="${maxTo}" step="10" value="${raiseTo}"><span>（${minTo}～${maxTo}）</span></div><div class="prow"><input type="range" class="rs" min="${minTo}" max="${maxTo}" step="10" value="${raiseTo}">
           <span class="pre"><button data-f="0.5">½池</button><button data-f="1">1池</button><button data-f="all">全下</button></span></div>`;
       } else if (st.phase === "wait" || st.phase === "result") {
-        h += seatedCount < 2 ? `<div class="mempty">人不夠，按空位的「＋電腦」找人陪你玩</div>` : `<div class="mempty">${st.phase === "result" ? "下一手馬上開始…" : "準備開始…"}</div>`;
+        h += seatedCount < 2 ? `<div class="mempty">人不夠，按空位的「＋電腦」找人陪你玩</div>` : (st.phase === "wait" && !st.started) ? `<div class="mempty">大家入座好了，按開始</div><div class="prow"><button class="pb start">▶ 開始</button></div>` : `<div class="mempty">${st.phase === "result" ? "下一手馬上開始…" : "準備開始…"}</div>`;
       } else h += `<div class="mempty">${me.folded ? "你已棄牌，等這手結束" : "等其他人行動…"}</div>`;
       h += `<div class="prow small"><button class="pb ghost reset">🔄 重開</button><button class="pb ghost stand">離桌</button></div>`;
       ctl.innerHTML = h;
       const q = (s) => ctl.querySelector(s);
+      q(".start") && q(".start").addEventListener("click", () => send({ t: "pstart" }));
       q(".fold") && q(".fold").addEventListener("click", () => send({ t: "pact", a: "fold" }));
       q(".call") && q(".call").addEventListener("click", () => send({ t: "pact", a: toCall ? "call" : "check" }));
       q(".raise") && q(".raise").addEventListener("click", () => send({ t: "pact", a: raiseTo >= maxTo ? "allin" : "raise", amt: raiseTo }));
