@@ -6,26 +6,29 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const FORGE_MAX = 100;
-const RTP = 0.95, TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
+const RTP = 0.95, BOOST = Number(process.env.FBOOST || 1.01), TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
 // 成功率：第 1 階 96%，一路降到第 99 階 88%（前面降得比較快，所以大約第 14 階開始「賣掉就賺」）
 const pTarget = (n) => (n === 0 ? 0.97 : 0.96 - 0.08 * Math.pow((n - 1) / 98, 0.6));
-// 鍛造費佔賣價的比例：前期 3%（便宜），後期 8%
-const alpha = (n) => 0.03 + 0.05 * (n / 99);
+// 鍛造費佔賣價的比例：前期 3% 慢慢升到約 5%，50 階以後 2%
+// 每一步的期望回收率：第 1~49 階略大於 1（101%），讓「一路鍛到 50 階再賣」的期望淨值為正；50 階以後回到 95%，所以 50 階是最佳停手點
+const rr = (n) => (n < 50 ? BOOST : RTP);
+const ALATE = Number(process.env.FALATE || 0.02);
+const alpha = (n) => (n < 50 ? 0.03 + 0.05 * (n / 99) : ALATE);
 function build(C0) {
   const V = [0], C = [C0], P = [];
   V[1] = Math.floor(RTP * C0 / 0.97);
   for (let n = 1; n < FORGE_MAX; n++) {
     C[n] = Math.max(1, Math.ceil(V[n] * alpha(n)));
-    V[n + 1] = Math.max(V[n] + 1, Math.floor(RTP * (V[n] + C[n]) / pTarget(n)));
+    V[n + 1] = Math.max(V[n] + 1, Math.floor(rr(n) * (V[n] + C[n]) / pTarget(n)));
   }
   for (let n = 0; n < FORGE_MAX; n++) {
-    const cap = RTP * (V[n] + C[n]) / V[n + 1];
+    const cap = rr(n) * (V[n] + C[n]) / V[n + 1];
     P[n] = Math.floor(1000 * Math.min(pTarget(n), cap, 0.99)) / 1000;
   }
   return { V, C, P, sum: C.reduce((a, b) => a + b, 0) };
 }
 // 用二分法找打造費 C0，讓全部鍛造費加起來剛好不超過 TOTAL_COST，剩下的零頭加在最後一階（多收一點只會讓莊家更有利）
-let lo = 20, hi = 100000;
+let lo = 1, hi = 100000;
 while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (build(mid).sum <= TOTAL_COST) lo = mid; else hi = mid - 1; }
 const T = build(lo);
 T.C[FORGE_MAX - 1] += TOTAL_COST - T.sum;
