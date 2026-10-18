@@ -25,7 +25,7 @@ function tile(t, cls = "", attrs = "", noDora = false) {
   if (t >= 34) { k = "f"; body = `<b>${FLO[t - 34]}</b><i>${(t - 34) % 4 + 1}</i>`; }
   else if (t >= 27) { k = ["w", "w", "w", "w", "dw", "dg", "dr"][t - 27]; body = `<b>${t === 31 ? "" : HON[t - 27]}</b>`; }
   else { const s = Math.floor(t / 9); k = ["m", "p", "s"][s]; body = `<b>${s === 0 ? NUM[t % 9] : (t % 9) + 1}</b><i>${["萬", "筒", "條"][s]}</i>`; }
-  return `<span class="mt k${k} ${cls}" ${attrs}>${body}</span>`;
+  return `<span class="mt k${k} ${cls}" data-k="${t}" ${attrs}>${body}</span>`;
 }
 const meldHTML = (m) => `<span class="mmeld">${m.tiles.map((x, k) => tile(m.k === "ankan" && (k === 0 || k === 3) ? -1 : x, "sm")).join("")}</span>`;
 
@@ -162,6 +162,8 @@ export function mountMahjong(rule, opts = {}) {
         ctl = `<div class="mctl">${ctl}<div class="mbtns">${b.join("")}</div></div>`;
       } else if (st.phase === "play") ctl = `<div class="mctl"><div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div></div>`;
       const result = st.phase === "result" && st.result ? resultHTML(st.result) : "";
+      const keepK = tipK;
+      hideTip(true);
       body.innerHTML = `<div class="mtable">${order.map(seatBox).join("")}${center}</div>${result}${hand}${ctl}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
       body.querySelectorAll(".mhand .mt.can").forEach((el) => el.addEventListener("click", () => {
         const t = Number(el.dataset.t);
@@ -175,9 +177,56 @@ export function mountMahjong(rule, opts = {}) {
       }));
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "msit", seat: Number(el.dataset.sit) })));
       const sb = body.querySelector(".stand"); sb && sb.addEventListener("click", () => send({ t: "mstand" }));
+      // 指到手牌：顯示這種牌在場上出現幾張、誰打的，並把桌上同樣的牌標出來（手機長按）
+      body.querySelectorAll(".mhand .mt[data-t]").forEach((el) => {
+        const k = Number(el.dataset.k);
+        el.addEventListener("mouseenter", () => showTip(el, k));
+        el.addEventListener("mouseleave", hideTip);
+        let lp = 0;
+        el.addEventListener("touchstart", () => { lp = setTimeout(() => { lp = -1; showTip(el, k); }, 450); }, { passive: true });
+        el.addEventListener("touchend", (e) => { if (lp === -1) { e.preventDefault(); setTimeout(hideTip, 1500); } else clearTimeout(lp); lp = 0; });
+        el.addEventListener("contextmenu", (e) => e.preventDefault());
+      });
+      if (keepK != null) { const el = [...body.querySelectorAll(".mhand .mt[data-t]")].find((x) => Number(x.dataset.k) % 100 === keepK && x.matches(":hover")); if (el) showTip(el, keepK); else tipK = null; }   // 畫面更新後，滑鼠還在同一張牌上就繼續顯示
       body.querySelectorAll(".myk").forEach((el) => el.addEventListener("click", () => { popName = popName === el.dataset.y ? "" : el.dataset.y; render(); }));
       tickStatus();
     }
+    // ---- 手牌提示：這種牌場上看得到幾張、誰打的
+    const kindOf = (t) => (t >= 100 ? t - 100 : t);
+    let tipEl = null, tipK = null;
+    function hideTip(keep) { if (!keep) tipK = null; if (tipEl) { tipEl.remove(); tipEl = null; } body.querySelectorAll(".mt.hl").forEach((x) => x.classList.remove("hl")); }
+    function showTip(el, k) {
+      hideTip(); tipK = k;
+      const nm = (i) => esc(st.seats[i]?.name || "");
+      const disc = [], meld = [];
+      let seen = 0;
+      st.seats.forEach((s, i) => {
+        if (!s) return;
+        const rv = (s.river || []).filter((x) => kindOf(x.t) === k);
+        if (rv.length) {
+          const called = rv.filter((x) => x.called).length;
+          disc.push(`${nm(i)} 打 ${rv.length} 張${called ? `（${called} 張被吃碰走）` : ""}`);
+          seen += rv.length - called;
+        }
+        const mm = (s.melds || []).reduce((n, m) => n + m.tiles.filter((x) => kindOf(x) === k).length, 0);
+        if (mm) { meld.push(`${nm(i)} 副露 ${mm} 張`); seen += mm; }
+      });
+      const dora = (st.dora || []).filter((d) => kindOf(d) === k).length;
+      const mine = [...(st.hand || []), ...(st.drawn != null ? [st.drawn] : [])].filter((x) => kindOf(x) === k).length;
+      seen += dora + mine;
+      const left = Math.max(0, 4 - seen);
+      tipEl = document.createElement("div");
+      tipEl.className = "mtip";
+      tipEl.innerHTML = `<b>${tileName(k)}</b>　場上看得到 <em>${seen}</em> 張（含你手上 ${mine} 張${dora ? `、寶牌指示 ${dora} 張` : ""}），還有 <em>${left}</em> 張沒出現`
+        + (disc.length ? `<div>🀄 ${disc.join("、")}</div>` : `<div>還沒有人打過</div>`) + (meld.length ? `<div>🔒 ${meld.join("、")}</div>` : "");
+      document.body.appendChild(tipEl);
+      const r = el.getBoundingClientRect(), w = Math.min(320, window.innerWidth - 16);
+      tipEl.style.width = w + "px";
+      tipEl.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+      tipEl.style.top = Math.max(8, r.top - tipEl.offsetHeight - 10) + "px";
+      body.querySelectorAll(".mtable .mt[data-k]").forEach((x) => { if (kindOf(Number(x.dataset.k)) === k) x.classList.add("hl"); });
+    }
+
     function resultHTML(r) {
       const nm = (i) => esc(st.seats[i]?.name || "");
       const deltas = r.deltas.map((d, i) => `<span class="${d > 0 ? "up" : d < 0 ? "down" : ""}">${nm(i)} ${d > 0 ? "+" : ""}${d.toLocaleString()}</span>`).join("");
@@ -211,7 +260,7 @@ export function mountMahjong(rule, opts = {}) {
       document.body.classList.toggle("mj-myturn", !!(mine && st.opts.kind === "turn"));
       document.body.classList.toggle("mj-myclaim", !!(mine && st.opts.kind === "claim"));
     }
-    function cleanup() { closed = true; clearInterval(timer); document.body.classList.remove("mj-myturn", "mj-myclaim"); try { ws && ws.close(); } catch {} }
+    function cleanup() { hideTip(); closed = true; clearInterval(timer); document.body.classList.remove("mj-myturn", "mj-myclaim"); try { ws && ws.close(); } catch {} }
     timer = setInterval(tickStatus, 300);
     connect();
     return cleanup;

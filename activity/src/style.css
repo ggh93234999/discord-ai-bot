@@ -617,3 +617,8 @@ body.tv-fs{overflow:hidden}
 .mj .minfo{font-size:clamp(12px, 1.6vw, 15px)}
 .mj .mtable{grid-template-columns:1fr minmax(110px,.9fr) 1fr}
 .mj .mseat.r2 .mriver,.mj .mseat.r0 .mriver{max-width:min(100%, calc(var(--rt) * 13))}
+/* 指到手牌的提示 */
+.mtip{position:fixed;z-index:10000;background:rgba(15,20,30,.96);color:#eee;border:1px solid #4fc3f7;border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.5;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+.mtip b{color:#ffd54f}.mtip em{font-style:normal;color:#4fc3f7;font-weight:700}
+.mtip div{margin-top:3px;color:#cfd8dc}
+.mt.hl{outline:3px solid #4fc3f7 !important;outline-offset:1px;transform:translateY(-2px)}
