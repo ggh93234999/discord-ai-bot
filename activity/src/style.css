@@ -641,3 +641,13 @@ body.tv-fs{overflow:hidden}
 .mj .mauto button.on{background:#2e7d32;color:#fff;border-color:#66bb6a;box-shadow:0 0 6px rgba(102,187,106,.5)}
 .mj .mhand.manual .mt[draggable]{cursor:grab}
 .mj .mhand .mt.dropto{outline:2px dashed #4fc3f7;outline-offset:2px}
+
+/* 德州撲克：自己目前最大牌型 */
+.poker .pmybest{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px auto 2px;padding:6px 14px;border-radius:20px;background:rgba(0,0,0,.35);border:1px solid #3d5a40;width:fit-content;max-width:100%;font-size:14px}
+.poker .pmybest[hidden]{display:none}
+.poker .pmybest .pmbl{color:#9fb8a2;font-size:12px}
+.poker .pmybest .pmbc{color:#fff}
+.poker .pmybest .pmbc.c1,.poker .pmybest .pmbc.c2{color:#a5d6a7}
+.poker .pmybest .pmbc.c3,.poker .pmybest .pmbc.c4,.poker .pmybest .pmbc.c5{color:#ffd54f}
+.poker .pmybest .pmbc.c6,.poker .pmybest .pmbc.c7,.poker .pmybest .pmbc.c8{color:#ff8a65;text-shadow:0 0 8px rgba(255,138,101,.6)}
+.poker .pcard.best{box-shadow:0 0 0 2px #ffd54f,0 0 10px rgba(255,213,79,.7);transform:translateY(-3px)}

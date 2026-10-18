@@ -53,6 +53,45 @@ export function bestScore(cards) {
   return best;
 }
 export const handCat = (score) => Math.floor(score / 15 ** 5);
+// 自己的手牌＋公牌目前能組出的最大牌型（只傳給自己）：名稱、說明、用到的牌
+const RN = { 11: "J", 12: "Q", 13: "K", 14: "A" };
+const rn = (r) => RN[r] || String(r);
+export function myBest(hole, board) {
+  const all = [...hole, ...board].filter((c) => c >= 0);
+  if (all.length < 2) return null;
+  let pick = all;
+  if (all.length >= 5) {
+    let best = -1;
+    const n = all.length;
+    for (let a = 0; a < n - 4; a++) for (let b = a + 1; b < n - 3; b++) for (let c = b + 1; c < n - 2; c++)
+      for (let d = c + 1; d < n - 1; d++) for (let e = d + 1; e < n; e++) {
+        const five = [all[a], all[b], all[c], all[d], all[e]], s = score5(five);
+        if (s > best) { best = s; pick = five; }
+      }
+  }
+  const r = pick.map(rankOf).sort((a, b) => b - a);
+  const cnt = {}; for (const x of r) cnt[x] = (cnt[x] || 0) + 1;
+  const groups = Object.entries(cnt).map(([k, v]) => [v, Number(k)]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  let cat, text, use = pick;
+  if (pick.length === 5) {
+    cat = handCat(score5(pick));
+    const straightHigh = r[0] === 14 && r[1] === 5 ? 5 : r[0];
+    text = [
+      `${rn(r[0])} 最大`, `一對 ${rn(groups[0][1])}`, `兩對 ${rn(groups[0][1])} 和 ${rn(groups[1][1])}`, `三條 ${rn(groups[0][1])}`,
+      `順子（到 ${rn(straightHigh)}）`, `同花（${rn(r[0])} 最大）`, `葛蘆（${rn(groups[0][1])} 帶 ${rn(groups[1][1])}）`, `四條 ${rn(groups[0][1])}`,
+      straightHigh === 14 ? "皇家同花順！" : `同花順（到 ${rn(straightHigh)}）`,
+    ][cat];
+  } else {                                    // 還沒翻牌／不滿 5 張：只看有沒有對子、三條、四條
+    const g = groups[0][0];
+    cat = g >= 4 ? 7 : g === 3 ? 3 : g === 2 && groups[1] && groups[1][0] === 2 ? 2 : g === 2 ? 1 : 0;
+    text = cat === 0 ? `${rn(r[0])} 最大` : cat === 2 ? `兩對 ${rn(groups[0][1])} 和 ${rn(groups[1][1])}` : `${HAND_NAMES[cat]} ${rn(groups[0][1])}`;
+    if (cat > 0) use = pick.filter((c) => cnt[rankOf(c)] >= 2);
+  }
+  // 牌型真正用到的牌（高牌只算最大那張；對子、兩對、三條、四條只算成組的牌）
+  if (cat === 0) use = [pick.find((c) => rankOf(c) === r[0])];
+  else if ([1, 2, 3, 7].includes(cat)) use = pick.filter((c) => cnt[rankOf(c)] >= 2);
+  return { cat, name: HAND_NAMES[cat], text, cards: use };
+}
 
 // 邊池：contrib = [{i, total, folded}]，回傳 [{amount, elig:[i...]}]
 export function buildPots(contrib) {
@@ -153,6 +192,7 @@ function view(t, ws) {
   const showAll = t.phase === "result" && t.result && t.result.showdown;
   return {
     t: "pstate", started: !!t.started, phase: t.phase, board: t.board, dealer: t.dealer, curBet: t.curBet, minRaise: t.minRaise, bb: t.bb, sb: t.sb, cfg: t.cfg, lvl: t.lvl ? { next: t.lvl.next, left: t.lvl.left } : null,
+    mybest: mine >= 0 && t.seats[mine].inHand && t.seats[mine].hole && t.seats[mine].hole.length ? myBest(t.seats[mine].hole, t.board || []) : null,
     toAct: t.toAct, deadline: t.deadline, nextAt: t.phase === "result" ? t.nextAt : 0, now: Date.now(), handNo: t.handNo, pot: t.potTotal(), log: t.log, you: mine,
     watchers: [...t.members].filter((w) => w.pspec).length, result: t.result,
     seats: t.seats.map((s, i) => s && ({

@@ -5,10 +5,11 @@ import { attachRules } from "./rules.js";
 const SUITS = ["♠", "♥", "♦", "♣"], RED = [false, true, true, false];
 const RK = { 11: "J", 12: "Q", 13: "K", 14: "A" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let BEST = new Set();       // 自己目前最大牌型用到的牌（標亮）
 const card = (c, small) => {
   if (c < 0) return `<span class="pcard back${small ? " sm" : ""}"></span>`;
   const r = (c % 13) + 2, s = Math.floor(c / 13);
-  return `<span class="pcard su${s}${small ? " sm" : ""}"><b>${RK[r] || r}</b><i>${SUITS[s]}</i></span>`;
+  return `<span class="pcard su${s}${small ? " sm" : ""}${BEST.has(c) ? " best" : ""}"><b>${RK[r] || r}</b><i>${SUITS[s]}</i></span>`;
 };
 const PHASE = { wait: "等玩家", preflop: "翻牌前", flop: "翻牌", turn: "轉牌", river: "河牌", result: "結算" };
 // 6 個座位在橢圓桌上的位置（百分比），第 0 個是自己（下方），順時針
@@ -27,6 +28,7 @@ export function mountPoker(opts = {}) {
         <div class="status">連線中…</div>
         ${spectate ? "" : `<div class="pnamebar">名稱 <input class="pnm" maxlength="12" placeholder="輸入你的名稱"></div>`}
         <div class="ptable"><div class="pfelt"><div class="pcenter"><div class="ptimer"></div><div class="ppot"></div><div class="pboard"></div></div></div><div class="pseats"></div></div>
+        <div class="pmybest" hidden></div>
         <div class="plog"></div>
         <div class="pctl"></div>
         <div class="pcfg"></div>
@@ -63,6 +65,12 @@ export function mountPoker(opts = {}) {
       const you = st.you, seated = you >= 0;
       watchEl.textContent = st.watchers ? `👀 ${st.watchers} 人旁觀` : "";
       potEl.textContent = st.pot ? `底池 ${st.pot}` : "";
+      const mb = st.mybest, mbEl = $(".pmybest"), folded = seated && st.seats[you] && st.seats[you].folded;
+      BEST = new Set(mb && !folded && st.phase !== "wait" ? mb.cards : []);
+      if (mbEl) {
+        mbEl.hidden = !mb || st.phase === "wait";
+        if (mb) mbEl.innerHTML = `<span class="pmbl">${folded ? "你已蓋牌，原本是" : "你目前最大"}</span><b class="pmbc c${mb.cat}">${esc(mb.text)}</b>`;
+      }
       boardEl.innerHTML = Array.from({ length: 5 }, (_, i) => (st.board[i] != null ? card(st.board[i]) : `<span class="pcard empty"></span>`)).join("");
       const base = seated ? you : 0;
       seatsEl.innerHTML = POS.map((pos, k) => {
