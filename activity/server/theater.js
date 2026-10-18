@@ -96,8 +96,9 @@ async function lookup(target) {
   }
   if (dur > MAX_DUR) throw new Error(`影片太長（上限 ${MAX_DUR / 3600} 小時）`);
   const quals = qualsOf(target.search ? j2 || j : j);
-  meta.set(j.id, { title, dur, subs, quals });
-  return { vid: j.id, title, dur, subs, quals };
+  const q = Math.max(...quals.filter((x) => x <= 1080), 0) || 720;
+  meta.set(j.id, { title, dur, subs, quals, q });
+  return { vid: j.id, title, dur, subs, quals, q };
 }
 function download(vid, q = 720) {
   const key = keyOf(vid, q);
@@ -106,7 +107,7 @@ function download(vid, q = 720) {
   const job = { status: "downloading", pct: 0, phase: 0, lastP: 0, err: "" };
   jobs.set(key, job);
   const tmp = path.join(DIR, key + ".part.%(ext)s");
-  const notify = (v) => (q === 720 ? pushVid(v) : notifyQual(v, q));   // 720p 通知整個房間，其他畫質只通知要的人
+  const notify = (v) => { if (isMain(v, q)) pushVid(v); notifyQual(v, q); };   // 主要畫質通知整個房間，其他畫質只通知要的人
   let lastPush = 0;
   run(["-f", formatOf(q), "--merge-output-format", "mp4", "--no-playlist", "--newline", "--no-part",
        "--postprocessor-args", "ffmpeg:-movflags +faststart", "-o", tmp, "https://www.youtube.com/watch?v=" + vid], (line) => {
@@ -133,6 +134,8 @@ function download(vid, q = 720) {
     notify(vid);
   });
 }
+const mainQ = (it) => (it && it.q) || 720;
+function isMain(vid, q) { for (const r of rooms.values()) for (const it of [r.cur, ...r.queue]) if (it && it.vid === vid && mainQ(it) === q) return true; return false; }
 const statusOf = (vid, q = 720) => { if (fs.existsSync(files(vid, q))) return { status: "ready", pct: 100 }; const j = jobs.get(keyOf(vid, q)); return j ? { status: j.status, pct: Math.round(j.pct), err: j.err } : { status: "queued", pct: 0 }; };
 function touch(vid, q = 720) { const f = files(vid, q); try { const t = new Date(); fs.utimesSync(f, t, t); } catch {} }
 function cleanCache() {
@@ -155,8 +158,8 @@ function view(r) {
   const c = r.cur;
   return {
     t: "tstate", now: Date.now(), log: r.log,
-    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], quals: c.quals || [720], ...statusOf(c.vid) } : null,
-    queue: r.queue.map((q) => ({ key: q.key, vid: q.vid, title: q.title, dur: q.dur, by: q.by, ...statusOf(q.vid) })),
+    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], quals: c.quals || [720], q: mainQ(c), ...statusOf(c.vid, mainQ(c)) } : null,
+    queue: r.queue.map((q) => ({ key: q.key, vid: q.vid, title: q.title, dur: q.dur, by: q.by, ...statusOf(q.vid, mainQ(q)) })),
     viewers: [...r.members].map(nameOf),
   };
 }
@@ -168,15 +171,15 @@ function advance(r) {
   if (!r.cur && r.queue.length) {
     const q = r.queue.shift();
     r.cur = { ...q, playing: false, pos: 0, at: Date.now(), rate: 1, waitReady: true };
-    download(q.vid);
+    download(q.vid, mainQ(q));
   }
-  if (r.cur && r.cur.waitReady && statusOf(r.cur.vid).status === "ready") {   // 下載好了才開始播
+  if (r.cur && r.cur.waitReady && statusOf(r.cur.vid, mainQ(r.cur)).status === "ready") {   // 下載好了才開始播
     r.cur.waitReady = false; r.cur.playing = true; r.cur.pos = 0; r.cur.at = Date.now() + 1500;   // 留 1.5 秒讓大家載入
     r.log = `開始播放《${r.cur.title}》`;
   }
-  if (r.cur && statusOf(r.cur.vid).status === "error") { r.log = `《${r.cur.title}》下載失敗：${statusOf(r.cur.vid).err}`; r.cur = null; advance(r); }
+  if (r.cur && statusOf(r.cur.vid, mainQ(r.cur)).status === "error") { r.log = `《${r.cur.title}》下載失敗：${statusOf(r.cur.vid, mainQ(r.cur)).err}`; r.cur = null; advance(r); }
   // 清單裡接下來兩部先下載
-  for (const q of r.queue.slice(0, 2)) download(q.vid);
+  for (const q of r.queue.slice(0, 2)) download(q.vid, mainQ(q));
 }
 setInterval(() => {
   const now = Date.now();
@@ -226,7 +229,7 @@ export async function handleTheater(ws, m) {
       const info = await lookup(target);
       r.queue.push({ key: randomBytes(4).toString("hex"), ...info, by: who });
       r.log = `${who} 加入《${info.title}》`;
-      download(info.vid);
+      download(info.vid, info.q);
       advance(r); push(r);
       out(ws, { t: "tinfo", msg: "" });
     } catch (e) { out(ws, { t: "terr", error: String(e.message || e).slice(0, 120) }); }
@@ -246,7 +249,7 @@ export async function handleTheater(ws, m) {
     c.pos = Math.max(0, posOf(c)); c.at = Date.now(); c.rate = v; r.log = `${who} 把速度調成 ${v} 倍`;
   } else if (m.t === "tskip" && c) { r.log = `${who} 跳過《${c.title}》`; r.cur = null; advance(r); }
   else if (m.t === "tremove") { const k = r.queue.findIndex((q) => q.key === m.key); if (k >= 0) { r.log = `${who} 移除《${r.queue[k].title}》`; r.queue.splice(k, 1); } }
-  else if (m.t === "tup") { const k = r.queue.findIndex((q) => q.key === m.key); if (k > 0) { const [x] = r.queue.splice(k, 1); r.queue.unshift(x); r.log = `${who} 把《${x.title}》移到下一部`; download(x.vid); } }
+  else if (m.t === "tup") { const k = r.queue.findIndex((q) => q.key === m.key); if (k > 0) { const [x] = r.queue.splice(k, 1); r.queue.unshift(x); r.log = `${who} 把《${x.title}》移到下一部`; download(x.vid, mainQ(x)); } }
   else return true;
   push(r);
   return true;

@@ -47,15 +47,18 @@ export function mountTheater() {
     const send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
     // 畫質：預設 720p；選別的畫質時請伺服器準備，準備好才切過去（從同一秒接著播）
     const qReady = new Set();
-    let wantQ = Number(lsGet("tvres", "720")) || 720;
-    const useQ = (vid) => (wantQ !== 720 && qReady.has(vid + "|" + wantQ) ? wantQ : 720);
-    const fileOf = (vid) => (useQ(vid) === 720 ? `${vid}.mp4` : `${vid}.q${useQ(vid)}.mp4`);
-    const srcOf = (vid) => (env.inDiscord ? `/.proxy/api/tv/${fileOf(vid)}` : new URL(`api/tv/${fileOf(vid)}`, location.href).pathname);
+    // 想要的畫質（預設 1080p）；影片沒有就自動往下選最高的
+    let wantQ = Number(lsGet("tvres", "1080")) || 1080;
+    const effQ = (c) => { const qs = (c.quals && c.quals.length ? c.quals : [720]).slice().sort((a, b) => a - b); return qs.filter((q) => q <= wantQ).pop() || qs[0]; };
+    const mainOf = (c) => c.q || 720;                                  // 伺服器先下載的主要畫質
+    const useQ = (c) => { const e = effQ(c); return e === mainOf(c) || !qReady.has(c.vid + "|" + e) ? mainOf(c) : e; };
+    const fileOf = (vid, q) => (q === 720 ? `${vid}.mp4` : `${vid}.q${q}.mp4`);
+    const srcOf = (c) => { const f = fileOf(c.vid, useQ(c)); return env.inDiscord ? `/.proxy/api/tv/${f}` : new URL(`api/tv/${f}`, location.href).pathname; };
     let qAsked = "";
     function askQual(c) {
-      const k = c.vid + "|" + wantQ;
-      if (wantQ === 720 || qReady.has(k) || qAsked === k || !(c.quals || []).includes(wantQ)) return;
-      qAsked = k; send({ t: "tqual", vid: c.vid, q: wantQ });
+      const e = effQ(c), k = c.vid + "|" + e;
+      if (e === mainOf(c) || qReady.has(k) || qAsked === k) return;
+      qAsked = k; send({ t: "tqual", vid: c.vid, q: e });
     }
     video.volume = Number(lsGet("tvvol", "80")) / 100;
     video.muted = lsGet("tvmute") === "1";
@@ -71,8 +74,8 @@ export function mountTheater() {
         if (m.t === "tstate") { st = m; offset = Date.now() - m.now; st.recv = Date.now(); render(); sync(); }
         else if (m.t === "terr") { msgEl.textContent = "⚠️ " + m.error; msgEl.className = "tvmsg err"; }
         else if (m.t === "tqual") {
-          if (m.status === "ready") { qReady.add(m.vid + "|" + m.q); if (st && st.cur && st.cur.vid === m.vid && m.q === wantQ) { msgEl.textContent = ""; sync(); } }
-          else if (m.status === "downloading") { msgEl.className = "tvmsg"; msgEl.textContent = `${m.q}p 準備中… ${m.pct || 0}%（先用 720p 播）`; }
+          if (m.status === "ready") { qReady.add(m.vid + "|" + m.q); if (st && st.cur && st.cur.vid === m.vid && m.q === effQ(st.cur)) { msgEl.textContent = ""; sync(); } }
+          else if (m.status === "downloading") { msgEl.className = "tvmsg"; msgEl.textContent = `${m.q}p 準備中… ${m.pct || 0}%（先用 ${st && st.cur ? mainOf(st.cur) : 720}p 播）`; }
           else if (m.status === "error") { msgEl.className = "tvmsg err"; msgEl.textContent = `⚠️ ${m.q}p 下載失敗，維持 720p`; }
         }
         else if (m.t === "tinfo") { msgEl.textContent = m.msg; msgEl.className = "tvmsg"; }
@@ -91,7 +94,7 @@ export function mountTheater() {
         if (!c && curSrc) { video.removeAttribute("src"); video.load(); curSrc = ""; }
         return;
       }
-      const src = srcOf(c.vid);
+      const src = srcOf(c);
       if (curSrc !== src) {
         const sameVid = curVid === c.vid;
         curSrc = src; curVid = c.vid; video.src = src; video.load();
@@ -162,9 +165,9 @@ export function mountTheater() {
       resFor = sig;
       const qs = c.quals && c.quals.length ? c.quals : [720];
       resSel.innerHTML = qs.map((q) => `<option value="${q}">${q}p${q === 720 ? "" : ""}</option>`).join("");
-      resSel.value = String(qs.includes(wantQ) ? wantQ : 720);
+      resSel.value = String(effQ(c));
     }
-    resSel.addEventListener("change", () => { wantQ = Number(resSel.value); lsSet("tvres", String(wantQ)); const c = st && st.cur; if (c) { if (wantQ === 720) msgEl.textContent = ""; askQual(c); sync(); } });
+    resSel.addEventListener("change", () => { wantQ = Number(resSel.value); lsSet("tvres", String(wantQ)); const c = st && st.cur; if (c) { if (effQ(c) === mainOf(c)) msgEl.textContent = ""; askQual(c); sync(); } });
     ccSel.addEventListener("change", () => { const c = st && st.cur; lsSet("tvcc", ccSel.value); if (c) setTrack(c.vid, ccSel.value); });
     rateSel.addEventListener("change", () => { if (st && st.cur) send({ t: "tspeed", rate: Number(rateSel.value) }); });
     const extBtn = $(".ext");
