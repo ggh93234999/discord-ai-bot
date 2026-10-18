@@ -124,6 +124,11 @@ export function casinoFeed(ws, entry) {       // 任何遊戲結束一把就呼�
   ws.clast = { ...entry, ts: Date.now() }; ws.creal = !!entry.real; ws.chand = null;
   if (ws.cr) pushWho(ws.cr);
 }
+// 只讓同房的人看到最新動態，不寫入賭博紀錄（鍛造用：鍛造不是賭博）
+function roomFeed(ws, entry) {
+  ws.clast = { ...entry, ts: Date.now() }; ws.creal = !!entry.real; ws.chand = null;
+  if (ws.cr) pushWho(ws.cr);
+}
 function setHand(ws, hand) { ws.chand = hand; if (ws.cr) pushWho(ws.cr); }
 
 function leave(ws) {
@@ -458,6 +463,7 @@ async function handleForge(ws, m) {
       forgeSave(true);
       if (real) edel(ekey);
       if (real) syncRole(key, ws);
+      roomFeed(ws, { g: "forge", real, text: ok ? `升到 ${tier + 1} 階${useScroll ? "（用了卷軸）" : ""}` : saved ? `第 ${tier + 1} 階失敗，卷軸保住了 ${tier} 階的劍` : `第 ${tier + 1} 階失敗，${tier ? `${tier} 階的劍碎了` : "原料報銷"}` });
       out(ws, { ...forgeView(key, real, slot), t: "fres", ok, saved, scrolled: useScroll, scrollCost, prev: tier, paid: cost, lost, balance: r.balance });
     } else if (m.t === "fsell") {
       if (!s) return true;
@@ -470,9 +476,11 @@ async function handleForge(ws, m) {
         if (!r || !r.ok) { setSword(key, slot, s); forgeSave(true); edel(ekey); out(ws, { t: "cerr", error: "bot_down" }); return true; }
         edel(ekey);
         syncRole(key, ws);
+        roomFeed(ws, { g: "forge", real, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real, slot), t: "fres", sold: true, prev: tier, got: amt, balance: r.balance });
       } else {
         ws.cprac = (ws.cprac ?? FORGE_PRACTICE_START) + amt; setSword(key, slot, null); forgeSave(true);
+        roomFeed(ws, { g: "forge", real, text: `賣出 ${tier} 階劍` });
         out(ws, { ...forgeView(key, real, slot), t: "fres", sold: true, prev: tier, got: amt, balance: ws.cprac });
       }
     }
