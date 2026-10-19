@@ -29,7 +29,7 @@ export function mountFarm(root, { env, back }) {
         <button class="mode on" data-m="practice">🎮 練習模式</button>
         <button class="mode" data-m="real">💰 賭注模式</button>
       </div>
-      <div class="confirm" hidden><div class="ctext"></div><div class="cbtns"><button class="cyes">確定開啟</button><button class="cno">取消</button></div></div>
+      <div class="confirm" hidden><div class="ctext"></div><div class="cbtns"><button class="cyes">確定</button><button class="cno">取消</button></div></div>
       <div class="status">連線中…</div>
       <div class="fbar"><div class="bal"><span class="ballabel">練習幣</span> <b>--</b></div><button class="fbuy" hidden></button></div>
       <div class="ftabs"><button class="on" data-tab="mine">我的農場</button><button data-tab="visit">拜訪別人</button></div>
@@ -146,7 +146,7 @@ export function mountFarm(root, { env, back }) {
     if (tab === "visit") { list = null; send({ a: "list" }); } else send({ a: "get" });
     draw();
   }));
-  buyBtn.addEventListener("click", () => send({ a: "buyplot" }));
+  buyBtn.addEventListener("click", () => { if (!st || !st.plotCost) return; askConfirm(`擴一塊地要花 ${money(st.plotCost)} ${real() ? "真代幣" : "練習幣"}（目前 ${st.np} 塊，擴完 ${st.np + 1} 塊），確定嗎？`, () => send({ a: "buyplot" })); });
 
   // ---- 模式切換／登入（和賭場相同）
   function setMode(m) {
