@@ -288,6 +288,11 @@ html,body{overflow-y:auto}
 .seatbar button{padding:8px 14px;border-radius:8px;font-weight:700}
 .seatbar .sit{background:#2e7d32}.seatbar .stand{background:#455a64}
 .seatbar .sp{display:flex;align-items:center;gap:4px}
+.botbar[hidden]{display:none}
+.botbar{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin:6px 8px}
+.botbar button{padding:8px 14px;border-radius:8px;font-weight:700;background:#5e35b1;color:#fff;border:0;cursor:pointer}
+.botbar .botdel{background:#455a64}
+.botbar select{padding:8px 10px;border-radius:8px;background:#263238;color:#eceff1;border:1px solid #455a64;font-size:14px}
 .volrow{display:flex;gap:14px;justify-content:center;align-items:center;font-size:12px;color:#cfd8dc;padding:2px 8px;flex-wrap:wrap}
 .volrow input{width:90px;vertical-align:middle}
 .pinball .pvol{font-size:12px;color:#cfd8dc}.pinball .pvol input{width:80px;vertical-align:middle}.pinball .pad button.plunge{background:#b26a00;width:96px}

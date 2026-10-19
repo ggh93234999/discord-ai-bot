@@ -16,6 +16,7 @@ import { handleMahjong, mjClose } from "./mahjong.js";
 import { handleBridge, bridgeClose } from "./bridge.js";
 import { handleTheater, theaterClose, serveVideo, serveSub } from "./theater.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
+import { thinkMove, LEVELS as BOT_LEVELS } from "./bots.js";
 
 const PORT = Number(process.env.PORT || 3101);
 const GOMOKU = 15;
@@ -46,6 +47,7 @@ function rvStart() {
 }
 
 const ENG = { chess: chessEng, xq: xqEng };      // 西洋棋、象棋：規則在 chess.js / xq.js
+const BOT = { isBot: true, readyState: 3, send() {} };     // 電腦對手佔的座位（不是真的連線，所以不會收到廣播）
 function freshBoard(game) {
   if (ENG[game]) return ENG[game].init().sq.join("");
   if (game === "vb" || game === "pika") return "";
@@ -55,7 +57,7 @@ function freshBoard(game) {
 
 function newRoom(game) {
   return { game, cs: ENG[game] ? ENG[game].init() : null, board: freshBoard(game), turn: "b", winner: null, line: null, last: null, moves: 0,
-           players: { b: null, w: null }, clients: new Set(), emptySince: null,
+           players: { b: null, w: null }, clients: new Set(), emptySince: null, bot: null, botBusy: false, botGen: 0,
            vb: game === "vb" ? createVb() : null,
            pika: game === "pika" ? createPika() : null,
            input: { b: {}, w: {} },
@@ -101,6 +103,9 @@ function broadcast(room) {
       check: room.check ?? -1, reason: room.reason || "",
       legal: ENG[room.game] && !room.winner && roleOf(room, ws) === room.turn && room.players.b && room.players.w ? ENG[room.game].moves(room.cs).map((x) => [x.f, x.t]) : undefined,
       players: { b: !!room.players.b, w: !!room.players.w }, watchers: room.clients.size,
+      bot: room.bot ? { c: room.bot.c, level: room.bot.level, name: BOT_LEVELS[room.bot.level].name, thinking: !!room.botBusy } : null,
+      canBot: !!ENG[room.game] && roleOf(room, ws) !== "s" && !room.bot && room.moves === 0 && !room.winner && !room.wager && !room.offer && !room.busy && !!room.players.b !== !!room.players.w,
+      canBotDel: !!room.bot && roleOf(room, ws) !== "s" && (room.moves === 0 || !!room.winner),
       speed: room.speed, ping: room.ping, ...wagerView(room),
       vb: room.vb ? snapshotVb(room.vb) : undefined,
       pika: room.pika ? snapshotPika(room.pika) : undefined,
@@ -125,6 +130,44 @@ function assignSeat(room, ws) {
   }
 }
 const rebroadcast = (room) => () => broadcast(room);
+
+// ---- 電腦對手（西洋棋、象棋）：房間裡有真人坐著才會有電腦；電腦的走法在 bots.js 的執行緒裡算 ----
+const humanSeated = (room) => ["b", "w"].some((c) => room.players[c] && room.players[c] !== BOT);
+function resetBoard(room) {
+  Object.assign(room, { board: freshBoard(room.game), cs: ENG[room.game] ? ENG[room.game].init() : null, check: -1, reason: "", turn: "b", winner: null, line: null, last: null, moves: 0, passed: null });
+}
+function dropBot(room) {
+  if (!room.bot) return;
+  room.players[room.bot.c] = null; room.bot = null; room.botGen++;
+}
+function dropBotIfAlone(room) { if (room.bot && !humanSeated(room)) { dropBot(room); resetBoard(room); } }
+
+function maybeBot(room) {
+  const b = room.bot;
+  if (!b || room.winner || room.botBusy || room.turn !== b.c || !ENG[room.game] || !room.players.b || !room.players.w) return;
+  room.botBusy = true;
+  const gen = room.botGen, moves0 = room.moves, t0 = Date.now();
+  broadcast(room);
+  thinkMove(room.game, room.cs, b.level).then(async (mv) => {
+    const wait = 450 + (b.level === 1 ? 350 : 0) - (Date.now() - t0);        // 不要秒回，看得到對手在想
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    room.botBusy = false;
+    if (room.bot !== b || room.botGen !== gen || room.moves !== moves0 || room.winner || room.turn !== b.c) { broadcast(room); return; }   // 這段時間局面變了（有人離開、重開）
+    let ok = mv && doMove(room, b.c, { f: mv.f, to: mv.t, p: mv.p });
+    if (!ok) { const l = ENG[room.game].moves(room.cs); if (l.length) ok = doMove(room, b.c, { f: l[0].f, to: l[0].t, p: l[0].p }); }
+    if (!ok) broadcast(room);
+  }).catch((e) => { room.botBusy = false; console.log("bot error", e && e.message); broadcast(room); });
+}
+
+// 下一步棋：驗證 → 走棋 → 換邊 → 結算 → 廣播。真人和電腦共用
+function doMove(room, role, m) {
+  if (!place(room, role, m)) return false;
+  if (room.offer) clearOffer(room);                    // 開始下棋就取消還沒人接的賭注
+  if (!room.winner && room.game !== "rv") room.turn = role === "b" ? "w" : "b";
+  if (room.winner) settleWager(room, rebroadcast(room));
+  broadcast(room);
+  return true;
+}
 
 function place(room, role, m) {
   const eng = ENG[room.game];
@@ -288,10 +331,20 @@ wss.on("connection", (ws, req) => {
       if (role === "s" || room.winner || room.turn !== role) return;
       if (!room.players.b || !room.players.w) return;     // 要兩個人都到了才能下
       if (room.busy) return;                               // 押金還在扣款
-      if (!place(room, role, m)) return;
-      if (room.offer) clearOffer(room);                    // 開始下棋就取消還沒人接的賭注
-      if (!room.winner && room.game !== "rv") room.turn = role === "b" ? "w" : "b";
-      if (room.winner) settleWager(room, rebroadcast(room));
+      if (!doMove(room, role, m)) return;
+      maybeBot(room);
+    } else if (m.t === "botadd") {
+      if (role === "s" || !ENG[room.game]) return;
+      const lvl = Math.max(1, Math.min(4, Number(m.level) | 0 || 2));
+      if (room.bot) { room.bot.level = lvl; broadcast(room); return; }            // 已經有電腦：只是換難度
+      if (room.winner || room.moves > 0 || room.wager || room.offer || room.busy) return;
+      const empty = ["b", "w"].filter((c) => !room.players[c]);
+      if (empty.length !== 1) return;
+      room.players[empty[0]] = BOT; room.bot = { c: empty[0], level: lvl }; room.botGen++;
+      broadcast(room); maybeBot(room);
+    } else if (m.t === "botdel") {
+      if (role === "s" || !room.bot || !(room.moves === 0 || room.winner)) return;
+      dropBot(room); if (room.winner) resetBoard(room);
       broadcast(room);
     } else if (m.t === "sit") {
       if (role !== "s") return;
@@ -299,7 +352,7 @@ wss.on("connection", (ws, req) => {
     } else if (m.t === "stand") {
       if (role === "s" || !standOk(room)) return;
       if (room.offer) clearOffer(room);
-      room.players[role] = null; broadcast(room);
+      room.players[role] = null; dropBotIfAlone(room); broadcast(room);
     } else if (m.t === "again") {
       if (role === "s" || !room.winner) return;
       if (room.wager && !room.wager.settled) return;
@@ -308,11 +361,12 @@ wss.on("connection", (ws, req) => {
       const { b, w } = room.players;
       Object.assign(room, { board: freshBoard(room.game), cs: ENG[room.game] ? ENG[room.game].init() : null, check: -1, reason: "", turn: "b", winner: null, line: null, last: null, moves: 0, passed: null });
       room.players = { b: w, w: b };
+      if (room.bot) { room.bot.c = room.bot.c === "b" ? "w" : "b"; room.botGen++; }      // 換邊：電腦跟著換顏色
       room.ping = { b: room.ping.w, w: room.ping.b };
       room.acc = 0;
       if (room.game === "vb") { room.vb = createVb(); room.input = { b: {}, w: {} }; }
       else if (room.game === "pika") { room.pika = createPika(); room.input = { b: {}, w: {} }; }
-      broadcast(room);
+      broadcast(room); maybeBot(room);
     } else if (m.t === "restart") {
       // 打到一半重來：不換邊，直接重開本局
       if (role === "s") return;
@@ -358,6 +412,7 @@ wss.on("connection", (ws, req) => {
       if (room.offer && room.offer.by === c) room.offer = null;
       onPlayerLeft(room, c, rebroadcast(room));
     }
+    dropBotIfAlone(room);                                  // 真人都走了，電腦也不留
     // 有旁觀者就遞補空位
     for (const w of room.clients) if (roleOf(room, w) === "s") assignSeat(room, w);
     if (room.clients.size === 0) room.emptySince = Date.now();

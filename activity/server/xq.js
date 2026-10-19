@@ -5,7 +5,7 @@ const W = 9, H = 10;
 const isRed = (p) => p >= "A" && p <= "Z";
 const at = (sq, r, c) => (r < 0 || r >= H || c < 0 || c >= W ? null : sq[r * W + c]);
 const OR = [[-1, 0], [1, 0], [0, -1], [0, 1]], DG = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
-const key = (st) => st.sq.join("") + st.turn;
+export const key = (st) => st.sq.join("") + st.turn;
 
 export function init() {
   const rows = ["rheakaehr", ".........", ".c.....c.", "p.p.p.p.p", ".........", ".........", "P.P.P.P.P", ".C.....C.", ".........", "RHEAKAEHR"];
@@ -67,13 +67,40 @@ function facing(sq) {
   for (let i = b + W; i < a; i += W) if (sq[i] !== ".") return false;
   return true;
 }
-// red 方的王有沒有被吃（含飛將）
-function inCheck(sq, red) {
+// red 方的王有沒有被吃（含飛將）：直接從王的位置往外看有沒有車、炮、馬、兵（比產生對方所有走法快很多）
+export function inCheck(sq, red) {
+  const k = kingIdx(sq, red);
+  if (k < 0) return true;
+  if (facing(sq)) return true;
+  const r = (k / W) | 0, c = k % W, R = red ? "r" : "R", C = red ? "c" : "C", Hs = red ? "h" : "H", P = red ? "p" : "P";
+  for (const [dr, dc] of OR) {                                       // 車直接看到王；炮隔一顆子看到王
+    let rr = r + dr, cc = c + dc, t;
+    while ((t = at(sq, rr, cc)) === ".") { rr += dr; cc += dc; }
+    if (t === null) continue;
+    if (t === R) return true;
+    rr += dr; cc += dc;
+    while ((t = at(sq, rr, cc)) === ".") { rr += dr; cc += dc; }
+    if (t === C) return true;
+  }
+  for (const [dr, dc] of [[-2, -1], [-2, 1], [2, -1], [2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2]]) {   // 馬：馬腳沒被塞住
+    if (at(sq, r + dr, c + dc) !== Hs) continue;
+    const lr = r + dr - (Math.abs(dr) === 2 ? Math.sign(dr) : 0), lc = c + dc - (Math.abs(dc) === 2 ? Math.sign(dc) : 0);
+    if (at(sq, lr, lc) === ".") return true;
+  }
+  if (at(sq, red ? r - 1 : r + 1, c) === P) return true;            // 兵：從前面吃（黑卒往下、紅兵往上）
+  if (red ? r >= 5 : r <= 4) { if (at(sq, r, c - 1) === P || at(sq, r, c + 1) === P) return true; }   // 過河的兵可以橫吃
+  return false;
+}
+// 舊寫法（產生對方所有走法），只留給測試比對
+export function inCheckSlow(sq, red) {
   const k = kingIdx(sq, red);
   if (k < 0) return true;
   if (facing(sq)) return true;
   return pseudo(sq, !red).some((m) => m.t === k);
 }
+
+// 輪到的那方是不是正被將軍（電腦搜尋用）
+export const checked = (st) => inCheck(st.sq, st.turn === "b");
 
 export function apply(st, m, quick) {
   const sq = st.sq.slice(), cap = sq[m.t] !== ".";

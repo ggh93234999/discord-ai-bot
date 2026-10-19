@@ -94,7 +94,7 @@ export function createWager(root, { env, getWs, getSt }) {
         const acc = () => send({ t: "waccept" });
         el.append(btn("接受對賭", () => (authed ? acc() : login(acc)), "yes"), btn("拒絕", () => send({ t: "wcancel" })));
       } else el.append(line(`💰 ${o.name} 提出 ${o.amount} 代幣對賭`));
-    } else if (player && st.moves === 0 && !st.winner && st.players.b && st.players.w) {
+    } else if (player && st.moves === 0 && !st.winner && st.players.b && st.players.w && !st.bot) {
       if (!env.inDiscord || !env.sdk) { /* 在一般瀏覽器開，不顯示對賭 */ }
       else if (!authed) {
         el.append(btn("💰 想對賭？登入", () => login()), line("不賭的話直接下棋就好，不用登入"));

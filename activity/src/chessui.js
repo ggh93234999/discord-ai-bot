@@ -24,10 +24,21 @@ export function mountBoard(game) {
         <div class="cwrap"><canvas></canvas></div>
         <div class="promo" hidden></div>
         <div class="actions"><button class="resign" hidden>認輸</button><button class="again" hidden>${cfg.again}</button></div>
+        <div class="botbar" hidden>
+          <select class="botlv" title="電腦難度"><option value="1">新手</option><option value="2">普通</option><option value="3">高手</option><option value="4">大師</option></select>
+          <button class="botadd" hidden>🤖 加電腦對手</button><button class="botdel" hidden>移除電腦</button>
+        </div>
       </div>`;
     const $ = (s) => root.querySelector(s);
     const canvas = $("canvas"), ctx = canvas.getContext("2d");
     const statusEl = $(".status"), resignBtn = $(".resign"), againBtn = $(".again"), watchEl = $(".watch"), promoEl = $(".promo");
+    const botbar = $(".botbar"), botLv = $(".botlv"), botAdd = $(".botadd"), botDel = $(".botdel");
+    const lvGet = () => { try { return localStorage.getItem("botlv") || "2"; } catch { return "2"; } };
+    botLv.value = lvGet();
+    const botSend = (t) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t, level: Number(botLv.value) })); };
+    botAdd.addEventListener("click", () => botSend("botadd"));
+    botDel.addEventListener("click", () => botSend("botdel"));
+    botLv.addEventListener("change", () => { try { localStorage.setItem("botlv", botLv.value); } catch {} if (st && st.bot) botSend("botadd"); });
     $(".back").addEventListener("click", back);
     const wg = createWager(root, { env, getWs: () => ws, getSt: () => st });
     const seat = createSeat(root, { getWs: () => ws, getSt: () => st });
@@ -156,11 +167,17 @@ export function mountBoard(game) {
       let t;
       if (st.winner === "d") t = `和棋${st.reason ? "：" + st.reason : ""}`;
       else if (st.winner) t = (st.winner === st.you ? "🎉 你贏了！" : st.you === "s" ? `${nm[st.winner]}獲勝` : "😢 你輸了") + (st.reason ? `（${st.reason}）` : "（對方認輸或離開）");
-      else if (!st.players.b || !st.players.w) t = `${me}　等另一位玩家加入…（請朋友也點開 Activity）`;
-      else t = `${me}　輪到${nm[st.turn]}${st.turn === st.you ? "（你）" : ""}${st.check >= 0 ? "　⚠️ 將軍！" : ""}`;
+      else if (!st.players.b || !st.players.w) t = st.you === "s" ? `${me}　等玩家加入…（按「🪑 上場對戰」入座後，可以加電腦對手）` : `${me}　等另一位玩家加入…（請朋友也點開 Activity，或按「🤖 加電腦對手」）`;
+      else {
+        const who = st.turn === st.you ? "（你）" : st.bot && st.turn === st.bot.c ? `（🤖電腦·${st.bot.name}${st.bot.thinking ? "，思考中…" : ""}）` : "";
+        t = `${me}${st.bot ? `　對手：🤖電腦·${st.bot.name}` : ""}　輪到${nm[st.turn]}${who}${st.check >= 0 ? "　⚠️ 將軍！" : ""}`;
+      }
       statusEl.textContent = t;
       resignBtn.hidden = !(st.you !== "s" && !st.winner && st.players.b && st.players.w);
       againBtn.hidden = !(st.you !== "s" && st.winner);
+      botAdd.hidden = !st.canBot; botDel.hidden = !st.canBotDel;
+      botbar.hidden = !(st.canBot || (st.bot && st.you !== "s"));
+      if (st.bot && document.activeElement !== botLv) botLv.value = String(st.bot.level);
     }
 
     const pos = (ev) => { const r = canvas.getBoundingClientRect(); return [(ev.clientX - r.left) * (w / r.width), (ev.clientY - r.top) * (h / r.height)]; };

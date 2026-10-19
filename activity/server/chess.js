@@ -6,7 +6,7 @@ const N8 = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 
 const K8 = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
 const DG = [[-1, -1], [-1, 1], [1, -1], [1, 1]], OR = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-const key = (st) => st.sq.join("") + st.turn + st.castle + st.ep;
+export const key = (st) => st.sq.join("") + st.turn + st.castle + st.ep;
 
 export function init() {
   const back = "rnbqkbnr";
@@ -29,6 +29,8 @@ function attacked(sq, idx, by) {
   return false;
 }
 const kingIdx = (sq, wh) => sq.indexOf(wh ? "K" : "k");
+// 輪到的那方是不是正被將軍（電腦搜尋用）
+export function checked(st) { const wh = st.turn === "b", k = kingIdx(st.sq, wh); return k >= 0 && attacked(st.sq, k, wh ? "w" : "b"); }
 
 function pseudo(st) {
   const { sq } = st, wh = st.turn === "b", out = [];
