@@ -14,6 +14,7 @@ import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
+import { mountFarm } from "./farm.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
 const optional = import.meta.glob(["./pikachu_online.js", "./lf2.js"], { eager: true });
@@ -40,6 +41,7 @@ const app = document.getElementById("app");
 // cat：選單分類；players：人數標籤
 const CATS = [
   { id: "forge", icon: "⚒️", name: "鍛造", note: "獨立玩法：鍛劍、賣劍賺代幣，最多同時 10 把" },
+  { id: "farm", icon: "🌱", name: "農場", note: "獨立玩法：種菜、收成、賣菜賺代幣，也能偷朋友的菜" },
   { id: "casino", icon: "🎰", name: "賭場", note: "練習幣或真代幣，每個遊戲裡都有 📖 規則" },
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
   { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
@@ -62,6 +64,7 @@ const GAMES = [
   { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
+  { id: "farm", cat: "farm", wide: true, icon: "🌱", name: "種菜", players: "1 人（可拜訪）", desc: "作物照真實時間長大，收成賣代幣；成熟的菜 5 分鐘後朋友可以來偷", mount: mountFarm },
   { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
   { id: "forgeboard", cat: "forge", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },

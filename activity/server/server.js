@@ -8,6 +8,7 @@ import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
+import { handleFarm, recoverFarmPending } from "./farm.js";
 import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./casino.js";
 import * as chessEng from "./chess.js";
 import * as xqEng from "./xq.js";
@@ -239,6 +240,7 @@ const httpServer = http.createServer((req, res) => {
 });
 const wss = new WebSocketServer({ server: httpServer, path: "/ws", maxPayload: 4096 });
 recoverEscrow().catch((e) => console.log("escrow 還原失敗", e.message));
+recoverFarmPending().catch((e) => console.log("農場補發失敗", e.message));
 recoverCasinoEscrow().catch((e) => console.log("賭場 escrow 還原失敗", e.message));
 httpServer.listen(PORT, "127.0.0.1");
 
@@ -298,6 +300,7 @@ wss.on("connection", (ws, req) => {
       casinoFeed(ws, { g: "slots", real: false, kind, bet, back, grid: r.grid, nwin: r.wins.length });
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
+    if (m.t === "fm") { handleFarm(ws, m).catch((e) => console.log("農場錯誤", e && e.message)); return; }
     if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }

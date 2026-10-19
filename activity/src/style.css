@@ -728,3 +728,43 @@ body.tv-fs{overflow:hidden}
 /* 手機版 Discord：頂端有一條蓋在 Activity 上的列（約 45px），把遊戲畫面往下推才看得到「← 選單」 */
 .dcm .game{padding-top:58px}
 .mj .mhand .mt.sel{transform:translateY(-12px);outline:2px solid #ffd54f;outline-offset:1px}
+
+/* ---- 種菜 ---- */
+.farm { width:100%; max-width:560px; margin:0 auto; }
+.farm .fbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center; margin:2px 0 6px; }
+.farm .fbuy { padding:5px 12px; border:0; border-radius:8px; background:#6b4f2a; color:#fff; font-size:13px; cursor:pointer; }
+.farm .fbuy[hidden] { display:none; }
+.farm .ftabs { display:flex; gap:6px; justify-content:center; margin:4px 0 8px; }
+.farm .ftabs button { padding:6px 16px; border:0; border-radius:8px 8px 0 0; background:#2b2f3a; color:#9aa3b5; font-size:14px; cursor:pointer; }
+.farm .ftabs button.on { background:#3e6b3c; color:#fff; font-weight:700; }
+.farm .fbody { width:100%; display:flex; flex-direction:column; gap:10px; padding-bottom:20px; }
+.farm .seeds { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.farm .seed { display:flex; flex-direction:column; align-items:center; gap:1px; padding:6px 2px; border:2px solid transparent; border-radius:10px; background:#2b2f3a; color:#dde; cursor:pointer; line-height:1.25; }
+.farm .seed span { font-size:26px; line-height:1.1; } .farm .seed b { font-size:13px; } .farm .seed small { font-size:11px; color:#9aa3b5; text-align:center; }
+.farm .seed.sel { border-color:#8bc34a; background:#34452f; }
+.farm .fact { display:flex; gap:8px; }
+.farm .fact button { flex:1; padding:8px 4px; border:0; border-radius:8px; background:#3e6b3c; color:#fff; font-size:14px; cursor:pointer; }
+.farm .fact button:disabled { opacity:.4; cursor:default; }
+.farm .fgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:10px; border-radius:14px; background:linear-gradient(#5a3e22,#432d18); box-shadow:inset 0 0 0 3px #7b5a33; }
+@media (min-width:520px) { .farm .fgrid { grid-template-columns:repeat(4,1fr); } }
+.farm .plot { position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:84px; padding:6px 2px; border:0; border-radius:10px; background:#6e4b28; color:#f3e5c8; box-shadow:inset 0 -4px 0 rgba(0,0,0,.25); font-family:inherit; }
+.farm .plot .pi { font-size:34px; line-height:1.1; } .farm .plot .pi.sm { font-size:24px; opacity:.85; }
+.farm .plot small { font-size:11px; text-align:center; line-height:1.2; }
+.farm .plot.empty { background:#5b3e20; color:#bfa07a; cursor:pointer; border:2px dashed #8a6a42; }
+.farm .plot.empty .pi { font-size:26px; opacity:.7; }
+.farm .plot.grow { background:#4f6b34; }
+.farm .plot.grow i { position:absolute; left:0; bottom:0; height:4px; width:calc(var(--pr) * 100%); background:#c5e17a; }
+.farm .plot.ripe { background:#c79a2b; color:#2b1c05; cursor:pointer; font-weight:700; animation:farmripe 1.4s ease-in-out infinite alternate; }
+.farm .plot.wait { background:#6b6a3a; } .farm .plot.done { background:#554a3a; opacity:.8; } .farm .plot.none { background:transparent; box-shadow:none; opacity:.35; }
+.farm .plot.steal { background:#b8442f; color:#fff; }
+@keyframes farmripe { from { filter:brightness(1); } to { filter:brightness(1.18); } }
+.farm .ftitle { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font-size:14px; }
+.farm .ftitle button, .farm .vback { padding:5px 12px; border:0; border-radius:8px; background:#3e6b3c; color:#fff; font-size:13px; cursor:pointer; }
+.farm .finv { padding:10px; border-radius:12px; background:#23262f; }
+.farm .item { display:inline-flex; align-items:center; gap:4px; margin:0 6px 6px 0; padding:5px 9px; border:0; border-radius:8px; background:#33384a; color:#fff; font-size:20px; cursor:pointer; }
+.farm .item b { font-size:14px; } .farm .item small { font-size:11px; color:#9aa3b5; } .farm .item em { font-style:normal; font-size:11px; padding:1px 5px; border-radius:6px; background:#e0a526; color:#1b1b1b; }
+.farm .flist { display:flex; flex-direction:column; gap:6px; }
+.farm .frow { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:10px 12px; border:0; border-radius:10px; background:#2b2f3a; color:#fff; font-size:14px; cursor:pointer; text-align:left; }
+.farm .frow span { font-size:12px; color:#9aa3b5; } .farm .frow em { font-style:normal; color:#ffd54a; }
+.farm .fempty, .farm .fnote { margin:4px 0; font-size:13px; color:#9aa3b5; text-align:center; line-height:1.5; }
+.farm .flog { padding:8px 10px; border-radius:10px; background:#2a2327; font-size:13px; color:#d6b8b8; } .farm .flog div { margin-top:3px; }
