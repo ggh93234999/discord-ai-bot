@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" preserveAspectRatio="xMidYMid slice">
+  <defs><filter id="paper" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.04 0.06" numOctaves="4" seed="5" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0.8  0 0 0 0 0.72  0 0 0 0 0.55  0 0 0 0.09 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+    <filter id="wash" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.01 0.025" numOctaves="3" seed="9" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="40"/><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="3" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="6"/><feGaussianBlur stdDeviation="0.7"/></filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="16"/></filter><filter id="blur3"><feGaussianBlur stdDeviation="3"/></filter><filter id="blur1"><feGaussianBlur stdDeviation="1.2"/></filter><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e1420"/><stop offset="0.6" stop-color="#161e2c"/><stop offset="1" stop-color="#0a0e16"/></linearGradient></defs>
+  <rect width="600" height="900" fill="url(#g)"/>
+  <circle cx="300" cy="170" r="120" fill="#e9e2cf" opacity="0.10" filter="url(#soft)"/>
+  <circle cx="300" cy="170" r="62" fill="#ece5d0" opacity="0.9" filter="url(#blur1)"/>
+  <g filter="url(#wash)">
+    <path d="M-40 420 L60 340 L150 390 L250 300 L340 380 L430 330 L520 390 L640 320 L640 600 L-40 600Z" fill="#3a4658" opacity="0.5"/>
+    <path d="M-40 500 L90 430 L200 480 L320 410 L440 480 L560 440 L640 480 L640 680 L-40 680Z" fill="#26303f" opacity="0.75"/>
+    <path d="M-40 600 L120 540 L240 590 L380 530 L520 590 L640 560 L640 760 L-40 760Z" fill="#161d29" opacity="0.9"/>
+  </g>
+  <g filter="url(#soft)" fill="#aab7c8"><ellipse cx="160" cy="430" rx="220" ry="20" opacity="0.16"/><ellipse cx="470" cy="520" rx="240" ry="18" opacity="0.14"/></g>
+  <rect y="700" width="600" height="200" fill="#0b1019"/>
+  <g filter="url(#blur3)"><ellipse cx="300" cy="740" rx="50" ry="6" fill="#ece5d0" opacity="0.35"/><ellipse cx="300" cy="768" rx="30" ry="4" fill="#ece5d0" opacity="0.22"/><ellipse cx="300" cy="796" rx="16" ry="3" fill="#ece5d0" opacity="0.14"/></g>
+  <g stroke="#7e8da4" stroke-width="1.4" opacity="0.22" filter="url(#blur1)"><path d="M0 724 H600 M40 752 H560 M80 782 H520 M120 814 H480 M160 848 H440"/></g>
+  <rect width="600" height="900" fill="#fff" filter="url(#paper)"/>
+</svg>

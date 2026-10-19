@@ -1,6 +1,14 @@
 // 一起看影片：同一個 Activity 的人同步看 YouTube。影片由伺服器下載後從 /api/tv/<id>.mp4 播放，
 // 播放、暫停、進度、播放清單都在伺服器（server/theater.js），這裡依伺服器時間校正，誤差超過 1 秒就跳過去。
 import { wsUrl } from "./gomoku.js";
+import bgA from "./theaterbg-a.svg";
+import bgB from "./theaterbg-b.svg";
+import bgC from "./theaterbg-c.svg";
+import bgD from "./theaterbg-d.svg";
+import bgE from "./theaterbg-e.svg";
+import bgStage from "./theater-bg.svg";
+// 背景可以在畫面上自己選（只存在這個瀏覽器）
+const BGS = [["stage", "戲台", bgStage], ["a", "A 月夜江山", bgA], ["b", "B 竹林夜", bgB], ["c", "C 燈籠串", bgC], ["d", "D 夜塔雲海", bgD], ["e", "E 雨夜屋簷", bgE]];
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0"); };
@@ -12,6 +20,7 @@ export function mountTheater() {
     root.innerHTML = `
       <div class="game slots theater">
         <header><button class="back">← 選單</button><h2>一起看影片</h2><span class="watch"></span></header>
+        <label class="thbg">🎨 背景 <select>${BGS.map((b) => `<option value="${b[0]}">${b[1]}</option>`).join("")}</select></label>
         <div class="tvstage">
         <div class="tvwrap">
           <video class="tv" playsinline preload="auto"></video>
@@ -247,6 +256,12 @@ export function mountTheater() {
     $(".tvadd").addEventListener("submit", (e) => { e.preventDefault(); const q = $(".tvq").value.trim(); if (!q) return; send({ t: "tadd", q }); $(".tvq").value = ""; msgEl.className = "tvmsg"; });
     function cleanup() { document.removeEventListener("fullscreenchange", onFsChange); document.removeEventListener("keydown", onKey); document.body.classList.remove("tv-fs"); closed = true; clearInterval(timer); clearTimeout(startTimer); try { video.pause(); video.removeAttribute("src"); video.load(); } catch {} try { ws && ws.close(); } catch {} }
     $(".back").addEventListener("click", () => { cleanup(); back(); });
+    {
+      const gameEl = root.querySelector(".theater"), sel = root.querySelector(".thbg select");
+      const apply = (id) => { const b = BGS.find((x) => x[0] === id) || BGS[0]; gameEl.style.backgroundImage = `url("${b[2]}")`; sel.value = b[0]; };
+      apply(lsGet("tvbg", "stage"));
+      sel.addEventListener("change", () => { lsSet("tvbg", sel.value); apply(sel.value); });
+    }
     timer = setInterval(tick, 500);
     connect();
     return cleanup;
