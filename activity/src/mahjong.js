@@ -202,6 +202,8 @@ export function mountMahjong(rule, opts = {}) {
       body.innerHTML = `<div class="mtable">${order.map(seatBox).join("")}${center}</div>${result}${hand}${ctl}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
       body.querySelectorAll(".mhand .mt.can").forEach((el) => el.addEventListener("click", () => {
         const t = Number(el.dataset.t);
+        if (touchOnly() && selT !== t) { selT = t; body.querySelectorAll(".mhand .mt.sel").forEach((x) => x.classList.remove("sel")); el.classList.add("sel"); showTip(el, Number(el.dataset.k)); return; }   // 手機：第一下只是選這張、看牌的狀態；再點同一張才打出去
+        selT = null;
         if (riichiMode) { riichiMode = false; send({ t: "mact", a: "riichi", tile: t }); } else send({ t: "mact", a: "discard", tile: t });
       }));
       body.querySelectorAll(".mbtns [data-a]").forEach((el) => el.addEventListener("click", () => {
@@ -241,6 +243,10 @@ export function mountMahjong(rule, opts = {}) {
         el.addEventListener("contextmenu", (e) => e.preventDefault());
       });
       if (keepK != null) { const el = [...body.querySelectorAll(".mhand .mt[data-t]")].find((x) => Number(x.dataset.k) % 100 === keepK && x.matches(":hover")); if (el) showTip(el, keepK); else tipK = null; }   // 畫面更新後，滑鼠還在同一張牌上就繼續顯示
+      if (selT != null) {                                         // 畫面更新後，手機上選著的牌還在手上就繼續選著（不在了就取消）
+        const el = [...body.querySelectorAll(".mhand .mt.can")].find((x) => Number(x.dataset.t) === selT);
+        if (el) { el.classList.add("sel"); showTip(el, Number(el.dataset.k)); } else selT = null;
+      }
       body.querySelectorAll(".myk").forEach((el) => el.addEventListener("click", () => { popName = popName === el.dataset.y ? "" : el.dataset.y; render(); }));
       tickStatus();
     }
@@ -279,7 +285,8 @@ export function mountMahjong(rule, opts = {}) {
 
     // ---- 手牌提示：這種牌場上看得到幾張、誰打的
     const kindOf = (t) => (t >= 100 ? t - 100 : t);
-    let tipEl = null, tipK = null;
+    let tipEl = null, tipK = null, selT = null;      // selT：手機上第一下點到、還沒打出去的那張牌（牌的編號）
+    const touchOnly = () => { try { return matchMedia("(pointer: coarse)").matches; } catch { return false; } };
     function hideTip(keep) { if (!keep) tipK = null; if (tipEl) { tipEl.remove(); tipEl = null; } body.querySelectorAll(".mt.hl").forEach((x) => x.classList.remove("hl")); }
     function showTip(el, k) {
       hideTip(); tipK = k;
