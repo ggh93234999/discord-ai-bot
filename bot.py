@@ -313,6 +313,11 @@ def describe_message(msg: discord.Message) -> str:
         extras.append(f"[圖片：{a.filename}]" if is_image(a) else f"[附件：{a.filename}]")
     if msg.stickers:
         extras.append("[貼圖]")
+    ref = msg.reference.resolved if msg.reference else None
+    if isinstance(ref, discord.Message) and msg.author.id != client.user.id:  # 回覆誰、那則有沒有圖（要改圖時靠這個知道指的是哪張）
+        rimgs = [a.filename for a in ref.attachments if is_image(a)]
+        who = "你" if ref.author.id == client.user.id else ref.author.display_name
+        extras.insert(0, f"[回覆{who}的訊息" + (f"，被回覆的訊息有圖片：{'、'.join(rimgs)}" if rimgs else "") + "]")
     for e in msg.embeds:  # 連結預覽之類的
         if e.title or e.description:
             extras.append(f"[內嵌：{(e.title or '')} {(e.description or '')[:200]}]".strip())
