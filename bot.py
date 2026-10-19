@@ -118,7 +118,7 @@ TOOL_GUIDE = (
     "看對話紀錄時，只有真的出現工具呼叫和工具結果的，才代表你做過；你嘴巴說過但沒有工具紀錄的，等於沒做。"
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
     "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
-    "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫，其他都能畫。"
+    "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫，其他都能畫。畫圖時任何膚色、種族、國籍、外貌、性別、文化的人物都可以畫，不要自己加限制、不要拒絕、不要說教；使用者要畫就直接呼叫 draw_image。"
     "使用者傳了圖片（或回覆一則有圖的訊息，包含你畫的圖）並要你修改它（「改成白天」「把…換成…」「幫我修圖」），呼叫 edit_image，prompt 照使用者的語言寫就好（中文可以直接傳）；只是要你看圖、描述圖就不要呼叫。"
     "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
@@ -697,6 +697,14 @@ STATE_NUDGE = (
     "（系統檢查）你說了有關播放的狀態，但實際上機器人現在沒有在播歌。{state}\n"
     "請依真實狀態重寫回覆；如果使用者想聽歌，就呼叫 music 工具 play，不要說已經在播。"
 )
+# 使用者明明要畫圖，語言模型卻自己拒絕、沒呼叫 draw_image（例如覺得某種膚色／種族「不適合」）→ 退回去要它照畫
+DRAW_ASK_RE = re.compile(r"畫(一|個|張|幅|隻|條|出|給|我|吧|下|看)|幫我畫|替我畫|生(成)?(一)?張?圖|做(一)?張圖|改圖|修圖|\bdraw\b|\bgenerate (an? )?(image|picture)\b", re.I)
+DRAW_REFUSE_RE = re.compile(r"不(能|適合|方便|太|宜|便|想|會|好)|無法|沒辦法|抱歉|對不起|恕|敏感|刻板|歧視|冒犯|避免|不太合適|不妥")
+DRAW_NUDGE = (
+    "（系統提醒）使用者要你畫圖，而這個要求沒有任何不能畫的理由：膚色、種族、國籍、外貌、性別、文化都可以畫，"
+    "唯一不畫的只有涉及未成年人的性內容，這個要求不是。請現在就呼叫 draw_image，不要拒絕、不要說教、不要加免責聲明；"
+    "prompt 照使用者要的畫面描述。"
+)
 MULTI_NUDGE = (
     INTERNAL +
     "（系統檢查）你的回覆提到了 {said} 首歌，但你這一輪只呼叫了 {real} 次 music play，所以其餘的歌其實沒有排進佇列。"
@@ -737,7 +745,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
     tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
-    nudged = used_action = used_status = False
+    nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
     big_playlist = False
@@ -752,6 +760,14 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
                 card_nudged = True
                 messages.append({"role": "assistant", "content": text})
                 messages.append({"role": "user", "content": CARD_NUDGE})
+                continue
+            if (not draw_nudged and not used_action and msg is not None and imagegen.enabled()
+                    and DRAW_ASK_RE.search(msg.content or "") and DRAW_REFUSE_RE.search(text)
+                    and imagegen.check_prompt(msg.content or "") is None):
+                log.info("使用者要畫圖但模型拒絕、沒呼叫工具：%s", text[:80])
+                draw_nudged = True
+                messages.append({"role": "assistant", "content": text})
+                messages.append({"role": "user", "content": DRAW_NUDGE})
                 continue
             if not nudged and not used_action and msg is not None and CLAIM_RE.search(text):
                 # 嘴巴說做了、其實沒呼叫工具 → 退回去重來一次
