@@ -406,6 +406,8 @@ body.pk-myturn .game.poker{background:#16296b}
 .card.wide b { font-size:24px; letter-spacing:4px; } .card.wide em { color:#7a2418; } .card.wide small { opacity:.85; color:#3a342a; font-size:14px; max-width:55%; }
 .card.wide .icon { font-size:30px; }
 @media (max-width:520px){ .card.wide { grid-column:1 / -1; } }
+.card.wide[data-g="farm"], .card.wide[data-g="farm"]:hover { background:#e9e2cf url("./farm-ink.svg") right center/cover no-repeat; }
+.card.wide[data-g="theater"], .card.wide[data-g="theater"]:hover { background:#e9e2cf url("./theater-ink.svg") right center/cover no-repeat; }
 
 .fgxp{text-align:center;font-size:13px;color:#e2c46a;margin:2px 0}.fgxp small{opacity:.6;margin-left:4px}
 
