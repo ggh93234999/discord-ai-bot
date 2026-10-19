@@ -19,14 +19,14 @@ export const CROPS = [
 ];
 const CROP = Object.fromEntries(CROPS.map((c) => [c.id, c]));
 export const YIELD = 3;                          // 每塊地一次收幾個
-const UNIT_RATE = 0.36;                          // 單個賣價 = 種子價 × 0.36（3 個 = 1.08 倍，再加變種）
+const UNIT_RATE = 0.55;                          // 單個賣價 = 種子價 × 0.55（3 個 = 1.65 倍；被偷 1 個剩 2 個 = 1.1 倍，還是賺，再加變種）
 export const unitPrice = (c) => Math.max(1, Math.round(CROP[c].seed * UNIT_RATE));
 // 稀有變種：每個收成各自抽一次
 export const VARIANTS = { n: { name: "", mult: 1 }, big: { name: "大顆", mult: 2 }, gold: { name: "金色", mult: 5 } };
 const rollVariant = () => { const r = randomInt(1000); return r < 10 ? "gold" : r < 60 ? "big" : "n"; };
 const START_PLOTS = 6, MAX_PLOTS = 24, PRACTICE_START = 300;
 const plotCost = (np) => 500 * (np - START_PLOTS + 1);          // 從 np 塊買到 np+1 塊
-const STEAL_GRACE = 5 * 60_000, STEAL_PER_PLOT = 2, STEAL_PER_DAY = 20, LOG_MAX = 20;
+const STEAL_GRACE = 5 * 60_000, STEAL_PER_PLOT = 1, STEAL_PER_DAY = 20, LOG_MAX = 20;
 const ripeAt = (p) => p.at + CROP[p.c].min * 60_000;
 
 // ---- 存檔

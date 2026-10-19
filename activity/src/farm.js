@@ -7,7 +7,7 @@ const ERR = {
   need_login: "要先登入才能用賭注模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_empty: "沒有空地可以種", bad_crop: "沒有這種作物", none_ripe: "還沒有成熟的作物", nothing: "沒有東西可以賣", max_plots: "田已經擴到最大了",
   no_farm: "找不到這塊農場", self: "不能偷自己的菜", steal_cap: "你今天已經偷夠了（每天最多 20 個）", not_ripe: "還不能偷：剛成熟的 5 分鐘內主人優先",
-  no_more: "這塊地你不能再偷了（每個人只能偷一次，每塊地最多被偷 2 個）", bad_plot: "這塊地沒有作物", error: "發生錯誤，再試一次",
+  no_more: "這塊地你不能再偷了（每個人只能偷一次，每塊地最多被偷 1 個）", bad_plot: "這塊地沒有作物", error: "發生錯誤，再試一次",
 };
 const VNAME = { n: "", big: "大顆", gold: "金色" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -111,7 +111,7 @@ export function mountFarm(root, { env, back }) {
       <div class="fgrid">${plots}</div>
       <div class="finv"><div class="ftitle">🧺 倉庫${st.invValue ? `<button class="sellall">全部賣出 +${money(st.invValue)}</button>` : ""}</div>${inv || `<p class="fempty">空的。收成後的菜會放在這裡，按一下就能賣。</p>`}</div>
       ${log}
-      <p class="fnote">每塊地一次收 3 個，有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 2 個。</p>`;
+      <p class="fnote">每塊地一次收 3 個，有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 1 個，就算被偷還是賺錢。</p>`;
     body.querySelectorAll(".seed").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.c; sfx.tick(); draw(); }));
     body.querySelectorAll(".plot.empty").forEach((b) => b.addEventListener("click", () => send({ a: "plant", c: sel, i: +b.dataset.i })));
     body.querySelectorAll(".plot.ripe").forEach((b) => b.addEventListener("click", () => send({ a: "harvest", i: +b.dataset.i })));
