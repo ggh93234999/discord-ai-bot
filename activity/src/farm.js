@@ -1,10 +1,10 @@
 // 種菜（個人農場，即時生長）：作物按真實時間長大，關掉 Activity 也照長。規則、數字、隨機都在伺服器，這裡只畫田和送指令。
-// 模式和賭場一樣：練習模式（農場自己的練習幣）／賭注模式（Discord 授權後動用機器人錢包的真代幣）。
+// 模式和賭場一樣：練習模式（農場自己的練習幣）／真代幣模式（Discord 授權後動用機器人錢包的真代幣）。
 import { wsUrl } from "./gomoku.js";
 import { sfx, sfxOn, setSfx } from "./farmsfx.js";
 
 const ERR = {
-  need_login: "要先登入才能用賭注模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
+  need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_empty: "沒有空地可以種", bad_crop: "沒有這種作物", none_ripe: "還沒有成熟的作物", nothing: "沒有東西可以賣", max_plots: "田已經擴到最大了",
   no_farm: "找不到這塊農場", self: "不能偷自己的菜", steal_cap: "你今天已經偷夠了（每天最多 20 個）", not_ripe: "還不能偷：剛成熟的 5 分鐘內主人優先",
   no_more: "這塊地你不能再偷了（每個人只能偷一次，每塊地最多被偷 1 個）", bad_plot: "這塊地沒有作物", error: "發生錯誤，再試一次",
@@ -28,7 +28,7 @@ export function mountFarm(root, { env, back }) {
       <header><button class="back">← 選單</button><h2>🌱 種菜</h2><button class="fsnd" title="音效開關">${sfxOn() ? "🔊" : "🔇"}</button></header>
       <div class="modebar">
         <button class="mode on" data-m="practice">🎮 練習模式</button>
-        <button class="mode" data-m="real">💰 賭注模式</button>
+        <button class="mode" data-m="real">💰 真代幣模式</button>
       </div>
       <div class="confirm" hidden><div class="ctext"></div><div class="cbtns"><button class="cyes">確定</button><button class="cno">取消</button></div></div>
       <div class="status">連線中…</div>
@@ -155,7 +155,7 @@ export function mountFarm(root, { env, back }) {
   function setMode(m) {
     mode = m; modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m)); root.querySelector(".farm").classList.toggle("realmode", m === "real");
     st = null; list = null; vis = null; draw(); showBal(); send({ a: tab === "visit" ? "list" : "get" });
-    statusEl.textContent = m === "real" ? `賭注模式：${session ? session.name : ""}，買種子、賣菜都是真代幣！` : "練習模式：農場獨立，用練習幣";
+    statusEl.textContent = m === "real" ? `真代幣模式：${session ? session.name : ""}，買種子、賣菜都是真代幣！` : "練習模式：農場獨立，用練習幣";
   }
   function askConfirm(text, onYes) {
     confirmEl.hidden = false; $(".ctext").textContent = text;
@@ -165,8 +165,8 @@ export function mountFarm(root, { env, back }) {
   modeBtns.forEach((b) => b.addEventListener("click", () => {
     if (b.dataset.m === "practice") { if (real()) setMode("practice"); return; }
     if (real()) return;
-    if (!env.inDiscord || !env.sdk) { statusEl.textContent = "賭注模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
-    askConfirm("賭注模式會用到你在機器人那邊的真代幣：買種子會扣、賣菜會加。農場和練習模式是分開的。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
+    if (!env.inDiscord || !env.sdk) { statusEl.textContent = "真代幣模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
+    askConfirm("真代幣模式會用到你在機器人那邊的真代幣：買種子會扣、賣菜會加。農場和練習模式是分開的。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
   }));
   async function login() {
     try {
@@ -177,7 +177,7 @@ export function mountFarm(root, { env, back }) {
         statusEl.textContent = "確認身分中…";
         const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
         const j = await r.json().catch(() => ({}));
-        if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用賭注模式"; return; }
+        if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用真代幣模式"; return; }
         if (!r.ok || !j.token) { statusEl.textContent = "登入失敗，請再試一次（" + (j.error || r.status) + "）"; return; }
         session = { token: j.token, name: j.name }; env.session = session;
       }
@@ -187,7 +187,7 @@ export function mountFarm(root, { env, back }) {
   function onAuthed(m) {
     if (!m.ok) {
       session = null; env.session = null;
-      if (wantReal) { wantReal = false; statusEl.textContent = m.error === "bot_down" ? ERR.bot_down : "登入已失效，請重新開啟賭注模式"; }
+      if (wantReal) { wantReal = false; statusEl.textContent = m.error === "bot_down" ? ERR.bot_down : "登入已失效，請重新開啟真代幣模式"; }
       if (real()) setMode("practice");
       return;
     }

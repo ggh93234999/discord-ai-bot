@@ -11,7 +11,7 @@ import { createForge } from "./forgeui.js";
 
 const BETS = [10, 50, 100, 500];
 const ERR = {
-  insufficient: "代幣不夠，選小一點的賭注", bot_down: "機器人暫時連不上，稍後再試", need_login: "要先登入才能用賭注模式",
+  insufficient: "代幣不夠，選小一點的賭注", bot_down: "機器人暫時連不上，稍後再試", need_login: "要先登入才能用真代幣",
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
   error: "發生錯誤，再試一次", 
 };
@@ -30,12 +30,13 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 export function mountCasino(game, opts = {}) {
   const spectate = opts.spectate || null;       // { room } → 旁觀別人的房間，不能玩
   return function (root, { env, back }) {
+    const RN = game === "forge" ? "真代幣模式" : "賭注模式";   // 鍛造不是賭博，不叫賭注
     root.innerHTML = `
       <div class="game slots casino">
         <header><button class="back">← 選單</button><h2>${spectate ? "👀 旁觀 · " : ""}${TITLES[game]}</h2><span class="watch"></span></header>
         <div class="modebar">
           <button class="mode on" data-m="practice">🎮 練習模式</button>
-          <button class="mode" data-m="real">💰 賭注模式</button>
+          <button class="mode" data-m="real">💰 ${RN}</button>
         </div>
         <div class="confirm" hidden>
           <div class="ctext"></div>
@@ -118,7 +119,7 @@ export function mountCasino(game, opts = {}) {
       gameEl.classList.toggle("realmode", m === "real"); blog.setMode(m === "real");
       $(".ballabel").textContent = m === "real" ? "💰 代幣" : "練習幣";
       showBalance(); draw(); if (forge) forge.refresh();
-      statusEl.textContent = m === "real" ? `賭注模式：${session ? session.name : ""}，用的是真代幣！` : "練習模式：選賭注，開始吧";
+      statusEl.textContent = m === "real" ? `${RN}：${session ? session.name : ""}，用的是真代幣！` : (game === "forge" ? "練習模式：開始鍛造吧" : "練習模式：選賭注，開始吧");
     }
     function askConfirm(text, onYes) {
       confirmEl.hidden = false; $(".ctext").textContent = text;
@@ -129,8 +130,8 @@ export function mountCasino(game, opts = {}) {
       if (busy || inHand || myBet()) return;
       if (b.dataset.m === "practice") { setMode("practice"); return; }
       if (real()) return;
-      if (!env.inDiscord || !env.sdk) { statusEl.textContent = "賭注模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
-      askConfirm("賭注模式會用到你在機器人那邊的真代幣，輸贏都會算數。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
+      if (!env.inDiscord || !env.sdk) { statusEl.textContent = "" + RN + "要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
+      askConfirm("" + RN + "會用到你在機器人那邊的真代幣，輸贏都會算數。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
     }));
     async function login() {
       try {
@@ -141,7 +142,7 @@ export function mountCasino(game, opts = {}) {
           statusEl.textContent = "確認身分中…";
           const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
           const j = await r.json().catch(() => ({}));
-          if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用賭注模式"; return; }
+          if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用" + RN + ""; return; }
           if (!r.ok || !j.token) { statusEl.textContent = "登入失敗，請再試一次（" + (j.error || r.status) + "）"; return; }
           session = { token: j.token, name: j.name }; env.session = session;
         }
@@ -151,7 +152,7 @@ export function mountCasino(game, opts = {}) {
     function onAuthed(m) {
       if (!m.ok) {
         session = null; env.session = null;
-        if (wantReal) { wantReal = false; statusEl.textContent = m.error === "bot_down" ? ERR.bot_down : "登入已失效，請重新開啟賭注模式"; }
+        if (wantReal) { wantReal = false; statusEl.textContent = m.error === "bot_down" ? ERR.bot_down : "登入已失效，請重新開啟" + RN + ""; }
         if (real()) setMode("practice");
         return;
       }
