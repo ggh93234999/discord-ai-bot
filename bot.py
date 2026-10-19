@@ -119,6 +119,7 @@ TOOL_GUIDE = (
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
     "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
     "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫，其他都能畫。"
+    "使用者傳了圖片（或回覆一則有圖的訊息，包含你畫的圖）並要你修改它（「改成白天」「把…換成…」「幫我修圖」），呼叫 edit_image，prompt 照使用者的語言寫就好（中文可以直接傳）；只是要你看圖、描述圖就不要呼叫。"
     "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
 OFFLINE_REPLY = "⚠️ 模型那台電腦現在沒開或連不到，晚點再試。"
@@ -578,6 +579,11 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             if msg is None:
                 return "這裡不能畫圖。"
             return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
+        if name == "edit_image":
+            if msg is None:
+                return "這裡不能改圖。"
+            images = await imagegen.collect_images(msg)
+            return await imagegen.submit_edit(client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
         if name == "weather":
             return await _weather(args.get("location", ""), args.get("days", 3))
         if name == "web_search":
@@ -597,7 +603,7 @@ def tool_status(name: str, args_json: str) -> str:
         args = {}
     if name == "music":
         return music.tool_status(args)
-    if name == "draw_image":
+    if name in ("draw_image", "edit_image"):
         return imagegen.tool_status(args)
     if name == "music_status":
         return "🔎 確認播放狀態"
@@ -669,7 +675,7 @@ def clean_text(text: str | None) -> str:
     return THINK_RE.sub("", text or "").strip()
 
 
-ACTION_TOOLS = {"draw_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
+ACTION_TOOLS = {"draw_image", "edit_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
 CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
 CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
 FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
@@ -725,7 +731,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL] if imagegen.enabled() else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
@@ -1015,6 +1021,25 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
     await interaction.followup.send(res)
 
 
+@client.tree.command(name="改圖", description="上傳一張圖並說要怎麼改（約 20 秒，改好會貼在頻道）")
+@app_commands.describe(圖片="要修改的圖", 內容="要怎麼改（中英文都可以），例如：把背景改成白天", 參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖")
+async def cmd_edit(interaction: discord.Interaction, 圖片: discord.Attachment, 內容: str,
+                   參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None):
+    if not imagegen.enabled():
+        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
+        return
+    atts = [a for a in (圖片, 參考圖2, 參考圖3) if a is not None]
+    if any(not (a.content_type or "").startswith("image/") for a in atts):
+        await interaction.response.send_message("請上傳圖片檔（PNG／JPEG／WEBP）。", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True)
+    prompt = 內容
+    images = [(await a.read(), a.filename or "image.png", (a.content_type or "image/png").split(";")[0]) for a in atts]
+    res = await imagegen.submit_edit(client.http_session, prompt, images, interaction.user.id,
+                                     imagegen.say_for_interaction(interaction), 內容)
+    await interaction.followup.send(res)
+
+
 @client.tree.command(name="help", description="看機器人會做什麼、有哪些指令")
 async def cmd_help(interaction: discord.Interaction):
     e = discord.Embed(title=f"🤖 {client.user.display_name} 使用說明", color=0x5865F2)
@@ -1028,7 +1053,7 @@ async def cmd_help(interaction: discord.Interaction):
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
               "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
               "・排八字命盤、畫星盤（說「@我 幫我排八字和星盤，1990-05-15 14:30 台北出生，男」）\n"
-              "・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
+              "・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
               "・放歌時會有一個自動更新的播放面板（進度條、接下來的歌、播完了沒），語音頻道狀態也會顯示歌名",

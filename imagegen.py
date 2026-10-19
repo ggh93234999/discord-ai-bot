@@ -100,37 +100,51 @@ def _max_queue() -> int:
     return int(os.getenv("IMAGE_MAX_QUEUE", "4") or 4)
 
 
-def _endpoint() -> tuple[str, dict]:
+def _endpoint(path: str = "generations") -> tuple[str, dict]:
     base = (os.getenv("IMAGE_BASE_URL") or os.getenv("LLM_BASE_URL") or "http://localhost:4000/v1").strip().rstrip("/")
     key = (os.getenv("IMAGE_API_KEY") or os.getenv("LLM_API_KEY") or "").strip()
-    return base + "/images/generations", ({"Authorization": f"Bearer {key}"} if key else {})
+    return base + "/images/" + path, ({"Authorization": f"Bearer {key}"} if key else {})
 
 
 class Paused(Exception):
     """畫圖服務暫停或連不上"""
 
 
-async def generate(session: aiohttp.ClientSession, model: str, prompt: str, size: str, timeout: int) -> bytes:
-    """回傳 PNG／JPEG 位元組。連不上、逾時、伺服器錯誤一律丟 Paused（不重試）。"""
-    url, headers = _endpoint()
-    body = {"model": model, "prompt": prompt, "size": size, "n": 1}
+async def _post(session: aiohttp.ClientSession, path: str, timeout: int, *, json=None, data=None) -> bytes:
+    """POST 到圖片 API，回傳圖片位元組。連不上、逾時、伺服器錯誤一律丟 Paused（不重試）。"""
+    url, headers = _endpoint(path)
     try:
-        async with session.post(url, json=body, headers=headers,
+        async with session.post(url, json=json, data=data, headers=headers,
                                 timeout=aiohttp.ClientTimeout(total=timeout, connect=15, sock_connect=15)) as resp:
-            data = await resp.json(content_type=None)
+            body = await resp.json(content_type=None)
             if resp.status >= 500 or resp.status in (404, 408, 429):
-                raise Paused(f"HTTP {resp.status}：{str(data)[:200]}")
+                raise Paused(f"HTTP {resp.status}：{str(body)[:200]}")
             if resp.status != 200:
-                raise RuntimeError(f"HTTP {resp.status}：{str(data)[:300]}")
+                raise RuntimeError(f"HTTP {resp.status}：{str(body)[:300]}")
     except (aiohttp.ClientConnectionError, asyncio.TimeoutError) as e:
         raise Paused(repr(e)) from e
-    item = (data.get("data") or [{}])[0]
+    item = (body.get("data") or [{}])[0]
     if item.get("b64_json"):
         return base64.b64decode(item["b64_json"])
     if item.get("url"):                       # 規格說只有 base64，這裡保險一下
         async with session.get(item["url"], timeout=aiohttp.ClientTimeout(total=120)) as r:
             return await r.read()
-    raise RuntimeError("回傳裡沒有圖片：" + str(data)[:200])
+    raise RuntimeError("回傳裡沒有圖片：" + str(body)[:200])
+
+
+async def generate(session, model: str, prompt: str, size: str, timeout: int) -> bytes:
+    return await _post(session, "generations", timeout, json={"model": model, "prompt": prompt, "size": size, "n": 1})
+
+
+async def edit(session, model: str, prompt: str, images: list[tuple[bytes, str, str]], timeout: int = 900) -> bytes:
+    """改圖：POST /images/edits（multipart）。images = [(位元組, 檔名, content_type)]，第一張是主要要改的。size 不填，依第一張的比例。"""
+    form = aiohttp.FormData()
+    form.add_field("model", model)
+    form.add_field("prompt", prompt)
+    form.add_field("n", "1")
+    for raw, name, ctype in images[:3]:
+        form.add_field("image", raw, filename=name, content_type=ctype)
+    return await _post(session, "edits", timeout, data=form)
 
 
 def _to_file(raw: bytes) -> str:
@@ -168,13 +182,32 @@ def say_for_interaction(interaction: discord.Interaction):
 
 
 def tool_status(args: dict) -> str:
+    if "quality" not in args and "shape" not in args:
+        return "🎨 排進改圖佇列（約 20 秒）"
     q = args.get("quality") if args.get("quality") in QUALITY else "fast"
     return f"🎨 排進畫圖佇列（約 {QUALITY[q][2] if q != 'high' else 10} {'秒' if q != 'high' else '分鐘'}）"
 
 
+def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say) -> str:
+    """共用排隊：make() 回傳要執行的 coroutine（呼叫模型），畫好後 say 貼出。"""
+    global _waiting
+    if user_id in _busy_users:
+        return "你上一張還在處理，等它好了再要下一張。"
+    if _waiting >= _max_queue():
+        return "畫圖排隊的人太多了（目前滿了），晚點再試。"
+    ahead = _waiting
+    _waiting += 1
+    _busy_users.add(user_id)
+    task = asyncio.create_task(_job(user_id, make, label, say))
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
+    wait = ahead * 40 + eta
+    when = f"前面還有 {ahead} 張，" if ahead else ""
+    return f"🎨 {ready}：{when}預計約 {max(1, round(wait / 60))} 分鐘，好了會自動貼在這則下面。"
+
+
 async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, source_text: str = "") -> str:
     """排一張圖。立刻回傳要給模型／使用者看的一句話；圖在背景畫，畫好後呼叫 say(text, path) 貼出。"""
-    global _waiting
     if not enabled():
         return "畫圖功能目前沒開。"
     prompt = str(args.get("prompt") or "").strip()
@@ -189,44 +222,88 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
     shape = args.get("shape") if args.get("shape") in SIZES else "square"
     env_name, default_model, eta, timeout = QUALITY[quality]
     model = os.getenv(env_name, default_model).strip() or default_model
-    max_queue = _max_queue()
-    if user_id in _busy_users:
-        return "你上一張還在畫，等它畫好再要下一張。"
-    if _waiting >= max_queue:
-        return "畫圖排隊的人太多了（目前滿了），晚點再試。"
-    ahead = _waiting
-    _waiting += 1
-    _busy_users.add(user_id)
-    task = asyncio.create_task(_job(session, user_id, model, prompt, SIZES[shape], timeout, quality, shape, say))
-    _tasks.add(task)
-    task.add_done_callback(_tasks.discard)
-    wait = (ahead * 40) + (eta if quality != "high" else eta)
-    when = f"前面還有 {ahead} 張，" if ahead else ""
-    return (f"🎨 排進畫圖了（{QUALITY_NAMES[quality]}，{SIZE_NAMES[shape]}）：{when}預計約 "
-            f"{max(1, round(wait / 60))} 分鐘，畫好會自動貼在這則下面。")
+    size = SIZES[shape]
+    return _enqueue(session, user_id, lambda: generate(session, model, prompt, size, timeout),
+                    f"{QUALITY_NAMES[quality]}・{size.replace('x', '×')}", f"排進畫圖了（{QUALITY_NAMES[quality]}，{SIZE_NAMES[shape]}）", eta, say)
 
 
-async def _job(session, user_id, model, prompt, size, timeout, quality, shape, say):
+EDIT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "edit_image",
+        "description": (
+            "修改使用者給的圖片（改天氣／時間／顏色、加或移除物件、換風格等）。使用者傳了圖片（或回覆一則有圖的訊息）並說「改成…」「把…換成…」「幫我修圖」時呼叫；"
+            "要改的圖由程式自動從這則訊息（或被回覆的訊息）的附件取得，你不用處理圖片。畫好要等約 20 秒，你呼叫後只要簡短回一句「在改了」就好。"
+            "prompt 寫「改什麼」，中英文都可以：使用者用中文講就直接用中文（不用翻譯），英文通常更穩定；可加上 \"Keep everything else the same.\"（其他部分維持不變）。" 
+            "圖中的小字、招牌文字改起來容易亂碼，不要承諾能精準改字。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"prompt": {"type": "string", "description": "修改指令（中英文皆可）"}},
+            "required": ["prompt"],
+        },
+    },
+}
+
+
+async def collect_images(msg: discord.Message) -> list[tuple[bytes, str, str]]:
+    """取要改的圖：先看這則訊息的附件，沒有就看被回覆的那則（例如回覆機器人剛畫好的圖）。最多 3 張。"""
+    atts = [a for a in msg.attachments if (a.content_type or "").startswith("image/")]
+    if not atts and msg.reference is not None:
+        ref = msg.reference.resolved
+        if ref is None and msg.reference.message_id:
+            try:
+                ref = await msg.channel.fetch_message(msg.reference.message_id)
+            except discord.HTTPException:
+                ref = None
+        if isinstance(ref, discord.Message):
+            atts = [a for a in ref.attachments if (a.content_type or "").startswith("image/")]
+    out = []
+    for a in atts[:3]:
+        if a.size and a.size > 20_000_000:
+            continue
+        out.append((await a.read(), a.filename or "image.png", (a.content_type or "image/png").split(";")[0]))
+    return out
+
+
+async def submit_edit(session, prompt: str, images: list, user_id: int, say, source_text: str = "") -> str:
+    if not enabled():
+        return "畫圖功能目前沒開。"
+    prompt = (prompt or "").strip()[:1200]
+    if not prompt:
+        return "沒有說要怎麼改。"
+    if not images:
+        return "沒有找到要改的圖片，請把圖片傳上來，或回覆一則有圖的訊息再說要怎麼改。"
+    why = check_prompt(prompt, source_text)
+    if why:
+        log.info("改圖被擋：%s｜%s", why, prompt[:80])
+        return why + "（這張沒有改）"
+    model = os.getenv("IMAGE_MODEL_EDIT", "draw-klein").strip() or "draw-klein"
+    return _enqueue(session, user_id, lambda: edit(session, model, prompt, images), "改圖",
+                    f"排進改圖了（{len(images)} 張參考圖）" if len(images) > 1 else "排進改圖了", 25, say)
+
+
+async def _job(user_id, make, label, say):
     global _waiting
     path = None
     try:
         async with _lock:
             t0 = time.time()
-            raw = await generate(session, model, prompt, size, timeout)
+            raw = await make()
             path = await asyncio.to_thread(_to_file, raw)
             took = round(time.time() - t0)
-        log.info("畫好了：%s %s %ds", model, size, took)
-        await say(f"🖼️ 畫好了（{QUALITY_NAMES[quality]}・{size.replace('x', '×')}・{took} 秒）", path)
+        log.info("圖好了：%s %ds", label, took)
+        await say(f"🖼️ 好了（{label}・{took} 秒）", path)
     except Paused as e:
         log.warning("畫圖服務暫停或連不上：%s", e)
         try:
             await say(PAUSED_REPLY)
         except Exception:
             pass
-    except Exception as e:
-        log.exception("畫圖失敗")
+    except Exception:
+        log.exception("畫圖／改圖失敗")
         try:
-            await say("🎨 這張畫失敗了，換個說法再試一次。")
+            await say("🎨 這張處理失敗了，換個說法或換張圖再試一次。")
         except Exception:
             pass
     finally:
