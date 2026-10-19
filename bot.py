@@ -583,10 +583,14 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
         if name == "draw_image":
             if msg is None:
                 return "這裡不能畫圖。"
+            if not imagegen.channel_ok(msg.channel):
+                return imagegen.NSFW_ONLY_REPLY
             return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
         if name == "edit_image":
             if msg is None:
                 return "這裡不能改圖。"
+            if not imagegen.channel_ok(msg.channel):
+                return imagegen.NSFW_ONLY_REPLY
             images = await imagegen.collect_images(msg)
             return await imagegen.submit_edit(client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
         if name == "weather":
@@ -1037,6 +1041,9 @@ async def cmd_auto(interaction: discord.Interaction, 開關: app_commands.Choice
     形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
           app_commands.Choice(name="直式", value="portrait")])
 async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square"):
+    if not imagegen.channel_ok(interaction.channel):
+        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
+        return
     if not imagegen.enabled():
         await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
         return
@@ -1054,6 +1061,9 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
     形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
           app_commands.Choice(name="直式", value="portrait")])
 async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square"):
+    if not imagegen.channel_ok(interaction.channel):
+        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
+        return
     if not imagegen.enabled():
         await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
         return
@@ -1081,6 +1091,9 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
                        參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖")
 async def cmd_edit(interaction: discord.Interaction, 內容: str, 圖片: discord.Attachment | None = None, 訊息: str | None = None,
                    參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None):
+    if not imagegen.channel_ok(interaction.channel):
+        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
+        return
     if not imagegen.enabled():
         await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
         return
@@ -1116,6 +1129,9 @@ class EditModal(discord.ui.Modal, title="改這張圖"):
 
 @client.tree.context_menu(name="改這張圖")
 async def ctx_edit(interaction: discord.Interaction, message: discord.Message):
+    if not imagegen.channel_ok(interaction.channel):
+        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
+        return
     if not imagegen.enabled():
         await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
         return
