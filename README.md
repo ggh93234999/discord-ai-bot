@@ -1,5 +1,7 @@
 # Discord AI 機器人（大笨bot）
 
+👉 **[介紹網頁](https://ggh93234999.github.io/discord-ai-bot/)**：不用看程式碼，直接看大笨bot 能做什麼。
+
 讀取頻道的歷史訊息當上下文，用本地模型（例如 Qwen，經 LiteLLM 的 OpenAI 相容 API）回覆。
 機器人本體跑在 Linux 伺服器上（systemd 服務 `discord-bot`），連到你設定的模型 API（`LLM_BASE_URL`）。
 Discord 機器人只需要「往外連」Discord，不用開任何連接埠。
