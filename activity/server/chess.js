@@ -29,6 +29,9 @@ function attacked(sq, idx, by) {
   return false;
 }
 const kingIdx = (sq, wh) => sq.indexOf(wh ? "K" : "k");
+// 電腦搜尋用：偽合法走法（還沒檢查自己的王有沒有被吃）、剛走完這步的那方有沒有走進被將軍
+export const pseudoMoves = (st) => pseudo(st);
+export function movedIntoCheck(n) { const wh = n.turn === "w", k = kingIdx(n.sq, wh); return k < 0 || attacked(n.sq, k, wh ? "w" : "b"); }
 // 輪到的那方是不是正被將軍（電腦搜尋用）
 export function checked(st) { const wh = st.turn === "b", k = kingIdx(st.sq, wh); return k >= 0 && attacked(st.sq, k, wh ? "w" : "b"); }
 

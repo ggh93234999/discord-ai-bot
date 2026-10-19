@@ -99,6 +99,9 @@ export function inCheckSlow(sq, red) {
   return pseudo(sq, !red).some((m) => m.t === k);
 }
 
+// 電腦搜尋用：偽合法走法（還沒檢查自己的王有沒有被吃）、剛走完這步的那方有沒有走進被將軍
+export const pseudoMoves = (st) => pseudo(st.sq, st.turn === "b");
+export const movedIntoCheck = (n) => inCheck(n.sq, n.turn === "w");
 // 輪到的那方是不是正被將軍（電腦搜尋用）
 export const checked = (st) => inCheck(st.sq, st.turn === "b");
 
