@@ -95,7 +95,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "畫圖": ("imagine", "Draw an image from a description (30 s to a few minutes; the result is posted in the channel)",
            {"內容": ("prompt", "What to draw (any language)"), "畫質": ("quality", "Fast (default) / cleaner composition and text / best quality (slow)"),
             "形狀": ("shape", "Square (default) / landscape / portrait")}),
-    "智慧畫圖": ("smartimagine", "A small model expands your one-liner into a full prompt first, then draws (a few extra seconds)",
+    "智慧畫圖": ("smartimagine", "Expands your one-liner into a full prompt first (10-30 s extra), then draws",
              {"內容": ("prompt", "What to draw, one sentence is enough (any language)"), "畫質": ("quality", "Fast (default) / cleaner composition and text / best quality (slow)"),
               "形狀": ("shape", "Square (default) / landscape / portrait")}),
     "改圖": ("editimage", "Edit an image (~20 s): attach one, paste a message link, or use the latest image here",

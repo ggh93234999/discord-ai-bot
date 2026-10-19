@@ -1042,7 +1042,7 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
     await interaction.followup.send(res)
 
 
-@client.tree.command(name="智慧畫圖", description="先用小模型把你的一句話擴寫成完整的畫圖提示詞，再畫（會多等幾秒）")
+@client.tree.command(name="智慧畫圖", description="先把你的一句話擴寫成完整的畫圖提示詞再畫（擴寫約 10～30 秒）")
 @app_commands.describe(內容="想畫什麼，一句話就好（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式")
 @app_commands.choices(
     畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
@@ -1058,7 +1058,7 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
         await interaction.response.send_message(why + "（這張沒有畫）", ephemeral=True)
         return
     await interaction.response.defer(thinking=True)
-    expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質, models.current())
+    expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質)
     note = ""
     if expanded:
         note = f"✨ 擴寫後的提示詞：{expanded[:900]}\n"
