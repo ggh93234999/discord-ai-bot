@@ -188,6 +188,42 @@ def tool_status(args: dict) -> str:
     return f"🎨 排進畫圖佇列（約 {QUALITY[q][2] if q != 'high' else 10} {'秒' if q != 'high' else '分鐘'}）"
 
 
+EXPAND_SYSTEM = (
+    "You write prompts for a text-to-image model. The user gives a short idea (any language). "
+    "Rewrite it as ONE vivid, concrete image prompt: subject and its appearance, action or pose, setting, style or medium, lighting, color palette, "
+    "camera angle and composition. Keep the user's intent exactly; add detail, do not change the subject or add other main subjects. "
+    "Do not add real people or celebrities unless the user named them. Avoid asking for readable text inside the image unless the user wants it. "
+    "{lang} Under 110 words. Output only the prompt itself: no quotes, no explanation, no preface."
+)
+
+
+def prompt_model() -> str:
+    """擴寫提示詞用的小模型：.env 的 IMAGE_PROMPT_MODEL；沒設就回空字串，由呼叫的人換成機器人目前用的語言模型。"""
+    return (os.getenv("IMAGE_PROMPT_MODEL") or "").strip()
+
+
+async def expand_prompt(session: aiohttp.ClientSession, idea: str, quality: str = "fast", fallback_model: str = "") -> str | None:
+    """把一句話擴寫成完整的畫圖提示詞。失敗（連不上、逾時、回空的）回傳 None，由呼叫的人改用原句。"""
+    base = (os.getenv("IMAGE_BASE_URL") or os.getenv("LLM_BASE_URL") or "http://localhost:4000/v1").strip().rstrip("/")
+    key = (os.getenv("IMAGE_API_KEY") or os.getenv("LLM_API_KEY") or "").strip()
+    lang = "Write the prompt in Traditional Chinese." if quality == "clean" else "Write the prompt in English."
+    body = {"model": prompt_model() or fallback_model, "temperature": 0.8, "max_tokens": 400,
+            "messages": [{"role": "system", "content": EXPAND_SYSTEM.format(lang=lang)}, {"role": "user", "content": idea}]}
+    try:
+        async with session.post(base + "/chat/completions", json=body, headers={"Authorization": f"Bearer {key}"} if key else {},
+                                timeout=aiohttp.ClientTimeout(total=90, connect=10)) as r:
+            data = await r.json(content_type=None)
+            if r.status != 200:
+                log.warning("擴寫提示詞失敗 HTTP %s：%s", r.status, str(data)[:200])
+                return None
+        text = (data["choices"][0]["message"].get("content") or "").strip()
+    except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, IndexError, ValueError) as e:
+        log.warning("擴寫提示詞失敗：%r", e)
+        return None
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip().strip('"“”').strip()
+    return text[:1200] or None
+
+
 def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say) -> str:
     """共用排隊：make() 回傳要執行的 coroutine（呼叫模型），畫好後 say 貼出。"""
     global _waiting

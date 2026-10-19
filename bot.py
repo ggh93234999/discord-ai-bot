@@ -1042,6 +1042,36 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
     await interaction.followup.send(res)
 
 
+@client.tree.command(name="智慧畫圖", description="先用小模型把你的一句話擴寫成完整的畫圖提示詞，再畫（會多等幾秒）")
+@app_commands.describe(內容="想畫什麼，一句話就好（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式")
+@app_commands.choices(
+    畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
+          app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
+    形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
+          app_commands.Choice(name="直式", value="portrait")])
+async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square"):
+    if not imagegen.enabled():
+        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
+        return
+    why = imagegen.check_prompt(內容)
+    if why:
+        await interaction.response.send_message(why + "（這張沒有畫）", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True)
+    expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質, models.current())
+    note = ""
+    if expanded:
+        note = f"✨ 擴寫後的提示詞：{expanded[:900]}\n"
+        prompt = expanded
+    else:
+        note = "（提示詞擴寫失敗，這張直接用你的原句畫）\n"
+        prompt = 內容
+    log.info("智慧畫圖 user=%s 原句=%s 擴寫=%s", interaction.user.id, 內容[:80], (expanded or "失敗")[:200])
+    res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀},
+                                interaction.user.id, imagegen.say_for_interaction(interaction), 內容)
+    await interaction.followup.send(note + res)
+
+
 @client.tree.command(name="改圖", description="改一張圖（約 20 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
 @app_commands.describe(內容="要怎麼改（中英文都可以），例如：把背景改成白天", 圖片="要修改的圖（可不附）", 訊息="要改哪則訊息裡的圖：貼那則訊息的連結（可不填）",
                        參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖")
