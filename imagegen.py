@@ -217,12 +217,12 @@ def prompt_model() -> str:
     return (os.getenv("IMAGE_PROMPT_MODEL") or "prompt-writer").strip()
 
 
-async def expand_prompt(session: aiohttp.ClientSession, idea: str, quality: str = "fast", fallback_model: str = "") -> str | None:
+async def expand_prompt(session: aiohttp.ClientSession, idea: str, quality: str = "fast", fallback_model: str = "", lang: str = "en") -> str | None:
     """把一句話擴寫成一段完整的英文畫圖提示詞。prompt-writer 已內建系統提示詞，只要把想法當 user 訊息傳進去。
     失敗（連不上、逾時、回空的）回傳 None，由呼叫的人改用原句。"""
     base = (os.getenv("IMAGE_BASE_URL") or os.getenv("LLM_BASE_URL") or "http://localhost:4000/v1").strip().rstrip("/")
     key = (os.getenv("IMAGE_API_KEY") or os.getenv("LLM_API_KEY") or "").strip()
-    body = {"model": prompt_model(), "max_tokens": 500, "messages": [{"role": "user", "content": idea}]}
+    body = {"model": prompt_model(), "max_tokens": 500, "messages": [{"role": "user", "content": idea + ("\n\n（請用繁體中文寫出完整的畫圖提示詞，不要用英文。）" if lang == "zh" else "")}]}
     try:
         async with session.post(base + "/chat/completions", json=body, headers={"Authorization": f"Bearer {key}"} if key else {},
                                 timeout=aiohttp.ClientTimeout(total=180, connect=10)) as r:

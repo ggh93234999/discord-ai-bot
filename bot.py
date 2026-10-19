@@ -1054,13 +1054,15 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
 
 
 @client.tree.command(name="智慧畫圖", description="先把你的一句話擴寫成完整的畫圖提示詞再畫（擴寫約 10～30 秒）")
-@app_commands.describe(內容="想畫什麼，一句話就好（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式")
+@app_commands.describe(內容="想畫什麼，一句話就好（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式",
+                       提示詞語言="擴寫出來的提示詞用英文（預設）還是中文")
 @app_commands.choices(
     畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
           app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
     形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
-          app_commands.Choice(name="直式", value="portrait")])
-async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square"):
+          app_commands.Choice(name="直式", value="portrait")],
+    提示詞語言=[app_commands.Choice(name="英文（預設）", value="en"), app_commands.Choice(name="中文", value="zh")])
+async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square", 提示詞語言: str = "en"):
     if not imagegen.channel_ok(interaction.channel):
         await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
         return
@@ -1072,7 +1074,7 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
         await interaction.response.send_message(why + "（這張沒有畫）", ephemeral=True)
         return
     await interaction.response.defer(thinking=True)
-    expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質)
+    expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質, lang=提示詞語言)
     note = ""
     if expanded:
         note = f"📝 原句：{內容[:300]}\n✨ 擴寫後的提示詞：{expanded[:900]}\n"
