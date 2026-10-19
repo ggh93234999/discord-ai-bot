@@ -23,3 +23,4 @@ discord-bot.service
 lf2-online/
 dm_users.json
 activity/server/video_cache
+music_state.json

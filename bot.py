@@ -860,6 +860,10 @@ def should_reply(msg: discord.Message) -> bool:
 @client.event
 async def on_ready():
     await channels.cleanup_on_ready()
+    try:
+        await music.start_resume(client)   # 重啟前在播的歌接回去（只做一次）
+    except Exception:
+        log.exception("接回播放失敗")
     log.info("已登入為 %s（ID %s）", client.user, client.user.id)
     log.info(
         "使用模型：%s @ %s，讀取最近 %d 則訊息當上下文，上網工具：%s",
