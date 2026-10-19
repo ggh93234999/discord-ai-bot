@@ -7,7 +7,7 @@
 - 那台沒有內容過濾，過濾在這裡做（check_prompt）。
 - 對方在打遊戲等暫停服務時連不上或回錯誤：直接回「畫圖服務目前暫停中」，不重試。
 設定（.env，都可省略）：IMAGE_GEN=on|off、IMAGE_BASE_URL、IMAGE_API_KEY（預設沿用 LLM_BASE_URL / LLM_API_KEY）、
-IMAGE_MODEL_FAST / IMAGE_MODEL_CLEAN / IMAGE_MODEL_HIGH、IMAGE_DAILY_LIMIT（每人每天張數，預設 15）、IMAGE_MAX_QUEUE（最多排幾張，預設 4）。
+IMAGE_MODEL_FAST / IMAGE_MODEL_CLEAN / IMAGE_MODEL_HIGH、IMAGE_MAX_QUEUE（最多排幾張，預設 4）。
 """
 import asyncio
 import base64
@@ -17,15 +17,12 @@ import os
 import re
 import tempfile
 import time
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import aiohttp
 import discord
 from PIL import Image
 
 log = logging.getLogger("bot")
-TZ = ZoneInfo(os.getenv("TZ_NAME", "Asia/Taipei"))
 
 PAUSED_REPLY = "🎨 畫圖服務目前暫停中，晚點再試。"
 SIZES = {"square": "768x768", "landscape": "1344x768", "portrait": "768x1344"}
@@ -96,16 +93,11 @@ def check_prompt(*texts: str) -> str | None:
 _lock = asyncio.Lock()                      # 對方一次只畫一張，這邊也一張一張送
 _waiting = 0                                # 目前在排隊（含正在畫）的張數
 _busy_users: set[int] = set()
-_daily: dict[tuple[int, str], int] = {}
 _tasks: set[asyncio.Task] = set()
 
 
-def _limits() -> tuple[int, int]:
-    return int(os.getenv("IMAGE_DAILY_LIMIT", "15") or 15), int(os.getenv("IMAGE_MAX_QUEUE", "4") or 4)
-
-
-def _today() -> str:
-    return datetime.now(TZ).strftime("%Y-%m-%d")
+def _max_queue() -> int:
+    return int(os.getenv("IMAGE_MAX_QUEUE", "4") or 4)
 
 
 def _endpoint() -> tuple[str, dict]:
@@ -197,19 +189,15 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
     shape = args.get("shape") if args.get("shape") in SIZES else "square"
     env_name, default_model, eta, timeout = QUALITY[quality]
     model = os.getenv(env_name, default_model).strip() or default_model
-    daily, max_queue = _limits()
-    day = (user_id, _today())
+    max_queue = _max_queue()
     if user_id in _busy_users:
         return "你上一張還在畫，等它畫好再要下一張。"
-    if _daily.get(day, 0) >= daily:
-        return f"你今天已經畫了 {daily} 張，明天再來吧。"
     if _waiting >= max_queue:
         return "畫圖排隊的人太多了（目前滿了），晚點再試。"
     ahead = _waiting
     _waiting += 1
     _busy_users.add(user_id)
-    _daily[day] = _daily.get(day, 0) + 1
-    task = asyncio.create_task(_job(session, user_id, day, model, prompt, SIZES[shape], timeout, quality, shape, say))
+    task = asyncio.create_task(_job(session, user_id, model, prompt, SIZES[shape], timeout, quality, shape, say))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
     wait = (ahead * 40) + (eta if quality != "high" else eta)
@@ -218,7 +206,7 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
             f"{max(1, round(wait / 60))} 分鐘，畫好會自動貼在這則下面。")
 
 
-async def _job(session, user_id, day, model, prompt, size, timeout, quality, shape, say):
+async def _job(session, user_id, model, prompt, size, timeout, quality, shape, say):
     global _waiting
     path = None
     try:
@@ -231,14 +219,12 @@ async def _job(session, user_id, day, model, prompt, size, timeout, quality, sha
         await say(f"🖼️ 畫好了（{QUALITY_NAMES[quality]}・{size.replace('x', '×')}・{took} 秒）", path)
     except Paused as e:
         log.warning("畫圖服務暫停或連不上：%s", e)
-        _daily[day] = max(0, _daily.get(day, 1) - 1)          # 沒畫成不算額度
         try:
             await say(PAUSED_REPLY)
         except Exception:
             pass
     except Exception as e:
         log.exception("畫圖失敗")
-        _daily[day] = max(0, _daily.get(day, 1) - 1)
         try:
             await say("🎨 這張畫失敗了，換個說法再試一次。")
         except Exception:
