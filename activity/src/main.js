@@ -24,6 +24,8 @@ const mountLf2 = optional["./lf2.js"]?.mountLf2;
 const clientId = import.meta.env.VITE_CLIENT_ID;
 const params = new URLSearchParams(location.search);
 const inDiscord = params.has("frame_id");
+// 手機版 Discord 會在 Activity 最上面蓋一條「大笨bot／退出」的列，會把「← 選單」擋住：手機上的 Discord 內多留一段頂端空間（?dcm=1 可以在一般瀏覽器測試）
+if ((inDiscord && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) || params.has("dcm")) document.documentElement.classList.add("dcm");
 let sdk = null;
 export const env = { inDiscord, instanceId: params.get("instance_id") || params.get("room") || "local-test" };
 
