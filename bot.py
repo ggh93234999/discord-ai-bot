@@ -33,6 +33,7 @@ import aliases
 import channels
 import economy
 import extras
+import imagegen
 import divination
 import dmlog
 import fortune
@@ -117,6 +118,7 @@ TOOL_GUIDE = (
     "看對話紀錄時，只有真的出現工具呼叫和工具結果的，才代表你做過；你嘴巴說過但沒有工具紀錄的，等於沒做。"
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
     "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
+    "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。露骨、涉及未成年人、真人肖像的圖一律拒絕、不呼叫。"
     "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
 OFFLINE_REPLY = "⚠️ 模型那台電腦現在沒開或連不到，晚點再試。"
@@ -572,6 +574,10 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             if msg is None:
                 return "這裡不能放音樂。"
             return await music.run_tool(msg, args)
+        if name == "draw_image":
+            if msg is None:
+                return "這裡不能畫圖。"
+            return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
         if name == "weather":
             return await _weather(args.get("location", ""), args.get("days", 3))
         if name == "web_search":
@@ -591,6 +597,8 @@ def tool_status(name: str, args_json: str) -> str:
         args = {}
     if name == "music":
         return music.tool_status(args)
+    if name == "draw_image":
+        return imagegen.tool_status(args)
     if name == "music_status":
         return "🔎 確認播放狀態"
     if name == "random_number":
@@ -661,7 +669,7 @@ def clean_text(text: str | None) -> str:
     return THINK_RE.sub("", text or "").strip()
 
 
-ACTION_TOOLS = {"music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
+ACTION_TOOLS = {"draw_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
 CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
 CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
 FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
@@ -717,7 +725,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL] if imagegen.enabled() else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
@@ -990,6 +998,23 @@ async def cmd_auto(interaction: discord.Interaction, 開關: app_commands.Choice
     await interaction.response.send_message(msg)
 
 
+@client.tree.command(name="畫圖", description="畫一張圖（約 30 秒～數分鐘，畫好會貼在頻道）")
+@app_commands.describe(內容="想畫什麼（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式")
+@app_commands.choices(
+    畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
+          app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
+    形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
+          app_commands.Choice(name="直式", value="portrait")])
+async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square"):
+    if not imagegen.enabled():
+        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True)
+    res = await imagegen.submit(client.http_session, {"prompt": 內容, "quality": 畫質, "shape": 形狀},
+                                interaction.user.id, imagegen.say_for_interaction(interaction), 內容)
+    await interaction.followup.send(res)
+
+
 @client.tree.command(name="help", description="看機器人會做什麼、有哪些指令")
 async def cmd_help(interaction: discord.Interaction):
     e = discord.Embed(title=f"🤖 {client.user.display_name} 使用說明", color=0x5865F2)
@@ -1003,7 +1028,7 @@ async def cmd_help(interaction: discord.Interaction):
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
               "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
               "・排八字命盤、畫星盤（說「@我 幫我排八字和星盤，1990-05-15 14:30 台北出生，男」）\n"
-              "・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
+              "・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
               "・放歌時會有一個自動更新的播放面板（進度條、接下來的歌、播完了沒），語音頻道狀態也會顯示歌名",
