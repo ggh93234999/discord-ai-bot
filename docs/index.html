@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大笨bot：住在 Discord 裡的 AI 機器人</title>
+<meta name="description" content="大笨bot 是一隻 Discord AI 機器人：聊天、上網查資料、放 YouTube 音樂、占卜，還有棋類、麻將、橋牌、德州撲克等小遊戲，西洋棋和象棋可以跟電腦下。開源，可以自己架。">
+<meta property="og:title" content="大笨bot">
+<meta property="og:description" content="住在 Discord 裡的 AI 機器人。會聊天、放音樂、占卜，也陪你下棋打麻將。名字取得很老實。">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#e9e5d8">
+<script>try{if(!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))document.documentElement.classList.add("js")}catch(e){}</script>
+<link rel="icon" href="favicon.png" type="image/png">
+<style>
+:root{
+  --paper:#e9e5d8;      /* 宣紙 */
+  --paper-2:#dcd7c7;
+  --ink:#1f1e1c;        /* 濃墨 */
+  --ink-2:#4f4d48;      /* 淡墨 */
+  --ink-3:#7d7b74;
+  --seal:#b1302a;       /* 硃砂 */
+  --celadon:#5f7f78;    /* 青 */
+  --kai:"Kaiti TC","BiauKai","DFKai-SB","STKaiti","KaiTi","AR PL UKai TW","Noto Serif TC","Songti TC",serif;
+  --song:"Noto Serif TC","Source Han Serif TC","Songti TC","PMingLiU","MingLiU",serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;color:var(--ink);font-family:var(--song);font-size:17px;line-height:1.95;
+  background-color:var(--paper);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 .3  0 0 0 0 .28  0 0 0 0 .2  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  -webkit-text-size-adjust:100%;
+}
+a{color:var(--seal);text-decoration-thickness:1px;text-underline-offset:.2em}
+a:focus-visible,button:focus-visible{outline:2px solid var(--seal);outline-offset:3px;border-radius:2px}
+.wrap{width:min(100% - 40px,60rem);margin-inline:auto}
+
+/* ---------- 開頭 ---------- */
+.hero{position:relative;padding:clamp(28px,6vw,72px) 0 clamp(8px,3vw,32px);overflow:hidden}
+.hero::before{ /* 一團暈開的淡墨 */
+  content:"";position:absolute;left:-12%;top:-8%;width:62%;aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(95,127,120,.28),rgba(95,127,120,0));filter:blur(8px);z-index:0}
+.hero .wrap{position:relative;z-index:1;display:grid;gap:8px 32px;align-items:center;grid-template-columns:1.25fr .75fr}
+.title{margin:0;font-family:var(--kai);font-weight:400;line-height:1;letter-spacing:0;white-space:nowrap}
+.title .a{display:inline-block;font-size:clamp(96px,22vw,230px);transform:rotate(-5deg) translateY(.02em)}
+.title .b{display:inline-block;font-size:clamp(78px,17.5vw,184px);transform:rotate(7deg) translate(-.06em,.12em);color:#2a2926}
+.title .c{display:inline-block;font-size:clamp(28px,6vw,60px);transform:rotate(-4deg) translate(.1em,.1em);color:var(--ink-2)}
+.lead{margin:.8em 0 0;font-size:clamp(18px,2.4vw,22px);max-width:26em}
+.aside{margin:.2em 0 0;color:var(--ink-2);font-size:15px}
+.mascot{width:100%;max-width:300px;justify-self:center;height:auto;transform:rotate(-3deg);border-radius:50%;box-shadow:0 2px 0 rgba(0,0,0,.25),0 10px 22px rgba(0,0,0,.18)}
+@media (max-width:720px){
+  .hero .wrap{grid-template-columns:1fr}
+  .mascot{max-width:220px;justify-self:start;margin-top:4px}
+}
+
+/* ---------- 對話卷 ---------- */
+.scroll{margin:clamp(20px,4vw,40px) auto 0;max-width:42rem}
+.scroll figcaption{font-size:14px;color:var(--ink-3);margin:0 0 10px;letter-spacing:.02em}
+.chat{list-style:none;margin:0;padding:18px 18px 8px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);
+  background:rgba(255,255,255,.2)}
+.chat li{display:flex;gap:12px;margin:0 0 14px;align-items:flex-start}
+.chat .u{justify-content:flex-end}
+.chat .u p{margin:0;max-width:85%;padding:2px 0 2px 12px;border-left:2px solid var(--ink-3);color:var(--ink-2)}
+.chat .b p{margin:0;max-width:85%;padding:6px 12px;background:rgba(31,30,28,.06);border-radius:2px 14px 14px 14px}
+.chat .seal{flex:none;display:grid;place-items:center;width:34px;height:34px;margin-top:2px;background:var(--seal);color:var(--paper);
+  font-family:var(--kai);font-size:22px;line-height:1;border-radius:3px;transform:rotate(-6deg)}
+.js .chat li{opacity:0;transform:translateY(6px)}
+.js .chat li.in{opacity:1;transform:none;transition:opacity .45s ease,transform .45s ease}
+.replay{margin:6px 0 0;padding:6px 0;background:none;border:0;border-bottom:1px solid var(--ink-3);color:var(--ink-2);font:inherit;font-size:14px;cursor:pointer}
+.replay:hover{color:var(--seal);border-color:var(--seal)}
+
+/* ---------- 內文 ---------- */
+section{padding:clamp(36px,6vw,64px) 0 0}
+h2{margin:0 0 .2em;font-family:var(--kai);font-weight:400;font-size:clamp(30px,5vw,44px);line-height:1.3}
+h2 + .intro{margin:0 0 1.4em;max-width:34em;color:var(--ink-2)}
+.rows{list-style:none;margin:0;padding:0;border-top:1px solid var(--ink-3)}
+.rows li{display:grid;grid-template-columns:64px 1fr;gap:6px 18px;padding:18px 0 16px;border-bottom:1px solid rgba(31,30,28,.22)}
+.stamp{display:grid;place-items:center;width:52px;height:52px;border:2px solid var(--seal);color:var(--seal);border-radius:4px;
+  font-family:var(--kai);font-size:30px;line-height:1;transform:rotate(var(--r,-3deg));background:rgba(177,48,42,.05)}
+.rows li:nth-child(2n) .stamp{--r:2.5deg}
+.rows li:nth-child(3n) .stamp{--r:-1deg}
+h3{margin:0;font-family:var(--kai);font-weight:400;font-size:24px;line-height:1.5}
+.rows p{margin:.1em 0 0;max-width:34em}
+.rows .small{font-size:15px;color:var(--ink-2)}
+@media (max-width:520px){.rows li{grid-template-columns:48px 1fr;gap:4px 12px}.stamp{width:44px;height:44px;font-size:25px}}
+
+/* ---------- 自己架 ---------- */
+.steps{margin:0;padding:0 0 0 2.4em;list-style:cjk-ideographic;max-width:44rem}
+.steps li{padding-left:.4em;margin:0 0 1.1em}
+.steps li::marker{font-family:var(--kai);color:var(--seal);font-size:1.15em}
+pre{margin:.5em 0 0;padding:12px 14px;background:rgba(31,30,28,.9);color:#e9e5d8;border-radius:3px;overflow-x:auto;
+  font:14px/1.7 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;tab-size:2}
+code{font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;font-size:.9em;background:rgba(31,30,28,.08);padding:.05em .35em;border-radius:2px}
+pre code{background:none;padding:0}
+.note{max-width:34em;color:var(--ink-2);font-size:15px}
+
+/* ---------- 結尾 ---------- */
+footer{position:relative;margin-top:clamp(48px,8vw,96px);padding-top:clamp(70px,14vw,150px);overflow:hidden}
+footer svg.hills{position:absolute;left:0;right:0;top:0;width:100%;height:clamp(90px,16vw,170px);display:block}
+footer .wrap{position:relative;padding-bottom:40px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:baseline;justify-content:space-between}
+footer p{margin:0;color:var(--ink-2);font-size:15px}
+.gh{font-family:var(--kai);font-size:26px}
+@media (prefers-reduced-motion:reduce){.js .chat li{opacity:1;transform:none}.js .chat li.in{transition:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <h1 class="title" aria-label="大笨bot"><span class="a" aria-hidden="true">大</span><span class="b" aria-hidden="true">笨</span><span class="c" aria-hidden="true">bot</span></h1>
+      <p class="lead">一隻住在 Discord 裡的 AI 機器人。會聊天、上網查、放音樂、占卜，也陪你下棋打麻將。</p>
+      <p class="aside">名字取得很老實，有時候真的很笨。</p>
+    </div>
+    <img class="mascot" src="avatar.jpg" width="512" height="512" alt="大笨bot 的頭貼：宣紙上用毛筆寫的一個歪歪的「笨」字，角落蓋著紅印">
+  </div>
+
+  <div class="wrap">
+    <figure class="scroll" style="margin-inline:0">
+      <figcaption>示意對話，不是真實紀錄</figcaption>
+      <ol class="chat" id="chat">
+        <li class="u"><p>@大笨bot 台北明天會下雨嗎</p></li>
+        <li class="b"><span class="seal" aria-hidden="true">笨</span><p>🔎 搜尋：台北 明天 天氣</p></li>
+        <li class="b"><span class="seal" aria-hidden="true">笨</span><p>下午有雨，出門帶傘。</p></li>
+        <li class="u"><p>放周杰倫的晴天</p></li>
+        <li class="b"><span class="seal" aria-hidden="true">笨</span><p>🎶 排進佇列了：晴天。語音頻道狀態也幫你改成歌名。</p></li>
+        <li class="u"><p>幫我擲筊，問明天面試順不順</p></li>
+        <li class="b"><span class="seal" aria-hidden="true">笨</span><p>聖筊。擲筊是程式擲的，我只負責解讀，想作弊也沒辦法。</p></li>
+        <li class="u"><p>你是不是很笨</p></li>
+        <li class="b"><span class="seal" aria-hidden="true">笨</span><p>名字都寫在上面了。</p></li>
+      </ol>
+      <button class="replay" id="replay" type="button" hidden>再看一次</button>
+    </figure>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>它會做的事</h2>
+      <p class="intro">私訊它、在頻道 @它、回覆它的訊息，它就會回。其他機器人說的話一律不理，免得兩隻機器人吵個沒完。</p>
+      <ul class="rows">
+        <li><span class="stamp" aria-hidden="true">聊</span><div><h3>聊天、看圖、上網</h3>
+          <p>讀頻道前面的訊息當上下文，圖片也看得懂（最近 4 則裡最多 4 張）。問天氣會去查，需要即時資訊時自己決定要不要搜尋、打開網頁。後面接什麼模型由你決定，本機的 Ollama，或 OpenAI、DeepSeek 這類線上服務都行。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">樂</span><div><h3>放 YouTube 音樂</h3>
+          <p>進語音頻道後說「放周杰倫的晴天」，或用指令貼網址、整個播放清單。有佇列、插播、播放面板和進度條，沒人聽了會自己離開。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">卜</span><div><h3>占卜</h3>
+          <p>塔羅（78 張，正逆位）、擲筊、六十甲子籤、易經起卦，還能排八字命盤和星盤，並附上圖。牌、籤、卦都由程式用亂數決定，模型只負責解讀。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">管</span><div><h3>開頻道、改頻道</h3>
+          <p>叫它開、改名、封存頻道，或建立「有人進去就自動開一間、走光就刪掉」的臨時語音房。叫它做事的人自己要有「管理頻道」權限，不然它不理你。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">雜</span><div><h3>投票、抽籤、總結</h3>
+          <p>按鈕投票、從一串選項抽人、亂數、總結最近的對話。另外有機器人自己的虛擬代幣：在頻道說話或掛語音就會慢慢賺，只能拿來玩，不是現金。</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>牌桌</h2>
+      <p class="intro">在語音頻道按下 Activity，就會開出一個即時同步的遊戲視窗。人不夠的位置可以補電腦，其他人先在旁邊看。</p>
+      <ul class="rows">
+        <li><span class="stamp" aria-hidden="true">棋</span><div><h3>棋類</h3>
+          <p>五子棋、四連棋、黑白棋、西洋棋、象棋。西洋棋和象棋可以加電腦對手，分新手、普通、高手、大師四級；電腦的棋是自己算的，不靠任何線上服務。</p>
+          <p class="small">新手只看一步而且常亂走，大師每步想三秒，大約能看七到十步。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">牌</span><div><h3>麻將、橋牌、德州撲克</h3>
+          <p>台灣麻將（16 張）和日本麻將（立直、寶牌、振聽）、台灣簡易橋牌、德州撲克，都能補電腦。電腦各有個性，有的愛衝，有的愛吃碰，也有真的會讀牌防守的。只用練習點數。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">賭</span><div><h3>老虎機、21 點、賽馬</h3>
+          <p>還有骰子和擲硬幣。可以選練習幣，或機器人的虛擬代幣。賽馬的 10 匹馬各有能力值和戰績，強馬賠得少，冷門賠得多。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">鍛</span><div><h3>鍛造</h3>
+          <p>把一把劍鍛到一百階，每一階的外觀都不一樣。每次鍛造有機率成功，也有機率劍碎，整把歸零。賣不賣、要不要衝，自己決定。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">動</span><div><h3>動作小遊戲</h3>
+          <p>小朋友下樓梯最多 4 人一起玩，彈珠台一個人玩。</p></div></li>
+        <li><span class="stamp" aria-hidden="true">影</span><div><h3>一起看影片</h3>
+          <p>貼 YouTube 連結或打關鍵字排進清單，大家同步播放、暫停和拖進度。畫質、字幕各自選，字幕直接用影片原本的，不經過 AI 翻譯。</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="host">
+    <div class="wrap">
+      <h2>自己架一隻</h2>
+      <p class="intro">程式是開源的。這是個人專案，機器人跑在作者自己的伺服器上，想用就照下面的步驟自己架一隻。</p>
+      <ol class="steps">
+        <li>到 <a href="https://discord.com/developers/applications">Discord Developer Portal</a> 建立應用程式和機器人，複製 token，並打開 Message Content Intent。token 等同機器人的密碼，不要貼到任何公開的地方。</li>
+        <li>準備 Python 3.11 以上、<code>ffmpeg</code> 和 <code>node</code>，再找一個 OpenAI 相容的模型 API（本機 Ollama 就可以）。</li>
+        <li>下載、安裝，把 token 和模型位址填進 <code>.env</code>：
+<pre><code>git clone https://github.com/ggh93234999/discord-ai-bot.git
+cd discord-ai-bot
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env</code></pre></li>
+        <li>啟動，看到「已同步斜線指令」就成功了：
+<pre><code>python bot.py</code></pre></li>
+      </ol>
+      <p class="note">機器人只需要主動連出去，不用對外開任何連接埠。要玩 Activity 遊戲，還要另外架網頁和後端，並在 Developer Portal 設定網址，詳細步驟在 README 的「部署」。</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <svg class="hills" viewBox="0 0 1200 170" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 170 L0 96 C60 70 90 40 150 58 C210 76 230 112 300 96 C360 82 400 20 470 30 C540 40 560 96 640 104 L640 170Z" fill="#1f1e1c" opacity=".10"/>
+    <path d="M360 170 C420 120 470 100 540 118 C620 138 660 70 740 52 C820 34 860 80 930 90 C1010 102 1050 60 1120 52 C1160 48 1190 62 1200 66 L1200 170Z" fill="#1f1e1c" opacity=".16"/>
+    <path d="M0 170 C80 140 140 150 220 132 C320 110 380 150 470 146 C600 140 640 120 760 138 C880 156 960 130 1060 142 C1120 150 1170 140 1200 136 L1200 170Z" fill="#1f1e1c" opacity=".28"/>
+  </svg>
+  <div class="wrap">
+    <a class="gh" href="https://github.com/ggh93234999/discord-ai-bot">原始碼在 GitHub</a>
+    <p>這一頁只是介紹，不會連到任何伺服器。</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement, chat = document.getElementById("chat"), btn = document.getElementById("replay");
+  if (!chat) return;
+  var items = Array.prototype.slice.call(chat.children), timers = [];
+  var still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (still) return;                                  // 偏好減少動態：整段直接顯示
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    items.forEach(function (li) { li.classList.remove("in"); });
+    btn.hidden = true;
+    var t = 500;
+    items.forEach(function (li, i) {
+      timers.push(setTimeout(function () { li.classList.add("in"); }, t));
+      t += li.classList.contains("u") ? 900 : 1300;
+      if (i === items.length - 1) timers.push(setTimeout(function () { btn.hidden = false; }, t));
+    });
+  }
+  btn.addEventListener("click", play);
+  play();
+})();
+</script>
+</body>
+</html>
