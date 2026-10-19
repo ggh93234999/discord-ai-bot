@@ -95,7 +95,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "畫圖": ("imagine", "Draw an image from a description (30 s to a few minutes; the result is posted in the channel)",
            {"內容": ("prompt", "What to draw (any language)"), "畫質": ("quality", "Fast (default) / cleaner composition and text / best quality (slow)"),
             "形狀": ("shape", "Square (default) / landscape / portrait")}),
-    "改圖": ("editimage", "Edit an image (about 20 s): attach one, paste a message link, or leave empty to use the latest image in the channel",
+    "改圖": ("editimage", "Edit an image (~20 s): attach one, paste a message link, or use the latest image here",
            {"內容": ("prompt", "How to change it (any language), e.g. make the background daytime"), "圖片": ("image", "The image to edit (optional)"),
             "訊息": ("message", "Message link of the message that has the image (optional)"),
             "參考圖2": ("image2", "Optional second reference image"), "參考圖3": ("image3", "Optional third reference image")}),
