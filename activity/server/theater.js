@@ -12,6 +12,7 @@ fs.mkdirSync(DIR, { recursive: true });
 const YTDLP = process.env.YTDLP || "/home/ggh93234999/.venvs/discord-bot/bin/yt-dlp";
 const MAX_DUR = 3 * 3600;                 // 最長 3 小時
 const MAX_CACHE = 30 * 1024 ** 3;         // 快取上限 30 GB，超過就刪最久沒看的
+const MAX_AGE = 14 * 24 * 3600 * 1000;    // 超過 14 天沒人看的影片就刪
 const MAX_QUEUE = 30;
 // 預設 720p（房間共用、大家先拿這個）；有人選別的畫質時才另外下載那個版本。都用 H.264（avc1），各平台都能播
 const QUALS = [360, 480, 720, 1080];
@@ -145,7 +146,7 @@ function cleanCache() {
   const list = fs.readdirSync(DIR).filter((f) => /^[A-Za-z0-9_-]{11}(\.q\d{3,4})?\.mp4$/.test(f)).map((f) => { const st = fs.statSync(path.join(DIR, f)); return { f, size: st.size, t: st.mtimeMs }; });
   let total = list.reduce((s, x) => s + x.size, 0);
   for (const x of list.sort((a, b) => a.t - b.t)) {
-    if (total <= MAX_CACHE) break;
+    if (total <= MAX_CACHE && Date.now() - x.t < MAX_AGE) break;   // 沒超過上限、也沒放太久就不用刪了（舊的排在前面）
     if (inUse.has(x.f.slice(0, 11))) continue;
     try { fs.unlinkSync(path.join(DIR, x.f)); total -= x.size; } catch {}
   }
