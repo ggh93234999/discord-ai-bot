@@ -772,8 +772,6 @@ body.tv-fs{overflow:hidden}
 .farm .flog { padding:8px 10px; border-radius:10px; background:#2a2327; font-size:13px; color:#d6b8b8; } .farm .flog div { margin-top:3px; }
 .farm header .fsnd { border:0; background:transparent; font-size:20px; cursor:pointer; }
 .game.farm { background:#101712 url("./farm-bg.svg") center/cover no-repeat; border-radius:14px; padding:6px 8px 16px; }
-.game.theater { background:#130d10 url("./theater-bg.svg") center/cover no-repeat; border-radius:14px; }
+.game.theater { background:#0e1420 url("./theaterbg-a.svg") center/cover no-repeat; border-radius:14px; }
 .farm .finv, .farm .seed { background:rgba(24,30,24,.82); }
 .farm .seed.sel { background:rgba(52,69,47,.92); }
-.theater .thbg { align-self:flex-end; margin:-4px 2px 0; font-size:13px; color:#cfc7d3; }
-.theater .thbg select { margin-left:4px; padding:3px 6px; border:1px solid #556; border-radius:8px; background:rgba(30,26,34,.85); color:#fff; font-size:13px; }
