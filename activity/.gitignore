@@ -1,5 +1,5 @@
 node_modules/
-dist/
+dist
 .env
 
 # 皮卡丘排球：程式碼來自無授權專案、圖片音效是原版遊戲的，不放進 repo
