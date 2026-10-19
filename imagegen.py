@@ -164,20 +164,27 @@ def _to_file(raw: bytes) -> str:
 
 # ---------------------------------------------------------------- 對外
 def say_for_message(msg: discord.Message):
-    """畫好後回覆在原訊息下面（原訊息被刪了就直接發在頻道）。"""
+    """畫好後回覆在原訊息下面（原訊息被刪了就直接發在頻道）。圖片單獨一則訊息，文字另外一則。"""
     async def say(text: str, path: str | None = None):
-        files = [discord.File(path)] if path else []
-        try:
-            await msg.reply(text, files=files, mention_author=False)
-        except discord.HTTPException:
-            await msg.channel.send(text, files=files)
+        first = True
+        for kw in ([{"files": [discord.File(path)]}] if path else []) + ([{"content": text}] if text else []):
+            try:
+                if first:
+                    await msg.reply(mention_author=False, **kw)
+                else:
+                    await msg.channel.send(**kw)
+            except discord.HTTPException:
+                await msg.channel.send(**kw)
+            first = False
     return say
 
 
 def say_for_interaction(interaction: discord.Interaction):
     async def say(text: str, path: str | None = None):
-        files = [discord.File(path)] if path else []
-        await interaction.channel.send(f"{interaction.user.mention} {text}", files=files)
+        if path:
+            await interaction.channel.send(file=discord.File(path))
+        if text:
+            await interaction.channel.send(f"{interaction.user.mention} {text}")
     return say
 
 
