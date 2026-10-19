@@ -214,7 +214,7 @@ async def expand_prompt(session: aiohttp.ClientSession, idea: str, quality: str 
     return text[:1200] or None
 
 
-def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say) -> str:
+def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say, extra: str = "") -> str:
     """共用排隊：make() 回傳要執行的 coroutine（呼叫模型），畫好後 say 貼出。"""
     global _waiting
     if user_id in _busy_users:
@@ -224,7 +224,7 @@ def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say)
     ahead = _waiting
     _waiting += 1
     _busy_users.add(user_id)
-    task = asyncio.create_task(_job(user_id, make, label, say))
+    task = asyncio.create_task(_job(user_id, make, label, say, extra))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
     wait = ahead * 40 + eta
@@ -232,7 +232,7 @@ def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say)
     return f"🎨 {ready}：{when}預計約 {max(1, round(wait / 60))} 分鐘，好了會自動貼在這則下面。"
 
 
-async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, source_text: str = "") -> str:
+async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, source_text: str = "", extra: str = "") -> str:
     """排一張圖。立刻回傳要給模型／使用者看的一句話；圖在背景畫，畫好後呼叫 say(text, path) 貼出。"""
     if not enabled():
         return "畫圖功能目前沒開。"
@@ -250,7 +250,7 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
     model = os.getenv(env_name, default_model).strip() or default_model
     size = SIZES[shape]
     return _enqueue(session, user_id, lambda: generate(session, model, prompt, size, timeout),
-                    f"{QUALITY_NAMES[quality]}・{size.replace('x', '×')}", f"排進畫圖了（{QUALITY_NAMES[quality]}，{SIZE_NAMES[shape]}）", eta, say)
+                    f"{QUALITY_NAMES[quality]}・{size.replace('x', '×')}", f"排進畫圖了（{QUALITY_NAMES[quality]}，{SIZE_NAMES[shape]}）", eta, say, extra)
 
 
 EDIT_TOOL = {
@@ -342,7 +342,7 @@ async def submit_edit(session, prompt: str, images: list, user_id: int, say, sou
                     f"排進改圖了（{len(images)} 張參考圖）" if len(images) > 1 else "排進改圖了", 25, say)
 
 
-async def _job(user_id, make, label, say):
+async def _job(user_id, make, label, say, extra=""):
     global _waiting
     path = None
     try:
@@ -352,7 +352,7 @@ async def _job(user_id, make, label, say):
             path = await asyncio.to_thread(_to_file, raw)
             took = round(time.time() - t0)
         log.info("圖好了：%s %ds", label, took)
-        await say(f"🖼️ 好了（{label}・{took} 秒）", path)
+        await say(f"🖼️ 好了（{label}・{took} 秒）{extra}", path)
     except Paused as e:
         log.warning("畫圖服務暫停或連不上：%s", e)
         try:

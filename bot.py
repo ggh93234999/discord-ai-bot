@@ -1065,14 +1065,14 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
     expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質)
     note = ""
     if expanded:
-        note = f"✨ 擴寫後的提示詞：{expanded[:900]}\n"
+        note = f"📝 原句：{內容[:300]}\n✨ 擴寫後的提示詞：{expanded[:900]}\n"
         prompt = expanded
     else:
-        note = "（提示詞擴寫失敗，這張直接用你的原句畫）\n"
+        note = f"📝 原句：{內容[:300]}\n（提示詞擴寫失敗，這張直接用你的原句畫）\n"
         prompt = 內容
     log.info("智慧畫圖 user=%s 原句=%s 擴寫=%s", interaction.user.id, 內容[:80], (expanded or "失敗")[:200])
     res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀},
-                                interaction.user.id, imagegen.say_for_interaction(interaction), 內容)
+                                interaction.user.id, imagegen.say_for_interaction(interaction), 內容, extra=f"\n📝 原句：{內容[:300]}")
     await interaction.followup.send(note + res)
 
 
