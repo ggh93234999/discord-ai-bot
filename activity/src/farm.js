@@ -1,6 +1,7 @@
 // 種菜（個人農場，即時生長）：作物按真實時間長大，關掉 Activity 也照長。規則、數字、隨機都在伺服器，這裡只畫田和送指令。
 // 模式和賭場一樣：練習模式（農場自己的練習幣）／賭注模式（Discord 授權後動用機器人錢包的真代幣）。
 import { wsUrl } from "./gomoku.js";
+import { sfx, sfxOn, setSfx } from "./farmsfx.js";
 
 const ERR = {
   need_login: "要先登入才能用賭注模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
@@ -24,7 +25,7 @@ const pidOf = () => { try { let p = localStorage.getItem("farmpid"); if (!p) { p
 export function mountFarm(root, { env, back }) {
   root.innerHTML = `
     <div class="game slots farm">
-      <header><button class="back">← 選單</button><h2>🌱 種菜</h2><span></span></header>
+      <header><button class="back">← 選單</button><h2>🌱 種菜</h2><button class="fsnd" title="音效開關">${sfxOn() ? "🔊" : "🔇"}</button></header>
       <div class="modebar">
         <button class="mode on" data-m="practice">🎮 練習模式</button>
         <button class="mode" data-m="real">💰 賭注模式</button>
@@ -39,12 +40,14 @@ export function mountFarm(root, { env, back }) {
   const statusEl = $(".status"), body = $(".fbody"), balEl = $(".bal b"), buyBtn = $(".fbuy"), confirmEl = $(".confirm");
   const modeBtns = root.querySelectorAll(".mode"), tabBtns = root.querySelectorAll(".ftabs button");
   $(".back").addEventListener("click", back);
+  $(".fsnd").addEventListener("click", (e) => { setSfx(!sfxOn()); e.currentTarget.textContent = sfxOn() ? "🔊" : "🔇"; if (sfxOn()) sfx.ripe(); });
 
   let ws = null, closed = false, retry = 0, wantReal = false;
   let mode = "practice", session = env.session || null, tab = "mine";
   let st = null, base = 0, sel = "radish", list = null, vis = null, visBase = 0, tick = 0;
   const real = () => mode === "real";
-  const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "fm", real: real(), pid: pidOf(), ...o }));
+  let pend = "";      // 等伺服器回應的動作（種植／擴地），回應來了才播音效
+  const send = (o) => { if (o.a === "plant" || o.a === "buyplot") pend = o.a; return ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "fm", real: real(), pid: pidOf(), ...o })); };
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
@@ -53,14 +56,14 @@ export function mountFarm(root, { env, back }) {
       const m = JSON.parse(e.data);
       if (m.t === "bauthed") return onAuthed(m);
       if (m.t !== "fm") return;
-      if (m.a === "view") { st = m; base = Date.now(); if (!CROPS_BY.length) fillCrops(m.crops); showBal(); if (tab === "mine") draw(); }
+      if (m.a === "view") { st = m; base = Date.now(); if (!CROPS_BY.length) fillCrops(m.crops); showBal(); if (tab === "mine") draw(); if (pend === "plant") sfx.plant(); else if (pend === "buyplot") sfx.build(); pend = ""; }
       else if (m.a === "list") { list = m; if (tab === "visit" && !vis) draw(); }
       else if (m.a === "visit") { vis = m; visBase = Date.now(); if (tab === "visit") draw(); }
-      else if (m.a === "got") statusEl.textContent = "收成了 " + summarize(m.got);
-      else if (m.a === "sold") statusEl.textContent = "賣出了，拿到 " + money(m.amount) + " 代幣";
-      else if (m.a === "stole") statusEl.textContent = `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！今天還能偷 ${m.left} 個`;
+      else if (m.a === "got") { statusEl.textContent = "收成了 " + summarize(m.got); sfx.harvest(m.got); }
+      else if (m.a === "sold") { statusEl.textContent = "賣出了，拿到 " + money(m.amount) + " 代幣"; sfx.sell(); }
+      else if (m.a === "stole") { statusEl.textContent = `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！今天還能偷 ${m.left} 個`; sfx.steal(); }
       else if (m.a === "err") {
-        statusEl.textContent = (ERR[m.error] || ERR.error);
+        statusEl.textContent = (ERR[m.error] || ERR.error); pend = ""; sfx.err();
         if (m.balance != null && st) { st.balance = m.balance; showBal(); }
         if (m.error === "no_more" || m.error === "not_ripe") send({ a: "visit", id: vis && vis.id });
       }
@@ -109,7 +112,7 @@ export function mountFarm(root, { env, back }) {
       <div class="finv"><div class="ftitle">🧺 倉庫${st.invValue ? `<button class="sellall">全部賣出 +${money(st.invValue)}</button>` : ""}</div>${inv || `<p class="fempty">空的。收成後的菜會放在這裡，按一下就能賣。</p>`}</div>
       ${log}
       <p class="fnote">每塊地一次收 3 個，有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 2 個。</p>`;
-    body.querySelectorAll(".seed").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.c; draw(); }));
+    body.querySelectorAll(".seed").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.c; sfx.tick(); draw(); }));
     body.querySelectorAll(".plot.empty").forEach((b) => b.addEventListener("click", () => send({ a: "plant", c: sel, i: +b.dataset.i })));
     body.querySelectorAll(".plot.ripe").forEach((b) => b.addEventListener("click", () => send({ a: "harvest", i: +b.dataset.i })));
     const pa = body.querySelector(".plantall"); if (pa) pa.addEventListener("click", () => send({ a: "plant", c: sel, i: "all" }));
@@ -197,7 +200,7 @@ export function mountFarm(root, { env, back }) {
     if (document.hidden) return;
     const sig = tab === "mine" && st ? sigMine() : tab === "visit" && vis ? sigVisit() : null;
     if (sig == null) return;
-    if (sig !== lastSig) { tab === "mine" ? draw() : drawVisit(); return; }     // 有格子換了狀態才重畫，其他只更新倒數文字（避免按到一半按鈕被換掉）
+    if (sig !== lastSig) { const more = tab === "mine" && (sig.match(/r/g) || []).length > (lastSig.match(/r/g) || []).length; tab === "mine" ? draw() : drawVisit(); if (more) sfx.ripe(); return; }     // 有格子換了狀態才重畫，其他只更新倒數文字（避免按到一半按鈕被換掉）
     body.querySelectorAll("[data-end]").forEach((d) => { const sm = d.querySelector("small"); if (sm) sm.textContent = (d.dataset.pre || "") + fmt(Math.max(0, +d.dataset.end - Date.now())); });
   }, 1000);
   // 每 30 秒重新跟伺服器對一次（別人偷菜、時間誤差）
