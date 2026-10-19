@@ -1042,9 +1042,10 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
     await interaction.followup.send(res)
 
 
-@client.tree.command(name="改圖", description="上傳一張圖並說要怎麼改（約 20 秒，改好會貼在頻道）")
-@app_commands.describe(圖片="要修改的圖", 內容="要怎麼改（中英文都可以），例如：把背景改成白天", 參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖")
-async def cmd_edit(interaction: discord.Interaction, 圖片: discord.Attachment, 內容: str,
+@client.tree.command(name="改圖", description="改一張圖（約 20 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
+@app_commands.describe(內容="要怎麼改（中英文都可以），例如：把背景改成白天", 圖片="要修改的圖（可不附）", 訊息="要改哪則訊息裡的圖：貼那則訊息的連結（可不填）",
+                       參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖")
+async def cmd_edit(interaction: discord.Interaction, 內容: str, 圖片: discord.Attachment | None = None, 訊息: str | None = None,
                    參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None):
     if not imagegen.enabled():
         await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
@@ -1054,11 +1055,40 @@ async def cmd_edit(interaction: discord.Interaction, 圖片: discord.Attachment,
         await interaction.response.send_message("請上傳圖片檔（PNG／JPEG／WEBP）。", ephemeral=True)
         return
     await interaction.response.defer(thinking=True)
-    prompt = 內容
-    images = [(await a.read(), a.filename or "image.png", (a.content_type or "image/png").split(";")[0]) for a in atts]
-    res = await imagegen.submit_edit(client.http_session, prompt, images, interaction.user.id,
+    note = ""
+    if atts:
+        images = [(await a.read(), a.filename or "image.png", (a.content_type or "image/png").split(";")[0]) for a in atts]
+    else:
+        images, note = await imagegen.find_images(client, interaction.channel, 訊息)
+    res = await imagegen.submit_edit(client.http_session, 內容, images, interaction.user.id,
                                      imagegen.say_for_interaction(interaction), 內容)
-    await interaction.followup.send(res)
+    await interaction.followup.send((res + ("\n-# " + note if note and images else "")) if images else note or res)
+
+
+class EditModal(discord.ui.Modal, title="改這張圖"):
+    內容 = discord.ui.TextInput(label="要怎麼改？", placeholder="例如：把背景改成白天，其他部分維持不變", style=discord.TextStyle.paragraph, max_length=500)
+
+    def __init__(self, target: discord.Message):
+        super().__init__()
+        self.target = target
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        images = await imagegen.images_of(self.target)
+        res = await imagegen.submit_edit(client.http_session, str(self.內容), images, interaction.user.id,
+                                         imagegen.say_for_interaction(interaction), str(self.內容))
+        await interaction.followup.send(res)
+
+
+@client.tree.context_menu(name="改這張圖")
+async def ctx_edit(interaction: discord.Interaction, message: discord.Message):
+    if not imagegen.enabled():
+        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
+        return
+    if not any((a.content_type or "").startswith("image/") for a in message.attachments):
+        await interaction.response.send_message("這則訊息沒有圖片。", ephemeral=True)
+        return
+    await interaction.response.send_modal(EditModal(message))
 
 
 @client.tree.command(name="help", description="看機器人會做什麼、有哪些指令")
@@ -1074,13 +1104,13 @@ async def cmd_help(interaction: discord.Interaction):
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
               "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
               "・排八字命盤、畫星盤（說「@我 幫我排八字和星盤，1990-05-15 14:30 台北出生，男」）\n"
-              "・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
+              "・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`，或在圖片上按右鍵／長按 → Apps →「改這張圖」）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
               "・放歌時會有一個自動更新的播放面板（進度條、接下來的歌、播完了沒），語音頻道狀態也會顯示歌名",
         inline=False,
     )
-    cmds = sorted((c for c in client.tree.get_commands() if not (getattr(c, "extras", None) or {}).get("alias_of")),
+    cmds = sorted((c for c in client.tree.get_commands() if isinstance(c, (app_commands.Command, app_commands.Group)) and not (getattr(c, "extras", None) or {}).get("alias_of")),
                   key=lambda c: c.name != "help")
     lines = []
     for c in cmds:

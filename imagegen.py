@@ -266,6 +266,39 @@ async def collect_images(msg: discord.Message) -> list[tuple[bytes, str, str]]:
     return out
 
 
+async def images_of(m: discord.Message) -> list[tuple[bytes, str, str]]:
+    out = []
+    for a in [a for a in m.attachments if (a.content_type or "").startswith("image/")][:3]:
+        if a.size and a.size > 20_000_000:
+            continue
+        out.append((await a.read(), a.filename or "image.png", (a.content_type or "image/png").split(";")[0]))
+    return out
+
+
+_LINK_RE = re.compile(r"(?:channels/(?:\d+|@me)/(\d+)/)?(\d{15,25})\s*$")
+
+
+async def find_images(client: discord.Client, channel, ref: str | None = None, scan: int = 40):
+    """/改圖 沒附圖時用：有給訊息連結／ID 就取那則的圖，否則往前找最近一則有圖的訊息（任何人或機器人的都算）。
+    回傳 (圖片列表, 說明文字)；找不到時圖片列表是空的。"""
+    if ref:
+        m = _LINK_RE.search(ref.strip())
+        if not m:
+            return [], "看不懂這個訊息連結，請在那則訊息上按右鍵／長按 →「複製訊息連結」再貼上。"
+        ch = client.get_channel(int(m.group(1))) if m.group(1) else channel
+        try:
+            msg = await (ch or channel).fetch_message(int(m.group(2)))
+        except discord.HTTPException:
+            return [], "找不到那則訊息（可能已被刪除，或我看不到那個頻道）。"
+        imgs = await images_of(msg)
+        return imgs, ("" if imgs else "那則訊息沒有圖片。")
+    async for msg in channel.history(limit=scan):
+        imgs = await images_of(msg)
+        if imgs:
+            return imgs, "（用的是頻道裡最近的一張圖）"
+    return [], f"最近 {scan} 則訊息裡找不到圖片，請附上圖片，或用 `訊息` 欄位貼那則訊息的連結。"
+
+
 async def submit_edit(session, prompt: str, images: list, user_id: int, say, source_text: str = "") -> str:
     if not enabled():
         return "畫圖功能目前沒開。"
