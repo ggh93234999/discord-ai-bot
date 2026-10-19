@@ -871,6 +871,10 @@ async def do_remove(member: discord.Member, target: str | int | None) -> str:
     return f"🗑️ 從佇列移除：**{removed[0].title}**（剩 {len(p.queue)} 首）"
 
 
+RADIO_SEEDS = ["周杰倫 晴天", "五月天 倔強", "告五人 披星戴月的想你", "田馥甄 小幸運", "蔡依林 日不落", "Ed Sheeran Shape of You",
+               "YOASOBI アイドル", "Official髭男dism Pretender", "Bruno Mars Uptown Funk", "Taylor Swift Shake It Off"]
+
+
 async def do_radio(member: discord.Member, text_channel, on: bool, seed: str | None = None) -> str:
     """無限電台：不用選歌，一直自動接相似的歌。有給 seed 就先放那首當起點。"""
     if not on:
@@ -884,21 +888,25 @@ async def do_radio(member: discord.Member, text_channel, on: bool, seed: str | N
     if not isinstance(member, discord.Member) or not member.voice or not member.voice.channel:
         return "要先進一個語音頻道，我才知道要去哪裡放。"
     player = get_player(member.guild)
+    msg = ""
     if seed:
         msg = await do_play(member, text_channel, seed, "end")
         if not player.connected:
             return msg
-    elif player.current is None and not player.queue and not player.recent:
-        h = history.get(str(member.guild.id))
-        if not h:
-            return "電台要有個起點：`/電台 起點:歌名`，或先放一首歌再開。"
-        player.recent.append(random.choice(h)["url"])  # 沒起點就拿紀錄裡隨便一首當種子
     else:
         try:
             await player.connect(member.voice.channel)
         except Exception as e:
             return f"進不了語音頻道（{e}）。"
-        msg = ""
+        if player.current is None and not player.queue and not player.recent:
+            # 沒指定起點、也沒在放歌：直接隨機一首當起點（有播放紀錄就從紀錄挑，沒有就從內建熱門歌挑）
+            h = history.get(str(member.guild.id))
+            if h:
+                player.recent.append(random.choice(h)["url"])
+            else:
+                msg = await do_play(member, text_channel, random.choice(RADIO_SEEDS), "end")
+                if not player.connected:
+                    return msg
     player.text_channel = text_channel
     player.radio = True
     player.shuffle_loop = False
@@ -906,7 +914,7 @@ async def do_radio(member: discord.Member, text_channel, on: bool, seed: str | N
     player.ensure_loop()
     if player.current:
         asyncio.create_task(player.refresh_panel())
-    return ((msg + "\n") if seed else "") + "📻 無限電台開啟：佇列空了會自動接相似的歌，一直放下去。要停就 `/停止` 或 `/電台 關`。"
+    return ((msg + "\n") if msg else "") + "📻 無限電台開啟：佇列空了會自動接相似的歌，一直放下去。要停就 `/停止` 或 `/電台 關`。"
 
 
 async def do_random(member: discord.Member, text_channel, on: bool) -> str:
