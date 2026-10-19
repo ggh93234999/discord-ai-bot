@@ -46,8 +46,7 @@ TOOL = {
         "description": (
             "用畫圖模型畫一張圖（插畫、風景、物品、卡通角色、概念圖等）。使用者說「畫一張…」「幫我畫…」「生一張圖」時呼叫。"
             "畫一張要等 30 秒到幾分鐘，畫好後程式會自動貼出來，你呼叫後只要簡短回一句「在畫了」就好，不要說已經畫好、不要描述圖的內容。"
-            "【不能畫】露骨或色情內容、跟未成年人有關的性暗示內容、真人肖像（包含明星、政治人物、任何指名道姓的真人、用真人照片換臉）、"
-            "血腥暴力的真實場景。遇到這類要求就直接拒絕，不要呼叫工具、也不要偷偷改成類似的東西。"
+            "【不能畫】涉及未成年人的性暗示或色情內容（一律拒絕，不要呼叫工具、也不要偷偷改成類似的東西）；其他都可以畫。"
             "prompt 寫畫面描述：主體、動作、場景、風格、光線、構圖；quality 為 fast 或 high 時 prompt 請用英文寫（先把使用者的意思翻成英文再描述得具體一點），"
             "quality 為 clean 時可以直接用中文。"
             "quality：預設用 fast（約 30 秒）；畫面裡要有清楚的文字（招牌、標語、海報字）或複雜構圖用 clean（約 100 秒）；"
@@ -70,7 +69,7 @@ def enabled() -> bool:
     return os.getenv("IMAGE_GEN", "on").strip().lower() not in ("off", "0", "false", "no")
 
 
-# ---------------------------------------------------------------- 內容過濾（那台沒有過濾，這裡擋）
+# ---------------------------------------------------------------- 內容過濾（那台沒有過濾；依主人要求，只擋涉及未成年人的性內容）
 _SEX = re.compile(
     r"裸|露點|露奶|乳頭|乳暈|胸部走光|陰莖|陰道|陰部|生殖器|性交|做愛|交配|口交|自慰|強暴|性愛|性感內衣|情趣|色情|成人向|限制級|18禁|"
     r"nsfw|nude|naked|topless|porn|hentai|erotic|sex|genital|nipple|penis|vagina|lingerie|fetish|bdsm|explicit|lewd|ecchi|cum\b|orgasm", re.I)
@@ -90,12 +89,6 @@ def check_prompt(*texts: str) -> str | None:
     t = " ".join(x for x in texts if x)
     if _SEX.search(t) and _MINOR.search(t):
         return "這個我不能畫（涉及未成年人的不當內容）。"
-    if _SEX.search(t):
-        return "這種露骨的內容我不畫。"
-    if _REAL.search(t):
-        return "我不畫真人肖像（包含明星、政治人物或指名道姓的真人）。想畫的話可以改成虛構角色或卡通風格。"
-    if _GORE.search(t):
-        return "血腥暴力的畫面我不畫。"
     return None
 
 
