@@ -10,16 +10,16 @@ import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botInfo } from "./bet.js";
 
 export const CROPS = [
-  { id: "radish", icon: "🥕", name: "蘿蔔", seed: 10, min: 3 },
-  { id: "cabbage", icon: "🥬", name: "小白菜", seed: 30, min: 10 },
-  { id: "tomato", icon: "🍅", name: "番茄", seed: 80, min: 30 },
-  { id: "corn", icon: "🌽", name: "玉米", seed: 200, min: 60 },
-  { id: "pumpkin", icon: "🎃", name: "南瓜", seed: 600, min: 180 },
-  { id: "melon", icon: "🍉", name: "西瓜", seed: 1500, min: 480 },
+  { id: "radish", icon: "🥕", name: "蘿蔔", seed: 10, min: 3, y: 5 },
+  { id: "cabbage", icon: "🥬", name: "小白菜", seed: 30, min: 10, y: 5 },
+  { id: "tomato", icon: "🍅", name: "番茄", seed: 80, min: 30, y: 5 },
+  { id: "corn", icon: "🌽", name: "玉米", seed: 200, min: 60, y: 4 },
+  { id: "pumpkin", icon: "🎃", name: "南瓜", seed: 600, min: 180, y: 4 },
+  { id: "melon", icon: "🍉", name: "西瓜", seed: 1500, min: 480, y: 4 },
 ];
 const CROP = Object.fromEntries(CROPS.map((c) => [c.id, c]));
-export const YIELD = 3;                          // 每塊地一次收幾個
-const UNIT_RATE = 0.55;                          // 單個賣價 = 種子價 × 0.55（3 個 = 1.65 倍；被偷 1 個剩 2 個 = 1.1 倍，還是賺，再加變種）
+const yieldOf = (c) => CROP[c].y;                // 每塊地一次收幾個（每種作物不同，見 CROPS）
+const UNIT_RATE = 0.36;                          // 單個賣價 = 種子價 × 0.36；靠產量（4～5 個）讓被偷 1 個後還是賺，單價不隨被偷調整
 export const unitPrice = (c) => Math.max(1, Math.round(CROP[c].seed * UNIT_RATE));
 // 稀有變種：每個收成各自抽一次
 export const VARIANTS = { n: { name: "", mult: 1 }, big: { name: "大顆", mult: 2 }, gold: { name: "金色", mult: 5 } };
@@ -75,11 +75,11 @@ function viewOf(ws, f, real, bal) {
   const day = today(), used = f.st.d === day ? f.st.n : 0;
   return {
     t: "fm", a: "view", real, now, np: f.plots.length, max: MAX_PLOTS, plotCost: f.plots.length < MAX_PLOTS ? plotCost(f.plots.length) : 0,
-    plots: f.plots.map((p) => (p ? { c: p.c, left: Math.max(0, ripeAt(p) - now), grace: Math.max(0, ripeAt(p) + STEAL_GRACE - now), got: YIELD - p.st.length, stolen: p.st.length } : null)),
+    plots: f.plots.map((p) => (p ? { c: p.c, left: Math.max(0, ripeAt(p) - now), grace: Math.max(0, ripeAt(p) + STEAL_GRACE - now), got: yieldOf(p.c) - p.st.length, stolen: p.st.length } : null)),
     inv, invValue: inv.reduce((s, x) => s + x.unit * x.n, 0),
     balance: real ? bal : f.coin, stealLeft: Math.max(0, STEAL_PER_DAY - used),
     log: f.log.slice(-8).reverse(),
-    crops: CROPS.map((c) => ({ id: c.id, icon: c.icon, name: c.name, seed: c.seed, min: c.min, unit: unitPrice(c.id) })),
+    crops: CROPS.map((c) => ({ id: c.id, icon: c.icon, name: c.name, seed: c.seed, min: c.min, y: c.y, unit: unitPrice(c.id) })),
   };
 }
 
@@ -183,7 +183,7 @@ export async function handleFarm(ws, m) {
       for (const i of idx) {
         const p = Number.isInteger(i) ? f.plots[i] : null;
         if (!p || ripeAt(p) > now) continue;
-        for (let u = 0; u < YIELD - p.st.length; u++) { const v = rollVariant(); addInv(f, p.c, v); got.push({ c: p.c, v }); }
+        for (let u = 0; u < yieldOf(p.c) - p.st.length; u++) { const v = rollVariant(); addInv(f, p.c, v); got.push({ c: p.c, v }); }
         f.plots[i] = null;
       }
       if (!got.length) { err("none_ripe"); return; }

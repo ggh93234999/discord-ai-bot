@@ -95,7 +95,7 @@ export function mountFarm(root, { env, back }) {
     if (tab === "visit") return drawVisit();
     if (!st) { body.innerHTML = `<p class="fempty">讀取農場中…</p>`; return; }
     const el = elapsed();
-    const seeds = st.crops.map((c) => `<button class="seed${c.id === sel ? " sel" : ""}" data-c="${c.id}"><span>${c.icon}</span><b>${c.name}</b><small>${money(c.seed)} 代幣<br>${fmt(c.min * 60000)}</small></button>`).join("");
+    const seeds = st.crops.map((c) => `<button class="seed${c.id === sel ? " sel" : ""}" data-c="${c.id}"><span>${c.icon}</span><b>${c.name}</b><small>${money(c.seed)} 代幣<br>${fmt(c.min * 60000)}・產 ${c.y}</small></button>`).join("");
     const plots = st.plots.map((p, i) => {
       if (!p) return `<button class="plot empty" data-i="${i}"><span class="pi">＋</span><small>種${cropOf(sel).name}</small></button>`;
       const left = Math.max(0, p.left - el), c = cropOf(p.c);
@@ -111,7 +111,7 @@ export function mountFarm(root, { env, back }) {
       <div class="fgrid">${plots}</div>
       <div class="finv"><div class="ftitle">🧺 倉庫${st.invValue ? `<button class="sellall">全部賣出 +${money(st.invValue)}</button>` : ""}</div>${inv || `<p class="fempty">空的。收成後的菜會放在這裡，按一下就能賣。</p>`}</div>
       ${log}
-      <p class="fnote">每塊地一次收 3 個，有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 1 個，就算被偷還是賺錢。</p>`;
+      <p class="fnote">每塊地一次收幾個看作物（種子卡上的「產」），有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 1 個，就算被偷還是賺錢。</p>`;
     body.querySelectorAll(".seed").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.c; sfx.tick(); draw(); }));
     body.querySelectorAll(".plot.empty").forEach((b) => b.addEventListener("click", () => send({ a: "plant", c: sel, i: +b.dataset.i })));
     body.querySelectorAll(".plot.ripe").forEach((b) => b.addEventListener("click", () => send({ a: "harvest", i: +b.dataset.i })));
