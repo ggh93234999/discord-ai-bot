@@ -31,7 +31,7 @@ SIZE_NAMES = {"square": "正方形", "landscape": "橫式", "portrait": "直式"
 QUALITY = {
     "fast": ("IMAGE_MODEL_FAST", "draw-klein", 30, 900),
     "clean": ("IMAGE_MODEL_CLEAN", "draw-qwen-fast", 100, 900),
-    "high": ("IMAGE_MODEL_HIGH", "draw-flux", 600, 1800),
+    "high": ("IMAGE_MODEL_HIGH", "draw-klein", 30, 900),
 }
 QUALITY_NAMES = {"fast": "快速", "clean": "構圖與文字較乾淨", "high": "最高畫質"}
 DISCORD_LIMIT = 7_800_000          # 一般伺服器單檔 8MB 上限，留一點空間
@@ -47,7 +47,7 @@ TOOL = {
             "prompt 寫畫面描述：主體、動作、場景、風格、光線、構圖；quality 為 fast 或 high 時 prompt 請用英文寫（先把使用者的意思翻成英文再描述得具體一點），"
             "quality 為 clean 時可以直接用中文。"
             "quality：預設用 fast（約 30 秒）；畫面裡要有清楚的文字（招牌、標語、海報字）或複雜構圖用 clean（約 100 秒）；"
-            "只有使用者明確說要「高畫質」「最高畫質」「畫質最好」才用 high（約 10 分鐘，很久）。"
+            "只有使用者明確說要「高畫質」「最高畫質」「畫質最好」才用 high（目前 draw-flux 已下架，和 fast 同一個模型，約 30 秒）。"
         ),
         "parameters": {
             "type": "object",

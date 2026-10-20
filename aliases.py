@@ -105,7 +105,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
 }
 
 CHOICE_EN = {
-    "快速（約30秒）": "Fast (~30 s)", "構圖與文字較乾淨（約100秒）": "Cleaner composition/text (~100 s)", "最高畫質（約10分鐘）": "Best quality (~10 min)",
+    "快速（約30秒）": "Fast (~30 s)", "構圖與文字較乾淨（約100秒）": "Cleaner composition/text (~100 s)", "最高畫質（約30秒）": "Best quality (~30 s)",
     "英文（預設）": "English (default)", "中文": "Chinese", "正方形": "Square", "橫式": "Landscape", "直式": "Portrait",
     "開": "on", "關": "off", "3 格（單排）": "3 cells (single row)", "9 格（3×3）": "9 cells (3x3)", "16 格（4×4）": "16 cells (4x4)", "正面": "heads", "反面": "tails", "全部": "all", "代幣怎麼賺": "how to earn tokens", "老虎機": "slots", "21點": "blackjack", "賽馬": "horse race", "擲硬幣": "coin flip", "骰子": "dice", "文字": "text", "語音": "voice",
     "封存（可還原）": "archive (restorable)", "解除封存": "unarchive", "刪除（永久）": "delete (permanent)",
