@@ -441,10 +441,10 @@ body.pk-myturn .game.poker{background:#16296b}
 .fbtabs .tab.on{background:#9c2a1f;border-color:#e0695c;color:#fff}
 .fbhint{text-align:center;font-size:12px;opacity:.75}
 .fblist{display:flex;flex-direction:column;gap:6px}
-.fbrow{display:grid;grid-template-columns:34px 38px 1fr auto;gap:8px;align-items:center;padding:6px 10px;border:1px solid #4a3f2a;border-radius:10px;background:rgba(28,22,15,.78)}
+.fbrow{display:grid;grid-template-columns:34px auto 1fr auto;gap:8px;align-items:center;padding:6px 10px;border:1px solid #4a3f2a;border-radius:10px;background:rgba(28,22,15,.78)}
 .fbrow.top1{border-color:#e6b84a;box-shadow:0 0 10px rgba(230,184,74,.45)} .fbrow.top2{border-color:#c9ced6} .fbrow.top3{border-color:#c98a4b}
 .fbrank{text-align:center;font-size:20px;font-weight:700}
-.fbsw svg{width:34px;height:60px;display:block}
+.fbsw{display:flex;gap:2px}.fbsw svg{width:30px;height:54px;display:block}
 .fbinfo{display:flex;flex-direction:column;min-width:0}.fbinfo b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fbinfo small{opacity:.75;font-size:12px}
 .fbval{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#ffd86b}.fbval small{display:block;opacity:.65;font-size:11px;font-weight:400;color:#ece7dc}
 .fbtotal{text-align:center;font-size:12px;opacity:.6;margin-top:4px}

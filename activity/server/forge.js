@@ -82,7 +82,8 @@ export function forgeBoard(real, limit = 30) {
     const tiers = slotsOf(key).filter(Boolean).map((x) => x.tier);
     if (!tiers.length) continue;
     const tier = Math.max(...tiers), id = key.slice(2);
-    rows.push({ name: (db.nm && db.nm[key]) || (key.startsWith("p:g") ? "匿名鍛造師" : "玩家" + id.slice(-4)), tier, swords: tiers.length, best: db.best[key] || tier, sell: V[tier] });
+    const top = [...tiers].sort((a, b) => b - a).slice(0, 3);
+    rows.push({ top, name: (db.nm && db.nm[key]) || (key.startsWith("p:g") ? "匿名鍛造師" : "玩家" + id.slice(-4)), tier, swords: tiers.length, best: db.best[key] || tier, sell: V[tier] });
   }
   rows.sort((a, b) => b.tier - a.tier || b.best - a.best || b.swords - a.swords);
   return { t: "fboard", real, rows: rows.slice(0, limit), total: rows.length };

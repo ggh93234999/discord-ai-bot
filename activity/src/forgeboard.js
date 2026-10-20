@@ -13,7 +13,7 @@ export function mountForgeBoard(root, { env, back }) {
     <div class="game fboard">
       <header><button class="back">← 選單</button><h2>🏆 神兵榜</h2><span></span></header>
       <div class="fbtabs"><button class="tab on" data-r="1">💰 真代幣模式</button><button class="tab" data-r="0">🎮 練習模式</button></div>
-      <div class="fbhint">依每個人「目前手上最高階的劍」排名，劍碎或賣掉就會掉榜。</div>
+      <div class="fbhint">依每個人「目前手上最高階的那一把劍」排名，每人最多顯示最高階的 3 把，劍碎或賣掉就會掉榜。</div>
       <div class="fblist"></div>
     </div>`;
   const listEl = root.querySelector(".fblist");
@@ -31,9 +31,9 @@ export function mountForgeBoard(root, { env, back }) {
     listEl.innerHTML = d.rows.map((r, i) => `
       <div class="fbrow${i < 3 ? " top" + (i + 1) : ""}">
         <span class="fbrank">${MEDAL[i] || i + 1}</span>
-        <span class="fbsw">${swordSvg(r.tier, "fb" + i)}</span>
-        <span class="fbinfo"><b>${esc(r.name)}</b><small>${r.tier} 階「${esc(swordName(r.tier))}」・擁有 ${r.swords} 把</small></span>
-        <span class="fbval"><small>賣價</small>${money(r.sell)}</span>
+        <span class="fbsw">${(r.top || [r.tier]).map((t, j) => swordSvg(t, "fb" + i + "_" + j)).join("")}</span>
+        <span class="fbinfo"><b>${esc(r.name)}</b><small>${(r.top || [r.tier]).join("・")} 階${r.swords > 3 ? `（共 ${r.swords} 把，只顯示最高 3 把）` : ""}</small></span>
+        <span class="fbval"><small>最高階賣價</small>${money(r.sell)}</span>
       </div>`).join("") + `<div class="fbtotal">共 ${d.total} 人有劍</div>`;
   }
   function ask() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "fboard", real })); }
