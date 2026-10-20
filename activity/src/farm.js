@@ -22,6 +22,15 @@ function fmt(ms) {
 }
 const pidOf = () => { try { let p = localStorage.getItem("farmpid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("farmpid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
 
+const p2 = (n) => String(n).padStart(2, "0");
+// 紀錄時間：今天只顯示 HH:MM，其他天加上月/日
+function logTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts), n = new Date();
+  const hm = `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  return d.toDateString() === n.toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+}
+
 export function mountFarm(root, { env, back }) {
   root.innerHTML = `
     <div class="game slots farm">
@@ -104,7 +113,7 @@ export function mountFarm(root, { env, back }) {
     }).join("");
     const emptyN = st.plots.filter((p) => !p).length, ripeN = st.plots.filter((p) => p && p.left - el <= 0).length;
     const inv = st.inv.map((x) => `<button class="item" data-k="${x.k}" title="賣出這個">${VNAME[x.v] ? `<em>${VNAME[x.v]}</em>` : ""}${cropOf(x.c).icon}<b>×${x.n}</b><small>${money(x.unit)}/個</small></button>`).join("");
-    const log = st.log.length ? `<div class="flog"><b>最近發生的事</b>${st.log.map((l) => `<div>${esc(l.txt)}</div>`).join("")}</div>` : "";
+    const log = st.log.length ? `<div class="flog"><b>最近發生的事</b>${st.log.map((l) => `<div><span class="ftime">${logTime(l.ts)}</span>${esc(l.txt)}</div>`).join("")}</div>` : "";
     body.innerHTML = `
       <div class="seeds">${seeds}</div>
       <div class="fact"><button class="plantall" ${emptyN ? "" : "disabled"}>全部種${cropOf(sel).icon}（${emptyN} 塊）</button><button class="harvall" ${ripeN ? "" : "disabled"}>全部收成（${ripeN} 塊）</button></div>

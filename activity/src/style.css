@@ -775,3 +775,5 @@ body.tv-fs{overflow:hidden}
 .game.theater { background:#0e1420 url("./theaterbg-a.svg") center/cover no-repeat; border-radius:14px; }
 .farm .finv, .farm .seed { background:rgba(24,30,24,.82); }
 .farm .seed.sel { background:rgba(52,69,47,.92); }
+
+.flog .ftime{opacity:.6;font-size:12px;margin-right:8px;font-variant-numeric:tabular-nums}
