@@ -254,7 +254,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 所有人共用同一場；伺服器決定名次、每人畫面一致。10 匹馬的能力值、出賽、勝場、近 5 場存在 `activity/server/horses.json`（所有人共用，已 `.gitignore`；初始以 1000 場模擬當基本資料）。每匹有跑法（先行／逃馬／追込／穩定／爆發）和毛色，會影響動畫。下注頁每匹馬顯示戰鬥卡：能力雷達圖、歷史戰績、近 5 場、當天狀態、倍率；**不顯示本場勝率**，要自己判斷。
 
 ### 部署
-- 前端：`activity/`（Vite 打包，`npm install && npm run build`，產物在 `activity/dist/`；前端改動只需重新 build）。把 `VITE_CLIENT_ID` 寫進 `activity/.env`（Application ID，不是密鑰）。
+- 前端：`activity/`（Vite 打包，`npm install && npm run build`，產物在 `activity/dist/`；前端改動只需重新 build）。把 `VITE_CLIENT_ID`（Application ID，不是密鑰）和 `DISCORD_CLIENT_SECRET`（真代幣模式登入用）都寫進專案根目錄的 `.env`，bot、前端、後端共用同一個檔。
 - 後端：`activity/server/`（Node + ws，預設 `127.0.0.1:3101`，用 `node server.js` 或 systemd 常駐；後端改動需重啟）。賭場／撲克／賽馬紀錄等執行時資料（`horses.json`、`casino_log.json`、`escrow.json`…）都在這裡，不進 git。
 - 對外：需要公開 HTTPS 網址。Developer Portal → Activities → URL Mappings 把 `/` 指到你放 `dist/` 的目錄；WebSocket 路徑 `/ws` 要轉到後端（Apache 用 `ProxyPass /你的路徑/ws http://127.0.0.1:3101/ws upgrade=websocket`）。
 - 機器人端：Discord 開啟 Activities 後會自動建立入口指令 `/launch`；整批同步指令時必須把它一起帶上（`bot.py` 的 `sync_commands` 已處理）。

@@ -1,5 +1,5 @@
 // 賭注模式：Discord OAuth 登入、登入憑證（session）、和機器人內部 API 的溝通。
-// 密鑰（DISCORD_CLIENT_SECRET）只從 server/.env 讀，不會被傳到前端或寫進記錄。
+// 密鑰（DISCORD_CLIENT_SECRET）從專案根目錄的 .env 讀（也相容舊的 server/.env），不會被傳到前端或寫進記錄。
 import fs from "node:fs";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ function loadEnv(file) {
 }
 
 const dir = fileURLToPath(new URL(".", import.meta.url));
-const ENV = { ...loadEnv(dir + ".env"), ...process.env };
+const ENV = { ...loadEnv(dir + ".env"), ...loadEnv(dir + "../../.env"), ...process.env };
 const CLIENT_ID = ENV.DISCORD_CLIENT_ID || "1560169041493102594";
 const CLIENT_SECRET = ENV.DISCORD_CLIENT_SECRET || "";
 export const GUILD_ID = ENV.ACTIVITY_GUILD_ID || "1560169531777744938";
