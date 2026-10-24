@@ -34,6 +34,7 @@ import channels
 import economy
 import extras
 import imagegen
+import memberstatus
 import webimg
 import divination
 import dmlog
@@ -228,7 +229,8 @@ def load_system_prompt(guild=None) -> str:
 
 intents = discord.Intents.default()
 intents.message_content = True  # 需要在 Developer Portal 打開 Message Content Intent
-intents.members = False
+intents.members = True       # 查成員公開狀態（member_status）要用；Developer Portal 的 Server Members Intent 要開
+intents.presences = True     # 同上：Presence Intent 也要開
 
 
 class Bot(discord.Client):
@@ -603,6 +605,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return text + "".join(f"\n[[FILE:{f}]]" for f in files)
         if name == "music_status":
             return music.real_state(msg.guild if msg else None)
+        if name == "member_status":
+            return memberstatus.run(msg.guild if msg else None, args)
         if name == "music":
             if msg is None:
                 return "這裡不能放音樂。"
@@ -668,6 +672,8 @@ def tool_status(name: str, args_json: str) -> str:
         return f"🔎 上網找圖：{args.get('query') or args.get('url') or ''}"[:80]
     if name == "music_status":
         return "🔎 確認播放狀態"
+    if name == "member_status":
+        return f"👀 看成員狀態：{args.get('name') or '大家'}"[:80]
     if name == "random_number":
         return "🎲 抽數字"
     if name == "fortune_chart":
@@ -883,7 +889,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
