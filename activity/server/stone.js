@@ -51,11 +51,12 @@ export const cutFee = (bet) => Math.max(1, Math.round(bet * CUT_FEE));
 export const openFee = (bet) => Math.max(1, Math.round(bet * OPEN_FEE));
 export const CUT_WEIGHTS = CUT_W, SKIN_WEIGHTS = SKIN_W;
 
-// ---- 市場：一次擺 6 顆石頭，大小（價格）不同。價格 = 基準價 × 大小；價值倍率照等級，所以大石頭只是賭得比較大，不會比較划算。
-export const MARKET_N = 6;
-export function newMarket(bet, maxPrice) {
-  return Array.from({ length: MARKET_N }, (_, id) => {
-    const tier = drawTier(), size = Math.round((0.6 + Math.random() * 1.0) * 100) / 100;
-    return { id, tier, size, price: Math.max(1, Math.min(maxPrice, Math.round(bet * size))), seed: randomInt(1, 2 ** 30), skin: hintFor(tier, SKIN_WEIGHTS), win: Math.random() < 0.35 ? hintFor(tier, CUT_WEIGHTS) : null };
-  });
+// ---- 市場：全服共用 100 顆，每顆價格不同；被買走就消失，之後慢慢補貨。
+// 價格在 20～2000 之間（取對數平均分布，便宜的比較多），價值 = 價格 × 等級倍率，所以貴的石頭只是賭得比較大。
+export const MARKET_MAX = 100, RESTOCK_MS = 15000, PRICE_MIN = 20, PRICE_MAX = 2000;
+let nextId = 1;
+export function makeStone() {
+  const tier = drawTier(), price = Math.round(Math.exp(Math.log(PRICE_MIN) + Math.random() * Math.log(PRICE_MAX / PRICE_MIN)));
+  const size = Math.round(Math.min(1.8, Math.max(0.6, Math.pow(price / 100, 0.3))) * 100) / 100;
+  return { id: nextId++, tier, price, size, seed: randomInt(1, 2 ** 30), skin: hintFor(tier, SKIN_WEIGHTS), win: Math.random() < 0.35 ? hintFor(tier, CUT_WEIGHTS) : null, at: Date.now() };
 }

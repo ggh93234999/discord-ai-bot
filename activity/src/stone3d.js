@@ -51,7 +51,7 @@ export function buildStone(p) {                       // p: { seed, size, skinJ,
     m.position.copy(c.multiplyScalar(1.004)); m.lookAt(m.position.clone().add(nrm));
     g.add(m);
   });
-  g.scale.setScalar(0.75 + 0.35 * (p.size || 1));
+  g.scale.setScalar(0.7 + 0.22 * (p.size || 1));
   return g;
 }
 
