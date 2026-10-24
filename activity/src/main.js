@@ -11,6 +11,7 @@ import { mountPoker } from "./poker.js";
 import { mountMahjong } from "./mahjong.js";
 import { mountBridge } from "./bridge.js";
 import { mountBigtwo } from "./bigtwo.js";
+import { mountAvalon } from "./avalon.js";
 import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
@@ -45,6 +46,7 @@ const CATS = [
   { id: "forge", icon: "⚒️", name: "鍛造", note: "獨立玩法：鍛劍、賣劍賺代幣，最多同時 10 把" },
   { id: "farm", icon: "🌱", name: "農場", note: "獨立玩法：種菜、收成、賣菜賺代幣，也能偷朋友的菜" },
   { id: "casino", icon: "🎰", name: "賭場", note: "練習幣或真代幣，每個遊戲裡都有 📖 規則" },
+  { id: "party", icon: "🧩", name: "桌遊・派對", note: "多人推理／聊天，沒有計時" },
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
   { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
   { id: "media", icon: "🎬", name: "影音", note: "大家一起看" },
@@ -66,6 +68,7 @@ const GAMES = [
   { id: "mjjp", cat: "casino", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
   { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
   { id: "bigtwo", cat: "casino", icon: "🂮", name: "大老二", players: "4 人（可補電腦）", desc: "台灣玩法：單張、對子、順子到同花順，先出完的贏，練習點數", mount: mountBigtwo() },
+  { id: "avalon", cat: "party", icon: "🗡️", name: "阿瓦隆", players: "5–10 人（可補電腦）", desc: "好人與壞人的推理：組隊、投票、出任務，沒有計時，按「下一步」才繼續", mount: mountAvalon() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "gallery", cat: "art", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },

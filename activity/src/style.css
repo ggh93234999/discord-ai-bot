@@ -840,3 +840,35 @@ body.tv-fs{overflow:hidden}
 @media (max-width:520px){.bt .brhand{gap:2px}.bt .bc.big{width:30px;height:46px}.bt .bc.big b{font-size:14px}.bt .bc.big i{font-size:16px}}
 
 .br .btbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+/* ================= 阿瓦隆 ================= */
+.av .avbody{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px}
+.av .avlog{font-size:12px;color:#aaa;text-align:center;min-height:16px}
+.av .btbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.av .btbtns .mb:disabled,.av .mb:disabled{opacity:.35;cursor:default}
+.av .avlobby{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:520px}
+.av .avplist{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.av .avp{background:#1f3d2c;border-radius:10px;padding:6px 10px;display:flex;gap:6px;align-items:center}.av .avp.me{outline:2px solid #ffd54f}
+.av .avlobby small,.av .avroster{color:#aaa;text-align:center;font-size:12px}
+.av .avtrack{display:flex;gap:8px;justify-content:center}
+.av .avq{width:58px;padding:6px 0;border-radius:10px;background:#2a2f3a;display:flex;flex-direction:column;align-items:center;gap:2px;border:2px solid transparent}
+.av .avq b{font-size:20px}.av .avq i{font-style:normal;font-size:10px;color:#bbb;text-align:center}
+.av .avq.ok{background:#1b5e20}.av .avq.bad{background:#8e1b1b}.av .avq.cur{border-color:#ffd54f}
+.av .avrej{font-size:12px;color:#ccc;display:flex;align-items:center;gap:4px}
+.av .avrj{width:10px;height:10px;border-radius:50%;background:#444;display:inline-block}.av .avrj.on{background:#e53935}
+.av .avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;width:100%;max-width:560px}
+.av .avpl{background:#1f3d2c;border-radius:10px;padding:8px;text-align:center;border:2px solid transparent;font-size:14px}
+.av .avpl.me{background:#2a5a3f}.av .avpl.leader{border-color:#ffd54f}
+.av .avpl.inteam{background:#1565c0}.av .avpl.chosen{background:#1565c0;border-color:#90caf9}
+.av .avpl.pick{cursor:pointer}.av .avpl.pick:hover{filter:brightness(1.2)}
+.av .avtag{font-size:12px;color:#ffe08a;min-height:16px}
+.av .avres{font-size:18px;font-weight:700;padding:8px 16px;border-radius:10px}
+.av .avres.ok{background:#1b5e20}.av .avres.bad{background:#8e1b1b}
+.av .avrole{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;max-width:420px}
+.av .avrc{background:#3a2f12;border:2px solid #ffd54f;border-radius:12px;padding:10px 14px;text-align:center;line-height:1.7}
+.av .avrole.evil .avrc{background:#3a1212;border-color:#e53935}
+.av .avrc h3{margin:0 0 4px}
+.av .avend{max-width:520px;width:100%}
+.av .avroles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+.av .avrow{display:flex;justify-content:space-between;gap:6px;padding:4px 8px;border-radius:8px;font-size:13px}
+.av .avrow.good{background:#1b5e20}.av .avrow.evil{background:#8e1b1b}.av .avrow.hit{outline:2px solid #ffd54f}

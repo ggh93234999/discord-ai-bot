@@ -4,9 +4,10 @@ import { mountPoker } from "./poker.js";
 import { mountMahjong } from "./mahjong.js";
 import { mountBridge } from "./bridge.js";
 import { mountBigtwo } from "./bigtwo.js";
+import { mountAvalon } from "./avalon.js";
 import { mountCasino } from "./casino.js";
 
-const GAMES = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], poker: ["♠️", "德州撲克"], mjtw: ["🀄", "台灣麻將"], mjjp: ["🀅", "日本麻將"], bridge: ["🂡", "橋牌"], bigtwo: ["🂮", "大老二"] };
+const GAMES = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], poker: ["♠️", "德州撲克"], mjtw: ["🀄", "台灣麻將"], mjjp: ["🀅", "日本麻將"], bridge: ["🂡", "橋牌"], bigtwo: ["🂮", "大老二"], avalon: ["🗡️", "阿瓦隆"] };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const PHASE = { bet: "下注中", run: "比賽中", result: "公布結果" };
 
@@ -39,7 +40,7 @@ export function mountSpectateLobby(root, { env, back }) {
     clearInterval(timer); try { ws.close(); } catch {}
     ws = null;
     root.innerHTML = "";
-    inner = (r.game === "poker" ? mountPoker({ spectate: { room: r.id } }) : r.game === "bridge" ? mountBridge({ spectate: { room: r.id } }) : r.game === "bigtwo" ? mountBigtwo({ spectate: { room: r.id } }) : r.game.startsWith("mj") ? mountMahjong(r.game.slice(2), { spectate: { room: r.id } }) : mountCasino(r.game, { spectate: { room: r.id } }))(root, { env, back: () => { if (inner) inner(); inner = null; connect(); showLobby(); } });
+    inner = (r.game === "poker" ? mountPoker({ spectate: { room: r.id } }) : r.game === "bridge" ? mountBridge({ spectate: { room: r.id } }) : r.game === "bigtwo" ? mountBigtwo({ spectate: { room: r.id } }) : r.game === "avalon" ? mountAvalon({ spectate: { room: r.id } }) : r.game.startsWith("mj") ? mountMahjong(r.game.slice(2), { spectate: { room: r.id } }) : mountCasino(r.game, { spectate: { room: r.id } }))(root, { env, back: () => { if (inner) inner(); inner = null; connect(); showLobby(); } });
   }
 
   function connect() {
