@@ -69,6 +69,7 @@ const GAMES = [
   { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
   { id: "bigtwo", cat: "casino", icon: "🂮", name: "大老二", players: "4 人（可補電腦）", desc: "台灣玩法：單張、對子、順子到同花順，先出完的贏，練習點數", mount: mountBigtwo() },
   { id: "avalon", cat: "party", icon: "🗡️", name: "阿瓦隆", players: "5–10 人（可補電腦）", desc: "好人與壞人的推理：組隊、投票、出任務，沒有計時，按「下一步」才繼續", mount: mountAvalon() },
+  { id: "stone", cat: "casino", icon: "💎", name: "賭石", players: "1 人", desc: "買原石、切開看線索，賣給收購商或全開，最高 60 倍", mount: mountCasino("stone") },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "gallery", cat: "art", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },

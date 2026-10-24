@@ -7,6 +7,7 @@ import { listMjTables } from "./mahjong.js";
 import { listBridgeTables } from "./bridge.js";
 import { listBigTwoTables } from "./bigtwo.js";
 import { listAvalonTables } from "./avalon.js";
+import { TIERS, MAX_CUTS, drawTier, hintFor, offerFor, cutFee, openFee, CUT_WEIGHTS, SKIN_WEIGHTS } from "./stone.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -14,7 +15,7 @@ import { botSettle, botPay, botRole, botInfo, betLimit } from "./bet.js";
 import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, realKeys, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
-export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "forge"];
+export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "stone", "forge"];
 const PRACTICE_START = 1000;
 const BET_MS = 30000, RESULT_MS = 10000;
 const rnd = (n) => randomInt(n);
@@ -105,7 +106,7 @@ function logLabel(e) {
   if (e.g === "dice") return `你 ${e.me}　莊家 ${e.bot}`;
   if (e.g === "bj") return `${e.pv} 比 ${e.dv}　${String(e.text || "").replace(/^[^\u4e00-\u9fa5A-Za-z]+/, "")}`;
   if (e.g === "horse") return `${(e.idx ?? 0) + 1}號 ${e.name || ""}${e.win === e.idx ? "（冠軍）" : ""}`;
-  if (e.g === "forge") return e.text || "";
+  if (e.g === "forge" || e.g === "stone") return e.text || "";
   if (e.g === "slots") return `${{ 1: "3 格", 3: "3×3", 4: "4×4" }[e.kind] || ""}${e.nwin ? `　中 ${e.nwin} 線` : ""}`;
   return "";
 }
@@ -177,7 +178,22 @@ async function finishBj(ws, bj, why) {
   casinoFeed(ws, { g: "bj", ...res });
 }
 
+// ---- 賭石：買石 → 逐刀切開（每刀付費）→ 賣給收購商或全開
+const stoneView = (st) => ({ real: st.real, bet: st.bet, fees: st.fees, skin: TIERS[st.skin].skin, cuts: st.cuts.map((j) => TIERS[j].cut), cutsLeft: MAX_CUTS - st.cuts.length, cutFee: cutFee(st.bet), openFee: openFee(st.bet), offer: offerFor(st.bet, st.skin, st.cuts) });
+async function finishStone(ws, st, how, why) {
+  ws.stone = null;
+  const tier = TIERS[st.tier];
+  const back = how === "opened" ? Math.round(st.bet * tier.mult) : offerFor(st.bet, st.skin, st.cuts);
+  const r = await payTo(st.ref, back, why);
+  edel(st.ekey);
+  const spent = st.bet + st.fees;
+  const res = { real: st.real, bet: spent, price: st.bet, fees: st.fees, back, how, tier: st.tier, tname: tier.name, mult: tier.mult, cuts: st.cuts.map((j) => TIERS[j].cut), skin: TIERS[st.skin].skin };
+  out(ws, { t: "cres", g: "stone", done: true, ...res, balance: r.balance, payfail: !r.ok });
+  casinoFeed(ws, { g: "stone", ...res, text: `${how === "opened" ? "全開" : "賣出"}　${tier.name}（${tier.mult}×）` });
+}
+
 export function casinoClose(ws) {
+  if (ws.stone) finishStone(ws, ws.stone, "sold", "賭石(斷線自動賣出)").catch(() => {});
   if (ws.bj) finishBj(ws, ws.bj, "21點(斷線自動停牌)").catch(() => {});
   leave(ws);
 }
@@ -338,7 +354,7 @@ export async function handleCasino(ws, m) {
   if (m.t === "creset") { if (!ws.bj) ws.cprac = ws.cr && ws.cr.game === "forge" ? FORGE_PRACTICE_START : PRACTICE_START; out(ws, { t: "cinit", balance: ws.cprac, you: ws.cid }); if (ws.cr) pushWho(ws.cr); return true; }
   if (m.t === "fboard") { out(ws, forgeBoard(!!m.real)); return true; }
   if (m.t === "fget" || m.t === "fforge" || m.t === "fsell") return handleForge(ws, m);
-  if (!["cplay", "cbj", "chorse"].includes(m.t)) return false;
+  if (!["cplay", "cbj", "chorse", "cstone"].includes(m.t)) return false;
   if (ws.cspec) return true;                       // 旁觀者不能玩
   if (ws.cbusy) return true;
   ws.cbusy = true;
@@ -386,6 +402,33 @@ export async function handleCasino(ws, m) {
           out(ws, { t: "cres", g: "bj", done: false, ...view }); setHand(ws, { g: "bj", ...view });
         }
       } else if (ws.bj && m.a === "stand") await finishBj(ws, ws.bj, "21點");
+    } else if (m.t === "cstone") {
+      if (m.a === "buy") {
+        if (ws.stone || !betOk) return true;
+        const r = await stake(ws, real, bet, "賭石買石");
+        if (!r.ok) { fail(ws, r); return true; }
+        const ekey = "s:" + randomBytes(5).toString("hex");
+        if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: bet });
+        const tier = drawTier();
+        const st = { real, bet, fees: 0, ekey, ref: betRef(ws, real, bet), tier, skin: hintFor(tier, SKIN_WEIGHTS), cuts: [] };
+        ws.stone = st; ws.creal = real;
+        const view = stoneView(st);
+        out(ws, { t: "cres", g: "stone", done: false, ...view, balance: r.balance }); setHand(ws, { g: "stone", real, bet, text: "挑石頭中" });
+      } else if (ws.stone && m.a === "cut") {
+        const st = ws.stone, fee = cutFee(st.bet);
+        if (st.cuts.length >= MAX_CUTS) return true;
+        const r = await stake(ws, st.real, fee, "賭石切石");
+        if (!r.ok) { fail(ws, r); return true; }
+        st.fees += fee; st.cuts.push(hintFor(st.tier, CUT_WEIGHTS));
+        if (st.real) eadd(st.ekey, { uid: st.ref.uid, name: st.ref.name, amount: st.bet + st.fees });
+        out(ws, { t: "cres", g: "stone", done: false, ...stoneView(st), balance: r.balance });
+      } else if (ws.stone && m.a === "open") {
+        const st = ws.stone, fee = openFee(st.bet);
+        const r = await stake(ws, st.real, fee, "賭石解石");
+        if (!r.ok) { fail(ws, r); return true; }
+        st.fees += fee;
+        await finishStone(ws, st, "opened", "賭石");
+      } else if (ws.stone && m.a === "sell") await finishStone(ws, ws.stone, "sold", "賭石");
     } else if (m.t === "chorse" && m.a === "bet") {
       const room = ws.cr, h = room && room.game === "horse" ? room.h : null, idx = Number(m.idx);
       if (!h || h.phase !== "bet" || Date.now() >= h.closeAt) return fail(ws, { error: "closed" }), true;

@@ -872,3 +872,8 @@ body.tv-fs{overflow:hidden}
 .av .avroles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
 .av .avrow{display:flex;justify-content:space-between;gap:6px;padding:4px 8px;border-radius:8px;font-size:13px}
 .av .avrow.good{background:#1b5e20}.av .avrow.evil{background:#8e1b1b}.av .avrow.hit{outline:2px solid #ffd54f}
+.av .avcomp{display:flex;flex-direction:column;gap:4px;font-size:13px;text-align:center;background:rgba(0,0,0,.25);border-radius:10px;padding:8px 12px;width:100%;box-sizing:border-box}
+.av .avcomp .g{color:#a5d6a7}.av .avcomp .e{color:#ef9a9a}
+
+.casino .stone{font-size:64px;text-align:center}
+.casino .strow{text-align:center;font-size:14px;color:#ddd;margin:3px 0}.casino .strow.big{font-size:18px;color:#fff;margin:8px 0}

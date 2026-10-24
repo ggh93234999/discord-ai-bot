@@ -7,7 +7,7 @@ import { mountBigtwo } from "./bigtwo.js";
 import { mountAvalon } from "./avalon.js";
 import { mountCasino } from "./casino.js";
 
-const GAMES = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], poker: ["♠️", "德州撲克"], mjtw: ["🀄", "台灣麻將"], mjjp: ["🀅", "日本麻將"], bridge: ["🂡", "橋牌"], bigtwo: ["🂮", "大老二"], avalon: ["🗡️", "阿瓦隆"] };
+const GAMES = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], stone: ["💎", "賭石"], poker: ["♠️", "德州撲克"], mjtw: ["🀄", "台灣麻將"], mjjp: ["🀅", "日本麻將"], bridge: ["🂡", "橋牌"], bigtwo: ["🂮", "大老二"], avalon: ["🗡️", "阿瓦隆"] };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const PHASE = { bet: "下注中", run: "比賽中", result: "公布結果" };
 

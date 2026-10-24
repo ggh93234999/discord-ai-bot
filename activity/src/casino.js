@@ -15,11 +15,12 @@ const ERR = {
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
   error: "發生錯誤，再試一次", 
 };
-const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", slots: "老虎機", forge: "鍛造" };
+const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", stone: "賭石", slots: "老虎機", forge: "鍛造" };
 const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
   dice: "你和莊家各擲兩顆骰子比點數，大的贏（拿回 2 倍），一樣退錢",
   bj: "點數最接近 21 不爆牌就贏；贏拿 2 倍，Blackjack 拿 2.5 倍，平手退錢",
+  stone: "買一顆原石，可以切開看線索，再賣給收購商或付解石費全開；開出的價值從 0 到 60 倍都有可能",
   forge: "每升一階要付鍛造費，有機率成功，也可能劍碎（全部歸零）；階數越高賣價越高，隨時可以賣掉。共 100 階，劍會幫你存起來",
   horse: "全房一起押：下注時間內選馬下注，時間到大家一起看比賽，押中拿 賭注×賠率",
 };
@@ -64,7 +65,7 @@ export function mountCasino(game, opts = {}) {
 
     let ws = null, closed = false, retry = 0, bet = 50, busy = false, wantReal = false, you = null;
     let mode = "practice", session = env.session || null, practiceBal = null, realBal = null;
-    let pick = "heads", inHand = false;
+    let pick = "heads", inHand = false, stoneV = null;
     let hs = null, skew = 0, horseSel = -1, raf = 0, tickTimer = 0;     // 賽馬狀態
     const timers = [];
     const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
@@ -191,6 +192,13 @@ export function mountCasino(game, opts = {}) {
       else if (game === "bj") {
         if (!inHand) ctl.append(btn("🃏 發牌", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); draw(); send({ t: "cbj", a: "deal", bet, real: real() }); }));
         else ctl.append(btn("➕ 要牌", "", () => send({ t: "cbj", a: "hit" })), btn("✋ 停牌", "alt", () => send({ t: "cbj", a: "stand" })));
+      } else if (game === "stone") {
+        if (!inHand || !stoneV) ctl.append(btn("💎 買石", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); draw(); send({ t: "cstone", a: "buy", bet, real: real() }); }));
+        else {
+          const v = stoneV, act = (a) => () => { busy = true; draw(); send({ t: "cstone", a }); };
+          const cb = btn(v.cutsLeft ? `🔪 切一刀（-${money(v.cutFee)}，剩 ${v.cutsLeft} 刀）` : "🔪 已切 3 刀", "alt", act("cut")); cb.disabled = !v.cutsLeft;
+          ctl.append(cb, btn(`💰 賣給收購商（${money(v.offer)}）`, "alt", act("sell")), btn(`🔨 解石全開（-${money(v.openFee)}）`, "", act("open")));
+        }
       } else if (game === "horse") {
         const canBet = hs && hs.phase === "bet" && !myBet();
         const label = !hs ? "連線中…" : myBet() ? `✅ 已下注 ${myBet().bet} 押 ${myBet().idx + 1} 號` : hs.phase === "bet" ? (horseSel < 0 ? "先點一匹馬" : `💰 下注 ${bet} 押 ${horseSel + 1} 號`) : hs.phase === "run" ? "比賽進行中…" : "下一場即將開始…";
@@ -207,6 +215,7 @@ export function mountCasino(game, opts = {}) {
       if (m.g === "coin") coinAnim(m);
       else if (m.g === "dice") diceAnim(m);
       else if (m.g === "bj") bjShow(m);
+      else if (m.g === "stone") stoneShow(m);
     }
     function coinAnim(m) {
       stage.innerHTML = `<div class="coin flip">🪙</div>`;
@@ -228,6 +237,17 @@ export function mountCasino(game, opts = {}) {
     }
     function cardsHtml(list, hideSecond) {
       return list.map((c) => `<span class="pcard ${/♥|♦/.test(c) ? "red" : ""}">${c}</span>`).join("") + (hideSecond ? `<span class="pcard back">?</span>` : "");
+    }
+    function stoneShow(m) {
+      inHand = !m.done; busy = false; stoneV = m.done ? null : m;
+      const rows = [`<div class="strow">🪨 買下價 ${money(m.done ? m.price : m.bet)}</div>`, `<div class="strow">外皮：${esc(m.skin)}</div>`, ...m.cuts.map((c, i) => `<div class="strow">第 ${i + 1} 刀：${esc(c)}</div>`)];
+      let html = `<div class="stone">🪨</div>${rows.join("")}`;
+      if (m.done) {
+        html = `<div class="stone">${m.mult >= 4 ? "💎" : m.mult > 0 ? "🟢" : "🪨"}</div>${rows.join("")}<div class="strow big">${m.how === "opened" ? "全開" : "其實是"}：<b>${esc(m.tname)}</b>（${m.mult}×）</div>
+          <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">${m.how === "opened" ? "解石成功" : "賣給收購商"}　${resultLine(m)}${m.fees ? `（含切／解石費 ${money(m.fees)}）` : ""}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
+        statusEl.textContent = "再買一顆？";
+      } else statusEl.textContent = "切開看看，或直接決定";
+      stage.innerHTML = html; showBalance(); draw();
     }
     function bjShow(m) {
       inHand = !m.done; busy = false;

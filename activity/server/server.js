@@ -306,7 +306,7 @@ wss.on("connection", (ws, req) => {
     }
     if (m.t === "gl") { handleGallery(ws, m).catch((e) => console.log("圖創區錯誤", e && e.message)); return; }
     if (m.t === "fm") { handleFarm(ws, m).catch((e) => console.log("農場錯誤", e && e.message)); return; }
-    if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
+    if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|cstone|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
     if (typeof m.t === "string" && /^(avjoin|avsit|avstart|avstand|avaddbot|avdelbot|avact|avname|avcfg|avlobby)$/.test(m.t)) { handleAvalon(ws, m); return; }

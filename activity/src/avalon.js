@@ -2,6 +2,19 @@
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 
+const GOOD_N = { 5: 3, 6: 4, 7: 4, 8: 5, 9: 6, 10: 6 };
+// 依人數和勾選的角色算出每種角色的數量（和伺服器 assignRoles 同一套規則）
+function composition(n, c) {
+  const goodN = GOOD_N[n], evilN = n - goodN, evil = ["刺客"];
+  if (c.percival && evil.length < evilN) evil.push("莫甘娜");
+  if (c.mordred && evil.length < evilN) evil.push("莫德雷德");
+  if (c.oberon && evil.length < evilN) evil.push("奧伯倫");
+  const good = ["梅林"];
+  if (evil.includes("莫甘娜") && good.length < goodN) good.push("派西維爾");
+  const cnt = (list, fill, total) => [...list, ...Array(total - list.length).fill(fill)].reduce((m, r) => ((m[r] = (m[r] || 0) + 1), m), {});
+  const fmt = (m) => Object.entries(m).map(([r, k]) => `${r}${k > 1 ? ` ×${k}` : ""}`).join("、");
+  return { goodN, evilN, good: fmt(cnt(good, "亞瑟的忠臣", goodN)), evil: fmt(cnt(evil, "爪牙", evilN)) };
+}
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function getPid() { try { let p = localStorage.getItem("avpid"); if (!p) { p = Math.random().toString(36).slice(2, 10); localStorage.setItem("avpid", p); } return p; } catch { return Math.random().toString(36).slice(2, 10); } }
 const lsName = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
@@ -57,7 +70,9 @@ export function mountAvalon(opts = {}) {
           ${chk("percival", "派西維爾＋莫甘娜")}${chk("mordred", "莫德雷德")}${chk("oberon", "奧伯倫")}</div>
           <div class="btbtns"><button class="mb ghost addbot"${st.players.length >= st.maxp ? " disabled" : ""}>＋電腦</button><button class="mb start">▶ 開始（不足人數由電腦補）</button></div>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」加入，5～10 人，不夠的人數由電腦補。</div>`;
-      body.innerHTML = `<div class="avlobby"><div class="avplist">${list}</div>${!me && !spectate ? `<button class="mb sit">入座</button>` : ""}${cfg}<small>沒有計時：每個公開的畫面（投票結果、任務結果）都要有人按「下一步」才會繼續。身分只有自己看得到。</small>${me && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      const total = Math.max(c.n, st.players.length), cp = composition(total, c);
+      const comp = `<div class="avcomp"><b>${total} 人局</b>：<span class="g">好人 ${cp.goodN} 人（${cp.good}）</span><span class="e">壞人 ${cp.evilN} 人（${cp.evil}）</span></div>`;
+      body.innerHTML = `<div class="avlobby"><div class="avplist">${list}</div>${comp}${!me && !spectate ? `<button class="mb sit">入座</button>` : ""}${cfg}<small>沒有計時：每個公開的畫面（投票結果、任務結果）都要有人按「下一步」才會繼續。身分只有自己看得到。</small>${me && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : `等開局（${st.players.length} 人入座）`;
       const q = (s) => body.querySelector(s);
       q(".sit") && q(".sit").addEventListener("click", () => send({ t: "avsit" }));
