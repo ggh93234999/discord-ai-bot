@@ -903,3 +903,7 @@ body.tv-fs{overflow:hidden}
 .casino .stcp small{display:block;font-size:11px;color:#ccc;line-height:1.4;margin-top:2px}
 .casino .stcimg{width:176px;height:176px;background:#171c1a;border-radius:10px;overflow:hidden}
 .casino .stcimg canvas{width:100%;height:100%;display:block}
+.casino .stpcs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0}
+.casino .stpc{background:#1d2622;border:2px solid transparent;border-radius:10px;color:#ddd;padding:5px 10px;cursor:pointer;font-size:13px;display:flex;flex-direction:column;align-items:center}
+.casino .stpc small{font-size:11px;color:#bbb}
+.casino .stpc.sel{border-color:#7fdcff;color:#fff}

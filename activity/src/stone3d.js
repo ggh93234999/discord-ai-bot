@@ -81,30 +81,38 @@ function capMesh(b64, seed, axis, pos, dbl = true) {
   m.matrixAutoUpdate = false; m.matrix.makeBasis(D(u), D(w), D(n)).setPosition(n[0] * pos, n[1] * pos, n[2] * pos); return m;
 }
 
-// 切開後的石頭：n 刀 → 最多 2^n 塊，每塊用裁切平面剪出來，並沿各刀的法線方向稍微拉開，露出切面
+// 切開後的石頭：每一刀把「你選的那一塊」分成兩塊（座標軸對齊的盒子）。每塊用裁切平面剪出來，沿各刀的法線方向稍微拉開，露出切面。
+// p.cuts = [{piece, lo, hi, axis, pos, grid}]（lo／hi 是切出來兩塊的編號），p.sold = 已賣掉（不顯示）的塊。
 const N3 = (c) => new THREE.Vector3(...AXES[c.axis]);
 export const GAP = 0.09;
 function makeSplit(p, lod) {
-  const cuts = p.cuts || [], base = buildStone({ ...p, cuts: [], lod: cuts.length ? Math.min(lod || 6, 5) : lod }), sc = base.scale.x, k = cuts.length;
-  if (!k) return { root: base, sc, setGaps() {} };
-  const root = new THREE.Group(), pieces = [];
-  for (let m = 0; m < (1 << k); m++) {
-    const sg = cuts.map((_, i) => ((m >> i) & 1 ? 1 : -1)), h = base.clone(true);
-    h.traverse((x) => { if (x.material) x.material = x.material.clone(); });
-    const planes = sg.map((si, i) => new THREE.Plane(N3(cuts[i]).multiplyScalar(si), 0));
+  const cuts = p.cuts || [], sold = new Set(p.sold || []);
+  const base = buildStone({ ...p, cuts: [], lod: cuts.length ? Math.min(lod || 6, 5) : lod }), sc = base.scale.x;
+  const boxes = new Map([[0, { anc: [] }]]);
+  cuts.forEach((c, ci) => {
+    const par = boxes.get(c.piece); if (!par) return; par.split = true;
+    boxes.set(c.lo, { anc: [...par.anc, { ci, axis: c.axis, sg: -1, pos: c.pos }] }); boxes.set(c.hi, { anc: [...par.anc, { ci, axis: c.axis, sg: 1, pos: c.pos }] });
+  });
+  const root = new THREE.Group(), leaves = [];
+  for (const [id, bx] of boxes) {
+    if (bx.split || sold.has(id)) continue;
+    const h = base.clone(true); h.traverse((x) => { if (x.material) x.material = x.material.clone(); });
+    const planes = bx.anc.map((e) => new THREE.Plane(N3(e).multiplyScalar(e.sg), 0));
     h.traverse((x) => { if (x.material) x.material.clippingPlanes = planes; });
-    cuts.forEach((c, i) => { const cap = capMesh(c.grid, p.seed, c.axis, c.pos); cap.material.clippingPlanes = planes.filter((_, j) => j !== i); h.add(cap); });
-    root.add(h); pieces.push({ h, sg, planes });
+    bx.anc.forEach((e, i) => { const cap = capMesh(cuts[e.ci].grid, p.seed, e.axis, e.pos); cap.material.clippingPlanes = planes.filter((_, j) => j !== i); h.add(cap); });
+    root.add(h); leaves.push({ id, h, anc: bx.anc, planes });
   }
   const setGaps = (g) => {
-    for (const pc of pieces) {
-      const off = new THREE.Vector3(); pc.sg.forEach((si, i) => off.addScaledVector(N3(cuts[i]), si * g[i]));
-      pc.h.position.copy(off);
-      pc.planes.forEach((pl, i) => { pl.constant = -(pc.sg[i] * cuts[i].pos * sc) - pl.normal.dot(off); });
+    for (const lf of leaves) {
+      const off = new THREE.Vector3(); lf.anc.forEach((e) => off.addScaledVector(N3(e), e.sg * g[e.ci]));
+      lf.h.position.copy(off);
+      lf.planes.forEach((pl, i) => { pl.constant = -(lf.anc[i].sg * lf.anc[i].pos * sc) - pl.normal.dot(off); });
     }
   };
+  const highlight = (id) => { for (const lf of leaves) { const m = lf.h.children[0]?.material; if (m && m.emissive) m.emissive.set(lf.id === id ? 0x2a5a6a : 0x000000); } };
+  const api = { root, sc, leaves, setGaps, highlight, n: cuts.length };
   setGaps(cuts.map(() => GAP * sc));
-  return { root, sc, setGaps };
+  return api;
 }
 
 export function createViewer(container) {
@@ -120,7 +128,7 @@ export function createViewer(container) {
   const ctl = new OrbitControls(cam, renderer.domElement);
   ctl.enableDamping = true; ctl.enablePan = false; ctl.minDistance = 2.4; ctl.maxDistance = 8; ctl.autoRotate = true; ctl.autoRotateSpeed = 1.2;
   ctl.addEventListener("start", () => { ctl.autoRotate = false; });
-  let cur = null, raf = 0, dead = false, prev = null;
+  let cur = null, raf = 0, dead = false, prev = null, sel = null;
   renderer.localClippingEnabled = true;
   const tickers = new Set();
   const loop = () => { if (dead) return; raf = requestAnimationFrame(loop); const now = performance.now(); for (const f of [...tickers]) f(now); ctl.update(); renderer.render(scene, cam); };
@@ -128,18 +136,23 @@ export function createViewer(container) {
   const dispose3 = (o) => o.traverse((x) => { if (x.geometry) x.geometry.dispose(); if (x.material) { x.material.map?.dispose(); x.material.dispose(); } });
   return {
     el: renderer.domElement,
-    show(p) { this.preview(null); if (cur) { scene.remove(cur.root); dispose3(cur.root); } cur = makeSplit(p, p.lod); scene.add(cur.root); },
-    // 預覽刀的位置：一片半透明的平面穿過石頭（座標是石頭的本地座標，要乘上石頭的縮放）
-    preview(axis, pos) {
+    show(p) { this.preview(null); if (cur) { scene.remove(cur.root); dispose3(cur.root); } cur = makeSplit(p, p.lod); scene.add(cur.root); if (sel != null) cur.highlight(sel); },
+    highlight(id) { sel = id; cur?.highlight(id); },
+    // 預覽刀的位置：一片半透明的平面，範圍是選到的那一塊（box = {lo, hi}，石頭座標）
+    preview(axis, pos, box) {
       if (prev) { scene.remove(prev); dispose3(prev); prev = null; }
       if (axis == null || !cur) return;
       const n = AXES[axis], [u, w] = planeBasis(n), sc = cur.sc;
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * GS * 0.9, 2 * GS * 0.9), new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }));
+      const rng = (v) => { const k = [0, 1, 2].find((i) => Math.abs(v[i]) > 0.5), lo = Math.max(box ? box.lo[k] : -GS, -GS), hi = Math.min(box ? box.hi[k] : GS, GS); return v[k] > 0 ? [lo, hi] : [-hi, -lo]; };
+      const [a0, a1] = rng(u), [b0, b1] = rng(w);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }));
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xdff8ff })));
-      m.matrixAutoUpdate = false; m.matrix.makeBasis(D(u), D(w), D(n)).scale(new THREE.Vector3(sc, sc, sc)).setPosition(n[0] * pos * sc, n[1] * pos * sc, n[2] * pos * sc);
+      const ca = (a0 + a1) / 2, cb = (b0 + b1) / 2;
+      m.matrixAutoUpdate = false;
+      m.matrix.makeBasis(D(u), D(w), D(n)).scale(new THREE.Vector3(sc * (a1 - a0), sc * (b1 - b0), sc)).setPosition(sc * (n[0] * pos + u[0] * ca + w[0] * cb), sc * (n[1] * pos + u[1] * ca + w[1] * cb), sc * (n[2] * pos + u[2] * ca + w[2] * cb));
       prev = m; scene.add(m);
     },
-    // 切石動畫：刀片掃過 → 石頭沿切面分開、拉得更開露出真正的切面 → 留一道小縫停著。p 是切之前的石頭，cutObj = {axis,pos,grid} 是這一刀
+    // 切石動畫：刀片掃過 → 那一塊沿切面分開、拉得更開露出真正的切面 → 留一道小縫停著。p 是切之前的石頭，cutObj 是這一刀
     cut(p, pAfter, cutObj) {
       return new Promise((resolve) => {
         if (!cur) return resolve();
@@ -153,12 +166,11 @@ export function createViewer(container) {
           if (t < 800) blade.position.copy(n).multiplyScalar(sc * d + (-1.6 + 3.2 * ease(t / 800)));
           else if (phase === 0) {
             phase = 1; scene.remove(blade);
-            scene.remove(cur.root); dispose3(cur.root); nx = cur = makeSplit({ ...p, cuts: [...(p.cuts || []), cutObj] }, 5); scene.add(cur.root);
+            scene.remove(cur.root); dispose3(cur.root); nx = cur = makeSplit({ ...pAfter }, 5); scene.add(cur.root); if (sel != null) cur.highlight(sel);
           }
           if (phase === 1) {
             const k = t < 1500 ? ease((t - 800) / 700) : t < 3300 ? 1 : 1 - ease(Math.min(1, (t - 3300) / 600));
-            const gaps = Array.from({ length: old + 1 }, (_, i) => (i < old ? GAP * sc : GAP * sc + (0.8 * sc - GAP * sc) * k));
-            nx.setGaps(gaps);
+            nx.setGaps(Array.from({ length: old + 1 }, (_, i) => (i < old ? GAP * sc : GAP * sc + (0.8 * sc - GAP * sc) * k)));
             if (t >= 3900) { tickers.delete(f); resolve(); }
           }
         };

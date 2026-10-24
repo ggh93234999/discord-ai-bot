@@ -3,7 +3,7 @@
 // 公開資料 pub：外表看得到的線索（場口外皮、松花、蟒帶、霧、癬、表面的裂、窗口），這些都由隱藏資料「有機率地」長出來，也夾雜假線索。
 // 價格 = 賣家看外表估的每公斤價 × 重量（所以貴的不一定好）；價值 = 翡翠體積 × 品質 × 重量 × 裂的折損。
 import { randomInt } from "node:crypto";
-import { GRID, GS, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
+import { GRID, GS, AXES, planeBasis, inside, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
 
 export const TIERS = [
   { name: "沒有翡翠" }, { name: "豆種" }, { name: "糯種" }, { name: "冰糯種" }, { name: "冰種" },
@@ -121,33 +121,80 @@ export function doCut(hid, axis, pos) {
   return { axis, pos, grid: Buffer.from(s.grid).toString("base64"), inside: s.inside, jade: s.jade, frac: s.inside ? s.jade / s.inside : 0, avgQ: tot ? wq / tot : 0, crack: s.hist[9] > 0 };
 }
 // 收購商出價：沒切過，是標價的 5～6 成；切過就看切面（切到翡翠就依看到的比例和品質估，沒切到就大幅降價）
-// 目前看得到的翡翠有多大：從每個切面的翡翠範圍，推出翡翠體在 x／y／z 三個方向至少有多長，沒看到的方向用已知的幾何平均補；
-// 再除以石頭本身的大小得到體積占比（VOLK 是迴歸出來的修正係數）。看到的翡翠愈大、愈多面，估的體積就愈大。
+// ---- 切塊與估價
+// 石頭切開後變成一塊塊（盒子 lo～hi，座標軸對齊）。每一刀只切你選的那一塊，變成兩塊；沒有次數上限（最多 MAX_PIECES 塊）。
+// 每一塊各自估價：看目前所有切面上看得到的翡翠，推出整塊翡翠大概多大（沿 x／y／z 的範圍），再算這一塊裡預期有多少翡翠。
+export const MAX_PIECES = 32, BOX = 2;
 export let VOLK = 2.4;
 export const setVolK = (k) => { VOLK = k; };
-export function seenVolume(st) {
-  const P = shapeParams(st.seed ?? st.hid?.seed), cell = (2 * GS) / GRID, ext = [0, 0, 0];
-  const AX = [[2, 1], [2, 0], [0, 1]];                                   // 每個切面方向：格子的列、行各對應世界座標哪一軸（見 planeBasis）
-  let tot = 0, wq = 0;
+export function newPieces() { return [{ id: 0, lo: [-BOX, -BOX, -BOX], hi: [BOX, BOX, BOX], sold: false }]; }
+export function newStoneState(hid, price, w, pub) {
+  return { hid, seed: hid.seed, price, w, win: pub.win, cuts: [], pieces: newPieces(), nextId: 1, got: 0 };
+}
+// 這一刀能不能切：那一塊還在、位置在那一塊裡面（離邊緣至少 0.1）、石頭沒超過塊數上限
+export function canCut(st, pieceId, axis, pos) {
+  const pc = st.pieces.find((p) => p.id === pieceId && !p.sold);
+  if (!pc || !Number.isInteger(axis) || axis < 0 || axis > 2 || !Number.isFinite(pos)) return null;
+  if (st.pieces.filter((p) => !p.sold).length >= MAX_PIECES) return null;
+  if (pos < pc.lo[axis] + 0.1 || pos > pc.hi[axis] - 0.1 || Math.abs(pos) > 1.4) return null;
+  return pc;
+}
+export function applyCut(st, pc, axis, pos) {
+  const c = doCut(st.hid, axis, pos), lo = st.nextId++, hi = st.nextId++;
+  const hiL = pc.hi.slice(), loL = pc.lo.slice(); hiL[axis] = pos; loL[axis] = pos;
+  pc.sold = true; pc.split = true;                                                  // 被切開的這一塊不再單獨存在
+  st.pieces.push({ id: lo, lo: pc.lo, hi: hiL, sold: false }, { id: hi, lo: loL, hi: pc.hi, sold: false });
+  const cut = { ...c, piece: pc.id, lo, hi }; st.cuts.push(cut); return cut;
+}
+function samples(st) {                                                              // 石頭裡面的取樣點（算每一塊占石頭的比例）
+  if (st._samp) return st._samp;
+  const P = shapeParams(st.seed), pts = [], n = 16;
+  for (let k = 0; k < n; k++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const p = [((i + 0.5) / n * 2 - 1) * 1.5, ((j + 0.5) / n * 2 - 1) * 1.5, ((k + 0.5) / n * 2 - 1) * 1.5];
+    if (inside(P, p)) pts.push(p);
+  }
+  return (st._samp = pts);
+}
+const inBox = (p, pc) => p[0] >= pc.lo[0] && p[0] < pc.hi[0] && p[1] >= pc.lo[1] && p[1] < pc.hi[1] && p[2] >= pc.lo[2] && p[2] < pc.hi[2];
+// 目前看到的翡翠：所有切面上翡翠格子的世界座標範圍。只在一個平面上看到的方向，厚度未知，用已知方向的幾何平均補；
+// 某個方向上有一刀完全沒切到翡翠，就把範圍限制在那一刀的同一邊。
+export function estBody(st) {
+  const cell = (2 * GS) / GRID, mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9]; let tot = 0, wq = 0;
   for (const c of st.cuts) {
     if (!(c.jade > 0)) continue;
-    const g = Buffer.from(c.grid, "base64"); let i0 = GRID, i1 = -1, j0 = GRID, j1 = -1;
-    for (let j = 0; j < GRID; j++) for (let i = 0; i < GRID; i++) { const v = g[j * GRID + i]; if (v >= 1 && v <= 8) { if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; } }
-    const [ax, bx] = AX[c.axis]; ext[ax] = Math.max(ext[ax], (i1 - i0 + 1) * cell / 2); ext[bx] = Math.max(ext[bx], (j1 - j0 + 1) * cell / 2);
-    tot += c.jade; wq += c.avgQ * c.jade;
+    const n = AXES[c.axis], [u, w] = planeBasis(n), g = Buffer.from(c.grid, "base64");
+    for (let j = 0; j < GRID; j++) for (let i = 0; i < GRID; i++) {
+      const v = g[j * GRID + i]; if (v < 1 || v > 8) continue;
+      const aa = ((i + 0.5) / GRID * 2 - 1) * GS, bb = ((j + 0.5) / GRID * 2 - 1) * GS; tot++; wq += v;
+      for (let k = 0; k < 3; k++) { const x = n[k] * c.pos + u[k] * aa + w[k] * bb, h = n[k] ? 0 : cell / 2; if (x - h < mn[k]) mn[k] = x - h; if (x + h > mx[k]) mx[k] = x + h; }
+    }
   }
-  const known = ext.filter((x) => x > 0); if (!known.length) return { vol: 0, q: 0 };
-  const gm = Math.exp(known.reduce((a, x) => a + Math.log(x), 0) / known.length), r = ext.map((x) => (x > 0 ? x : gm));
-  const lim = [P.sx, P.sy, P.sz].map((x) => 0.9 * x), rr = r.map((x, i) => Math.min(x, lim[i]));
-  return { vol: Math.min(0.6, VOLK * (rr[0] * rr[1] * rr[2]) / (P.sx * P.sy * P.sz)), q: Math.max(1, Math.round(wq / tot)) };
+  if (!tot) return null;
+  const known = [0, 1, 2].filter((k) => mx[k] - mn[k] > 1e-6).map((k) => (mx[k] - mn[k]) / 2), gm = known.length ? Math.exp(known.reduce((a, x) => a + Math.log(x), 0) / known.length) : cell;
+  for (let k = 0; k < 3; k++) if (mx[k] - mn[k] <= 1e-6) { const m = mn[k]; mn[k] = m - gm; mx[k] = m + gm; }
+  for (const c of st.cuts) if (!(c.jade > 0)) { const k = c.axis, ctr = (mn[k] + mx[k]) / 2; if (c.pos > mn[k] && c.pos < mx[k]) { if (ctr >= c.pos) mn[k] = c.pos; else mx[k] = c.pos; } }
+  const ctr = [0, 1, 2].map((k) => (mn[k] + mx[k]) / 2), r = [0, 1, 2].map((k) => Math.max(cell / 2, (mx[k] - mn[k]) / 2));
+  return { ctr, r, q: Math.max(1, Math.round(wq / tot)) };
 }
-export function offerFor(st) {
-  const price = st.price, cuts = st.cuts;
-  if (!cuts.length) return Math.floor(price * (st.win && st.win.code >= 1 && st.win.code <= 8 ? 0.65 : 0.55));
-  if (!cuts.some((c) => c.jade > 0)) return Math.floor(price * Math.max(0.03, 0.4 * Math.pow(0.5, cuts.length)));
-  const { vol, q } = seenVolume(st), est = st.w * vol * YIELD * mixOf(q);
-  return Math.max(Math.floor(price * 0.12), Math.floor(est * OFFER_K));
+const ELL = (() => { const a = []; for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) for (let k = 0; k < 9; k++) { const p = [(i + 0.5) / 4.5 - 1, (j + 0.5) / 4.5 - 1, (k + 0.5) / 4.5 - 1]; if (Math.hypot(...p) <= 1) a.push(p); } return a; })();
+// 每一塊的重量（公斤）和收購價。回傳還在的塊：[{id, lo, hi, w, offer}]
+export function pieceInfo(st) {
+  const P = shapeParams(st.seed), pts = samples(st), est = estBody(st), left = st.pieces.filter((p) => !p.sold);
+  let jadeAll = 0, k = 1;
+  if (est) { jadeAll = (VOLK * est.r[0] * est.r[1] * est.r[2]) / (P.sx * P.sy * P.sz); k = Math.min(1, 0.6 / jadeAll); }
+  const prior = (st.win && st.win.code >= 1 && st.win.code <= 8 ? 0.65 : 0.55) * Math.pow(0.55, st.cuts.length);
+  return left.map((pc) => {
+    const pf = pts.filter((p) => inBox(p, pc)).length / (pts.length || 1), w = st.w * pf;
+    let value;
+    if (!est) value = st.price * pf * Math.max(0.04, prior);
+    else {
+      const frac = ELL.filter((e) => inBox([est.ctr[0] + e[0] * est.r[0], est.ctr[1] + e[1] * est.r[1], est.ctr[2] + e[2] * est.r[2]], pc)).length / ELL.length;
+      value = st.w * (jadeAll * k * frac) * YIELD * mixOf(est.q) * OFFER_K + st.price * pf * 0.04;
+    }
+    return { id: pc.id, lo: pc.lo, hi: pc.hi, w: Math.round(w * 100) / 100, offer: Math.max(1, Math.floor(value)) };
+  });
 }
+export const offerFor = (st) => pieceInfo(st).reduce((a, p) => a + p.offer, 0);
 // 全開：沿翡翠核心的三個方向，挑切到最多翡翠的那一面來展示
 export function openSection(hid) {
   if (!hid.body) return doCut(hid, 1, 0);

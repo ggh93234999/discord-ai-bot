@@ -20,7 +20,7 @@ const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
   dice: "你和莊家各擲兩顆骰子比點數，大的贏（拿回 2 倍），一樣退錢",
   bj: "點數最接近 21 不爆牌就贏；贏拿 2 倍，Blackjack 拿 2.5 倍，平手退錢",
-  stone: "逛市場挑一顆原石（可 3D 旋轉觀察），切開看線索，再賣給收購商或付解石費全開；價值從 0 到 60 倍都有可能",
+  stone: "逛市場挑一顆原石（可 3D 旋轉觀察），一塊塊切開看裡面，每一塊各自賣給收購商；切幾刀都可以",
   forge: "每升一階要付鍛造費，有機率成功，也可能劍碎（全部歸零）；階數越高賣價越高，隨時可以賣掉。共 100 階，劍會幫你存起來",
   horse: "全房一起押：下注時間內選馬下注，時間到大家一起看比賽，押中拿 賭注×賠率",
 };
@@ -200,9 +200,12 @@ export function mountCasino(game, opts = {}) {
           mb.disabled = !pk || busy; ctl.append(mb);
         } else if (!inHand || !stoneV) ctl.append(btn("🪨 逛石頭市場", "", () => { stage.querySelector(".cresult")?.remove(); send({ t: "cstone", a: "market" }); }));
         else {
-          const v = stoneV, act = (a) => () => { busy = true; draw(); send({ t: "cstone", a }); };
-          const cb = btn(v.cutsLeft ? `🔪 切下去（-${money(v.cutFee)}，剩 ${v.cutsLeft} 刀）` : "🔪 已切 3 刀", "alt", () => { busy = true; draw(); send({ t: "cstone", a: "cut", axis: cutAxis, pos: cutPos }); }); cb.disabled = !v.cutsLeft || busy;
-          ctl.append(cb, btn(`💰 賣給收購商（${money(v.offer)}）`, "alt", act("sell")), btn(`🔨 解石全開（-${money(v.openFee)}）`, "", act("open")));
+          const v = stoneV, pc = v.pieces.find((p) => p.id === selPiece), rg = pc ? cutRange(pc, cutAxis) : [1, 0];
+          const cb = btn(`🔪 切這塊（-${money(v.cutFee)}）`, "alt", () => { busy = true; draw(); send({ t: "cstone", a: "cut", piece: selPiece, axis: cutAxis, pos: cutPos }); });
+          cb.disabled = !pc || rg[1] < rg[0] || v.pieces.length >= v.maxPieces || busy;
+          const sb = btn(pc ? `💰 賣這塊（${money(pc.offer)}）` : "💰 賣這塊", "alt", () => { busy = true; draw(); send({ t: "cstone", a: "sell", piece: selPiece }); }); sb.disabled = !pc || busy;
+          const ab = btn(`💰 全部賣出（${money(v.offer)}）`, "", () => { busy = true; draw(); send({ t: "cstone", a: "sell", piece: "all" }); }); ab.disabled = busy;
+          ctl.append(cb, sb, ab);
         }
       } else if (game === "horse") {
         const canBet = hs && hs.phase === "bet" && !myBet();
@@ -244,7 +247,7 @@ export function mountCasino(game, opts = {}) {
       return list.map((c) => `<span class="pcard ${/♥|♦/.test(c) ? "red" : ""}">${c}</span>`).join("") + (hideSecond ? `<span class="pcard back">?</span>` : "");
     }
     // ---- 賭石：3D 原石市場。viewer 是同一個 canvas，重畫畫面時只是搬位置
-    let viewer = null, marketOn = false, stSel = -1, viewerP = null, stPage = 0, stSort = "new", stLeft = 0, cutAxis = 0, cutPos = 0;
+    let viewer = null, marketOn = false, stSel = -1, viewerP = null, stPage = 0, stSort = "new", stLeft = 0, cutAxis = 0, cutPos = 0, selPiece = -1;
     const AXN = ["左右切", "上下切", "前後切"], fp = (x) => (x >= 0 ? "+" : "") + x.toFixed(2);
     const stoneMk = new Map(), thumbCache = new Map();
     const slotEl = document.createElement("div"); slotEl.className = "s3d";
@@ -253,7 +256,8 @@ export function mountCasino(game, opts = {}) {
       viewerP ||= import("./stone3d.js").then((mod) => { viewer = mod.createViewer(slotEl); return viewer; });
       return viewerP;
     }
-    const stoneP = (x) => ({ ...x, cuts: x.cuts || [] });
+    const stoneP = (x) => ({ ...x, cuts: x.cuts || [], sold: x.sold || [] });
+    const cutRange = (pc, ax) => [Math.ceil(Math.max(pc.lo[ax] + 0.1, -1.4) * 20 - 1e-9) / 20, Math.floor(Math.min(pc.hi[ax] - 0.1, 1.4) * 20 + 1e-9) / 20];
     function onMarket(m) {
       if (m.full) { stoneMk.clear(); for (const x of m.stones) stoneMk.set(x.id, x); marketOn = true; if (!inHand) marketShow(); }
       if (m.add) for (const x of m.add) stoneMk.set(x.id, x);
@@ -291,35 +295,51 @@ export function mountCasino(game, opts = {}) {
     async function stoneShow(m) {
       const prevV = stoneV; inHand = !m.done; busy = false; stoneV = m.done ? null : m; marketOn = false;
       const v = await ensureViewer(); if (closed) return;
-      const cuts = m.cuts || [], newCut = !m.done && m.newCut && cuts.length > 0, reveal = m.done && m.section;
-      const cap = (c, i) => `第 ${i + 1} 刀（${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠，占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}`;
+      const cuts = m.cuts || [], newCut = !m.done && m.newCut && cuts.length > 0, pcs = m.pieces || [];
+      if (!pcs.find((p) => p.id === selPiece)) selPiece = pcs.length ? pcs.slice().sort((a, b) => b.w - a.w)[0].id : -1;
+      const cap = (c, i) => `第 ${i + 1} 刀（塊 #${c.piece}　${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠，占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}`;
       const panel = (c, i, hide) => `<div class="stcp"${hide ? ' style="visibility:hidden"' : ""}><div class="stcimg" data-i="${i}"></div><small>${cap(c, i)}</small></div>`;
-      let html = `<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　已付切／解石費 ${money(m.fees)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>`;
-      if (!m.done && m.cutsLeft > 0) html += `<div class="stcutui"><div class="stax">${AXN.map((l, i) => `<button data-ax="${i}" class="${cutAxis === i ? "sel" : ""}">${l}</button>`).join("")}</div><label>刀的位置 <input type="range" class="stpos" min="-0.6" max="0.6" step="0.05" value="${cutPos}"> <b class="stposv">${fp(cutPos)}</b></label><div class="sthint">藍色的平面就是刀要切的地方。切一刀要付費，切完會看到那個面裡面長怎樣。</div></div>`;
+      let html = `<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>`;
+      if (!m.done) {
+        html += `<div class="stpcs">${pcs.map((p) => `<button class="stpc${p.id === selPiece ? " sel" : ""}" data-id="${p.id}">塊 #${p.id}<small>${p.w} 公斤　收購價 ${money(p.offer)}</small></button>`).join("")}</div>
+          <div class="stcutui"><div class="stax">${AXN.map((l, i) => `<button data-ax="${i}" class="${cutAxis === i ? "sel" : ""}">${l}</button>`).join("")}</div><label>刀的位置 <input type="range" class="stpos" step="0.05" value="${cutPos}"> <b class="stposv">${fp(cutPos)}</b></label>
+          <div class="sthint">先選一塊，再選方向和位置（藍色平面就是刀要走的地方）。每一塊都有自己的收購價：依目前看到的翡翠推出整塊翡翠有多大，再算這一塊裡預期有多少。次數不限，每刀要付費。</div></div>`;
+      }
       if (cuts.length) html += `<div class="stcuts">${cuts.map((c, i) => panel(c, i, newCut && i === cuts.length - 1)).join("")}</div>`;
-      if (reveal) {
-        const net = m.back - m.bet;
-        html += `<div class="stcuts"><div class="stcp" id="streveal" style="visibility:hidden"><div class="stcimg" data-i="r"></div><small>${m.how === "opened" ? "全開的切面" : "如果剖開（"}${AXN[m.section.axis]} ${fp(m.section.pos)}${m.how === "opened" ? "" : "）"}：${m.section.hit ? `翡翠占切面約 ${Math.round(m.section.frac * 100)}%` : "沒有翡翠"}</small></div></div>
-          <div class="strow big" id="streveal2" style="visibility:hidden">${m.q ? `裡面是：<b>${esc(m.tname)}</b>，翡翠約占石頭 ${m.volPct}%${m.cf < 1 ? `，裂使價值打 ${m.cf} 折` : ""}` : "裡面<b>沒有翡翠</b>，是廢石"}　（真正價值 ${money(m.value)}）</div>
-          <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}" id="streveal3" style="visibility:hidden">${m.how === "opened" ? "解石全開" : "賣給收購商"}　${resultLine(m)}${m.fees ? `（含切／解石費 ${money(m.fees)}）` : ""}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
-        statusEl.textContent = m.how === "opened" ? "解石中…" : "結算中…";
-      } else if (!m.done) statusEl.textContent = m.cutsLeft ? "調整刀的位置，切開看看，或直接決定" : "三刀都切完了，賣掉或解石全開";
+      if (m.done) {
+        html += `<div class="stcuts"><div class="stcp"><div class="stcimg" data-i="r"></div><small>整顆石頭裡面最大的切面（${AXN[m.section.axis]} ${fp(m.section.pos)}）</small></div></div>
+          <div class="strow big">${m.q ? `裡面其實是：<b>${esc(m.tname)}</b>，翡翠約占石頭 ${m.volPct}%${m.cf < 1 ? `，裂使價值打 ${m.cf} 折` : ""}` : "裡面<b>沒有翡翠</b>"}　（整顆如果完整處理約值 ${money(m.value)}）</div>
+          <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">全部賣完　${resultLine(m)}（含切石費 ${money(m.fees)}）${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
+        statusEl.textContent = "再逛一輪？";
+      }
       stage.innerHTML = html; stage.querySelector(".stslot").append(slotEl); slotEl.style.display = ""; v.resize();
       const put = (i, c) => { const el = stage.querySelector(`.stcimg[data-i="${i}"]`); if (el) el.append(v.sectionCanvas(c.grid, m.seed, 176)); };
-      cuts.forEach((c, i) => put(i, c)); if (reveal) put("r", m.section);
-      const prv = () => v.preview(!m.done && m.cutsLeft > 0 ? cutAxis : null, cutPos);
-      if (newCut || reveal) {                                          // 切石動畫：刀片掃過、石頭裂成兩半露出真正的切面
-        busy = true; draw();
-        const before = stoneP({ ...m, cuts: newCut ? cuts.slice(0, -1) : cuts }), after = stoneP(m);
-        v.show(before); await v.cut(before, after, newCut ? cuts[cuts.length - 1] : m.section); if (closed) return;
+      cuts.forEach((c, i) => put(i, c)); if (m.done) put("r", m.section);
+      const selBox = () => pcs.find((p) => p.id === selPiece);
+      const prv = () => { const pc = selBox(); v.preview(!m.done && pc ? cutAxis : null, cutPos, pc); v.highlight(!m.done ? selPiece : null); };
+      const sl = stage.querySelector(".stpos");
+      const sync = () => {                                              // 選到的塊或方向變了：更新滑桿範圍、預覽、按鈕
+        const pc = selBox(); if (!pc || !sl) return;
+        if (cutRange(pc, cutAxis)[1] < cutRange(pc, cutAxis)[0]) { const ok = [0, 1, 2].find((a) => cutRange(pc, a)[1] >= cutRange(pc, a)[0]); if (ok != null) { cutAxis = ok; stage.querySelectorAll(".stax button").forEach((x) => x.classList.toggle("sel", Number(x.dataset.ax) === cutAxis)); } }
+        const [lo, hi] = cutRange(pc, cutAxis); sl.min = lo; sl.max = Math.max(lo, hi); cutPos = Math.max(lo, Math.min(hi, cutPos)); if (hi < lo) cutPos = lo;
+        if (!(Math.abs(cutPos) > 1e-9) && 0 < lo) cutPos = lo; sl.value = cutPos; stage.querySelector(".stposv").textContent = fp(cutPos);
+        stage.querySelectorAll(".stax button").forEach((x) => { x.disabled = cutRange(pc, Number(x.dataset.ax))[1] < cutRange(pc, Number(x.dataset.ax))[0]; });
+        prv(); draw();
+      };
+      if (newCut) {                                                      // 切石動畫：刀片掃過、那一塊沿切面分開露出真正的切面
+        busy = true; draw(); statusEl.textContent = "切開中…";
+        const before = stoneP({ ...m, cuts: cuts.slice(0, -1) }), after = stoneP(m);
+        v.highlight(null); v.show(before); await v.cut(before, after, cuts[cuts.length - 1]); if (closed) return;
         stage.querySelectorAll('[style*="visibility"]').forEach((e) => { e.style.visibility = ""; });
         busy = false;
-        if (reveal) statusEl.textContent = "再逛一輪？"; else statusEl.textContent = m.cutsLeft ? "可以再切、賣掉，或解石全開" : "三刀都切完了，賣掉或解石全開";
-      } else v.show(stoneP(m));
-      prv();
-      const sl = stage.querySelector(".stpos");
-      if (sl) sl.addEventListener("input", () => { cutPos = Number(sl.value); stage.querySelector(".stposv").textContent = fp(cutPos); prv(); });
-      stage.querySelectorAll(".stax button").forEach((b) => b.addEventListener("click", () => { cutAxis = Number(b.dataset.ax); stage.querySelectorAll(".stax button").forEach((x) => x.classList.toggle("sel", x === b)); prv(); }));
+      } else v.show(stoneP(m.done ? { ...m, sold: [] } : m));
+      if (!m.done) {
+        statusEl.textContent = m.soldNow ? `賣掉了，拿到 ${money(m.soldNow)}` : "選一塊來切，或賣掉";
+        stage.querySelectorAll(".stpc").forEach((b) => b.addEventListener("click", () => { if (busy) return; selPiece = Number(b.dataset.id); stage.querySelectorAll(".stpc").forEach((x) => x.classList.toggle("sel", x === b)); v.highlight(selPiece); sync(); }));
+        if (sl) sl.addEventListener("input", () => { cutPos = Number(sl.value); stage.querySelector(".stposv").textContent = fp(cutPos); prv(); });
+        stage.querySelectorAll(".stax button").forEach((b) => b.addEventListener("click", () => { cutAxis = Number(b.dataset.ax); stage.querySelectorAll(".stax button").forEach((x) => x.classList.toggle("sel", x === b)); sync(); }));
+        sync();
+      } else v.preview(null);
       showBalance(); draw();
     }
     function bjShow(m) {
