@@ -777,3 +777,8 @@ body.tv-fs{overflow:hidden}
 .farm .seed.sel { background:rgba(52,69,47,.92); }
 
 .flog .ftime{opacity:.6;font-size:12px;margin-right:8px;font-variant-numeric:tabular-nums}
+
+.farm .seedtitle{margin:10px 2px 4px;font-size:13px;color:#b9d99a}
+.farm .seed.tree{border-color:rgba(255,183,77,.35)} .farm .seed.tree.sel{border-color:#ffb74d}
+.farm .plot.tree{box-shadow:inset 0 0 0 2px rgba(255,183,77,.55)}
+.farm .plot .chop{position:absolute;top:2px;right:3px;font-size:12px;opacity:.55;cursor:pointer;line-height:1} .farm .plot .chop:hover{opacity:1}

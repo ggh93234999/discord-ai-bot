@@ -3,6 +3,9 @@
 // 錢：賭注模式用機器人錢包的真代幣（買種子扣、賣菜補發）；練習模式用農場自己的練習幣（存在 farm.json）。
 // 經濟：每塊地一次產 3 個，3 個賣價合計約是種子價的 1.16 倍，加上稀有變種期望值約 +18% 左右；
 // 每塊地每小時大約賺 40 代幣上下，不會比賭場／鍛造容易賺。
+// 果樹（tree:true）：種一次不用再買，每隔一段時間結一次果（一次至少 20 個），收成後樹還在、重新計時；
+//   別人可以偷、次數不限、同一個人可以偷很多次，但每棵樹每次最多只能被偷走一半（floor(產量/2)）。
+//   單價 = 樹苗價 × 1.25 ÷ 一半的數量（進位），所以就算被偷到只剩一半，主人這一輪賣掉也至少賺回樹苗錢的 1.25 倍，不會虧本。
 // 偷菜：別人的田成熟 5 分鐘後才能偷，每塊地最多被偷 2 個（同一個人只能偷一次），主人至少留 1 個；每人每天最多偷 20 個。
 import fs from "node:fs";
 import { randomInt, randomBytes, createHash } from "node:crypto";
@@ -16,11 +19,22 @@ export const CROPS = [
   { id: "corn", icon: "🌽", name: "玉米", seed: 200, min: 60, y: 4 },
   { id: "pumpkin", icon: "🎃", name: "南瓜", seed: 600, min: 180, y: 4 },
   { id: "melon", icon: "🍉", name: "西瓜", seed: 1500, min: 480, y: 4 },
+  // 果樹：seed = 樹苗價（只買一次），min = 每輪結果要幾分鐘，y = 每輪結幾個
+  { id: "cherry", icon: "🍒", name: "櫻桃", seed: 60, min: 60, y: 20, tree: true },
+  { id: "blueberry", icon: "🫐", name: "藍莓", seed: 120, min: 120, y: 22, tree: true },
+  { id: "starfruit", icon: "⭐", name: "楊桃", seed: 180, min: 180, y: 24, tree: true },
+  { id: "peach", icon: "🍑", name: "水蜜桃", seed: 240, min: 240, y: 24, tree: true },
+  { id: "grape", icon: "🍇", name: "麝香葡萄", seed: 360, min: 360, y: 26, tree: true },
+  { id: "mango", icon: "🥭", name: "愛文芒果", seed: 480, min: 480, y: 28, tree: true },
+  { id: "avocado", icon: "🥑", name: "酪梨", seed: 720, min: 720, y: 30, tree: true },
 ];
 const CROP = Object.fromEntries(CROPS.map((c) => [c.id, c]));
 const yieldOf = (c) => CROP[c].y;                // 每塊地一次收幾個（每種作物不同，見 CROPS）
 const UNIT_RATE = 0.36;                          // 單個賣價 = 種子價 × 0.36；靠產量（4～5 個）讓被偷 1 個後還是賺，單價不隨被偷調整
-export const unitPrice = (c) => Math.max(1, Math.round(CROP[c].seed * UNIT_RATE));
+const TREE_PROFIT = 1.25;                         // 果樹：被偷到只剩一半時，主人這一輪的收入至少是樹苗價的幾倍
+const keepMin = (c) => Math.ceil(CROP[c].y / 2);   // 果樹每輪最少能留給主人的數量
+const stealMax = (c) => (CROP[c].tree ? Math.floor(CROP[c].y / 2) : STEAL_PER_PLOT);   // 每塊地（每棵樹）每輪最多被偷幾個
+export const unitPrice = (c) => (CROP[c].tree ? Math.ceil((CROP[c].seed * TREE_PROFIT) / keepMin(c)) : Math.max(1, Math.round(CROP[c].seed * UNIT_RATE)));
 // 稀有變種：每個收成各自抽一次
 export const VARIANTS = { n: { name: "", mult: 1 }, big: { name: "大顆", mult: 2 }, gold: { name: "金色", mult: 5 } };
 const rollVariant = () => { const r = randomInt(1000); return r < 10 ? "gold" : r < 60 ? "big" : "n"; };
@@ -50,7 +64,11 @@ function farmOf(key, create = true) {
   return f;
 }
 const addInv = (f, c, v, n = 1) => { const k = c + "." + v; f.inv[k] = (f.inv[k] || 0) + n; };
-const addLog = (f, txt) => { f.log.push({ ts: Date.now(), txt }); while (f.log.length > LOG_MAX) f.log.shift(); };
+const addLog = (f, txt, k = "") => {
+  const last = f.log[f.log.length - 1], now = Date.now();
+  if (k && last && last.k === k && now - last.ts < 10 * 60_000) { last.n = (last.n || 1) + 1; last.ts = now; last.txt = `${txt} ×${last.n}`; return; }     // 連續偷果樹：合併成「×N」
+  f.log.push(k ? { ts: now, txt, k, n: 1 } : { ts: now, txt }); while (f.log.length > LOG_MAX) f.log.shift();
+};
 
 // ---- 賭注模式的錢
 async function realBalance(ws) {
@@ -79,7 +97,7 @@ function viewOf(ws, f, real, bal) {
     inv, invValue: inv.reduce((s, x) => s + x.unit * x.n, 0),
     balance: real ? bal : f.coin, stealLeft: Math.max(0, STEAL_PER_DAY - used),
     log: f.log.slice(-8).reverse(),
-    crops: CROPS.map((c) => ({ id: c.id, icon: c.icon, name: c.name, seed: c.seed, min: c.min, y: c.y, unit: unitPrice(c.id) })),
+    crops: CROPS.map((c) => ({ id: c.id, icon: c.icon, name: c.name, seed: c.seed, min: c.min, y: c.y, unit: unitPrice(c.id), tree: !!c.tree })),
   };
 }
 
@@ -91,8 +109,9 @@ function visitView(ws, key, f, myKey) {
     plots: f.plots.map((p) => {
       if (!p) return null;
       const left = Math.max(0, ripeAt(p) - now), grace = Math.max(0, ripeAt(p) + STEAL_GRACE - now);
-      const canSteal = left === 0 && grace === 0 && p.st.length < STEAL_PER_PLOT && !p.st.includes(myKey) && key !== myKey;
-      return { c: p.c, left, grace, canSteal, mineDone: p.st.includes(myKey), full: p.st.length >= STEAL_PER_PLOT };
+      const tree = !!CROP[p.c].tree, max = stealMax(p.c);
+      const canSteal = left === 0 && grace === 0 && p.st.length < max && (tree || !p.st.includes(myKey)) && key !== myKey;
+      return { c: p.c, left, grace, canSteal, mineDone: !tree && p.st.includes(myKey), full: p.st.length >= max, tree, stealLeft: Math.max(0, max - p.st.length) };
     }),
   };
 }
@@ -134,16 +153,18 @@ export async function handleFarm(ws, m) {
       const i = Number(m.i);
       if (tk === key) { err("self"); return; }
       const day = today(); if (f.st.d !== day) f.st = { d: day, n: 0 };
-      if (f.st.n >= STEAL_PER_DAY) { err("steal_cap"); return; }
       const p = Number.isInteger(i) ? g.plots[i] : null;
       if (!p) { err("bad_plot"); return; }
+      const tree = !!CROP[p.c].tree;
+      if (!tree && f.st.n >= STEAL_PER_DAY) { err("steal_cap"); return; }      // 果樹不受每天次數限制
       if (Date.now() < ripeAt(p) + STEAL_GRACE) { err("not_ripe"); return; }
-      if (p.st.length >= STEAL_PER_PLOT || p.st.includes(key)) { err("no_more"); return; }
+      if (p.st.length >= stealMax(p.c)) { err(tree ? "tree_half" : "no_more"); return; }
+      if (!tree && p.st.includes(key)) { err("no_more"); return; }
       const v = rollVariant();
-      p.st.push(key); f.st.n++; addInv(f, p.c, v);
-      addLog(g, `${name} 偷走了你的 ${VARIANTS[v].name}${CROP[p.c].icon}`);
+      p.st.push(key); if (!tree) f.st.n++; addInv(f, p.c, v);
+      addLog(g, `${name} 偷走了你的 ${VARIANTS[v].name}${CROP[p.c].icon}`, tree ? `${key}|${p.c}|${v}` : "");
       farmSave(true);
-      out(ws, { t: "fm", a: "stole", c: p.c, v, left: STEAL_PER_DAY - f.st.n });
+      out(ws, { t: "fm", a: "stole", c: p.c, v, tree, left: STEAL_PER_DAY - f.st.n, treeLeft: Math.max(0, stealMax(p.c) - p.st.length) });
     }
     out(ws, visitView(ws, tk, g, key));
     return;
@@ -184,7 +205,8 @@ export async function handleFarm(ws, m) {
         const p = Number.isInteger(i) ? f.plots[i] : null;
         if (!p || ripeAt(p) > now) continue;
         for (let u = 0; u < yieldOf(p.c) - p.st.length; u++) { const v = rollVariant(); addInv(f, p.c, v); got.push({ c: p.c, v }); }
-        f.plots[i] = null;
+        if (CROP[p.c].tree) { p.at = now; p.st = []; }      // 果樹：樹留著，重新計時、被偷的紀錄清掉
+        else f.plots[i] = null;
       }
       if (!got.length) { err("none_ripe"); return; }
       farmSave(true);
@@ -211,6 +233,12 @@ export async function handleFarm(ws, m) {
       } else f.coin += amt;
       farmSave(true);
       out(ws, { t: "fm", a: "sold", amount: amt });
+      await send(); return;
+    }
+    if (a === "chop") {      // 砍掉果樹（不退錢），空出那塊地
+      const i = Number(m.i), p = Number.isInteger(i) ? f.plots[i] : null;
+      if (!p || !CROP[p.c].tree) { err("bad_plot"); return; }
+      f.plots[i] = null; farmSave(true);
       await send(); return;
     }
     if (a === "buyplot") {

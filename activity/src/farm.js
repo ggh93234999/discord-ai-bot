@@ -7,7 +7,7 @@ const ERR = {
   need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_empty: "沒有空地可以種", bad_crop: "沒有這種作物", none_ripe: "還沒有成熟的作物", nothing: "沒有東西可以賣", max_plots: "田已經擴到最大了",
   no_farm: "找不到這塊農場", self: "不能偷自己的菜", steal_cap: "你今天已經偷夠了（每天最多 20 個）", not_ripe: "還不能偷：剛成熟的 5 分鐘內主人優先",
-  no_more: "這塊地你不能再偷了（每個人只能偷一次，每塊地最多被偷 1 個）", bad_plot: "這塊地沒有作物", error: "發生錯誤，再試一次",
+  no_more: "這塊地你不能再偷了（每個人只能偷一次，每塊地最多被偷 1 個）", bad_plot: "這塊地沒有作物", tree_half: "這棵樹已經被偷走一半了，剩下的要留給主人", error: "發生錯誤，再試一次",
 };
 const VNAME = { n: "", big: "大顆", gold: "金色" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -70,7 +70,7 @@ export function mountFarm(root, { env, back }) {
       else if (m.a === "visit") { vis = m; visBase = Date.now(); if (tab === "visit") draw(); }
       else if (m.a === "got") { statusEl.textContent = "收成了 " + summarize(m.got); sfx.harvest(m.got); }
       else if (m.a === "sold") { statusEl.textContent = "賣出了，拿到 " + money(m.amount) + " 代幣"; sfx.sell(); }
-      else if (m.a === "stole") { statusEl.textContent = `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！今天還能偷 ${m.left} 個`; sfx.steal(); }
+      else if (m.a === "stole") { statusEl.textContent = m.tree ? `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！果樹不限次數，這棵還能偷 ${m.treeLeft} 個` : `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！今天還能偷 ${m.left} 個`; sfx.steal(); }
       else if (m.a === "err") {
         statusEl.textContent = (ERR[m.error] || ERR.error); pend = ""; sfx.err();
         if (m.balance != null && st) { st.balance = m.balance; showBal(); }
@@ -104,26 +104,34 @@ export function mountFarm(root, { env, back }) {
     if (tab === "visit") return drawVisit();
     if (!st) { body.innerHTML = `<p class="fempty">讀取農場中…</p>`; return; }
     const el = elapsed();
-    const seeds = st.crops.map((c) => `<button class="seed${c.id === sel ? " sel" : ""}" data-c="${c.id}"><span>${c.icon}</span><b>${c.name}</b><small>${money(c.seed)} 代幣<br>${fmt(c.min * 60000)}・產 ${c.y}</small></button>`).join("");
+    const seedCard = (c) => `<button class="seed${c.id === sel ? " sel" : ""}${c.tree ? " tree" : ""}" data-c="${c.id}"><span>${c.icon}</span><b>${c.name}</b><small>${c.tree ? `樹苗 ${money(c.seed)} 代幣<br>每 ${fmt(c.min * 60000)} 結 ${c.y} 個` : `${money(c.seed)} 代幣<br>${fmt(c.min * 60000)}・產 ${c.y}`}</small></button>`;
+    const seeds = `<div class="seeds">${st.crops.filter((c) => !c.tree).map(seedCard).join("")}</div>`
+      + (st.crops.some((c) => c.tree) ? `<div class="seedtitle">🌳 果樹：只買一次，收成後樹還在，每隔一段時間再結果</div><div class="seeds">${st.crops.filter((c) => c.tree).map(seedCard).join("")}</div>` : "");
     const plots = st.plots.map((p, i) => {
       if (!p) return `<button class="plot empty" data-i="${i}"><span class="pi">＋</span><small>種${cropOf(sel).name}</small></button>`;
       const left = Math.max(0, p.left - el), c = cropOf(p.c);
-      if (left > 0) return `<div class="plot grow" data-i="${i}" data-end="${base + p.left}"><span class="pi sm">${c.icon}</span><small>${fmt(left)}</small><i style="--pr:${Math.max(0.05, 1 - left / (c.min * 60000))}"></i></div>`;
-      return `<button class="plot ripe" data-i="${i}"><span class="pi">${c.icon}</span><small>可收成 ×${p.got}${p.stolen ? `（被偷 ${p.stolen}）` : ""}</small></button>`;
+      const chop = c.tree ? `<span class="chop" data-i="${i}" title="砍掉這棵樹">🪓</span>` : "";
+      if (left > 0) return `<div class="plot grow${c.tree ? " tree" : ""}" data-i="${i}" data-end="${base + p.left}">${chop}<span class="pi sm">${c.icon}</span><small>${fmt(left)}</small><i style="--pr:${Math.max(0.05, 1 - left / (c.min * 60000))}"></i></div>`;
+      return `<button class="plot ripe${c.tree ? " tree" : ""}" data-i="${i}">${chop}<span class="pi">${c.icon}</span><small>可收成 ×${p.got}${p.stolen ? `（被偷 ${p.stolen}）` : ""}</small></button>`;
     }).join("");
     const emptyN = st.plots.filter((p) => !p).length, ripeN = st.plots.filter((p) => p && p.left - el <= 0).length;
     const inv = st.inv.map((x) => `<button class="item" data-k="${x.k}" title="賣出這個">${VNAME[x.v] ? `<em>${VNAME[x.v]}</em>` : ""}${cropOf(x.c).icon}<b>×${x.n}</b><small>${money(x.unit)}/個</small></button>`).join("");
     const log = st.log.length ? `<div class="flog"><b>最近發生的事</b>${st.log.map((l) => `<div><span class="ftime">${logTime(l.ts)}</span>${esc(l.txt)}</div>`).join("")}</div>` : "";
     body.innerHTML = `
-      <div class="seeds">${seeds}</div>
+      ${seeds}
       <div class="fact"><button class="plantall" ${emptyN ? "" : "disabled"}>全部種${cropOf(sel).icon}（${emptyN} 塊）</button><button class="harvall" ${ripeN ? "" : "disabled"}>全部收成（${ripeN} 塊）</button></div>
       <div class="fgrid">${plots}</div>
       <div class="finv"><div class="ftitle">🧺 倉庫${st.invValue ? `<button class="sellall">全部賣出 +${money(st.invValue)}</button>` : ""}</div>${inv || `<p class="fempty">空的。收成後的菜會放在這裡，按一下就能賣。</p>`}</div>
       ${log}
-      <p class="fnote">每塊地一次收幾個看作物（種子卡上的「產」），有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 1 個，就算被偷還是賺錢。</p>`;
+      <p class="fnote">蔬菜：每塊地一次收幾個看作物（種子卡上的「產」），收成後土地清空；別人看到成熟的菜 5 分鐘後可以來偷，每塊地最多被偷 1 個。<br>果樹：只買一次，每隔一段時間結一次果（一次 20 個以上），收成後樹還在；任何人都能偷、次數不限，但每棵樹每輪最多被偷走一半，被偷光一半主人也不會虧本。有機會長出大顆（賣 2 倍）和金色（賣 5 倍）。</p>`;
     body.querySelectorAll(".seed").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.c; sfx.tick(); draw(); }));
     body.querySelectorAll(".plot.empty").forEach((b) => b.addEventListener("click", () => send({ a: "plant", c: sel, i: +b.dataset.i })));
     body.querySelectorAll(".plot.ripe").forEach((b) => b.addEventListener("click", () => send({ a: "harvest", i: +b.dataset.i })));
+    body.querySelectorAll(".chop").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const i = +b.dataset.i, c = st.plots[i] && cropOf(st.plots[i].c);
+      askConfirm(`要砍掉這棵${c ? c.name : ""}樹嗎？不會退樹苗錢，這輪還沒收的果子也會沒有。`, () => send({ a: "chop", i }));
+    }));
     const pa = body.querySelector(".plantall"); if (pa) pa.addEventListener("click", () => send({ a: "plant", c: sel, i: "all" }));
     const ha = body.querySelector(".harvall"); if (ha) ha.addEventListener("click", () => send({ a: "harvest", i: "all" }));
     body.querySelectorAll(".item").forEach((b) => b.addEventListener("click", () => send({ a: "sell", k: b.dataset.k })));
@@ -138,10 +146,10 @@ export function mountFarm(root, { env, back }) {
         const c = cropOf(p.c), left = Math.max(0, p.left - el), grace = Math.max(0, p.grace - el);
         if (left > 0) return `<div class="plot grow" data-end="${visBase + p.left}"><span class="pi sm">${c.icon}</span><small>${fmt(left)}</small></div>`;
         if (grace > 0) return `<div class="plot wait" data-end="${visBase + p.grace}" data-pre="主人優先 "><span class="pi">${c.icon}</span><small>主人優先 ${fmt(grace)}</small></div>`;
-        if (p.canSteal) return `<button class="plot ripe steal" data-i="${i}"><span class="pi">${c.icon}</span><small>偷一個</small></button>`;
-        return `<div class="plot done"><span class="pi">${c.icon}</span><small>${p.mineDone ? "你偷過了" : p.full ? "被偷光了" : "不能偷"}</small></div>`;
+        if (p.canSteal) return `<button class="plot ripe steal${p.tree ? " tree" : ""}" data-i="${i}"><span class="pi">${c.icon}</span><small>偷一個${p.tree ? `（還能偷 ${p.stealLeft}）` : ""}</small></button>`;
+        return `<div class="plot done${p.tree ? " tree" : ""}"><span class="pi">${c.icon}</span><small>${p.mineDone ? "你偷過了" : p.full ? (p.tree ? "已被偷走一半" : "被偷光了") : "不能偷"}</small></div>`;
       }).join("");
-      body.innerHTML = `<div class="ftitle"><button class="vback">← 農場列表</button><b>🏡 ${esc(vis.name)} 的農場</b></div><div class="fgrid">${plots}</div><p class="fnote">${st ? `你今天還能偷 ${st.stealLeft} 個。` : ""}偷來的菜放進自己的倉庫，到「我的農場」賣掉。</p>`;
+      body.innerHTML = `<div class="ftitle"><button class="vback">← 農場列表</button><b>🏡 ${esc(vis.name)} 的農場</b></div><div class="fgrid">${plots}</div><p class="fnote">${st ? `蔬菜你今天還能偷 ${st.stealLeft} 個；果樹不限次數，但每棵每輪最多被偷走一半。` : ""}偷來的放進自己的倉庫，到「我的農場」賣掉。</p>`;
       body.querySelector(".vback").addEventListener("click", () => { vis = null; send({ a: "list" }); draw(); });
       body.querySelectorAll(".steal").forEach((b) => b.addEventListener("click", () => send({ a: "steal", id: vis.id, i: +b.dataset.i })));
       return;
