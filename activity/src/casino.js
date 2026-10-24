@@ -288,7 +288,7 @@ export function mountCasino(game, opts = {}) {
       if ((m.add || m.del) && marketOn && !inHand) marketShow();
     }
     const sortedMk = () => { const a = [...stoneMk.values()]; return stSort === "lo" ? a.sort((x, y) => x.price - y.price) : stSort === "hi" ? a.sort((x, y) => y.price - x.price) : a.sort((x, y) => y.id - x.id); };
-    const descHtml = (x) => (x.desc || []).map((l) => `<div>${esc(l)}</div>`).join("");
+    const descHtml = (x) => `<div class="stchips">${(x.desc || []).map((l) => { const i = l.indexOf("："); return `<span class="chip"><b>${esc(l.slice(0, i))}</b>${esc(l.slice(i + 1))}</span>`; }).join("")}</div>`;
     let mkBusy = false;
     async function marketShow() {
       if (mkBusy) return; mkBusy = true;
@@ -322,7 +322,9 @@ export function mountCasino(game, opts = {}) {
       if (!pcs.find((p) => p.id === selPiece)) selPiece = pcs.length ? pcs.slice().sort((a, b) => b.w - a.w)[0].id : -1;
       const cap = (c, i) => `第 ${i + 1} 刀（塊 #${c.piece}　${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠，占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}${c.broke ? "　⚠ 刀走在裂上，翡翠崩掉一角" : ""}`;
       const panel = (c, i, hide) => `<div class="stcp"${hide ? ' style="visibility:hidden"' : ""}><div class="stcimg" data-i="${i}"></div><small>${cap(c, i)}</small></div>`;
-      let html = `<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>${m.canProbe && !m.done ? probeUi(m.marks, ["light", "rub"], m) : marksHtml(m.marks)}`;
+      const dOff = newCut && prevV ? m.offer - prevV.offer : 0, big = prevV ? Math.abs(dOff) >= Math.max(2, prevV.offer * 0.08) : false;
+      const banner = newCut && prevV ? `<div class="stbanner ${!big ? "" : dOff > 0 ? "up" : "down"}" style="visibility:hidden">${!big ? "差不多" : dOff > 0 ? "切漲 ▲" : "切垮 ▼"}　總收購價 ${money(prevV.offer)} → ${money(m.offer)}</div>` : "";
+      let html = `${banner}<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>${m.canProbe && !m.done ? probeUi(m.marks, ["light", "rub"], m) : marksHtml(m.marks)}`;
       if (!m.done) {
         html += `<div class="stpcs">${pcs.map((p) => `<button class="stpc${p.id === selPiece ? " sel" : ""}" data-id="${p.id}">塊 #${p.id}<small>${p.w} 公斤　收購價 ${money(p.offer)}${p.hope ? `（含預期 ${money(p.hope)}）` : ""}</small></button>`).join("")}</div>
           <div class="stcutui"><div class="stax">${AXN.map((l, i) => `<button data-ax="${i}" class="${cutAxis === i ? "sel" : ""}">${l}</button>`).join("")}</div><label>刀的位置 <input type="range" class="stpos" step="0.05" value="${cutPos}"> <b class="stposv">${fp(cutPos)}</b></label>

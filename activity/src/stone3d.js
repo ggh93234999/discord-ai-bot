@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { mulberry, hash3, fbm, shapeParams, surfacePoint, AXES, GRID, GS, OUT, planeBasis } from "../shared/stonegeo.js";
 
 // 翡翠等級（1 綠絲石 … 8 帝王綠）在切面上的顏色
@@ -46,7 +47,7 @@ export function buildStone(p) {                         // p: { ...pub, cuts:[{a
     cols.set([c.r, c.g, c.b], i * 3);
   }
   geo.setAttribute("color", new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
-  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })));
+  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, envMapIntensity: 0.35 })));
   if (p.win) {                                                                          // 窗口：貼在表面的一小片磨亮平面，顏色是那個點裡面的東西
     const dir = p.win.dir, sp = surfacePoint(P, dir, false), nrm = new THREE.Vector3(dir[0] / (P.sx * P.sx), dir[1] / (P.sy * P.sy), dir[2] / (P.sz * P.sz)).normalize();
     const col = p.win.code >= 1 && p.win.code <= 8 ? TIER_COL[p.win.code] : "#8c877b";
@@ -91,7 +92,7 @@ export function gridCanvas(b64, seed, px = 192) {
 function capMesh(b64, seed, axis, pos, dbl = true) {
   const n = AXES[axis], [u, w] = planeBasis(n), tex = new THREE.CanvasTexture(gridCanvas(b64, seed, 256));
   tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * GS, 2 * GS), new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.5, roughness: 0.2, metalness: 0.02, side: dbl ? THREE.DoubleSide : THREE.FrontSide }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * GS, 2 * GS), new THREE.MeshPhysicalMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.22, transparent: true, alphaTest: 0.5, roughness: 0.28, metalness: 0, clearcoat: 0.9, clearcoatRoughness: 0.08, envMapIntensity: 1.1, side: dbl ? THREE.DoubleSide : THREE.FrontSide }));
   m.matrixAutoUpdate = false; m.matrix.makeBasis(D(u), D(w), D(n)).setPosition(n[0] * pos, n[1] * pos, n[2] * pos); return m;
 }
 
@@ -136,7 +137,11 @@ export function createViewer(container) {
   container.appendChild(renderer.domElement);
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 50);
   cam.position.set(0, 0.6, 4.6);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose();
+  const shc = document.createElement("canvas"); shc.width = shc.height = 128; { const x = shc.getContext("2d"), g = x.createRadialGradient(64, 64, 4, 64, 64, 62); g.addColorStop(0, "rgba(0,0,0,0.55)"); g.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shc), transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = -1.0; scene.add(shadow);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
   const l1 = new THREE.DirectionalLight(0xffffff, 1.5); l1.position.set(3, 4, 5); scene.add(l1);
   const l2 = new THREE.DirectionalLight(0x9fd0ff, 0.5); l2.position.set(-4, -1, -3); scene.add(l2);
   const ctl = new OrbitControls(cam, renderer.domElement);
@@ -182,13 +187,21 @@ export function createViewer(container) {
     cut(p, pAfter, cutObj) {
       return new Promise((resolve) => {
         if (!cur) return resolve();
-        this.preview(null); ctl.autoRotate = false; cam.position.set(1.2, 0.8, 4.6); ctl.target.set(0, 0, 0); ctl.update();
-        const n = N3(cutObj), d = cutObj.pos, sc = cur.sc, old = (p.cuts || []).length;
+        this.preview(null); ctl.autoRotate = false; ctl.target.set(0, 0, 0);
+        const n = N3(cutObj), side = new THREE.Vector3().crossVectors(N3(cutObj), new THREE.Vector3(0, 1, 0)); if (side.length() < 0.1) side.set(1, 0, 0); side.normalize();
+        cam.position.copy(side.multiplyScalar(2.9)).addScaledVector(n, 2.3).add(new THREE.Vector3(0, 1.1, 0)); ctl.update();
+        const d = cutObj.pos, sc = cur.sc, old = (p.cuts || []).length;
         const blade = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 0.03), new THREE.MeshBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0.55 }));
         blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); scene.add(blade);
+        const NP = 90, pp = new Float32Array(NP * 3), vel = [], uu = planeBasis([n.x, n.y, n.z]);
+        for (let i = 0; i < NP; i++) { const a = (Math.random() * 2 - 1) * 1.0, b = (Math.random() * 2 - 1) * 0.7, p0 = new THREE.Vector3().addScaledVector(D(uu[0]), a).addScaledVector(D(uu[1]), b).addScaledVector(n, sc * d); pp.set([p0.x, p0.y, p0.z], i * 3); vel.push(new THREE.Vector3((Math.random() - 0.5) * 0.02, Math.random() * 0.012, (Math.random() - 0.5) * 0.02).addScaledVector(n, (Math.random() - 0.5) * 0.01)); }
+        const mg = new THREE.BufferGeometry(); mg.setAttribute("position", new THREE.BufferAttribute(pp, 3));
+        const mist = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0xdff6ff, size: 0.045, transparent: true, opacity: 0, depthWrite: false })); scene.add(mist);
         const t0 = performance.now(), ease = (x) => x * x * (3 - 2 * x); let phase = 0, nx = null;
         const f = (now) => {
           const t = now - t0;
+          if (t < 2200) { mist.material.opacity = t < 700 ? (t / 700) * 0.85 : Math.max(0, 0.85 * (1 - (t - 700) / 1500)); const a = mg.attributes.position; for (let i = 0; i < NP; i++) a.setXYZ(i, a.getX(i) + vel[i].x, a.getY(i) + vel[i].y, a.getZ(i) + vel[i].z); a.needsUpdate = true; }
+          else if (mist.parent) { scene.remove(mist); mg.dispose(); mist.material.dispose(); }
           if (t < 800) blade.position.copy(n).multiplyScalar(sc * d + (-1.6 + 3.2 * ease(t / 800)));
           else if (phase === 0) {
             phase = 1; scene.remove(blade);
