@@ -891,3 +891,15 @@ body.tv-fs{overflow:hidden}
 .casino .stpager{display:flex;gap:12px;align-items:center;justify-content:center;color:#ccc}.casino .stpager button:disabled{opacity:.3;cursor:default}
 .casino .stth small{font-size:11px;text-align:center}
 .casino.g-stone .bar .bets{display:none}
+.casino .stinfo.sm{font-size:12px;line-height:1.6;color:#bbb;margin:2px 0 6px}
+.casino .stcutui{text-align:center;margin:6px 0}
+.casino .stax{display:flex;gap:6px;justify-content:center;margin-bottom:6px}
+.casino .stax button{background:#1d2622;border:2px solid transparent;border-radius:8px;color:#ddd;padding:5px 10px;cursor:pointer}
+.casino .stax button.sel{border-color:#7fdcff;color:#fff}
+.casino .stcutui label{font-size:13px;color:#ddd;display:flex;gap:8px;align-items:center;justify-content:center}
+.casino .stpos{width:55%;max-width:240px}
+.casino .stcuts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0}
+.casino .stcp{width:176px;text-align:center}
+.casino .stcp small{display:block;font-size:11px;color:#ccc;line-height:1.4;margin-top:2px}
+.casino .stcimg{width:176px;height:176px;background:#171c1a;border-radius:10px;overflow:hidden}
+.casino .stcimg canvas{width:100%;height:100%;display:block}

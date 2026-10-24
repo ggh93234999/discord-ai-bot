@@ -7,7 +7,7 @@ import { listMjTables } from "./mahjong.js";
 import { listBridgeTables } from "./bridge.js";
 import { listBigTwoTables } from "./bigtwo.js";
 import { listAvalonTables } from "./avalon.js";
-import { TIERS, MAX_CUTS, drawTier, hintFor, makeStone, MARKET_MAX, RESTOCK_MS, offerFor, cutFee, openFee, CUT_WEIGHTS, SKIN_WEIGHTS } from "./stone.js";
+import { TIERS, MAX_CUTS, CUT_POS, genStone, descLines, valueOf, offerFor, cutFee, openFee, doCut, openSection, MARKET_MAX, RESTOCK_MS } from "./stone.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -179,24 +179,27 @@ async function finishBj(ws, bj, why) {
 }
 
 // ---- 賭石：買石 → 逐刀切開（每刀付費）→ 賣給收購商或全開
-const stoneView = (st) => ({ real: st.real, bet: st.bet, fees: st.fees, size: st.size, seed: st.seed, skinJ: st.skin, windowJ: st.win, cutJs: st.cuts.slice(st.win == null ? 0 : 1), skin: TIERS[st.skin].skin, win: st.win == null ? null : TIERS[st.win].cut, cuts: st.cuts.slice(st.win == null ? 0 : 1).map((j) => TIERS[j].cut), cutsLeft: MAX_CUTS - (st.cuts.length - (st.win == null ? 0 : 1)), cutFee: cutFee(st.bet), openFee: openFee(st.bet), offer: offerFor(st.bet, st.skin, st.cuts) });
+const cutPub = (c) => ({ axis: c.axis, pos: c.pos, grid: c.grid, frac: Math.round(c.frac * 1000) / 1000, hit: c.jade > 0, crack: c.crack });
+const stoneView = (st) => ({ real: st.real, bet: st.price, price: st.price, fees: st.fees, ...st.pub, desc: descLines(st.pub), cuts: st.cuts.map(cutPub), cutsLeft: MAX_CUTS - st.cuts.length, cutFee: cutFee(st.price), openFee: openFee(st.price), offer: offerFor(st) });
 // ---- 賭石市場：全服共用，被買走就消失，每 15 秒補一顆（最多 100 顆）
 const smarket = new Map(), stoneSubs = new Set();
-const pubStone = (x) => ({ id: x.id, size: x.size, price: x.price, seed: x.seed, skinJ: x.skin, skin: TIERS[x.skin].skin, windowJ: x.win, win: x.win == null ? null : TIERS[x.win].cut });
+let stoneSeq = 0;
+const newStone = () => { const x = genStone(++stoneSeq); smarket.set(x.pub.id, x); return x; };
+const pubStone = (x) => ({ ...x.pub, desc: descLines(x.pub) });
 const stoneBroadcast = (o) => { for (const w of stoneSubs) out(w, o); };
-for (let i = 0; i < MARKET_MAX; i++) { const x = makeStone(); smarket.set(x.id, x); }
-setInterval(() => { if (smarket.size < MARKET_MAX) { const x = makeStone(); smarket.set(x.id, x); stoneBroadcast({ t: "smkt", add: [pubStone(x)], left: smarket.size }); } }, RESTOCK_MS).unref();
+for (let i = 0; i < MARKET_MAX; i++) newStone();
+setInterval(() => { if (smarket.size < MARKET_MAX) { const x = newStone(); stoneBroadcast({ t: "smkt", add: [pubStone(x)], left: smarket.size }); } }, RESTOCK_MS).unref();
 
 async function finishStone(ws, st, how, why) {
   ws.stone = null;
-  const tier = TIERS[st.tier];
-  const back = how === "opened" ? Math.round(st.bet * tier.mult) : offerFor(st.bet, st.skin, st.cuts);
+  const hid = st.hid, back = how === "opened" ? valueOf(hid) : offerFor(st);
   const r = await payTo(st.ref, back, why);
   edel(st.ekey);
-  const spent = st.bet + st.fees;
-  const res = { real: st.real, bet: spent, price: st.bet, fees: st.fees, back, how, tier: st.tier, tname: tier.name, mult: tier.mult, cuts: st.cuts.slice(st.win == null ? 0 : 1).map((j) => TIERS[j].cut), cutJs: st.cuts.slice(st.win == null ? 0 : 1), skin: TIERS[st.skin].skin, skinJ: st.skin, windowJ: st.win, win: st.win == null ? null : TIERS[st.win].cut, size: st.size, seed: st.seed };
+  const spent = st.price + st.fees, b = hid.body, tname = b ? TIERS[b.q].name : "沒有翡翠";
+  const sec = openSection(hid);
+  const res = { real: st.real, bet: spent, price: st.price, fees: st.fees, back, how, tname, q: b ? b.q : 0, volPct: Math.round(hid.vol * 1000) / 10, cf: Math.round(hid.cf * 100) / 100, value: valueOf(hid), ...st.pub, desc: descLines(st.pub), cuts: st.cuts.map(cutPub), section: cutPub(sec) };
   out(ws, { t: "cres", g: "stone", done: true, ...res, balance: r.balance, payfail: !r.ok });
-  casinoFeed(ws, { g: "stone", ...res, text: `${how === "opened" ? "全開" : "賣出"}　${tier.name}（${tier.mult}×）` });
+  casinoFeed(ws, { g: "stone", real: st.real, bet: spent, back, text: `${how === "opened" ? "全開" : "賣出"}　${tname}` });
 }
 
 export function casinoClose(ws) {
@@ -418,26 +421,27 @@ export async function handleCasino(ws, m) {
         const pick = smarket.get(Number(m.id)), real = !!m.real;
         if (ws.stone) return true;
         if (!pick) { out(ws, { t: "cerr", error: "sold" }); return true; }
-        if (real && pick.price > betLimit()) { out(ws, { t: "cerr", error: "bad_amount" }); return true; }
-        smarket.delete(pick.id);                                   // 先拿走，別人就買不到了；付款失敗再放回去
-        const r = await stake(ws, real, pick.price, "賭石買石");
-        if (!r.ok) { smarket.set(pick.id, pick); fail(ws, r); return true; }
-        stoneBroadcast({ t: "smkt", del: [pick.id], left: smarket.size });
-        const ekey = "s:" + randomBytes(5).toString("hex"), pbet = pick.price;
-        if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: pbet });
-        const st = { real, bet: pbet, fees: 0, ekey, ref: betRef(ws, real, pbet), tier: pick.tier, skin: pick.skin, win: pick.win, cuts: pick.win == null ? [] : [pick.win], size: pick.size, seed: pick.seed };
+        const price = pick.pub.price;
+        if (real && price > betLimit()) { out(ws, { t: "cerr", error: "bad_amount" }); return true; }
+        smarket.delete(pick.pub.id);                                // 先拿走，別人就買不到了；付款失敗再放回去
+        const r = await stake(ws, real, price, "賭石買石");
+        if (!r.ok) { smarket.set(pick.pub.id, pick); fail(ws, r); return true; }
+        stoneBroadcast({ t: "smkt", del: [pick.pub.id], left: smarket.size });
+        const ekey = "s:" + randomBytes(5).toString("hex");
+        if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: price });
+        const st = { real, price, fees: 0, ekey, ref: betRef(ws, real, price), pub: pick.pub, hid: pick.hid, w: pick.pub.w, win: pick.pub.win, cuts: [] };
         ws.stone = st; ws.creal = real;
-        out(ws, { t: "cres", g: "stone", done: false, ...stoneView(st), balance: r.balance }); setHand(ws, { g: "stone", real, bet: pbet, text: "挑石頭中" });
+        out(ws, { t: "cres", g: "stone", done: false, ...stoneView(st), balance: r.balance }); setHand(ws, { g: "stone", real, bet: price, text: "挑石頭中" });
       } else if (ws.stone && m.a === "cut") {
-        const st = ws.stone, fee = cutFee(st.bet);
-        if (st.cuts.length - (st.win == null ? 0 : 1) >= MAX_CUTS) return true;
+        const st = ws.stone, fee = cutFee(st.price), axis = Number(m.axis), pos = Math.round(Number(m.pos) * 20) / 20;
+        if (st.cuts.length >= MAX_CUTS || !Number.isInteger(axis) || axis < 0 || axis > 2 || !(pos >= CUT_POS[0] && pos <= CUT_POS[1])) return true;
         const r = await stake(ws, st.real, fee, "賭石切石");
         if (!r.ok) { fail(ws, r); return true; }
-        st.fees += fee; st.cuts.push(hintFor(st.tier, CUT_WEIGHTS));
-        if (st.real) eadd(st.ekey, { uid: st.ref.uid, name: st.ref.name, amount: st.bet + st.fees });
-        out(ws, { t: "cres", g: "stone", done: false, ...stoneView(st), balance: r.balance });
+        st.fees += fee; st.cuts.push(doCut(st.hid, axis, pos));
+        if (st.real) eadd(st.ekey, { uid: st.ref.uid, name: st.ref.name, amount: st.price + st.fees });
+        out(ws, { t: "cres", g: "stone", done: false, newCut: true, ...stoneView(st), balance: r.balance });
       } else if (ws.stone && m.a === "open") {
-        const st = ws.stone, fee = openFee(st.bet);
+        const st = ws.stone, fee = openFee(st.price);
         const r = await stake(ws, st.real, fee, "賭石解石");
         if (!r.ok) { fail(ws, r); return true; }
         st.fees += fee;
