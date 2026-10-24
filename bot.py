@@ -34,6 +34,7 @@ import channels
 import economy
 import extras
 import imagegen
+import webimg
 import divination
 import dmlog
 import fortune
@@ -181,7 +182,7 @@ ACTION_LINE_RE = re.compile(r"^-# ⚙️.*$\n?", re.M)
 
 # 程式（不是模型）自動貼的訊息：畫好的圖、「好了（…秒）」、畫圖失敗／暫停、智慧畫圖的原句與擴寫。
 # 讀歷史時要標成「系統自動訊息」，不然模型會以為是自己寫的、照著模仿（沒畫圖也假裝「好了」）。
-PROGRAM_PREFIXES = ("🖼️ ", "🎨 ", "📝 ")
+PROGRAM_PREFIXES = ("🖼️ ", "🎨 ", "📝 ", "🔎 ")
 # 模型自己亂寫的假圖片標記和假「好了」：送出前拿掉
 FAKE_MEDIA_RE = re.compile(r"\[圖片：[^\]\n]*\]|🖼️\s*好了（[^）\n]*）|好了（(?:快速|構圖與文字較乾淨)[^）\n]*）")
 
@@ -191,7 +192,7 @@ def is_program_post(msg: discord.Message) -> bool:
         return False
     if msg.content.lstrip().startswith(PROGRAM_PREFIXES):
         return True
-    return any(a.filename.startswith(("draw_", "edit_")) for a in msg.attachments) and not msg.content.strip()
+    return any(a.filename.startswith(("draw_", "edit_", "web_")) for a in msg.attachments) and not msg.content.strip()
 
 
 def strip_fake_media(text: str) -> str:
@@ -616,8 +617,31 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
                 return "這裡不能改圖。"
             if not imagegen.channel_ok(msg.channel):
                 return imagegen.NSFW_ONLY_REPLY
-            images = await imagegen.collect_images(msg)
+            images = webimg.recall(msg.channel.id) if args.get("use_found") else await imagegen.collect_images(msg)
+            if args.get("use_found") and not images:
+                return "最近沒有上網找到的圖（超過 30 分鐘會清掉），請先用 web_image 找圖，或把圖片傳上來。"
             return await imagegen.submit_edit(client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
+        if name == "web_image":
+            if msg is None:
+                return "這裡不能抓圖。"
+            items = await webimg.find(client.http_session, str(args.get("query") or "").strip(), str(args.get("url") or "").strip(),
+                                      args.get("count") or 1, safe=not webimg.is_nsfw(msg.channel))
+            if not items:
+                return "沒有找到可以下載的圖片（換個關鍵字，或直接給我圖片網址）。"
+            webimg.remember(msg.channel.id, items)
+            if args.get("send", True) is not False:
+                for n, (raw, fname, ctype, title, src) in enumerate(items):
+                    path = await asyncio.to_thread(imagegen._to_file, raw) if len(raw) > imagegen.DISCORD_LIMIT else None
+                    ext = Path(path).suffix.lstrip(".") if path else fname.rsplit(".", 1)[-1]
+                    f = discord.File(path or io.BytesIO(raw), filename=f"web_{msg.id}_{n + 1}.{ext}")
+                    text = f"🔎 {title}\n<{src}>"[:500] if title else f"🔎 <{src}>"[:500]
+                    try:
+                        await (msg.reply(text, file=f, mention_author=False) if n == 0 else msg.channel.send(text, file=f))
+                    except discord.HTTPException:
+                        await msg.channel.send(text, file=f)
+            sent = "並貼到頻道了" if args.get("send", True) is not False else "（沒有貼出）"
+            return (f"找到 {len(items)} 張圖{sent}。來源：" + "；".join(i[4] for i in items)
+                    + "。這些是網路上的圖、不是你畫的。要改它們就呼叫 edit_image 並設 use_found=true。")
         if name == "weather":
             return await _weather(args.get("location", ""), args.get("days", 3))
         if name == "web_search":
@@ -639,6 +663,8 @@ def tool_status(name: str, args_json: str) -> str:
         return music.tool_status(args)
     if name in ("draw_image", "edit_image"):
         return imagegen.tool_status(args)
+    if name == "web_image":
+        return f"🔎 上網找圖：{args.get('query') or args.get('url') or ''}"[:80]
     if name == "music_status":
         return "🔎 確認播放狀態"
     if name == "random_number":
@@ -709,7 +735,7 @@ def clean_text(text: str | None) -> str:
     return THINK_RE.sub("", text or "").strip()
 
 
-ACTION_TOOLS = {"draw_image", "edit_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
+ACTION_TOOLS = {"draw_image", "edit_image", "web_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
 CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
 CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
 FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
@@ -773,7 +799,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
@@ -1059,12 +1085,13 @@ async def cmd_auto(interaction: discord.Interaction, 開關: app_commands.Choice
 
 
 @client.tree.command(name="畫圖", description="畫一張圖（約 30 秒～數分鐘，畫好會貼在頻道）")
-@app_commands.describe(內容="想畫什麼（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨", 形狀="正方形（預設）／橫式／直式")
+@app_commands.describe(內容="想畫什麼（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨", 形狀="正方形（預設）／橫式／直式", 大小="一般（預設）／大圖／超大圖（要等比較久，只有快速畫質）")
 @app_commands.choices(
     畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean")],
     形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
-          app_commands.Choice(name="直式", value="portrait")])
-async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square"):
+          app_commands.Choice(name="直式", value="portrait")],
+    大小=[app_commands.Choice(name="一般（預設）", value="normal"), app_commands.Choice(name="大圖（約1900像素）", value="large"), app_commands.Choice(name="超大圖（長邊2048像素）", value="huge")])
+async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square", 大小: str = "normal"):
     if not imagegen.channel_ok(interaction.channel):
         await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
         return
@@ -1072,20 +1099,21 @@ async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = 
         await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
         return
     await interaction.response.defer(thinking=True)
-    res = await imagegen.submit(client.http_session, {"prompt": 內容, "quality": 畫質, "shape": 形狀},
+    res = await imagegen.submit(client.http_session, {"prompt": 內容, "quality": 畫質, "shape": 形狀, "scale": 大小},
                                 interaction.user.id, imagegen.say_for_interaction(interaction), 內容)
     await interaction.followup.send(res)
 
 
 @client.tree.command(name="智慧畫圖", description="先把你的一句話擴寫成完整的畫圖提示詞再畫（擴寫約 10～30 秒）")
 @app_commands.describe(內容="想畫什麼，一句話就好（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨", 形狀="正方形（預設）／橫式／直式",
-                       提示詞語言="擴寫出來的提示詞用英文（預設）還是中文")
+                       提示詞語言="擴寫出來的提示詞用英文（預設）還是中文", 大小="一般（預設）／大圖／超大圖（要等比較久，只有快速畫質）")
 @app_commands.choices(
     畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean")],
     形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
           app_commands.Choice(name="直式", value="portrait")],
-    提示詞語言=[app_commands.Choice(name="英文（預設）", value="en"), app_commands.Choice(name="中文", value="zh")])
-async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square", 提示詞語言: str = "en"):
+    提示詞語言=[app_commands.Choice(name="英文（預設）", value="en"), app_commands.Choice(name="中文", value="zh")],
+    大小=[app_commands.Choice(name="一般（預設）", value="normal"), app_commands.Choice(name="大圖（約1900像素）", value="large"), app_commands.Choice(name="超大圖（長邊2048像素）", value="huge")])
+async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square", 提示詞語言: str = "en", 大小: str = "normal"):
     if not imagegen.channel_ok(interaction.channel):
         await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
         return
@@ -1106,7 +1134,7 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
         note = f"📝 原句：{內容[:300]}\n（提示詞擴寫失敗，這張直接用你的原句畫）\n"
         prompt = 內容
     log.info("智慧畫圖 user=%s 原句=%s 擴寫=%s", interaction.user.id, 內容[:80], (expanded or "失敗")[:200])
-    res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀},
+    res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀, "scale": 大小},
                                 interaction.user.id, imagegen.say_for_interaction(interaction), 內容, extra=f"\n📝 原句：{內容[:300]}")
     await interaction.followup.send(note + res)
 

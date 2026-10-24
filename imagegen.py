@@ -27,6 +27,13 @@ log = logging.getLogger("bot")
 PAUSED_REPLY = "🎨 畫圖服務目前暫停中，晚點再試。"
 SIZES = {"square": "768x768", "landscape": "1344x768", "portrait": "768x1344"}
 SIZE_NAMES = {"square": "正方形", "landscape": "橫式", "portrait": "直式"}
+# 大小：一般（預設）；使用者有特別提到要大張／高解析度才用 large／huge（只有「快速」畫質支援，會比較久）。長寬都要是 16 的倍數。
+BIG_SIZES = {
+    "large": {"square": "1280x1280", "landscape": "1920x1088", "portrait": "1088x1920"},
+    "huge": {"square": "2048x2048", "landscape": "2048x1152", "portrait": "1152x2048"},
+}
+SCALE_NAMES = {"normal": "一般", "large": "大圖", "huge": "超大圖"}
+SCALE_EXTRA_ETA = {"normal": 0, "large": 20, "huge": 70}      # 比一般多等幾秒（實測 2048×2048 約 60 秒）
 # 畫質 → (環境變數名, 預設模型, 預估秒數, HTTP 逾時秒數)
 QUALITY = {
     "fast": ("IMAGE_MODEL_FAST", "draw-klein", 30, 900),
@@ -53,6 +60,7 @@ TOOL = {
             "properties": {
                 "prompt": {"type": "string", "description": "要畫的畫面描述"},
                 "quality": {"type": "string", "enum": ["fast", "clean"], "description": "畫質／速度，預設 fast"},
+                "scale": {"type": "string", "enum": ["normal", "large", "huge"], "description": "圖片大小，預設 normal。只有使用者特別提到要大張／高解析度／高清／2K／4K／壁紙級時才用：large（長邊約 1900 像素）或 huge（長邊 2048 像素，API 上限），會比較久，而且只支援 fast 畫質"},
                 "shape": {"type": "string", "enum": ["square", "landscape", "portrait"], "description": "square 正方形（預設）、landscape 橫式（風景、桌布）、portrait 直式（手機桌布、人物全身）"},
             },
             "required": ["prompt"],
@@ -169,9 +177,14 @@ def _to_file(raw: bytes) -> str:
     img.load()
     ext, out = ".png", raw
     if len(raw) > DISCORD_LIMIT:
-        buf = io.BytesIO()
-        img.convert("RGB").save(buf, "JPEG", quality=90, optimize=True)
-        ext, out = ".jpg", buf.getvalue()
+        rgb, ext = img.convert("RGB"), ".jpg"
+        for scale_down, quality in ((1.0, 92), (1.0, 85), (0.8, 85), (0.65, 80), (0.5, 80)):
+            im = rgb if scale_down == 1.0 else rgb.resize((int(rgb.width * scale_down), int(rgb.height * scale_down)), Image.LANCZOS)
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=quality, optimize=True)
+            out = buf.getvalue()
+            if len(out) <= DISCORD_LIMIT:
+                break
     f = tempfile.NamedTemporaryFile(prefix="draw_", suffix=ext, delete=False)
     f.write(out)
     f.close()
@@ -208,7 +221,8 @@ def tool_status(args: dict) -> str:
     if "quality" not in args and "shape" not in args:
         return "🎨 排進改圖佇列（約 20 秒）"
     q = args.get("quality") if args.get("quality") in QUALITY else "fast"
-    return f"🎨 排進畫圖佇列（約 {QUALITY[q][2]} 秒）"
+    sc = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
+    return f"🎨 排進畫圖佇列（約 {QUALITY['fast' if sc != 'normal' else q][2] + SCALE_EXTRA_ETA[sc]} 秒）"
 
 
 def prompt_model() -> str:
@@ -271,9 +285,16 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
     shape = args.get("shape") if args.get("shape") in SIZES else "square"
     env_name, default_model, eta, timeout = QUALITY[quality]
     model = os.getenv(env_name, default_model).strip() or default_model
-    size = SIZES[shape]
+    scale = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
+    if scale != "normal" and quality != "fast":      # 大尺寸只有快速畫質的模型支援
+        quality = "fast"
+        env_name, default_model, eta, timeout = QUALITY[quality]
+        model = os.getenv(env_name, default_model).strip() or default_model
+    size = BIG_SIZES[scale][shape] if scale != "normal" else SIZES[shape]
+    eta += SCALE_EXTRA_ETA[scale]
+    big = "" if scale == "normal" else f"，{SCALE_NAMES[scale]}"
     return _enqueue(session, user_id, lambda: generate(session, model, prompt, size, timeout),
-                    f"{QUALITY_NAMES[quality]}・{size.replace('x', '×')}", f"排進畫圖了（{QUALITY_NAMES[quality]}，{SIZE_NAMES[shape]}）", eta, say, extra)
+                    f"{QUALITY_NAMES[quality]}・{size.replace('x', '×')}", f"排進畫圖了（{QUALITY_NAMES[quality]}，{SIZE_NAMES[shape]}{big}）", eta, say, extra)
 
 
 EDIT_TOOL = {
@@ -283,12 +304,14 @@ EDIT_TOOL = {
         "description": (
             "修改使用者給的圖片（改天氣／時間／顏色、加或移除物件、換風格等）。使用者傳了圖片（或回覆一則有圖的訊息）並說「改成…」「把…換成…」「幫我修圖」時呼叫；"
             "要改的圖由程式自動從這則訊息（或被回覆的訊息）的附件取得，你不用處理圖片。畫好要等約 20 秒，你呼叫後只要簡短回一句「在改了」就好。"
+            "如果要改的是剛才用 web_image 上網找到的圖（不是使用者傳的附件），use_found 設 true。"
             "prompt 寫「改什麼」，中英文都可以：使用者用中文講就直接用中文（不用翻譯），英文通常更穩定；可加上 \"Keep everything else the same.\"（其他部分維持不變）。" 
             "圖中的小字、招牌文字改起來容易亂碼，不要承諾能精準改字。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫。"
         ),
         "parameters": {
             "type": "object",
-            "properties": {"prompt": {"type": "string", "description": "修改指令（中英文皆可）"}},
+            "properties": {"prompt": {"type": "string", "description": "修改指令（中英文皆可）"},
+                           "use_found": {"type": "boolean", "description": "true＝改剛才用 web_image 找到的圖，而不是這則訊息的附件"}},
             "required": ["prompt"],
         },
     },

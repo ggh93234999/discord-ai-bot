@@ -94,10 +94,10 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
              {"開關": ("mode", "on or off")}),
     "畫圖": ("imagine", "Draw an image from a description (30 s to a few minutes; the result is posted in the channel)",
            {"內容": ("prompt", "What to draw (any language)"), "畫質": ("quality", "Fast (default) / cleaner composition and text"),
-            "形狀": ("shape", "Square (default) / landscape / portrait")}),
+            "形狀": ("shape", "Square (default) / landscape / portrait"), "大小": ("size", "Normal (default) / large / extra large (slower, Fast quality only)")}),
     "智慧畫圖": ("smartimagine", "Expands your one-liner into a full prompt first (10-30 s extra), then draws",
              {"內容": ("prompt", "What to draw, one sentence is enough (any language)"), "畫質": ("quality", "Fast (default) / cleaner composition and text"),
-              "形狀": ("shape", "Square (default) / landscape / portrait"), "提示詞語言": ("prompt_language", "Language of the expanded prompt: English (default) or Chinese")}),
+              "形狀": ("shape", "Square (default) / landscape / portrait"), "提示詞語言": ("prompt_language", "Language of the expanded prompt: English (default) or Chinese"), "大小": ("size", "Normal (default) / large / extra large (slower, Fast quality only)")}),
     "改圖": ("editimage", "Edit an image (~20 s): attach one, paste a message link, or use the latest image here",
            {"內容": ("prompt", "How to change it (any language), e.g. make the background daytime"), "圖片": ("image", "The image to edit (optional)"),
             "訊息": ("message", "Message link of the message that has the image (optional)"),
@@ -106,7 +106,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
 
 CHOICE_EN = {
     "快速（約30秒）": "Fast (~30 s)", "構圖與文字較乾淨（約100秒）": "Cleaner composition/text (~100 s)",
-    "英文（預設）": "English (default)", "中文": "Chinese", "正方形": "Square", "橫式": "Landscape", "直式": "Portrait",
+    "英文（預設）": "English (default)", "一般（預設）": "Normal (default)", "大圖（約1900像素）": "Large (~1900 px)", "超大圖（長邊2048像素）": "Extra large (2048 px long side)", "中文": "Chinese", "正方形": "Square", "橫式": "Landscape", "直式": "Portrait",
     "開": "on", "關": "off", "3 格（單排）": "3 cells (single row)", "9 格（3×3）": "9 cells (3x3)", "16 格（4×4）": "16 cells (4x4)", "正面": "heads", "反面": "tails", "全部": "all", "代幣怎麼賺": "how to earn tokens", "老虎機": "slots", "21點": "blackjack", "賽馬": "horse race", "擲硬幣": "coin flip", "骰子": "dice", "文字": "text", "語音": "voice",
     "封存（可還原）": "archive (restorable)", "解除封存": "unarchive", "刪除（永久）": "delete (permanent)",
 }
