@@ -826,3 +826,15 @@ body.tv-fs{overflow:hidden}
 .gl-row .gl-del{background:#7a2e2e}
 .gl-dlg{width:min(90vw,340px);padding:14px;border-radius:12px;background:#242936;display:flex;flex-direction:column;gap:8px;color:#eef}
 .gl-delcat{padding:7px;border:0;border-radius:8px;background:#5a2b2b;color:#fcc;font-size:12px;cursor:pointer}
+
+/* ================= 大老二（沿用橋牌的牌桌樣式） ================= */
+.bt .btlast{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+.bt .brhand .bc.can{cursor:pointer;transition:transform .12s}
+.bt .brhand.act .bc.can{filter:none}
+.bt .brhand .bc.sel{transform:translateY(-14px);box-shadow:0 0 0 3px #ffd54f}
+.bt .btbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.bt .btbtns .mb:disabled{opacity:.35;cursor:default}
+.bt .btleft{font-size:12px;color:#ddd;margin-top:6px;text-align:left}
+.bt .btleft div{display:flex;flex-wrap:wrap;gap:2px;margin-top:2px}
+.bt .brtable{grid-template-rows:auto minmax(150px,auto) auto}
+@media (max-width:520px){.bt .brhand{gap:2px}.bt .bc.big{width:30px;height:46px}.bt .bc.big b{font-size:14px}.bt .bc.big i{font-size:16px}}

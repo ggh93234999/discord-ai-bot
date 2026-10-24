@@ -16,6 +16,7 @@ import * as xqEng from "./xq.js";
 import { handlePoker, pokerClose } from "./poker.js";
 import { handleMahjong, mjClose } from "./mahjong.js";
 import { handleBridge, bridgeClose } from "./bridge.js";
+import { handleBigtwo, bigtwoClose } from "./bigtwo.js";
 import { handleTheater, theaterClose, serveVideo, serveSub } from "./theater.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 import { thinkMove, LEVELS as BOT_LEVELS } from "./bots.js";
@@ -307,6 +308,7 @@ wss.on("connection", (ws, req) => {
     if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
+    if (typeof m.t === "string" && /^(btjoin|btsit|btstart|btstand|btaddbot|btdelbot|btact|btname|btcfg)$/.test(m.t)) { handleBigtwo(ws, m); return; }
     if (typeof m.t === "string" && /^(brjoin|brsit|brstart|brstand|braddbot|brdelbot|bract|brname|brcfg)$/.test(m.t)) { handleBridge(ws, m); return; }
     if (typeof m.t === "string" && /^(tjoin|tname|tadd|tqual|tplay|tpause|tseek|tspeed|tskip|tremove|tup)$/.test(m.t)) { handleTheater(ws, m).catch(() => {}); return; }
     if (m.t === "join" && MULTI_GAMES.includes(m.game)) {
@@ -408,6 +410,7 @@ wss.on("connection", (ws, req) => {
     pokerClose(ws);
     mjClose(ws);
     bridgeClose(ws);
+    bigtwoClose(ws);
     theaterClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;

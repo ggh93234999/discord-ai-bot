@@ -10,6 +10,7 @@ import { mountPinball } from "./pinball.js";
 import { mountPoker } from "./poker.js";
 import { mountMahjong } from "./mahjong.js";
 import { mountBridge } from "./bridge.js";
+import { mountBigtwo } from "./bigtwo.js";
 import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
@@ -64,6 +65,7 @@ const GAMES = [
   { id: "mjtw", cat: "casino", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
   { id: "mjjp", cat: "casino", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
   { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
+  { id: "bigtwo", cat: "casino", icon: "🂮", name: "大老二", players: "4 人（可補電腦）", desc: "台灣玩法：單張、對子、順子到同花順，先出完的贏，練習點數", mount: mountBigtwo() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "gallery", cat: "art", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
