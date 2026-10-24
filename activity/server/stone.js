@@ -126,10 +126,11 @@ export function doCut(hid, axis, pos) {
 // 每一塊各自估價：看目前所有切面上看得到的翡翠，推出整塊翡翠大概多大（沿 x／y／z 的範圍），再算這一塊裡預期有多少翡翠。
 export const MAX_PIECES = 32, BOX = 2;
 export let VOLK = 2.4;
+export const HOPE0 = 0.65, HOPE_DECAY = 0.65, HOPE_NEAR = 0.25;
 export const setVolK = (k) => { VOLK = k; };
 export function newPieces() { return [{ id: 0, lo: [-BOX, -BOX, -BOX], hi: [BOX, BOX, BOX], sold: false }]; }
 export function newStoneState(hid, price, w, pub) {
-  return { hid, seed: hid.seed, price, w, win: pub.win, cuts: [], pieces: newPieces(), nextId: 1, got: 0 };
+  return { hid, seed: hid.seed, price, w, win: pub.win, pub, cuts: [], pieces: newPieces(), nextId: 1, got: 0 };
 }
 // 這一刀能不能切：那一塊還在、位置在那一塊裡面（離邊緣至少 0.1）、石頭沒超過塊數上限
 export function canCut(st, pieceId, axis, pos) {
@@ -180,18 +181,22 @@ const ELL = (() => { const a = []; for (let i = 0; i < 9; i++) for (let j = 0; j
 // 每一塊的重量（公斤）和收購價。回傳還在的塊：[{id, lo, hi, w, offer}]
 export function pieceInfo(st) {
   const P = shapeParams(st.seed), pts = samples(st), est = estBody(st), left = st.pieces.filter((p) => !p.sold);
+  // 預期價值：買家看外表（場口、松花、霧、窗口…）對這顆石頭的期望，和賣家開價是兩回事（賣家有加價和誤差）
+  const V0 = st.pub ? marketPerKg(st.pub) * st.w : st.price;
   let jadeAll = 0, k = 1;
   if (est) { jadeAll = (VOLK * est.r[0] * est.r[1] * est.r[2]) / (P.sx * P.sy * P.sz); k = Math.min(1, 0.6 / jadeAll); }
-  const prior = (st.win && st.win.code >= 1 && st.win.code <= 8 ? 0.65 : 0.55) * Math.pow(0.55, st.cuts.length);
   return left.map((pc) => {
     const pf = pts.filter((p) => inBox(p, pc)).length / (pts.length || 1), w = st.w * pf;
-    let value;
-    if (!est) value = st.price * pf * Math.max(0.04, prior);
+    let seen = 0, hope;
+    if (!est) hope = V0 * pf * Math.max(0.05, HOPE0 * Math.pow(HOPE_DECAY, st.cuts.length));      // 還沒看到翡翠：只能靠外表猜，每切一刀沒看到就更不看好
     else {
       const frac = ELL.filter((e) => inBox([est.ctr[0] + e[0] * est.r[0], est.ctr[1] + e[1] * est.r[1], est.ctr[2] + e[2] * est.r[2]], pc)).length / ELL.length;
-      value = st.w * (jadeAll * k * frac) * YIELD * mixOf(est.q) * OFFER_K + st.price * pf * 0.04;
+      seen = st.w * (jadeAll * k * frac) * YIELD * mixOf(est.q) * OFFER_K;
+      const cx = [0, 1, 2].map((i) => (Math.max(pc.lo[i], -1.5) + Math.min(pc.hi[i], 1.5)) / 2), dn = Math.hypot(...cx.map((x, i) => (x - est.ctr[i]) / est.r[i]));
+      hope = V0 * pf * HOPE_NEAR * Math.exp(-0.5 * Math.pow(Math.max(0, dn - 1) / 1.2, 2));   // 看到翡翠後，離它越近的塊越讓人期待（可能還延伸過去）
     }
-    return { id: pc.id, lo: pc.lo, hi: pc.hi, w: Math.round(w * 100) / 100, offer: Math.max(1, Math.floor(value)) };
+    const rock = st.price * pf * 0.04;
+    return { id: pc.id, lo: pc.lo, hi: pc.hi, w: Math.round(w * 100) / 100, seen: Math.floor(seen), hope: Math.floor(hope), offer: Math.max(1, Math.floor(seen + hope + rock)) };
   });
 }
 export const offerFor = (st) => pieceInfo(st).reduce((a, p) => a + p.offer, 0);

@@ -301,7 +301,7 @@ export function mountCasino(game, opts = {}) {
       const panel = (c, i, hide) => `<div class="stcp"${hide ? ' style="visibility:hidden"' : ""}><div class="stcimg" data-i="${i}"></div><small>${cap(c, i)}</small></div>`;
       let html = `<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>`;
       if (!m.done) {
-        html += `<div class="stpcs">${pcs.map((p) => `<button class="stpc${p.id === selPiece ? " sel" : ""}" data-id="${p.id}">塊 #${p.id}<small>${p.w} 公斤　收購價 ${money(p.offer)}</small></button>`).join("")}</div>
+        html += `<div class="stpcs">${pcs.map((p) => `<button class="stpc${p.id === selPiece ? " sel" : ""}" data-id="${p.id}">塊 #${p.id}<small>${p.w} 公斤　收購價 ${money(p.offer)}${p.hope ? `（含預期 ${money(p.hope)}）` : ""}</small></button>`).join("")}</div>
           <div class="stcutui"><div class="stax">${AXN.map((l, i) => `<button data-ax="${i}" class="${cutAxis === i ? "sel" : ""}">${l}</button>`).join("")}</div><label>刀的位置 <input type="range" class="stpos" step="0.05" value="${cutPos}"> <b class="stposv">${fp(cutPos)}</b></label>
           <div class="sthint">先選一塊，再選方向和位置（藍色平面就是刀要走的地方）。每一塊都有自己的收購價：依目前看到的翡翠推出整塊翡翠有多大，再算這一塊裡預期有多少。次數不限，每刀要付費。</div></div>`;
       }
