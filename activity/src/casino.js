@@ -287,7 +287,7 @@ export function mountCasino(game, opts = {}) {
       } finally { mkBusy = false; }
     }
     async function stoneShow(m) {
-      inHand = !m.done; busy = false; stoneV = m.done ? null : m; marketOn = false;
+      const prevV = stoneV; inHand = !m.done; busy = false; stoneV = m.done ? null : m; marketOn = false;
       const v = await ensureViewer(); if (closed) return;
       const lines = [`<div class="strow">🪨 買下價 ${money(m.done ? m.price : m.bet)}（${(m.size || 1).toFixed(2)}×）</div>`, `<div class="strow">外皮：${esc(m.skin)}</div>`, ...(m.win ? [`<div class="strow">窗口：${esc(m.win)}</div>`] : []), ...m.cuts.map((c, i) => `<div class="strow">第 ${i + 1} 刀：${esc(c)}</div>`)];
       let html = `<div class="stslot"></div>${lines.join("")}`;
@@ -296,8 +296,14 @@ export function mountCasino(game, opts = {}) {
           <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">${m.how === "opened" ? "解石成功" : "賣給收購商"}　${resultLine(m)}${m.fees ? `（含切／解石費 ${money(m.fees)}）` : ""}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
         statusEl.textContent = "再逛一輪？";
       } else statusEl.textContent = "可以切開看線索，或直接決定";
-      stage.innerHTML = html; stage.querySelector(".stslot").append(slotEl); v.resize();
-      v.show(stoneP({ ...m, opened: m.done ? m.tier : null }));
+      stage.innerHTML = html; stage.querySelector(".stslot").append(slotEl); slotEl.style.display = ""; v.resize();
+      const cutNow = prevV && !m.done && prevV.seed === m.seed && m.cutJs.length === (prevV.cutJs || []).length + 1;
+      if (cutNow) {                                                     // 切石動畫：刀片掃過、石頭裂成兩半露出切面
+        busy = true; draw(); statusEl.textContent = "切開中…";
+        const lines = stage.querySelectorAll(".strow"), last = lines[lines.length - 1]; if (last) last.style.visibility = "hidden";
+        await v.cut(stoneP(prevV), stoneP(m), m.cutJs[m.cutJs.length - 1], m.cutJs.length);
+        if (last) last.style.visibility = ""; busy = false; statusEl.textContent = "可以再切、賣掉，或解石全開";
+      } else v.show(stoneP({ ...m, opened: m.done ? m.tier : null }));
       showBalance(); draw();
     }
     function bjShow(m) {
