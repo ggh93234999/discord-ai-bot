@@ -73,7 +73,7 @@ export function mountBridge(opts = {}) {
       if (seated && !spectate) {
         cfg = `<div class="mjcfg"><label>長度 <select class="cf-len">${st.lens.map((v) => `<option value="${v}"${c.len === v ? " selected" : ""}>${v} 手</option>`).join("")}</select></label>
           <label>每線位 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label></div>
-          <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
+          <div class="btbtns">${st.seats.some((s) => !s) ? `<button class="mb ghost fillbots">🤖 陪打（空位全補電腦）</button>` : ""}<button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button></div>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下。南北一隊、東西一隊，對面的人是你的同伴。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k < 2 && st.final[0].team === r.team ? " top" : ""}"><span>${TEAM[r.team]}</span><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
       body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。每手輸的那隊每人付「線位 × 每線位點數」給贏的那隊。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
@@ -82,6 +82,7 @@ export function mountBridge(opts = {}) {
       body.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "braddbot", seat: Number(b.dataset.bot) })));
       body.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => send({ t: "brdelbot", seat: Number(b.dataset.del) })));
       const q = (s) => body.querySelector(s);
+      q(".fillbots") && q(".fillbots").addEventListener("click", () => st.seats.forEach((x, i) => { if (!x) send({ t: "braddbot", seat: i }); }));
       q(".start") && q(".start").addEventListener("click", () => send({ t: "brstart" }));
       q(".stand") && q(".stand").addEventListener("click", () => send({ t: "brstand" }));
       const sendCfg = () => send({ t: "brcfg", len: Number(q(".cf-len").value), base: Number(q(".cf-base").value) });
