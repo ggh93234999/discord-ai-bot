@@ -3,14 +3,14 @@
 // 公開資料 pub：外表看得到的線索（場口外皮、松花、蟒帶、霧、癬、表面的裂、窗口），這些都由隱藏資料「有機率地」長出來，也夾雜假線索。
 // 價格 = 賣家看外表估的每公斤價 × 重量（所以貴的不一定好）；價值 = 翡翠體積 × 品質 × 重量 × 裂的折損。
 import { randomInt } from "node:crypto";
-import { GRID, GS, AXES, planeBasis, inside, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
+import { hash3, GRID, GS, AXES, planeBasis, inside, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
 
 export const TIERS = [
   { name: "沒有翡翠" }, { name: "豆種" }, { name: "糯種" }, { name: "冰糯種" }, { name: "冰種" },
   { name: "高冰種" }, { name: "糯冰陽綠" }, { name: "玻璃種滿綠" }, { name: "帝王綠" },
 ];
 export const U = [0, 60, 140, 350, 900, 2400, 7000, 22000, 80000];          // 每公斤翡翠肉的價值（代幣）
-export const OFFER_K = 0.85, MAX_CUTS = 3, CUT_FEE = 0.03, OPEN_FEE = 0.08, YIELD = 0.55;
+export const DENS_JADE = 0.3, KERF = 0.04, OFFER_K = 0.85, MAX_CUTS = 3, CUT_FEE = 0.03, OPEN_FEE = 0.08, YIELD = 0.55;
 export const MARKET_MAX = 100, RESTOCK_MS = 15000, PRICE_MIN = 30, PRICE_MAX = 4000;
 export const CUT_POS = [-0.6, 0.6];
 
@@ -90,14 +90,18 @@ export function genStone(id) {
   // ---- 價格：賣家看外表（和你看到的一樣）估每公斤價，加價 12%，再加一點誤差（有人估高、有人估低，看得準就撿得到便宜）
   const noise = Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.55), ppk = marketPerKg(pub) * MARGIN * noise;
   w = Math.round(Math.max(PRICE_MIN / ppk, Math.min(PRICE_MAX / ppk, w)) * 10) / 10 || 0.1;      // 重量依價格範圍調整（價值跟著重量走，不影響划不划算）
-  hid.w = w; pub.w = w;
+  hid.w = w;                                                                                       // w = 這個大小的普通石頭的重量（價格用它）
+  const dens = (1 + DENS_JADE * hid.vol) * Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.04);          // 真實密度比：翡翠比石頭重，加上石頭本身的差異
+  hid.dens = dens; pub.w = Math.round(w * dens * 10) / 10; pub.liters = Math.round(w / 2.7 * 10) / 10;
+  const feel = dens * Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.03);                               // 拿在手上的感覺也有誤差
+  pub.heft = feel < 0.985 ? 0 : feel < 1.025 ? 1 : feel < 1.07 ? 2 : 3;
   const price = Math.max(PRICE_MIN, Math.min(PRICE_MAX, Math.round(w * ppk)));
   pub.price = price; hid.price = price;
   pub.size = Math.round(Math.min(1.8, Math.max(0.6, Math.cbrt(w / 4))) * 100) / 100;
   return { pub, hid };
 }
 export function descLines(pub) {
-  const L = [`場口：${pub.siteName}（${pub.skinDesc}）`, `重量：${pub.w} 公斤`];
+  const L = [`場口：${pub.siteName}（${pub.skinDesc}）`, `重量：${pub.w} 公斤，體積約 ${pub.liters} 公升`, `手感：${["偏輕，不太像有料", "普通", "比同樣大小的石頭沉一些", "很沉"][pub.heft ?? 1]}`];
   L.push(pub.pine ? "松花：有，集中在一處" : "松花：沒看到");
   L.push(pub.band ? "蟒帶：有一圈凸起的帶子" : "蟒帶：沒有");
   L.push(pub.haze ? `霧：${pub.haze.name}` : "霧：沒有");
@@ -109,16 +113,19 @@ export function descLines(pub) {
 
 // ---- 價值與收購商
 const mixOf = (q) => 0.343 * U[q] + 0.386 * U[Math.max(0, q - 1)] + 0.271 * U[Math.max(0, q - 2)];
+// 翡翠塊愈大單價愈高：碎料只能做小件，大塊才做得了手鐲、牌子（連續的倍數：0.1 公斤以下 ×0.5，1 公斤 ×1，5 公斤以上 ×1.5）
+export const sizeMult = (kg) => Math.max(0.5, Math.min(1.5, 1 + 0.2 * Math.log2(Math.max(1e-3, kg))));
 export function valueOf(hid) {
   const b = hid.body; if (!b) return 0;
-  return Math.round(hid.w * Math.min(0.6, hid.vol) * YIELD * mixOf(b.q) * hid.cf);
+  const kg = hid.w * Math.min(0.6, hid.vol) * YIELD;
+  return Math.round(kg * mixOf(b.q) * hid.cf * sizeMult(kg));
 }
 export const cutFee = (price) => Math.max(1, Math.round(price * CUT_FEE));
 export const openFee = (price) => Math.max(1, Math.round(price * OPEN_FEE));
 export function doCut(hid, axis, pos) {
   const P = shapeParams(hid.seed), s = sectionGrid(hid, P, axis, pos);
   let tot = 0, wq = 0; for (let t = 1; t <= 8; t++) { tot += s.hist[t]; wq += s.hist[t] * t; }
-  return { axis, pos, grid: Buffer.from(s.grid).toString("base64"), inside: s.inside, jade: s.jade, frac: s.inside ? s.jade / s.inside : 0, avgQ: tot ? wq / tot : 0, crack: s.hist[9] > 0 };
+  return { axis, pos, grid: Buffer.from(s.grid).toString("base64"), inside: s.inside, jade: s.jade, frac: s.inside ? s.jade / s.inside : 0, avgQ: tot ? wq / tot : 0, crack: s.hist[9] > 0, crackN: s.hist[9] };
 }
 // 收購商出價：沒切過，是標價的 5～6 成；切過就看切面（切到翡翠就依看到的比例和品質估，沒切到就大幅降價）
 // ---- 切塊與估價
@@ -143,9 +150,13 @@ export function canCut(st, pieceId, axis, pos) {
 export function applyCut(st, pc, axis, pos) {
   const c = doCut(st.hid, axis, pos), lo = st.nextId++, hi = st.nextId++;
   const hiL = pc.hi.slice(), loL = pc.lo.slice(); hiL[axis] = pos; loL[axis] = pos;
+  const P = shapeParams(st.hid.seed), cell = (2 * GS) / GRID, loss = (c.jade * cell * cell * KERF) / (4.19 * P.sx * P.sy * P.sz);     // 鋸縫吃掉的翡翠（占石頭體積的比例）
+  st.hid.vol = Math.max(0, st.hid.vol - loss); st.kerf = (st.kerf || 0) + loss;
+  let broke = false;
+  if (c.jade > 0 && c.crackN >= 3 && Math.random() < Math.min(0.6, c.crackN * 0.06)) { broke = true; st.hid.vol *= 0.75; st.hid.cf *= 0.8; }   // 刀走在裂上：翡翠崩掉一角
   pc.sold = true; pc.split = true;                                                  // 被切開的這一塊不再單獨存在
   st.pieces.push({ id: lo, lo: pc.lo, hi: hiL, sold: false }, { id: hi, lo: loL, hi: pc.hi, sold: false });
-  const cut = { ...c, piece: pc.id, lo, hi }; st.cuts.push(cut); return cut;
+  const cut = { ...c, piece: pc.id, lo, hi, broke }; st.cuts.push(cut); return cut;
 }
 function samples(st) {                                                              // 石頭裡面的取樣點（算每一塊占石頭的比例）
   if (st._samp) return st._samp;
@@ -184,14 +195,15 @@ export function pieceInfo(st) {
   // 預期價值：買家看外表（場口、松花、霧、窗口…）對這顆石頭的期望，和賣家開價是兩回事（賣家有加價和誤差）
   const V0 = st.pub ? marketPerKg(st.pub) * st.w : st.price;
   let jadeAll = 0, k = 1;
-  if (est) { jadeAll = (VOLK * est.r[0] * est.r[1] * est.r[2]) / (P.sx * P.sy * P.sz); k = Math.min(1, 0.6 / jadeAll); }
+  if (est) { jadeAll = Math.max(0, (VOLK * est.r[0] * est.r[1] * est.r[2]) / (P.sx * P.sy * P.sz) - VOLK * (st.kerf || 0)) * Math.pow(0.75, st.cuts.filter((c) => c.broke).length); k = Math.min(1, 0.6 / (jadeAll || 1)); }
   return left.map((pc) => {
     const pf = pts.filter((p) => inBox(p, pc)).length / (pts.length || 1), w = st.w * pf;
     let seen = 0, hope;
     if (!est) hope = V0 * pf * Math.max(0.05, HOPE0 * Math.pow(HOPE_DECAY, st.cuts.length));      // 還沒看到翡翠：只能靠外表猜，每切一刀沒看到就更不看好
     else {
       const frac = ELL.filter((e) => inBox([est.ctr[0] + e[0] * est.r[0], est.ctr[1] + e[1] * est.r[1], est.ctr[2] + e[2] * est.r[2]], pc)).length / ELL.length;
-      seen = st.w * (jadeAll * k * frac) * YIELD * mixOf(est.q) * OFFER_K;
+      const kg = st.w * (jadeAll * k * frac) * YIELD;
+      seen = kg * mixOf(est.q) * OFFER_K * sizeMult(kg);
       const cx = [0, 1, 2].map((i) => (Math.max(pc.lo[i], -1.5) + Math.min(pc.hi[i], 1.5)) / 2), dn = Math.hypot(...cx.map((x, i) => (x - est.ctr[i]) / est.r[i]));
       hope = V0 * pf * HOPE_NEAR * Math.exp(-0.5 * Math.pow(Math.max(0, dn - 1) / 1.2, 2));   // 看到翡翠後，離它越近的塊越讓人期待（可能還延伸過去）
     }
@@ -206,4 +218,27 @@ export function openSection(hid) {
   let best = null;
   for (let a = 0; a < 3; a++) { const c = doCut(hid, a, Math.max(-0.6, Math.min(0.6, hid.body.c[a]))); if (!best || c.jade > best.jade) best = c; }
   return best;
+}
+
+// ---- 擦皮：在表面指定的位置磨掉一小塊皮，看到那一點底下的東西（和窗口一樣，只是一個點）
+export const rubFee = (price) => Math.max(1, Math.round(price * 0.015));
+export const lightFee = (price) => Math.max(1, Math.round(price * 0.005));
+export const MAX_RUB = 4, MAX_LIGHT = 6;
+export function rubAt(hid, dir) {
+  const P = shapeParams(hid.seed), p = surfacePoint(P, dir, false).map((x) => x * 0.93);
+  const c = interiorAt(hid, p); return c === 10 ? 0 : c;
+}
+// 打燈：強光從那一點打進去，看皮底下有多透。翡翠離表面愈近愈亮，愈遠愈暗，另外皮的厚薄每個點不一樣（有誤差）。
+// level 0 不透光 1 隱約透光 2 一片光暈 3 整片透亮；q = 透出來的光的顏色等級（霧只會透出白光）
+export function lightAt(hid, dir) {
+  const P = shapeParams(hid.seed), sp = surfacePoint(P, dir, false);
+  for (let t = 0.04; t <= 0.6; t += 0.04) {
+    const p = [sp[0] * (1 - t), sp[1] * (1 - t), sp[2] * (1 - t)], c = interiorAt(hid, p);
+    if ((c >= 1 && c <= 8) || c === 10) {
+      const skin = 0.7 + 0.6 * hash3(Math.round(dir[0] * 997), Math.round(dir[1] * 997), Math.round(dir[2] * 997), hid.seed);
+      const tr = Math.exp(-t / 0.2) * skin;
+      return { level: tr >= 0.5 ? 3 : tr >= 0.28 ? 2 : tr >= 0.12 ? 1 : 0, q: c === 10 ? 0 : c };
+    }
+  }
+  return { level: 0, q: 0 };
 }

@@ -13,7 +13,7 @@ const BETS = [10, 50, 100, 500];
 const ERR = {
   insufficient: "代幣不夠，選小一點的賭注", bot_down: "機器人暫時連不上，稍後再試", need_login: "要先登入才能用真代幣",
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
-  sold: "這顆石頭剛被別人買走了，挑別的吧", error: "發生錯誤，再試一次", 
+  sold: "這顆石頭剛被別人買走了，挑別的吧", limit: "這顆已經探太多次了", error: "發生錯誤，再試一次", 
 };
 const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", stone: "賭石", slots: "老虎機", forge: "鍛造" };
 const HINTS = {
@@ -92,6 +92,7 @@ export function mountCasino(game, opts = {}) {
         else if (m.t === "cwho") { watch.update(m.list); if (spectate) specUpdate(m); }
         else if (m.t === "cres") onRes(m);
         else if (m.t === "smkt") onMarket(m);
+        else if (m.t === "smark") onMark(m);
         else if (m.t === "hstate") onHorse(m);
         else if (m.t === "cbal") { if (m.balance != null) { if (m.real) realBal = m.balance; else practiceBal = m.balance; showBalance(); } if (m.payfail) statusEl.textContent = "派彩失敗，請聯絡管理員"; }
         else if (m.t === "cerr") onErr(m);
@@ -256,7 +257,28 @@ export function mountCasino(game, opts = {}) {
       viewerP ||= import("./stone3d.js").then((mod) => { viewer = mod.createViewer(slotEl); return viewer; });
       return viewerP;
     }
-    const stoneP = (x) => ({ ...x, cuts: x.cuts || [], sold: x.sold || [] });
+    const mkMarks = new Map();
+    const stoneP = (x) => ({ ...x, cuts: x.cuts || [], sold: x.sold || [], marks: x.marks || mkMarks.get(x.id) || [] });
+    const TN = ["沒有翡翠", "豆種", "糯種", "冰糯種", "冰種", "高冰種", "糯冰陽綠", "玻璃種滿綠", "帝王綠"], LV = ["不透光", "隱約透出一點光", "透出一片光暈", "整片透亮"];
+    const lightCol = (q) => (q >= 5 ? "翠綠色" : q >= 3 ? "淡綠色" : q >= 1 ? "偏白綠" : "白色");
+    const marksHtml = (marks) => (marks || []).length ? `<div class="stmarks">${marks.map((k, i) => k.kind === "light" ? `<div>🔦 第 ${i + 1} 處打燈：${LV[k.level]}${k.level ? `（${lightCol(k.q)}）` : ""}</div>` : `<div>🪨 第 ${i + 1} 處擦皮：${k.code === 0 ? "灰色，沒有翡翠" : k.code === 9 ? "有裂紋" : `看到${TN[k.code]}`}</div>`).join("")}</div>` : "";
+    const probeUi = (marks, kinds, p) => {
+      const lf = typeof p === "number" ? Math.max(1, Math.round(p * 0.005)) : p.lightFee, rf = typeof p === "number" ? 0 : p.rubFee;
+      return `<div class="stprobe">${kinds.includes("light") ? `<button data-k="light">🔦 打燈（-${money(lf)}）</button>` : ""}${kinds.includes("rub") ? `<button data-k="rub">🪨 擦皮（-${money(rf)}）</button>` : ""}</div><div class="sthint">按下後，點石頭上想探的位置。打燈看皮底下透不透光，擦皮磨開一小塊看那一點的內部。</div>${marksHtml(marks)}`;
+    };
+    let probe = null;
+    function wireProbe(v, fn) {
+      stage.querySelectorAll(".stprobe button").forEach((b) => b.addEventListener("click", () => {
+        const k = b.dataset.k; probe = probe === k ? null : k;
+        stage.querySelectorAll(".stprobe button").forEach((x) => x.classList.toggle("sel", x.dataset.k === probe));
+        v.pickMode(probe ? (dir) => { const kind = probe; probe = null; v.pickMode(null); stage.querySelectorAll(".stprobe button").forEach((x) => x.classList.remove("sel")); fn(kind, dir); } : null);
+        statusEl.textContent = probe ? "點石頭上想探的位置" : "";
+      }));
+    }
+    function onMark(m) {
+      setBal(m); mkMarks.set(m.id, m.marks);
+      if (marketOn && !inHand && m.id === stSel) marketShow();
+    }
     const cutRange = (pc, ax) => [Math.ceil(Math.max(pc.lo[ax] + 0.1, -1.4) * 20 - 1e-9) / 20, Math.floor(Math.min(pc.hi[ax] - 0.1, 1.4) * 20 + 1e-9) / 20];
     function onMarket(m) {
       if (m.full) { stoneMk.clear(); for (const x of m.stones) stoneMk.set(x.id, x); marketOn = true; if (!inHand) marketShow(); }
@@ -278,12 +300,13 @@ export function mountCasino(game, opts = {}) {
         const shown = list.slice(stPage * per, stPage * per + per);
         for (const x of shown) if (!thumbCache.has(x.id)) thumbCache.set(x.id, v.thumb(stoneP(x)));
         const pk = stoneMk.get(stSel);
-        stage.innerHTML = `<div class="stslot"></div>${pk ? `<div class="stinfo"><b>#${pk.id}　${pk.w} 公斤　${money(pk.price)}</b>${descHtml(pk)}</div>` : `<div class="stinfo">點下面的石頭來看看（市場共 ${stLeft || stoneMk.size} 顆，所有人共用）</div>`}
+        stage.innerHTML = `<div class="stslot"></div>${pk ? `<div class="stinfo"><b>#${pk.id}　${pk.w} 公斤　${money(pk.price)}</b>${descHtml(pk)}</div>${probeUi(mkMarks.get(pk.id), ["light"], pk.price)}` : `<div class="stinfo">點下面的石頭來看看（市場共 ${stLeft || stoneMk.size} 顆，所有人共用）</div>`}
           <div class="stsort">${[["new", "最新上架"], ["lo", "價格低→高"], ["hi", "價格高→低"]].map(([k, l]) => `<button class="${stSort === k ? "sel" : ""}" data-s="${k}">${l}</button>`).join("")}</div>
           <div class="stlist">${shown.map((x) => `<button class="stth${x.id === stSel ? " sel" : ""}" data-id="${x.id}"><img src="${thumbCache.get(x.id)}" alt=""><small>#${x.id}　${money(x.price)}</small></button>`).join("")}</div>
           <div class="stpager"><button class="pg" data-d="-1"${stPage <= 0 ? " disabled" : ""}>◀</button><span>${stPage + 1} / ${pages}</span><button class="pg" data-d="1"${stPage >= pages - 1 ? " disabled" : ""}>▶</button></div>
           <div class="sthint">拖曳旋轉、滾輪或雙指縮放。石頭是大家共用的，被買走就沒了，會慢慢補貨。</div>`;
-        stage.querySelector(".stslot").append(slotEl); v.resize(); if (pk) v.show(stoneP(pk)); else slotEl.style.display = "none";
+        stage.querySelector(".stslot").append(slotEl); v.resize(); probe = null; v.pickMode(null); if (pk) v.show(stoneP(pk)); else slotEl.style.display = "none";
+        if (pk) wireProbe(v, (k, dir) => send({ t: "cstone", a: k, id: pk.id, dir, real: real() }));
         if (pk) slotEl.style.display = "";
         stage.querySelectorAll(".stth").forEach((b) => b.addEventListener("click", () => { if (busy) return; stSel = Number(b.dataset.id); marketShow(); }));
         stage.querySelectorAll(".stsort button").forEach((b) => b.addEventListener("click", () => { stSort = b.dataset.s; stPage = 0; marketShow(); }));
@@ -297,9 +320,9 @@ export function mountCasino(game, opts = {}) {
       const v = await ensureViewer(); if (closed) return;
       const cuts = m.cuts || [], newCut = !m.done && m.newCut && cuts.length > 0, pcs = m.pieces || [];
       if (!pcs.find((p) => p.id === selPiece)) selPiece = pcs.length ? pcs.slice().sort((a, b) => b.w - a.w)[0].id : -1;
-      const cap = (c, i) => `第 ${i + 1} 刀（塊 #${c.piece}　${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠，占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}`;
+      const cap = (c, i) => `第 ${i + 1} 刀（塊 #${c.piece}　${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠，占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}${c.broke ? "　⚠ 刀走在裂上，翡翠崩掉一角" : ""}`;
       const panel = (c, i, hide) => `<div class="stcp"${hide ? ' style="visibility:hidden"' : ""}><div class="stcimg" data-i="${i}"></div><small>${cap(c, i)}</small></div>`;
-      let html = `<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>`;
+      let html = `<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>${m.canProbe && !m.done ? probeUi(m.marks, ["light", "rub"], m) : marksHtml(m.marks)}`;
       if (!m.done) {
         html += `<div class="stpcs">${pcs.map((p) => `<button class="stpc${p.id === selPiece ? " sel" : ""}" data-id="${p.id}">塊 #${p.id}<small>${p.w} 公斤　收購價 ${money(p.offer)}${p.hope ? `（含預期 ${money(p.hope)}）` : ""}</small></button>`).join("")}</div>
           <div class="stcutui"><div class="stax">${AXN.map((l, i) => `<button data-ax="${i}" class="${cutAxis === i ? "sel" : ""}">${l}</button>`).join("")}</div><label>刀的位置 <input type="range" class="stpos" step="0.05" value="${cutPos}"> <b class="stposv">${fp(cutPos)}</b></label>
@@ -326,6 +349,7 @@ export function mountCasino(game, opts = {}) {
         stage.querySelectorAll(".stax button").forEach((x) => { x.disabled = cutRange(pc, Number(x.dataset.ax))[1] < cutRange(pc, Number(x.dataset.ax))[0]; });
         prv(); draw();
       };
+      probe = null; v.pickMode(null);
       if (newCut) {                                                      // 切石動畫：刀片掃過、那一塊沿切面分開露出真正的切面
         busy = true; draw(); statusEl.textContent = "切開中…";
         const before = stoneP({ ...m, cuts: cuts.slice(0, -1) }), after = stoneP(m);
@@ -338,6 +362,7 @@ export function mountCasino(game, opts = {}) {
         stage.querySelectorAll(".stpc").forEach((b) => b.addEventListener("click", () => { if (busy) return; selPiece = Number(b.dataset.id); stage.querySelectorAll(".stpc").forEach((x) => x.classList.toggle("sel", x === b)); v.highlight(selPiece); sync(); }));
         if (sl) sl.addEventListener("input", () => { cutPos = Number(sl.value); stage.querySelector(".stposv").textContent = fp(cutPos); prv(); });
         stage.querySelectorAll(".stax button").forEach((b) => b.addEventListener("click", () => { cutAxis = Number(b.dataset.ax); stage.querySelectorAll(".stax button").forEach((x) => x.classList.toggle("sel", x === b)); sync(); }));
+        if (m.canProbe) wireProbe(v, (k, dir) => send({ t: "cstone", a: k, dir }));
         sync();
       } else v.preview(null);
       showBalance(); draw();

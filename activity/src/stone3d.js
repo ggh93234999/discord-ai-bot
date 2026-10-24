@@ -53,6 +53,20 @@ export function buildStone(p) {                         // p: { ...pub, cuts:[{a
     const m = new THREE.Mesh(new THREE.CircleGeometry(0.15, 32), new THREE.MeshStandardMaterial({ color: col, roughness: 0.1, metalness: 0.05, emissive: col, emissiveIntensity: p.win.code >= 4 ? 0.3 : 0.05, side: THREE.DoubleSide }));
     m.position.set(sp[0], sp[1], sp[2]).addScaledVector(nrm, 0.012); m.lookAt(m.position.clone().add(nrm)); g.add(m);
   }
+  for (const k of p.marks || []) {                                                      // 你探過的位置：擦皮磨開的小窗，打燈照出的光
+    const sp = surfacePoint(P, k.dir, false), nrm = new THREE.Vector3(k.dir[0] / (P.sx * P.sx), k.dir[1] / (P.sy * P.sy), k.dir[2] / (P.sz * P.sz)).normalize();
+    let m;
+    if (k.kind === "rub") {
+      const col = k.code >= 1 && k.code <= 8 ? TIER_COL[k.code] : "#8c877b";
+      m = new THREE.Mesh(new THREE.CircleGeometry(0.1, 24), new THREE.MeshStandardMaterial({ color: col, roughness: 0.1, emissive: col, emissiveIntensity: k.code >= 4 ? 0.3 : 0.05, side: THREE.DoubleSide }));
+    } else if (k.level === 0) {
+      m = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.15, 24), new THREE.MeshBasicMaterial({ color: 0x777777, side: THREE.DoubleSide }));
+    } else {
+      const col = k.q >= 5 ? 0x35e08a : k.q >= 3 ? 0x9fe0b0 : 0xeef0dc;
+      m = new THREE.Mesh(new THREE.CircleGeometry(0.1 + 0.07 * k.level, 24), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.35 + 0.15 * k.level, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    }
+    m.position.set(sp[0], sp[1], sp[2]).addScaledVector(nrm, 0.015); m.lookAt(m.position.clone().add(nrm)); g.add(m);
+  }
   g.scale.setScalar(0.85 + 0.22 * (p.size || 1));
   return g;
 }
@@ -110,7 +124,7 @@ function makeSplit(p, lod) {
     }
   };
   const highlight = (id) => { for (const lf of leaves) { const m = lf.h.children[0]?.material; if (m && m.emissive) m.emissive.set(lf.id === id ? 0x2a5a6a : 0x000000); } };
-  const api = { root, sc, leaves, setGaps, highlight, n: cuts.length };
+  const api = { root, sc, leaves, setGaps, highlight, n: cuts.length, P: shapeParams(p.seed) };
   setGaps(cuts.map(() => GAP * sc));
   return api;
 }
@@ -128,7 +142,18 @@ export function createViewer(container) {
   const ctl = new OrbitControls(cam, renderer.domElement);
   ctl.enableDamping = true; ctl.enablePan = false; ctl.minDistance = 2.4; ctl.maxDistance = 8; ctl.autoRotate = true; ctl.autoRotateSpeed = 1.2;
   ctl.addEventListener("start", () => { ctl.autoRotate = false; });
-  let cur = null, raf = 0, dead = false, prev = null, sel = null;
+  let cur = null, raf = 0, dead = false, prev = null, sel = null, pickCb = null, down = null;
+  const el = renderer.domElement, ray = new THREE.Raycaster();
+  el.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  el.addEventListener("pointerup", (e) => {                                             // 點一下（不是拖曳）→ 取石頭表面那一點，換成方向
+    if (!pickCb || !down || !cur || cur.n) return;
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 600) return;
+    const r = el.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1)), cam);
+    const mesh = cur.leaves[0]?.h.children[0]; if (!mesh) return;
+    const hit = ray.intersectObject(mesh)[0]; if (!hit) return;
+    const lp = mesh.worldToLocal(hit.point.clone()), P = cur.P, d = [lp.x / P.sx, lp.y / P.sy, lp.z / P.sz], L = Math.hypot(...d) || 1;
+    pickCb(d.map((x) => x / L));
+  });
   renderer.localClippingEnabled = true;
   const tickers = new Set();
   const loop = () => { if (dead) return; raf = requestAnimationFrame(loop); const now = performance.now(); for (const f of [...tickers]) f(now); ctl.update(); renderer.render(scene, cam); };
@@ -138,6 +163,7 @@ export function createViewer(container) {
     el: renderer.domElement,
     show(p) { this.preview(null); if (cur) { scene.remove(cur.root); dispose3(cur.root); } cur = makeSplit(p, p.lod); scene.add(cur.root); if (sel != null) cur.highlight(sel); },
     highlight(id) { sel = id; cur?.highlight(id); },
+    pickMode(cb) { pickCb = cb || null; el.style.cursor = cb ? "crosshair" : ""; },
     // 預覽刀的位置：一片半透明的平面，範圍是選到的那一塊（box = {lo, hi}，石頭座標）
     preview(axis, pos, box) {
       if (prev) { scene.remove(prev); dispose3(prev); prev = null; }
