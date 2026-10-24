@@ -91,9 +91,9 @@ export function genStone(id) {
   const noise = Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.55), ppk = marketPerKg(pub) * MARGIN * noise;
   w = Math.round(Math.max(PRICE_MIN / ppk, Math.min(PRICE_MAX / ppk, w)) * 10) / 10 || 0.1;      // 重量依價格範圍調整（價值跟著重量走，不影響划不划算）
   hid.w = w;                                                                                       // w = 這個大小的普通石頭的重量（價格用它）
-  const dens = (1 + DENS_JADE * hid.vol) * Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.04);          // 真實密度比：翡翠比石頭重，加上石頭本身的差異
+  const dens = (1 + DENS_JADE * hid.vol) * Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.14);          // 真實密度比：翡翠比石頭重，加上石頭本身的差異
   hid.dens = dens; pub.w = Math.round(w * dens * 10) / 10; pub.liters = Math.round(w / 2.7 * 10) / 10;
-  const feel = dens * Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.03);                               // 拿在手上的感覺也有誤差
+  const feel = dens * Math.exp((rnd() + rnd() + rnd() - 1.5) * 0.06);                               // 拿在手上的感覺也有誤差
   pub.heft = feel < 0.985 ? 0 : feel < 1.025 ? 1 : feel < 1.07 ? 2 : 3;
   const price = Math.max(PRICE_MIN, Math.min(PRICE_MAX, Math.round(w * ppk)));
   pub.price = price; hid.price = price;
@@ -240,5 +240,6 @@ export function lightAt(hid, dir) {
       return { level: tr >= 0.5 ? 3 : tr >= 0.28 ? 2 : tr >= 0.12 ? 1 : 0, q: c === 10 ? 0 : c };
     }
   }
-  return { level: 0, q: 0 };
+  const fake = hash3(Math.round(dir[0] * 991), Math.round(dir[2] * 991), Math.round(dir[1] * 991), hid.seed + 7);   // 石英脈、白色礦物也會透一點白光（假訊號）
+  return fake < 0.08 ? { level: 1, q: 0 } : { level: 0, q: 0 };
 }
