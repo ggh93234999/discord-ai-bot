@@ -3,7 +3,7 @@
 // 公開資料 pub：外表看得到的線索（場口外皮、松花、蟒帶、霧、癬、表面的裂、窗口），這些都由隱藏資料「有機率地」長出來，也夾雜假線索。
 // 價格 = 賣家看外表估的每公斤價 × 重量（所以貴的不一定好）；價值 = 翡翠體積 × 品質 × 重量 × 裂的折損。
 import { randomInt } from "node:crypto";
-import { shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
+import { GRID, GS, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
 
 export const TIERS = [
   { name: "沒有翡翠" }, { name: "豆種" }, { name: "糯種" }, { name: "冰糯種" }, { name: "冰種" },
@@ -121,13 +121,31 @@ export function doCut(hid, axis, pos) {
   return { axis, pos, grid: Buffer.from(s.grid).toString("base64"), inside: s.inside, jade: s.jade, frac: s.inside ? s.jade / s.inside : 0, avgQ: tot ? wq / tot : 0, crack: s.hist[9] > 0 };
 }
 // 收購商出價：沒切過，是標價的 5～6 成；切過就看切面（切到翡翠就依看到的比例和品質估，沒切到就大幅降價）
+// 目前看得到的翡翠有多大：從每個切面的翡翠範圍，推出翡翠體在 x／y／z 三個方向至少有多長，沒看到的方向用已知的幾何平均補；
+// 再除以石頭本身的大小得到體積占比（VOLK 是迴歸出來的修正係數）。看到的翡翠愈大、愈多面，估的體積就愈大。
+export let VOLK = 2.4;
+export const setVolK = (k) => { VOLK = k; };
+export function seenVolume(st) {
+  const P = shapeParams(st.seed ?? st.hid?.seed), cell = (2 * GS) / GRID, ext = [0, 0, 0];
+  const AX = [[2, 1], [2, 0], [0, 1]];                                   // 每個切面方向：格子的列、行各對應世界座標哪一軸（見 planeBasis）
+  let tot = 0, wq = 0;
+  for (const c of st.cuts) {
+    if (!(c.jade > 0)) continue;
+    const g = Buffer.from(c.grid, "base64"); let i0 = GRID, i1 = -1, j0 = GRID, j1 = -1;
+    for (let j = 0; j < GRID; j++) for (let i = 0; i < GRID; i++) { const v = g[j * GRID + i]; if (v >= 1 && v <= 8) { if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; } }
+    const [ax, bx] = AX[c.axis]; ext[ax] = Math.max(ext[ax], (i1 - i0 + 1) * cell / 2); ext[bx] = Math.max(ext[bx], (j1 - j0 + 1) * cell / 2);
+    tot += c.jade; wq += c.avgQ * c.jade;
+  }
+  const known = ext.filter((x) => x > 0); if (!known.length) return { vol: 0, q: 0 };
+  const gm = Math.exp(known.reduce((a, x) => a + Math.log(x), 0) / known.length), r = ext.map((x) => (x > 0 ? x : gm));
+  const lim = [P.sx, P.sy, P.sz].map((x) => 0.9 * x), rr = r.map((x, i) => Math.min(x, lim[i]));
+  return { vol: Math.min(0.6, VOLK * (rr[0] * rr[1] * rr[2]) / (P.sx * P.sy * P.sz)), q: Math.max(1, Math.round(wq / tot)) };
+}
 export function offerFor(st) {
   const price = st.price, cuts = st.cuts;
   if (!cuts.length) return Math.floor(price * (st.win && st.win.code >= 1 && st.win.code <= 8 ? 0.65 : 0.55));
-  const hit = cuts.filter((c) => c.jade > 0);
-  if (!hit.length) return Math.floor(price * Math.max(0.03, 0.4 * Math.pow(0.5, cuts.length)));
-  const bestCut = hit.reduce((m, c) => (c.frac > m.frac ? c : m), hit[0]), q = Math.max(1, Math.round(bestCut.avgQ));
-  const est = st.w * Math.min(0.6, 0.05 + 1.4 * bestCut.frac) * YIELD * mixOf(q);      // 切面占比 → 翡翠體積（用模擬資料迴歸）
+  if (!cuts.some((c) => c.jade > 0)) return Math.floor(price * Math.max(0.03, 0.4 * Math.pow(0.5, cuts.length)));
+  const { vol, q } = seenVolume(st), est = st.w * vol * YIELD * mixOf(q);
   return Math.max(Math.floor(price * 0.12), Math.floor(est * OFFER_K));
 }
 // 全開：沿翡翠核心的三個方向，挑切到最多翡翠的那一面來展示
