@@ -87,6 +87,8 @@ DEFAULT_SYSTEM_PROMPT = (
     "回覆要簡短口語，像朋友在聊天，不要用條列或標題。"
 )
 TOOL_GUIDE = (
+    "【系統自動訊息】對話紀錄裡標著「系統自動訊息」的內容（畫好的圖、「好了（…秒）」、排隊狀態）是程式貼的，不是你寫的。"
+    "你不可以自己寫「[圖片：…]」或「好了（快速・…秒）」這類字；圖只有你呼叫 draw_image／edit_image、而且程式真的畫完才會貼出來，沒呼叫就不要說畫好了。"
     "【重要】你可以上網。你有三個工具：weather（查天氣預報）、web_search（搜尋網路）和 fetch_url（讀取網頁內容）。"
     "問天氣一律用 weather。"
     "你的知識停在訓練時，可能已經過時：凡是問「最新」「現在」「今年」「最近」的東西"
@@ -176,6 +178,27 @@ def record_actions(message_id: int, calls: list[dict]) -> None:
 
 
 ACTION_LINE_RE = re.compile(r"^-# ⚙️.*$\n?", re.M)
+
+# 程式（不是模型）自動貼的訊息：畫好的圖、「好了（…秒）」、畫圖失敗／暫停、智慧畫圖的原句與擴寫。
+# 讀歷史時要標成「系統自動訊息」，不然模型會以為是自己寫的、照著模仿（沒畫圖也假裝「好了」）。
+PROGRAM_PREFIXES = ("🖼️ ", "🎨 ", "📝 ")
+# 模型自己亂寫的假圖片標記和假「好了」：送出前拿掉
+FAKE_MEDIA_RE = re.compile(r"\[圖片：[^\]\n]*\]|🖼️\s*好了（[^）\n]*）|好了（(?:快速|構圖與文字較乾淨)[^）\n]*）")
+
+
+def is_program_post(msg: discord.Message) -> bool:
+    if msg.author.id != client.user.id:
+        return False
+    if msg.content.lstrip().startswith(PROGRAM_PREFIXES):
+        return True
+    return any(a.filename.startswith(("draw_", "edit_")) for a in msg.attachments) and not msg.content.strip()
+
+
+def strip_fake_media(text: str) -> str:
+    out = FAKE_MEDIA_RE.sub("", text)
+    out = re.sub(r"[ \t]+\n", "\n", out)
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out or "我沒有真的畫圖。要畫的話再跟我說一次。"
 
 
 def is_auto_channel(channel_id: int) -> bool:
@@ -371,7 +394,9 @@ async def build_conversation(channel) -> list[dict]:
         text = describe_message(msg)
         if not text:
             continue
-        if msg.author.id == client.user.id:
+        if is_program_post(msg):
+            role, parts = "user", [{"type": "text", "text": f"【系統自動訊息（程式貼的，不是你寫的，不要模仿）】{text}"}]
+        elif msg.author.id == client.user.id:
             had_line = bool(ACTION_LINE_RE.search(text))
             text = ACTION_LINE_RE.sub("", text).strip()  # 「⚙️ 結果」行改用正式的工具紀錄表示
             logged = action_log.get(str(msg.id))
@@ -739,7 +764,7 @@ META_RE = re.compile(r"[^。！？!?～~\n]*(系統檢查|沒做任何動作|沒
 
 def strip_meta(text: str) -> str:
     """模型偶爾會把內部檢查的事講出來，這裡把那幾句拿掉（全拿光就留原文，不回空字串）。"""
-    out = META_RE.sub("", text).strip()
+    out = META_RE.sub("", strip_fake_media(text) if FAKE_MEDIA_RE.search(text) else text).strip()
     return out or text
 
 
