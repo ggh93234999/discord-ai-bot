@@ -23,7 +23,8 @@
     "@pixi/sprite": "^6.5.10",
     "@pixi/sprite-animated": "^6.5.10",
     "@pixi/spritesheet": "^6.5.10",
-    "@pixi/ticker": "^6.5.10"
+    "@pixi/ticker": "^6.5.10",
+    "three": "^0.160.1"
   },
   "devDependencies": {
     "vite": "^6.0.0"

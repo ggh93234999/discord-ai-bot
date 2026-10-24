@@ -7,7 +7,7 @@ import { listMjTables } from "./mahjong.js";
 import { listBridgeTables } from "./bridge.js";
 import { listBigTwoTables } from "./bigtwo.js";
 import { listAvalonTables } from "./avalon.js";
-import { TIERS, MAX_CUTS, drawTier, hintFor, offerFor, cutFee, openFee, CUT_WEIGHTS, SKIN_WEIGHTS } from "./stone.js";
+import { TIERS, MAX_CUTS, drawTier, hintFor, newMarket, offerFor, cutFee, openFee, CUT_WEIGHTS, SKIN_WEIGHTS } from "./stone.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -179,7 +179,8 @@ async function finishBj(ws, bj, why) {
 }
 
 // ---- 賭石：買石 → 逐刀切開（每刀付費）→ 賣給收購商或全開
-const stoneView = (st) => ({ real: st.real, bet: st.bet, fees: st.fees, skin: TIERS[st.skin].skin, cuts: st.cuts.map((j) => TIERS[j].cut), cutsLeft: MAX_CUTS - st.cuts.length, cutFee: cutFee(st.bet), openFee: openFee(st.bet), offer: offerFor(st.bet, st.skin, st.cuts) });
+const stoneView = (st) => ({ real: st.real, bet: st.bet, fees: st.fees, size: st.size, seed: st.seed, skinJ: st.skin, windowJ: st.win, cutJs: st.cuts.slice(st.win == null ? 0 : 1), skin: TIERS[st.skin].skin, win: st.win == null ? null : TIERS[st.win].cut, cuts: st.cuts.slice(st.win == null ? 0 : 1).map((j) => TIERS[j].cut), cutsLeft: MAX_CUTS - (st.cuts.length - (st.win == null ? 0 : 1)), cutFee: cutFee(st.bet), openFee: openFee(st.bet), offer: offerFor(st.bet, st.skin, st.cuts) });
+const marketView = (mk) => mk.stones.map((x) => ({ id: x.id, size: x.size, price: x.price, seed: x.seed, skinJ: x.skin, skin: TIERS[x.skin].skin, windowJ: x.win, win: x.win == null ? null : TIERS[x.win].cut }));
 async function finishStone(ws, st, how, why) {
   ws.stone = null;
   const tier = TIERS[st.tier];
@@ -187,7 +188,7 @@ async function finishStone(ws, st, how, why) {
   const r = await payTo(st.ref, back, why);
   edel(st.ekey);
   const spent = st.bet + st.fees;
-  const res = { real: st.real, bet: spent, price: st.bet, fees: st.fees, back, how, tier: st.tier, tname: tier.name, mult: tier.mult, cuts: st.cuts.map((j) => TIERS[j].cut), skin: TIERS[st.skin].skin };
+  const res = { real: st.real, bet: spent, price: st.bet, fees: st.fees, back, how, tier: st.tier, tname: tier.name, mult: tier.mult, cuts: st.cuts.slice(st.win == null ? 0 : 1).map((j) => TIERS[j].cut), cutJs: st.cuts.slice(st.win == null ? 0 : 1), skin: TIERS[st.skin].skin, skinJ: st.skin, windowJ: st.win, win: st.win == null ? null : TIERS[st.win].cut, size: st.size, seed: st.seed };
   out(ws, { t: "cres", g: "stone", done: true, ...res, balance: r.balance, payfail: !r.ok });
   casinoFeed(ws, { g: "stone", ...res, text: `${how === "opened" ? "全開" : "賣出"}　${tier.name}（${tier.mult}×）` });
 }
@@ -403,20 +404,23 @@ export async function handleCasino(ws, m) {
         }
       } else if (ws.bj && m.a === "stand") await finishBj(ws, ws.bj, "21點");
     } else if (m.t === "cstone") {
-      if (m.a === "buy") {
+      if (m.a === "market") {
         if (ws.stone || !betOk) return true;
-        const r = await stake(ws, real, bet, "賭石買石");
+        ws.smarket = { bet, real, stones: newMarket(bet, real ? betLimit() : MAX_PRACTICE) };
+        out(ws, { t: "cres", g: "stone", market: marketView(ws.smarket), base: bet });
+      } else if (m.a === "buy") {
+        const mk = ws.smarket, pick = mk && mk.stones.find((x) => x.id === Number(m.id));
+        if (ws.stone || !pick) return true;
+        const r = await stake(ws, mk.real, pick.price, "賭石買石");
         if (!r.ok) { fail(ws, r); return true; }
-        const ekey = "s:" + randomBytes(5).toString("hex");
-        if (real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: bet });
-        const tier = drawTier();
-        const st = { real, bet, fees: 0, ekey, ref: betRef(ws, real, bet), tier, skin: hintFor(tier, SKIN_WEIGHTS), cuts: [] };
-        ws.stone = st; ws.creal = real;
-        const view = stoneView(st);
-        out(ws, { t: "cres", g: "stone", done: false, ...view, balance: r.balance }); setHand(ws, { g: "stone", real, bet, text: "挑石頭中" });
+        const ekey = "s:" + randomBytes(5).toString("hex"), pbet = pick.price;
+        if (mk.real) eadd(ekey, { uid: ws.user.uid, name: ws.user.name, amount: pbet });
+        const st = { real: mk.real, bet: pbet, fees: 0, ekey, ref: betRef(ws, mk.real, pbet), tier: pick.tier, skin: pick.skin, win: pick.win, cuts: pick.win == null ? [] : [pick.win], size: pick.size, seed: pick.seed };
+        ws.stone = st; ws.smarket = null; ws.creal = mk.real;
+        out(ws, { t: "cres", g: "stone", done: false, ...stoneView(st), balance: r.balance }); setHand(ws, { g: "stone", real: mk.real, bet: pbet, text: "挑石頭中" });
       } else if (ws.stone && m.a === "cut") {
         const st = ws.stone, fee = cutFee(st.bet);
-        if (st.cuts.length >= MAX_CUTS) return true;
+        if (st.cuts.length - (st.win == null ? 0 : 1) >= MAX_CUTS) return true;
         const r = await stake(ws, st.real, fee, "賭石切石");
         if (!r.ok) { fail(ws, r); return true; }
         st.fees += fee; st.cuts.push(hintFor(st.tier, CUT_WEIGHTS));

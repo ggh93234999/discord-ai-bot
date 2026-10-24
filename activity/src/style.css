@@ -877,3 +877,11 @@ body.tv-fs{overflow:hidden}
 
 .casino .stone{font-size:64px;text-align:center}
 .casino .strow{text-align:center;font-size:14px;color:#ddd;margin:3px 0}.casino .strow.big{font-size:18px;color:#fff;margin:8px 0}
+.casino .s3d{width:100%;max-width:420px;margin:0 auto;touch-action:none}
+.casino .s3d canvas{width:100%!important;height:auto!important;border-radius:12px;background:radial-gradient(circle at 50% 40%,#2c3a34,#121816);cursor:grab;display:block}
+.casino .stslot{width:100%;display:flex;justify-content:center}
+.casino .stinfo{text-align:center;font-size:14px;line-height:1.7;color:#ddd}
+.casino .stlist{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-width:420px}
+.casino .stth{background:#1d2622;border:2px solid transparent;border-radius:10px;padding:4px;display:flex;flex-direction:column;align-items:center;color:#ddd;cursor:pointer}
+.casino .stth.sel{border-color:#ffd54f}.casino .stth img{width:100%;max-width:90px;aspect-ratio:1;object-fit:contain}
+.casino .sthint{font-size:12px;color:#999;text-align:center}

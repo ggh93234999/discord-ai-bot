@@ -50,3 +50,12 @@ export const offerFor = (bet, skinJ, cutJs) => Math.max(0, Math.floor(bet * expe
 export const cutFee = (bet) => Math.max(1, Math.round(bet * CUT_FEE));
 export const openFee = (bet) => Math.max(1, Math.round(bet * OPEN_FEE));
 export const CUT_WEIGHTS = CUT_W, SKIN_WEIGHTS = SKIN_W;
+
+// ---- 市場：一次擺 6 顆石頭，大小（價格）不同。價格 = 基準價 × 大小；價值倍率照等級，所以大石頭只是賭得比較大，不會比較划算。
+export const MARKET_N = 6;
+export function newMarket(bet, maxPrice) {
+  return Array.from({ length: MARKET_N }, (_, id) => {
+    const tier = drawTier(), size = Math.round((0.6 + Math.random() * 1.0) * 100) / 100;
+    return { id, tier, size, price: Math.max(1, Math.min(maxPrice, Math.round(bet * size))), seed: randomInt(1, 2 ** 30), skin: hintFor(tier, SKIN_WEIGHTS), win: Math.random() < 0.35 ? hintFor(tier, CUT_WEIGHTS) : null };
+  });
+}

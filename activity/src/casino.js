@@ -20,7 +20,7 @@ const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
   dice: "你和莊家各擲兩顆骰子比點數，大的贏（拿回 2 倍），一樣退錢",
   bj: "點數最接近 21 不爆牌就贏；贏拿 2 倍，Blackjack 拿 2.5 倍，平手退錢",
-  stone: "買一顆原石，可以切開看線索，再賣給收購商或付解石費全開；開出的價值從 0 到 60 倍都有可能",
+  stone: "逛市場挑一顆原石（可 3D 旋轉觀察），切開看線索，再賣給收購商或付解石費全開；價值從 0 到 60 倍都有可能",
   forge: "每升一階要付鍛造費，有機率成功，也可能劍碎（全部歸零）；階數越高賣價越高，隨時可以賣掉。共 100 階，劍會幫你存起來",
   horse: "全房一起押：下注時間內選馬下注，時間到大家一起看比賽，押中拿 賭注×賠率",
 };
@@ -193,10 +193,13 @@ export function mountCasino(game, opts = {}) {
         if (!inHand) ctl.append(btn("🃏 發牌", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); draw(); send({ t: "cbj", a: "deal", bet, real: real() }); }));
         else ctl.append(btn("➕ 要牌", "", () => send({ t: "cbj", a: "hit" })), btn("✋ 停牌", "alt", () => send({ t: "cbj", a: "stand" })));
       } else if (game === "stone") {
-        if (!inHand || !stoneV) ctl.append(btn("💎 買石", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); draw(); send({ t: "cstone", a: "buy", bet, real: real() }); }));
+        if (market && !inHand) {
+          const pk = market[stSel], mb = btn(pk ? `💎 買這顆（${money(pk.price)}）` : "先點一顆石頭", "", () => { if (pk) { busy = true; draw(); send({ t: "cstone", a: "buy", id: pk.id }); } });
+          mb.disabled = !pk || busy; ctl.append(mb, btn("🔄 換一批", "alt", () => { busy = true; draw(); send({ t: "cstone", a: "market", bet, real: real() }); }));
+        } else if (!inHand || !stoneV) ctl.append(btn("🪨 逛石頭市場", "", () => { busy = true; stage.querySelector(".cresult")?.remove(); draw(); send({ t: "cstone", a: "market", bet, real: real() }); }));
         else {
           const v = stoneV, act = (a) => () => { busy = true; draw(); send({ t: "cstone", a }); };
-          const cb = btn(v.cutsLeft ? `🔪 切一刀（-${money(v.cutFee)}，剩 ${v.cutsLeft} 刀）` : "🔪 已切 3 刀", "alt", act("cut")); cb.disabled = !v.cutsLeft;
+          const cb = btn(v.cutsLeft ? `🔪 切一刀（-${money(v.cutFee)}，剩 ${v.cutsLeft} 刀）` : "🔪 已切 3 刀", "alt", act("cut")); cb.disabled = !v.cutsLeft || busy;
           ctl.append(cb, btn(`💰 賣給收購商（${money(v.offer)}）`, "alt", act("sell")), btn(`🔨 解石全開（-${money(v.openFee)}）`, "", act("open")));
         }
       } else if (game === "horse") {
@@ -238,16 +241,44 @@ export function mountCasino(game, opts = {}) {
     function cardsHtml(list, hideSecond) {
       return list.map((c) => `<span class="pcard ${/♥|♦/.test(c) ? "red" : ""}">${c}</span>`).join("") + (hideSecond ? `<span class="pcard back">?</span>` : "");
     }
-    function stoneShow(m) {
-      inHand = !m.done; busy = false; stoneV = m.done ? null : m;
-      const rows = [`<div class="strow">🪨 買下價 ${money(m.done ? m.price : m.bet)}</div>`, `<div class="strow">外皮：${esc(m.skin)}</div>`, ...m.cuts.map((c, i) => `<div class="strow">第 ${i + 1} 刀：${esc(c)}</div>`)];
-      let html = `<div class="stone">🪨</div>${rows.join("")}`;
+    // ---- 賭石：3D 原石市場。viewer 是同一個 canvas，重畫畫面時只是搬位置
+    let viewer = null, market = null, stSel = 0, thumbs = [], viewerP = null;
+    const slotEl = document.createElement("div"); slotEl.className = "s3d";
+    async function ensureViewer() {
+      if (viewer) return viewer;
+      viewerP ||= import("./stone3d.js").then((mod) => { viewer = mod.createViewer(slotEl); return viewer; });
+      return viewerP;
+    }
+    const stoneP = (x) => ({ seed: x.seed, size: x.size, skinJ: x.skinJ, windowJ: x.windowJ, cuts: x.cutJs || [] , opened: x.opened ?? null });
+    async function marketShow(list) {
+      market = list; stSel = Math.min(stSel, list.length - 1); inHand = false; busy = false; stoneV = null;
+      const v = await ensureViewer(); if (closed) return;
+      thumbs = list.map((x) => v.thumb(stoneP(x)));
+      renderMarket();
+    }
+    function renderMarket() {
+      const pk = market[stSel];
+      stage.innerHTML = `<div class="stslot"></div><div class="stinfo"><b>#${pk.id + 1}　${pk.size.toFixed(2)}×　價格 ${money(pk.price)}</b><div>外皮：${esc(pk.skin)}</div><div>${pk.win ? `窗口（開了一小塊）：${esc(pk.win)}` : "沒有開窗口，只能看外皮"}</div></div>
+        <div class="stlist">${market.map((x, i) => `<button class="stth${i === stSel ? " sel" : ""}" data-i="${i}"><img src="${thumbs[i]}" alt=""><small>#${x.id + 1}　${money(x.price)}</small></button>`).join("")}</div>
+        <div class="sthint">拖曳旋轉、滾輪或雙指縮放；挑一顆再按「買這顆」。越大顆價格越高，賭得也越大。</div>`;
+      stage.querySelector(".stslot").append(slotEl); viewer.resize(); viewer.show(stoneP(pk));
+      stage.querySelectorAll(".stth").forEach((b) => b.addEventListener("click", () => { if (busy) return; stSel = Number(b.dataset.i); renderMarket(); draw(); }));
+      statusEl.textContent = "挑一顆石頭：轉轉看外皮和窗口"; draw();
+    }
+    async function stoneShow(m) {
+      if (m.market) { return marketShow(m.market); }
+      inHand = !m.done; busy = false; stoneV = m.done ? null : m; market = null;
+      const v = await ensureViewer(); if (closed) return;
+      const lines = [`<div class="strow">🪨 買下價 ${money(m.done ? m.price : m.bet)}（${(m.size || 1).toFixed(2)}×）</div>`, `<div class="strow">外皮：${esc(m.skin)}</div>`, ...(m.win ? [`<div class="strow">窗口：${esc(m.win)}</div>`] : []), ...m.cuts.map((c, i) => `<div class="strow">第 ${i + 1} 刀：${esc(c)}</div>`)];
+      let html = `<div class="stslot"></div>${lines.join("")}`;
       if (m.done) {
-        html = `<div class="stone">${m.mult >= 4 ? "💎" : m.mult > 0 ? "🟢" : "🪨"}</div>${rows.join("")}<div class="strow big">${m.how === "opened" ? "全開" : "其實是"}：<b>${esc(m.tname)}</b>（${m.mult}×）</div>
+        html += `<div class="strow big">${m.how === "opened" ? "全開" : "其實是"}：<b>${esc(m.tname)}</b>（${m.mult}×）</div>
           <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">${m.how === "opened" ? "解石成功" : "賣給收購商"}　${resultLine(m)}${m.fees ? `（含切／解石費 ${money(m.fees)}）` : ""}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
-        statusEl.textContent = "再買一顆？";
-      } else statusEl.textContent = "切開看看，或直接決定";
-      stage.innerHTML = html; showBalance(); draw();
+        statusEl.textContent = "再逛一輪？";
+      } else statusEl.textContent = "可以切開看線索，或直接決定";
+      stage.innerHTML = html; stage.querySelector(".stslot").append(slotEl); v.resize();
+      v.show(stoneP({ ...m, opened: m.done ? m.tier : null }));
+      showBalance(); draw();
     }
     function bjShow(m) {
       inHand = !m.done; busy = false;
@@ -512,6 +543,6 @@ export function mountCasino(game, opts = {}) {
 
     connect();
     draw();
-    return () => { closed = true; window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); blog.destroy(); try { ws.close(); } catch {} };
+    return () => { closed = true; try { viewer && viewer.destroy(); } catch {} window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); blog.destroy(); try { ws.close(); } catch {} };
   };
 }
