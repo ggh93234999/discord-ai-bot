@@ -253,7 +253,7 @@ export function mountCasino(game, opts = {}) {
       viewerP ||= import("./stone3d.js").then((mod) => { viewer = mod.createViewer(slotEl); return viewer; });
       return viewerP;
     }
-    const stoneP = (x) => ({ ...x, cuts: (x.cuts || []).map((c) => ({ axis: c.axis, pos: c.pos })) });
+    const stoneP = (x) => ({ ...x, cuts: x.cuts || [] });
     function onMarket(m) {
       if (m.full) { stoneMk.clear(); for (const x of m.stones) stoneMk.set(x.id, x); marketOn = true; if (!inHand) marketShow(); }
       if (m.add) for (const x of m.add) stoneMk.set(x.id, x);

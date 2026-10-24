@@ -10,7 +10,7 @@ export const TIERS = [
   { name: "高冰種" }, { name: "糯冰陽綠" }, { name: "玻璃種滿綠" }, { name: "帝王綠" },
 ];
 export const U = [0, 60, 140, 350, 900, 2400, 7000, 22000, 80000];          // 每公斤翡翠肉的價值（代幣）
-export const MAX_CUTS = 3, CUT_FEE = 0.03, OPEN_FEE = 0.08, YIELD = 0.55;
+export const OFFER_K = 0.85, MAX_CUTS = 3, CUT_FEE = 0.03, OPEN_FEE = 0.08, YIELD = 0.55;
 export const MARKET_MAX = 100, RESTOCK_MS = 15000, PRICE_MIN = 30, PRICE_MAX = 4000;
 export const CUT_POS = [-0.6, 0.6];
 
@@ -127,8 +127,8 @@ export function offerFor(st) {
   const hit = cuts.filter((c) => c.jade > 0);
   if (!hit.length) return Math.floor(price * Math.max(0.03, 0.4 * Math.pow(0.5, cuts.length)));
   const bestCut = hit.reduce((m, c) => (c.frac > m.frac ? c : m), hit[0]), q = Math.max(1, Math.round(bestCut.avgQ));
-  const est = st.w * Math.min(0.6, Math.pow(bestCut.frac, 1.5)) * YIELD * mixOf(q) * 0.9;
-  return Math.max(Math.floor(price * 0.12), Math.floor(est * 0.85));
+  const est = st.w * Math.min(0.6, 0.05 + 1.4 * bestCut.frac) * YIELD * mixOf(q);      // 切面占比 → 翡翠體積（用模擬資料迴歸）
+  return Math.max(Math.floor(price * 0.12), Math.floor(est * OFFER_K));
 }
 // 全開：沿翡翠核心的三個方向，挑切到最多翡翠的那一面來展示
 export function openSection(hid) {
