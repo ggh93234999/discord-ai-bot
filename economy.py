@@ -59,6 +59,7 @@ def on_message(msg: discord.Message) -> None:
 
 start_voice_loop = lambda: None   # setup() 之後換成真的
 start_internal_api = lambda: None   # setup() 之後換成真的
+gallery_chat = None                 # bot.py 設定：Activity 圖創區的「跟大笨bot說話」處理函式 async (gid, uid, name, cat, text, history) -> dict
 
 
 def _acct(gid: int, uid: int, name: str | None = None) -> dict:
@@ -654,7 +655,26 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 log.exception("鍛造身分組出錯")
                 return web.json_response({"ok": False, "error": "role_failed"})
 
+        async def gallery_route(request):
+            # Activity 圖創區：使用者在頁面裡跟大笨bot說話，回覆文字與要畫的圖（圖由 Activity 後端畫，不會傳到 Discord）
+            p = await parse(request)
+            if not p:
+                return web.json_response({"ok": False, "error": "bad_request"}, status=400)
+            gid, uid, d = p
+            if not guild_ok(gid):
+                return web.json_response({"ok": False, "error": "no_guild"})
+            if gallery_chat is None:
+                return web.json_response({"ok": False, "error": "not_ready"})
+            try:
+                hist = [h for h in (d.get("history") or []) if isinstance(h, dict)][-14:]
+                res = await asyncio.wait_for(gallery_chat(gid, uid, str(d.get("name") or uid)[:40], str(d.get("cat") or "")[:30], str(d.get("text") or "")[:600], hist), 150)
+                return web.json_response({"ok": True, **res})
+            except Exception as e:
+                log.warning("圖創區對話失敗：%r", e)
+                return web.json_response({"ok": False, "error": "chat_failed"})
+
         app = web.Application(middlewares=[auth])
+        app.router.add_post("/gallery/chat", gallery_route)
         app.router.add_post("/wallet/info", info)
         app.router.add_post("/wallet/settle", settle)
         app.router.add_post("/wallet/pay", pay)

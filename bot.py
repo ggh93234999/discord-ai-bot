@@ -242,6 +242,7 @@ class Bot(discord.Client):
     async def setup_hook(self):
         self.http_session = aiohttp.ClientSession()
         economy.start_voice_loop()  # 掛語音也賺代幣
+        economy.gallery_chat = gallery_chat   # Activity 圖創區跟大笨bot說話
         economy.start_internal_api()  # 給 Discord Activity 賭注模式用的內部 API
         aliases.add_english_aliases(self.tree)  # 每個中文指令再加一個英文名字的版本
         await self.sync_commands()
@@ -733,6 +734,89 @@ async def call_model(messages: list[dict], use_tools: bool | list = False, max_t
 
 def clean_text(text: str | None) -> str:
     return THINK_RE.sub("", text or "").strip()
+
+
+GALLERY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "gallery_draw",
+        "description": (
+            "在 Activity 的圖創區畫一張圖（圖會顯示在圖創區網頁，不會傳到 Discord）。使用者要你畫圖、生圖時呼叫。"
+            "prompt 用英文寫具體的畫面描述（主體、動作、場景、風格、光線、構圖）；使用者有指定文字內容時照原文放進去。"
+            "畫要等約 30 秒～1 分鐘，畫好後程式會自動放進圖創區；你呼叫後只要簡短回一句「在畫了」之類的話，不要說已經畫好、不要描述圖的內容。"
+            "【不能畫】涉及未成年人的性暗示或色情內容（一律拒絕、不呼叫）；其他題材不用限制。"
+            "scale 預設 normal，只有使用者特別提到要大張／高解析度時才用 large 或 huge。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "畫面描述（英文）"},
+                "shape": {"type": "string", "enum": ["square", "landscape", "portrait"], "description": "預設 square；風景桌布用 landscape，手機桌布／人物全身用 portrait"},
+                "scale": {"type": "string", "enum": ["normal", "large", "huge"]},
+                "quality": {"type": "string", "enum": ["fast", "clean"], "description": "預設 fast；要清楚的文字（招牌、海報字）才用 clean"},
+            },
+            "required": ["prompt"],
+        },
+    },
+}
+
+
+async def gallery_chat(gid: int, uid: int, name: str, cat: str, text: str, history: list) -> dict:
+    """Activity 圖創區裡跟大笨bot說話：回一段話，並可能附上要畫的圖（由 Activity 後端畫、顯示在網頁，不傳到 Discord）。"""
+    if not imagegen.enabled():
+        return {"reply": "畫圖功能目前沒開。", "draws": []}
+    system = (load_system_prompt(None) + "\n\n【現在的場合】你在 Discord Activity 的「圖創區」網頁裡，大家在這裡用 AI 畫圖、互相看圖。"
+              f"目前這一頁的分類是「{cat or '未分類'}」。使用者要你畫圖就呼叫 gallery_draw（圖會顯示在這個網頁，不會傳到 Discord）；"
+              "沒有要畫圖的話就正常聊天、給畫圖點子、幫忙把想法寫成畫面描述。回覆保持簡短。"
+              "你只有真的呼叫了 gallery_draw 才可以說在畫；不要自己寫「[圖片：…]」或「好了（…秒）」這類字。")
+    turns: list[dict] = []
+    for h in history:
+        who, body = str(h.get("name") or "")[:40], str(h.get("text") or "")[:500]
+        if not body:
+            continue
+        role = "assistant" if h.get("bot") else "user"
+        turns.append({"role": role, "content": body if role == "assistant" else f"{who}：{body}"})
+    turns.append({"role": "user", "content": f"{name}：{text}"})
+    messages = [{"role": "system", "content": system}, *turns]
+    reply = await call_model(messages, use_tools=[GALLERY_TOOL], max_tokens=600)
+    draws = _gallery_draws(reply, text)
+    content = clean_text(reply.get("content"))
+    if not draws and DRAW_ASK_RE.search(text) and (not content or DRAW_REFUSE_RE.search(content)):
+        # 使用者明明要畫圖，模型卻拒絕／沒呼叫工具 → 退回去要它照畫（只有涉及未成年人的性內容不畫，程式另外會擋）
+        retry = await call_model(messages + [{"role": "assistant", "content": content or "（沒有回覆）"}, {"role": "user", "content": DRAW_NUDGE}],
+                                 use_tools=[GALLERY_TOOL], max_tokens=600)
+        draws = _gallery_draws(retry, text)
+        if draws:
+            content = clean_text(retry.get("content"))
+    content = strip_fake_media(content) if FAKE_MEDIA_RE.search(content) else content
+    why = imagegen.check_prompt(text)
+    if why:
+        return {"reply": why, "draws": []}
+    if draws and not content:
+        content = "好，在畫了～"
+    if not draws and not content:
+        content = "嗯？再說一次～"
+    return {"reply": content[:900], "draws": draws}
+
+
+def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
+    out = []
+    for tc in (reply.get("tool_calls") or [])[:2]:
+        fn = tc.get("function") or {}
+        if fn.get("name") != "gallery_draw":
+            continue
+        try:
+            a = json.loads(fn.get("arguments") or "{}")
+        except json.JSONDecodeError:
+            continue
+        prompt = str(a.get("prompt") or "").strip()[:600]
+        if not prompt or imagegen.check_prompt(prompt, user_text):
+            continue
+        out.append({"prompt": prompt,
+                    "shape": a.get("shape") if a.get("shape") in imagegen.SIZES else "square",
+                    "scale": a.get("scale") if a.get("scale") in imagegen.BIG_SIZES else "normal",
+                    "quality": a.get("quality") if a.get("quality") in imagegen.QUALITY else "fast"})
+    return out
 
 
 ACTION_TOOLS = {"draw_image", "edit_image", "web_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}

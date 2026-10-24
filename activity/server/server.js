@@ -9,6 +9,7 @@ import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
 import { handleFarm, recoverFarmPending } from "./farm.js";
+import { handleGallery, serveGallery } from "./gallery.js";
 import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./casino.js";
 import * as chessEng from "./chess.js";
 import * as xqEng from "./xq.js";
@@ -233,6 +234,7 @@ function place(room, role, m) {
 
 
 const httpServer = http.createServer((req, res) => {
+  if (req.url.startsWith("/api/gallery/img/") && serveGallery(req, res)) return;
   if (req.url.startsWith("/api/tv/sub/")) return void serveSub(req, res).then((ok) => { if (!ok) { res.writeHead(404); res.end(); } });
   if (req.url.startsWith("/api/tv/") && serveVideo(req, res)) return;
   if (req.url.startsWith("/api/")) return handleApi(req, res).catch(() => { try { res.writeHead(500); res.end(); } catch {} });
@@ -300,6 +302,7 @@ wss.on("connection", (ws, req) => {
       casinoFeed(ws, { g: "slots", real: false, kind, bet, back, grid: r.grid, nwin: r.wins.length });
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
+    if (m.t === "gl") { handleGallery(ws, m).catch((e) => console.log("圖創區錯誤", e && e.message)); return; }
     if (m.t === "fm") { handleFarm(ws, m).catch((e) => console.log("農場錯誤", e && e.message)); return; }
     if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }

@@ -16,7 +16,7 @@ function loadEnv(file) {
 }
 
 const dir = fileURLToPath(new URL(".", import.meta.url));
-const ENV = { ...loadEnv(dir + ".env"), ...loadEnv(dir + "../../.env"), ...process.env };
+export const ENV = { ...loadEnv(dir + ".env"), ...loadEnv(dir + "../../.env"), ...process.env };
 const CLIENT_ID = ENV.DISCORD_CLIENT_ID || "1560169041493102594";
 const CLIENT_SECRET = ENV.DISCORD_CLIENT_SECRET || "";
 export const GUILD_ID = ENV.ACTIVITY_GUILD_ID || "1560169531777744938";
@@ -42,6 +42,14 @@ async function bot(path, body) {
   const r = await fetch(BOT_API + path, {
     method: "POST", headers: { "X-Key": INTERNAL_KEY, "Content-Type": "application/json" },
     body: JSON.stringify(body), signal: AbortSignal.timeout(4000),
+  });
+  return r.json();
+}
+// 圖創區：問機器人這句話要怎麼回、要不要畫圖（語言模型可能要想一陣子）
+export async function botGalleryChat(gid, uid, name, cat, text, history) {
+  const r = await fetch(BOT_API + "/gallery/chat", {
+    method: "POST", headers: { "X-Key": INTERNAL_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ gid, uid, name, cat, text, history }), signal: AbortSignal.timeout(160_000),
   });
   return r.json();
 }
@@ -103,8 +111,8 @@ export async function handleApi(req, res) {
       const tok = await tr.json();
       if (!tr.ok || !tok.access_token) { console.log("OAuth 換 token 失敗：", tr.status, tok.error || ""); return json(res, 401, { error: "oauth_failed" }); }
       const me = await discord("/users/@me", tok.access_token);
-      let member = false;
-      try { member = (await discord("/users/@me/guilds", tok.access_token)).some((g) => g.id === GUILD_ID); } catch {}
+      let member = false, guilds = [];
+      try { guilds = (await discord("/users/@me/guilds", tok.access_token)).map((g) => String(g.id)); member = guilds.includes(GUILD_ID); } catch {}
       // 用完就撤銷，不留著 access token
       fetch("https://discord.com/api/v10/oauth2/token/revoke", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -113,7 +121,7 @@ export async function handleApi(req, res) {
       if (!member) return json(res, 403, { error: "not_member" });
       const name = me.global_name || me.username || me.id;
       const token = randomBytes(24).toString("hex");
-      sessions.set(token, { uid: me.id, name, exp: Date.now() + SESSION_MS });
+      sessions.set(token, { uid: me.id, name, guilds, exp: Date.now() + SESSION_MS });
       return json(res, 200, { token, name });
     } catch (e) {
       console.log("OAuth 流程錯誤：", e.message);

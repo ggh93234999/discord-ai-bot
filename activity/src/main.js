@@ -15,6 +15,7 @@ import { mountSpectateLobby } from "./spectate.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
 import { mountFarm } from "./farm.js";
+import { mountGallery } from "./gallery.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
 const optional = import.meta.glob(["./pikachu_online.js", "./lf2.js"], { eager: true });
@@ -46,6 +47,7 @@ const CATS = [
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
   { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
   { id: "media", icon: "🎬", name: "影音", note: "大家一起看" },
+  { id: "art", icon: "🎨", name: "創作", note: "AI 畫圖，圖只放在這裡" },
 ];
 const GAMES = [
   { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
@@ -64,6 +66,7 @@ const GAMES = [
   { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
+  { id: "gallery", cat: "art", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
   { id: "farm", cat: "farm", wide: true, icon: "🌱", name: "種菜", players: "1 人（可拜訪）", desc: "作物照真實時間長大，收成賣代幣；成熟的菜 5 分鐘後朋友可以來偷", mount: mountFarm },
   { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
   { id: "forgeboard", cat: "forge", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
