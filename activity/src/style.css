@@ -984,3 +984,11 @@ body.tv-fs{overflow:hidden}
 .av .mb.yes{background:#2e7d32;color:#fff}.av .mb.no{background:#c62828;color:#fff}
 .av .mb.yes:hover:not(:disabled){background:#388e3c}.av .mb.no:hover:not(:disabled){background:#d32f2f}
 .av .mb.no:disabled,.av .mb.yes:disabled{opacity:.45}
+
+.menu{max-width:640px}
+.mtabs{display:flex;gap:6px;overflow-x:auto;padding:6px 2px 10px;margin:0 0 6px;position:sticky;top:0;z-index:5;background:var(--bg,#111);scrollbar-width:none}
+.mtabs::-webkit-scrollbar{display:none}
+.mtab{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:8px 13px;border:2px solid var(--line);border-radius:20px;background:#1d1d1f;color:#cfd3dc;font-size:15px;cursor:pointer;white-space:nowrap}
+.mtab i{font-style:normal;font-size:11px;background:rgba(255,255,255,.12);border-radius:9px;padding:0 6px;color:#9aa3b5}
+.mtab.on{background:#3a56b0;border-color:#6f8bff;color:#fff;font-weight:700}.mtab.on i{background:rgba(255,255,255,.25);color:#fff}
+.dcm .mtabs{top:48px}

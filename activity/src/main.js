@@ -43,14 +43,12 @@ const app = document.getElementById("app");
 
 // cat：選單分類；players：人數標籤
 const CATS = [
-  { id: "forge", icon: "⚒️", name: "鍛造", note: "獨立玩法：鍛劍、賣劍賺代幣，最多同時 10 把" },
-  { id: "farm", icon: "🌱", name: "農場", note: "獨立玩法：種菜、收成、賣菜賺代幣，也能偷朋友的菜" },
-  { id: "casino", icon: "🎰", name: "賭場", note: "練習幣或真代幣，每個遊戲裡都有 📖 規則" },
-  { id: "party", icon: "🧩", name: "桌遊・派對", note: "多人推理／聊天，沒有計時" },
+  { id: "life", icon: "🌱", name: "經營", note: "獨立玩法：種菜、鍛造，賺代幣" },
+  { id: "casino", icon: "🎰", name: "賭場", note: "1 人對莊，練習幣或真代幣，每個遊戲裡都有 📖 規則" },
+  { id: "table", icon: "🀄", name: "牌桌", note: "多人牌類與桌遊，可加電腦補位" },
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
-  { id: "action", icon: "🎮", name: "動作・競技", note: "即時對戰／闖關" },
-  { id: "media", icon: "🎬", name: "影音", note: "大家一起看" },
-  { id: "art", icon: "🎨", name: "創作", note: "AI 畫圖，圖只放在這裡" },
+  { id: "action", icon: "🎮", name: "動作", note: "即時對戰／闖關" },
+  { id: "media", icon: "🎬", name: "影音創作", note: "一起看影片、AI 畫圖" },
 ];
 const GAMES = [
   { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
@@ -63,19 +61,19 @@ const GAMES = [
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
-  { id: "poker", cat: "casino", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
-  { id: "mjtw", cat: "casino", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
-  { id: "mjjp", cat: "casino", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
-  { id: "bridge", cat: "casino", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
-  { id: "bigtwo", cat: "casino", icon: "🂮", name: "大老二", players: "4 人（可補電腦）", desc: "台灣玩法：單張、對子、順子、葫蘆、鐵支、同花順和一條龍，先出完的贏，練習點數", mount: mountBigtwo() },
-  { id: "avalon", cat: "party", icon: "🗡️", name: "阿瓦隆", players: "5–10 人（可補電腦）", desc: "好人與壞人的推理：組隊、投票、出任務，沒有計時，按「下一步」才繼續", mount: mountAvalon() },
+  { id: "poker", cat: "table", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
+  { id: "mjtw", cat: "table", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
+  { id: "mjjp", cat: "table", icon: "🀅", name: "日本麻將", players: "4 人（可補電腦）", desc: "立直、寶牌、役與符翻計分，練習點數", mount: mountMahjong("jp") },
+  { id: "bridge", cat: "table", icon: "🂡", name: "橋牌", players: "4 人（可補電腦）", desc: "台灣簡易橋牌：叫王、吃墩，兩人一隊，練習點數", mount: mountBridge() },
+  { id: "bigtwo", cat: "table", icon: "🂮", name: "大老二", players: "4 人（可補電腦）", desc: "台灣玩法：單張、對子、順子、葫蘆、鐵支、同花順和一條龍，先出完的贏，練習點數", mount: mountBigtwo() },
+  { id: "avalon", cat: "table", icon: "🗡️", name: "阿瓦隆", players: "5–10 人（可補電腦）", desc: "好人與壞人的推理：組隊、投票、出任務，沒有計時，按「下一步」才繼續", mount: mountAvalon() },
   { id: "stone", cat: "casino", icon: "💎", name: "賭石", players: "1 人", desc: "買整顆原石、一塊塊切開看裡面，每塊各自賣給收購商", mount: mountCasino("stone") },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
-  { id: "gallery", cat: "art", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
-  { id: "farm", cat: "farm", wide: true, icon: "🌱", name: "種菜", players: "1 人（可拜訪）", desc: "作物照真實時間長大，收成賣代幣；成熟的菜 5 分鐘後朋友可以來偷", mount: mountFarm },
-  { id: "forge", cat: "forge", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
-  { id: "forgeboard", cat: "forge", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
+  { id: "gallery", cat: "media", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
+  { id: "farm", cat: "life", wide: true, icon: "🌱", name: "種菜", players: "1 人（可拜訪）", desc: "作物照真實時間長大，收成賣代幣；成熟的菜 5 分鐘後朋友可以來偷", mount: mountFarm },
+  { id: "forge", cat: "life", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
+  { id: "forgeboard", cat: "life", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
@@ -84,18 +82,21 @@ const GAMES = [
 
 function showMenu() {
   const card = (g) => `<button class="card${g.wide ? " wide" : ""}" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
+  const tabs = CATS.filter((c) => GAMES.some((g) => g.cat === c.id));
+  let tab = ""; try { tab = localStorage.getItem("menutab") || ""; } catch {}
+  if (!tabs.some((c) => c.id === tab)) tab = tabs[0].id;
+  const cur = tabs.find((c) => c.id === tab);
   app.innerHTML = `
     <div class="menu">
       <h1>遊戲間</h1>
       <div class="namebar"><label>👤 你的名稱 <input class="gname" maxlength="12" placeholder="輸入名稱，所有遊戲通用"></label><small>沒填的話，有登入就用你的 Discord 名稱，否則自動編號</small></div>
-      ${CATS.map((c) => {
-        const list = GAMES.filter((g) => g.cat === c.id);
-        return list.length ? `<section class="cat"><h2>${c.icon} ${c.name}<small>${c.note}</small></h2><div class="cards">${list.map(card).join("")}</div></section>` : "";
-      }).join("")}
+      <nav class="mtabs">${tabs.map((c) => `<button class="mtab${c.id === tab ? " on" : ""}" data-t="${c.id}"><span>${c.icon}</span>${c.name}<i>${GAMES.filter((g) => g.cat === c.id).length}</i></button>`).join("")}</nav>
+      <section class="cat"><h2>${cur.icon} ${cur.name}<small>${cur.note}</small></h2><div class="cards">${GAMES.filter((g) => g.cat === tab).map(card).join("")}</div></section>
     </div>`;
   const gn = app.querySelector(".gname");
   try { gn.value = localStorage.getItem("pokername") || ""; } catch {}
   gn.addEventListener("change", () => { const v = gn.value.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12); gn.value = v; try { localStorage.setItem("pokername", v); } catch {} });
+  app.querySelectorAll(".mtab").forEach((b) => b.addEventListener("click", () => { try { localStorage.setItem("menutab", b.dataset.t); } catch {} showMenu(); }));
   app.querySelectorAll(".card").forEach((b) => {
     b.addEventListener("click", () => start(b.dataset.g));
   });
