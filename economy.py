@@ -681,8 +681,8 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         app.router.add_post("/forge/role", forge_role)
         runner = web.AppRunner(app)
         await runner.setup()
-        await web.TCPSite(runner, "127.0.0.1", 3107).start()
-        log.info("Activity 內部 API 已啟動（127.0.0.1:3107）")
+        await web.TCPSite(runner, "127.0.0.1", int(os.getenv("BOT_API_PORT", "3107"))).start()
+        log.info("Activity 內部 API 已啟動（127.0.0.1:%s）", os.getenv("BOT_API_PORT", "3107"))
 
     start_internal_api = lambda: asyncio.create_task(internal_api())
 
