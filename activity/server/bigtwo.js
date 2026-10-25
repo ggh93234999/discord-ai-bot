@@ -1,7 +1,7 @@
 // 大老二（台灣玩法，練習點數）：4 人各 13 張，先出完的人贏。
-// 牌型：單張、對子、五張（順子 < 同花 < 葫蘆 < 鐵支 < 同花順）。大小順序 3 < … < K < A < 2，同點比花色 ♣ < ♦ < ♥ < ♠。
+// 牌型：單張、對子、五張（順子、同花、葫蘆）；鐵支和同花順是炸彈，可以直接壓任何非炸彈的牌，同花順 > 鐵支。大小順序 3 < … < K < A < 2，同點比花色 ♣ < ♦ < ♥ < ♠。
 // 第一手由 ♣3 的人先出（第一次出牌一定要包含 ♣3）；之後每手由上一手的贏家先出。
-// 別人出牌後要出同張數、更大的牌，或「過」；連續三家都過，最後出牌的人可以自由出任何牌型。
+// 別人出牌後要出同張數且同牌型、更大的牌（炸彈例外），或「過」；連續三家都過，最後出牌的人可以自由出任何牌型。
 // 伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
 import { classify, beats, cardsText, sortHand, strength, rstr, suitOf, CLUB3, TYPE_NAMES } from "../shared/bigtwo_rules.js";
@@ -150,6 +150,7 @@ function botMove(t, i) {
   }
   cands.sort((a, b) => a.combo.k - b.combo.k);
   const pick = cands[0];
+  if (pick.combo.type >= 7 && h.last.combo.type < 7 && minOpp > 3 && hand.length > 6 && Math.random() < 0.7) return null;   // 不輕易拿炸彈壓小牌
   const spendy = pick.cards.some((c) => rstr(c) >= 14) && hand.length > 5;
   if (spendy && minOpp > 3 && Math.random() < 0.6) return null;         // 沒人快出完時，不拿 A、2 去壓小牌
   return pick.cards;

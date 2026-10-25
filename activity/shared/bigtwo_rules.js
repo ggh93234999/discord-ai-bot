@@ -32,8 +32,12 @@ export function classify(cards) {
   if (straight) return { n, type: 4, k: 4000 + strength(top), top };
   return null;
 }
-// a 能不能壓過 b（同張數、同類型規則）
-export const beats = (a, b) => !b || (a.n === b.n && a.k > b.k);
+// a 能不能壓過 b：
+//  - 鐵支、同花順是「炸彈」，可以直接壓任何非炸彈的牌（單張、對子、順子、同花、葫蘆都行）；
+//  - 炸彈之間：同花順 > 鐵支；同樣牌型再比大小（k 已經含牌型分數）；
+//  - 其他牌型：張數和牌型都要一樣（單張壓單張、對子壓對子、順子壓順子、同花壓同花、葫蘆壓葫蘆），而且更大。
+export const isBomb = (x) => x.type === 7 || x.type === 8;
+export const beats = (a, b) => !b || (isBomb(a) ? !isBomb(b) || a.k > b.k : a.n === b.n && a.type === b.type && a.k > b.k);
 export const cardsText = (cards) => cards.map((c) => SUITS[suitOf(c)] + ({ 11: "J", 12: "Q", 13: "K", 14: "A" }[rankOf(c)] || rankOf(c))).join(" ");
 // 手牌排序：由小到大（3 最小、2 最大）
 export const sortHand = (h) => h.sort((a, b) => strength(a) - strength(b));
