@@ -138,10 +138,11 @@ async function settleAll() {
     let got = 0;
     for (const f of fixtures.values()) {                         // 剛打完的比賽（12 小時內）先查比分，顯示在「最近結果」；每輪最多 6 場
       if (got >= 6) break;
-      if (!isFinished(f) || f.score || st.results[f.id] || now - f.start > 12 * 3600e3) continue;
+      if (!isFinished(f) || f.score || st.results[f.id] || (now - f.start > 12 * 3600e3 && !st.backfill)) continue;
       if (st.api && st.api.used >= BUDGET - 8) break;             // 快沒額度了：只留給有注單的場次
       got++; try { await getScore(f); } catch {} await new Promise((r) => setTimeout(r, 1100));
     }
+    if (st.backfill && !got) { st.backfill = false; save(); console.log("世界賽運彩 補比分完成"); }      // 一次性補抓舊場次比分（狀態檔設 backfill:true 觸發）
     for (const b of st.bets) {
       if (b.status !== "open" && b.status !== "unpaid") continue;
       let f = fixtures.get(b.fixtureId);
