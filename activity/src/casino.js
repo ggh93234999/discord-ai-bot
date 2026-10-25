@@ -321,10 +321,10 @@ export function mountCasino(game, opts = {}) {
       const v = await ensureViewer(); if (closed) return;
       const cuts = m.cuts || [], newCut = !m.done && m.newCut && cuts.length > 0, pcs = m.pieces || [];
       if (!pcs.find((p) => p.id === selPiece)) selPiece = pcs.length ? pcs.slice().sort((a, b) => b.w - a.w)[0].id : -1;
-      const cap = (c, i) => `第 ${i + 1} 刀（塊 #${c.piece}　${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠，占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}${c.broke ? "　⚠ 刀走在裂上，翡翠崩掉一角" : ""}`;
+      const cap = (c, i) => `第 ${i + 1} 刀（塊 #${c.piece}　${AXN[c.axis]} ${fp(c.pos)}）　${c.hit ? `切到翡翠（品質約 ${TN[c.q || 1]}${(c.q || 1) <= 2 ? "，屬低檔料" : ""}），占切面約 ${Math.round(c.frac * 100)}%` : "沒切到翡翠"}${c.crack ? "　切面有裂" : ""}${c.broke ? "　⚠ 刀走在裂上，翡翠崩掉一角" : ""}`;
       const panel = (c, i, hide) => `<div class="stcp"${hide ? ' style="visibility:hidden"' : ""}><div class="stcimg" data-i="${i}"></div><small>${cap(c, i)}</small></div>`;
       const dOff = newCut && prevV ? m.offer - prevV.offer : 0, big = prevV ? Math.abs(dOff) >= Math.max(2, prevV.offer * 0.08) : false;
-      const banner = newCut && prevV ? `<div class="stbanner ${!big ? "" : dOff > 0 ? "up" : "down"}" style="visibility:hidden">${!big ? "差不多" : dOff > 0 ? "切漲 ▲" : "切垮 ▼"}　總收購價 ${money(prevV.offer)} → ${money(m.offer)}</div>` : "";
+      const banner = newCut && prevV ? `<div class="stbanner ${!big ? "" : dOff > 0 ? "up" : "down"}" style="visibility:hidden">${!big ? "差不多" : dOff > 0 ? "切漲 ▲" : "切垮 ▼"}　總收購價 ${money(prevV.offer)} → ${money(m.offer)}${dOff < 0 && cuts.length ? (cuts[cuts.length - 1].hit ? ((cuts[cuts.length - 1].q || 1) <= 2 ? `<small>切到的是${TN[cuts[cuts.length - 1].q || 1]}（低檔料），比原本的期待低</small>` : "<small>翡翠範圍比原本期待的小</small>") : "<small>沒切到翡翠，原本的期待降低</small>") : ""}</div>` : "";
       let html = `${banner}<div class="stslot"></div><div class="strow">🪨 #${m.id}　${m.w} 公斤　買下價 ${money(m.price)}${m.fees ? `　切石費共 ${money(m.fees)}` : ""}${m.got ? `　已賣出收入 ${money(m.got)}` : ""}</div><div class="stinfo sm">${descHtml(m)}</div>${m.canProbe && !m.done ? probeUi(m.marks, ["light", "rub"], m) : marksHtml(m.marks)}`;
       if (!m.done) {
         html += `<div class="stpcs">${pcs.map((p) => `<button class="stpc${p.id === selPiece ? " sel" : ""}" data-id="${p.id}">塊 #${p.id}<small>${p.w} 公斤　收購價 ${money(p.offer)}${p.hope ? `（含預期 ${money(p.hope)}）` : ""}</small></button>`).join("")}</div>

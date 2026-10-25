@@ -995,3 +995,5 @@ body.tv-fs{overflow:hidden}
 /* 分頁列改成自動換行（不再橫向捲動，最右邊的分頁才不會被切掉） */
 .mtabs{flex-wrap:wrap;justify-content:center;overflow:visible;position:static;padding:6px 0 10px}
 .mtab{padding:7px 12px;font-size:14px}
+
+.casino .stbanner small{display:block;font-size:12px;opacity:.85;margin-top:2px}

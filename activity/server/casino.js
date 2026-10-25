@@ -179,7 +179,7 @@ async function finishBj(ws, bj, why) {
 }
 
 // ---- 賭石：買石 → 選一塊、切一刀（每刀付費，不限次數）→ 每一塊各自賣給收購商
-const cutPub = (c) => ({ piece: c.piece, lo: c.lo, hi: c.hi, axis: c.axis, pos: c.pos, grid: c.grid, frac: Math.round(c.frac * 1000) / 1000, hit: c.jade > 0, crack: c.crack, broke: !!c.broke });
+const cutPub = (c) => ({ piece: c.piece, lo: c.lo, hi: c.hi, axis: c.axis, pos: c.pos, grid: c.grid, frac: Math.round(c.frac * 1000) / 1000, hit: c.jade > 0, q: c.jade > 0 ? Math.max(1, Math.min(8, Math.round(c.avgQ || 1))) : 0, crack: c.crack, broke: !!c.broke });
 const soldIds = (st) => st.pieces.filter((p) => p.sold && !p.split).map((p) => p.id);
 const stoneView = (st) => { const pcs = pieceInfo(st); return { real: st.real, bet: st.price, price: st.price, fees: st.fees, got: st.got, ...st.pub, desc: descLines(st.pub), cuts: st.cuts.map(cutPub), pieces: pcs, sold: soldIds(st), cutFee: cutFee(st.price), offer: pcs.reduce((a, p) => a + p.offer, 0), maxPieces: MAX_PIECES, marks: st.marks, rubFee: rubFee(st.price), lightFee: lightFee(st.price), canProbe: st.cuts.length === 0 }; };
 const stoneEscrow = (st) => { const rest = st.price + st.fees - st.got; if (!st.real) return; if (rest > 0) eadd(st.ekey, { uid: st.ref.uid, name: st.ref.name, amount: rest }); else edel(st.ekey); };
