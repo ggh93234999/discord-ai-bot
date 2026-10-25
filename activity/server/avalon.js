@@ -199,6 +199,25 @@ function llmPrompt(t, i, mode) {
   const sys = `你在玩桌遊阿瓦隆，扮演玩家「${pname(t, i)}」（${i}號）。${RULES_TXT}\n你的身分：${ROLE_NAME[role]}（${evil ? "壞人" : "好人"}）。${kn.text}${kn.names.length ? kn.names.join("、") : ""}\n玩家：${t.players.map((p, k) => nm(k)).join("、")}（共 ${g.n} 人）。\n像真人一樣判斷：好人要從投票和任務結果找壞人；壞人要藏好身分、可以偶爾幫好人、爭取信任；梅林不能太明顯。說話規則：say 是公開發言，所有人都聽得到，像真人隨口說，口語、簡短、不要每次都說；壞人可以說謊或誤導，但不能直接說出自己的身分；好人也不要直接洩漏自己的特殊身分（梅林尤其要小心）；可以回應別人剛說的話。只輸出一個 JSON，不要多餘文字。`;
   const talk = g.chat.slice(-12).map((c) => `${c.i}號${c.name}：${c.text}`).join("\n") || "（還沒有人說話）";
   const state = `公開討論（最近的發言，大家都看得到）：\n${talk}\n\n目前第 ${g.round + 1} 次任務（需 ${questSize(g)} 人，${needFails(g) > 1 ? "要 2 張失敗票才失敗" : "1 張失敗票就失敗"}），已成功 ${g.results.filter((x) => x === "s").length} 次、失敗 ${g.results.filter((x) => x !== "s").length} 次，連續否決 ${g.rejects} 次，隊長是 ${nm(g.leader)}。\n歷史紀錄：\n${hist}`;
+  let hint = "";
+  if (evil) {
+    const okN = g.results.filter((x) => x === "s").length, flN = g.results.length - okN;
+    const mates = (t.phase === "vote" || t.phase === "quest") ? g.team.filter((k) => isEvil(g.roles[k])) : [];
+    const L = ["【壞人戰術，務必照做】"];
+    L.push(`・壞人要靠『任務失敗 3 次』或『連續 5 次否決』贏。現在好人成功 ${okN} 次、失敗 ${flN} 次、連續否決 ${g.rejects} 次。`);
+    if (t.phase === "vote") {
+      L.push(mates.length ? `・這隊有壞人（${mates.map(nm).join("、")}），可以贊成並讓他出失敗。` : "・這隊全是好人，好人只能出成功，這隊通過只會幫好人加分：通常應該反對（除非是第一輪、需要偽裝，或你反對太多次已被懷疑）。");
+      if (okN >= 2 && !mates.length) L.push("・好人只差 1 次成功就贏任務了，全是好人的隊必須反對！");
+      if (flN >= 2 && mates.length) L.push("・只差 1 次失敗就贏了，這隊有壞人，贊成並出失敗。");
+      if (g.rejects >= 2) L.push(`・已連續否決 ${g.rejects} 次，再否決到 5 次壞人直接獲勝，所以不管隊伍如何都傾向反對（但第 5 次提案若你想偽裝才贊成）。`);
+    }
+    if (t.phase === "quest") {
+      if (okN >= 2 || flN >= 2) L.push("・這是關鍵任務（好人再成功一次就贏任務，或壞人再失敗一次就贏），必須出失敗！");
+      else L.push("・第一、二次任務可以視情況先出成功偽裝，但別一直偽裝到被逼到牆角；若隊上只有你一個壞人，出失敗會暴露你，要評估。");
+    }
+    if (t.phase === "team") L.push("・選隊時盡量把自己或壞人同伴放進去；好人只差 1 次成功時，隊伍裡一定要有壞人。");
+    hint = L.join("\n") + "\n";
+  }
   let ask;
   if (mode === "talk") ask = t.phase === "team"
     ? `現在隊長 ${nm(g.leader)} 準備選隊伍，還沒決定。請先在公開討論發言：根據前面任務與投票的結果，說說你覺得該帶誰、不該帶誰、或你懷疑誰，要點名並給理由（40 字內）；也可以回應別人剛說的話，不要重複別人說過的。${evil ? "你是壞人，要裝成好人、可以引導大家選到對你有利的隊伍。" : ""}只輸出 {"say":"你的發言"}`
@@ -207,7 +226,7 @@ function llmPrompt(t, i, mode) {
   else if (t.phase === "vote") ask = `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]。${g.rejects >= 4 ? "（這是第 5 次提案，再否決壞人就贏了）" : ""}輸出 {"approve":true或false,"reason":"一句話（只有你自己知道）","say":"已討論過了，除非立場改變，請留空字串"}`;
   else if (t.phase === "quest") ask = `你在任務隊伍裡 [${g.team.map(nm).join("、")}]。${evil ? "你可以出成功或失敗。" : "你是好人，只能出成功。"}輸出 {"success":true或false,"reason":"一句話（只有你自己知道）","say":"可以空字串"}`;
   else ask = `好人完成了 3 次任務，你是刺客，要刺殺你認為是梅林的好人（不能選壞人）。可選：${g.roles.map((r, k) => (isEvil(r) ? null : nm(k))).filter(Boolean).join("、")}。輸出 {"target":號碼,"reason":"一句話","say":"可以空字串"}`;
-  return [{ role: "system", content: sys }, { role: "user", content: `${state}\n\n${ask}` }];
+  return [{ role: "system", content: sys }, { role: "user", content: `${state}\n\n${hint}${ask}` }];
 }
 async function llmDecide(t, i, mode) {
   const ac = new AbortController(), to = setTimeout(() => ac.abort(), LLM_TIMEOUT);
