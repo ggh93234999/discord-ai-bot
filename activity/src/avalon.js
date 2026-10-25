@@ -15,6 +15,16 @@ function composition(n, c) {
   const fmt = (m) => Object.entries(m).map(([r, k]) => `${r}${k > 1 ? ` ×${k}` : ""}`).join("、");
   return { goodN, evilN, good: fmt(cnt(good, "亞瑟的忠臣", goodN)), evil: fmt(cnt(evil, "爪牙", evilN)) };
 }
+const ABIL = {
+  "梅林": "好人。知道所有壞人是誰（莫德雷德除外）。要藏好，別被刺客認出來。",
+  "派西維爾": "好人。看得到梅林和莫甘娜兩個人，但分不出誰是誰。",
+  "亞瑟的忠臣": "好人。沒有特殊能力，靠討論和投票判斷。",
+  "刺客": "壞人。好人完成 3 次任務後，可以刺殺一人，刺中梅林就反敗為勝。",
+  "莫甘娜": "壞人。在派西維爾眼中和梅林一樣，會冒充梅林。",
+  "莫德雷德": "壞人。梅林看不到他。",
+  "奧伯倫": "壞人。不認識其他壞人，其他壞人也不認識他。",
+  "爪牙": "壞人。知道同伴是誰（奧伯倫除外）。",
+};
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function getPid() { try { let p = localStorage.getItem("avpid"); if (!p) { p = Math.random().toString(36).slice(2, 10); localStorage.setItem("avpid", p); } return p; } catch { return Math.random().toString(36).slice(2, 10); } }
 const lsName = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
@@ -72,9 +82,11 @@ export function mountAvalon(opts = {}) {
       } else if (!spectate) cfg = `<div class="mempty">點「入座」加入，5～10 人，不夠的人數由電腦補。</div>`;
       const total = Math.max(c.n, st.players.length), cp = composition(total, c);
       const comp = `<div class="avcomp"><b>${total} 人局</b>：<span class="g">好人 ${cp.goodN} 人（${cp.good}）</span><span class="e">壞人 ${cp.evilN} 人（${cp.evil}）</span></div>`;
-      body.innerHTML = `<div class="avlobby"><div class="avplist">${list}</div>${comp}${!me && !spectate ? `<button class="mb sit">入座</button>` : ""}${cfg}<small>沒有計時：每個公開的畫面（投票結果、任務結果）都要有人按「下一步」才會繼續。身分只有自己看得到。</small>${me && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      const names = (str) => str.split("、").map((x) => x.replace(/ ×\d+$/, ""));
+      const row = (r, cls) => `<div class="avab ${cls}"><b>${r}</b>${ABIL[r] || ""}</div>`;
+      const ab = `<div class="avabil">${names(cp.good).map((r) => row(r, "g")).join("")}${names(cp.evil).map((r) => row(r, "e")).join("")}${[["mordred", "莫德雷德"], ["oberon", "奧伯倫"]].filter(([k, r]) => c[k] && !cp.evil.includes(r)).map(([, r]) => `<div class="avab off"><b>${r}</b>此人數壞人名額不足，這局不會出現。</div>`).join("")}</div>`;
+      body.innerHTML = `<div class="avlobby"><div class="avplist">${list}</div>${comp}${ab}${!me && !spectate ? `<button class="mb sit">入座</button>` : ""}${cfg}<small>沒有計時：每個公開的畫面（投票結果、任務結果）都要有人按「下一步」才會繼續。身分只有自己看得到。</small>${me && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : `等開局（${st.players.length} 人入座）`;
-      const hd = body.querySelector(".avhist"); if (hd) hd.addEventListener("toggle", () => { histOpen = hd.open; });
       const q = (s) => body.querySelector(s);
       q(".sit") && q(".sit").addEventListener("click", () => send({ t: "avsit" }));
       q(".stand") && q(".stand").addEventListener("click", () => send({ t: "avstand" }));
@@ -159,6 +171,7 @@ export function mountAvalon(opts = {}) {
       const vres = st.phase === "voteres" ? st.voteRes : null;
       body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${roleCard()}${histHTML()}<small class="avroster">本局角色：${st.roleList.map(esc).join("、")}</small>${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
       statusEl.textContent = st.phase === "end" ? "阿瓦隆　結束" : `阿瓦隆　第 ${st.round + 1} 次任務　隊長 ${st.players[st.leader]?.name || ""}`;
+      const hd = body.querySelector(".avhist"); if (hd) hd.addEventListener("toggle", () => { histOpen = hd.open; });
       const q = (s) => body.querySelector(s);
       if (pickable) body.querySelectorAll(".avpl.pick").forEach((el) => el.addEventListener("click", () => {
         const i = Number(el.dataset.i);
