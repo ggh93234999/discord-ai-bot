@@ -81,6 +81,7 @@ const GAMES = [
   { id: "pinball", cat: "action", icon: "🎱", name: "彈珠台", players: "1 人", desc: "左右擋板接球，撞彈跳器拿分，3 顆球", mount: mountPinball },
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
+  { id: "lolbet", cat: "casino", wide: true, cls: "lolcard", icon: "🏆", name: "世界賽運彩", players: "全服共用", desc: "英雄聯盟世界賽單場勝負，賠率同步真實盤口", mount: mountLolBet },
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
   { id: "poker", cat: "table", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
   { id: "mjtw", cat: "table", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
@@ -98,13 +99,12 @@ const GAMES = [
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
-  { id: "lolbet", cat: "casino", icon: "🏆", name: "世界賽運彩", players: "全服共用", desc: "英雄聯盟世界賽單場勝負，賠率同步 Pinnacle 真實盤口，賽後自動派彩", mount: mountLolBet },
   { id: "spectate", cat: "casino", icon: "👀", name: "旁觀大廳", players: "不限", desc: "看有哪些房間在玩，按下去同步旁觀", mount: mountSpectateLobby },
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {
   presence("menu");
-  const card = (g) => `<button class="card${g.wide ? " wide" : ""}" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
+  const card = (g) => `<button class="card${g.wide ? " wide" : ""}${g.cls ? " " + g.cls : ""}" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
   const tabs = CATS.filter((c) => GAMES.some((g) => g.cat === c.id));
   let tab = ""; try { tab = localStorage.getItem("menutab") || ""; } catch {}
   if (!tabs.some((c) => c.id === tab)) tab = tabs[0].id;

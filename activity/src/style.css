@@ -1047,3 +1047,9 @@ body.tv-fs{overflow:hidden}
 .lolbet .lblogo{width:44px;height:44px;object-fit:contain;flex:none}
 .lolbet .lbsl .lblogo{width:28px;height:28px}
 .lolbet .lbfb{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#3b4252;color:#cfd6e4;font-weight:700;font-size:14px}
+
+/* 世界賽運彩：賭場最上面整排的大卡片（水墨風背景圖 src/lol-bg.jpg） */
+.card.wide.lolcard, .card.wide.lolcard:hover { grid-column:1 / -1; min-height:190px; justify-content:flex-start; border-color:#8a7a55; background:linear-gradient(90deg, rgba(247,243,232,.92) 0%, rgba(247,243,232,.55) 42%, rgba(247,243,232,0) 70%), #e9e2cf url("./lol-bg.jpg") center 60%/cover no-repeat; }
+.card.wide.lolcard:hover { border-color:#b3261e; filter:brightness(1.04); }
+.card.wide.lolcard b { color:#1b1b1b; } .card.wide.lolcard em { color:#7a2418; } .card.wide.lolcard small { color:#3a342a; max-width:62%; opacity:.95; }
+@media (max-width:520px){ .card.wide.lolcard, .card.wide.lolcard:hover { min-height:170px; background:linear-gradient(90deg, rgba(247,243,232,.95) 0%, rgba(247,243,232,.8) 48%, rgba(247,243,232,0) 78%), #e9e2cf url("./lol-bg.jpg") 62% 60%/cover no-repeat; } .card.wide.lolcard small { max-width:55%; } }
