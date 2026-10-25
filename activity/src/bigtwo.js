@@ -132,7 +132,7 @@ export function mountBigtwo(opts = {}) {
       body.innerHTML = `<div class="brtable">${order.map(seatBox).join("")}${mid}</div>${below}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
       body.querySelectorAll(".brhand .bc.can").forEach((el) => el.addEventListener("click", () => {
         const c = Number(el.dataset.c);
-        if (sel.has(c)) sel.delete(c); else if (sel.size < 5) sel.add(c);
+        if (sel.has(c)) sel.delete(c); else if (sel.size < 13) sel.add(c);
         el.classList.toggle("sel", sel.has(c));
         const p = body.querySelector(".btplay"); if (p) p.disabled = !canPlay();
       }));

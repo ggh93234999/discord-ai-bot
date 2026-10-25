@@ -1,5 +1,5 @@
 // 大老二（台灣玩法，練習點數）：4 人各 13 張，先出完的人贏。
-// 牌型：單張、對子、五張（順子、同花、葫蘆）；鐵支和同花順是炸彈，可以直接壓任何非炸彈的牌，同花順 > 鐵支。大小順序 3 < … < K < A < 2，同點比花色 ♣ < ♦ < ♥ < ♠。
+// 牌型：單張、對子、五張（順子、葫蘆）；鐵支和同花順是炸彈，可以直接壓任何非炸彈的牌，同花順 > 鐵支；一條龍（3 到 2 各一張，13 張）最大，壓全部。大小順序 3 < … < K < A < 2，同點比花色 ♣ < ♦ < ♥ < ♠。
 // 第一手由 ♣3 的人先出（第一次出牌一定要包含 ♣3）；之後每手由上一手的贏家先出。
 // 別人出牌後要出同張數且同牌型、更大的牌（炸彈例外），或「過」；連續三家都過，最後出牌的人可以自由出任何牌型。
 // 伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
@@ -62,7 +62,7 @@ function setTurn(t, i) {
 
 // ---------------------------------------------------------------- 出牌、過
 function checkPlay(h, i, cards) {
-  if (!Array.isArray(cards) || !cards.length || cards.length > 5) return null;
+  if (!Array.isArray(cards) || !cards.length || cards.length > 13) return null;
   const mine = new Set(h.hands[i]);
   if (new Set(cards).size !== cards.length || !cards.every((c) => Number.isInteger(c) && mine.has(c))) return null;
   const combo = classify(cards); if (!combo) return null;
@@ -129,7 +129,8 @@ function combos(hand) {
     let acc = [[]]; for (const col of cols) { const nx = []; for (const a of acc) for (const c of col) nx.push([...a, c]); acc = nx; }
     for (const a of acc) add(a);
   }
-  for (const s of byS) if (s.length >= 5) for (const p of pick(s, 5)) add(p);   // 同花（含同花順）
+  for (const s of byS) if (s.length >= 5) for (const p of pick(s, 5)) add(p);   // 同花順（普通同花 classify 會擋掉）
+  if (Object.keys(byR).length === 13) add(hand.slice());                       // 一條龍
   for (const r in byR) {
     if (byR[r].length >= 3) for (const tri of pick(byR[r], 3)) for (const r2 in byR) if (r2 !== r && byR[r2].length >= 2) for (const pr of pick(byR[r2], 2)) add([...tri, ...pr]);   // 葫蘆
     if (byR[r].length === 4) for (const c of hand) if (rstr(c) !== Number(r)) add([...byR[r], c]);                                                                        // 鐵支
