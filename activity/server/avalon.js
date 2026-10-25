@@ -189,7 +189,7 @@ function llmModel() {
 }
 const LLM_EFFORT = ENV.AVALON_LLM_REASONING ?? "none";      // 思考模式（none＝不思考，省錢又快）
 const LLM_TIMEOUT = Number(ENV.AVALON_LLM_TIMEOUT || 60) * 1000;
-export const llmEnabled = () => !!(LLM_URL && llmModel());
+export const llmEnabled = () => ENV.AVALON_LLM_ENABLE === "1" && !!(LLM_URL && llmModel());   // 預設關閉，.env 設 AVALON_LLM_ENABLE=1 才開
 const RULES_TXT = "阿瓦隆規則：好人要 3 次任務成功；壞人要 3 次任務失敗、或連續 5 次隊伍被否決、或好人完成 3 次後刺客刺中梅林。隊長選指定人數的隊伍，所有人公開投贊成／反對（過半贊成才通過）。通過後隊員各出『成功』或『失敗』牌，好人只能出成功，壞人可以出失敗。任務只要有失敗票就失敗（7 人以上的第 4 次要 2 張）。";
 const say = (t, i, text) => { const g = t.g, s = String(text || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 80); if (!g || !s) return; g.chat.push({ i, name: pname(t, i), text: s, round: g.round }); if (g.chat.length > 80) g.chat.shift(); };
 function llmPrompt(t, i, mode) {
