@@ -11,7 +11,7 @@ const BOOK = ENV.LOLBET_BOOKMAKER || "pinnacle";
 // ---- OddsPapi 免費方案總共只有 250 次呼叫：BUDGET 是「從現在起」這個模組最多能用幾次（已用掉的已先扣）。
 // 其中 RESERVE 次專門留給「結算賽果」，賠率／賽程更新只能動用剩下的，並平均分配到整個世界賽結束（END）。
 const BUDGET = Number(ENV.LOLBET_BUDGET) || 195;
-const RESERVE = Number(ENV.LOLBET_RESERVE) || 45;
+const RESERVE = Number(ENV.LOLBET_RESERVE) || 20;
 const END = Date.parse(ENV.LOLBET_END || "2026-11-16T00:00:00+08:00");
 const LOCK_MS = 60 * 1000;                                           // 開賽前 1 分鐘鎖盤
 const VOID_AFTER = 3 * 24 * 3600 * 1000;                             // 開賽後 3 天還沒結果就退款
@@ -126,19 +126,79 @@ async function getScore(f) {
 }
 
 // 結算：贏的派彩、輸的標記、比賽取消或太久沒結果的退款。派彩失敗的留著，下一輪再試。
+// ---- 賽果優先從 Liquipedia 的世界賽頁面拿（公開資料，不花 OddsPapi 額度）：瑞士輪頁面解析後依「兩隊＋開賽時間」對上場次。
+// 頁面請求有間隔限制（每次至少隔 8 分鐘，且只有「有人在看或有人下注」時才抓）。抓不到（例如淘汰賽頁面格式不同）再退回 OddsPapi。
+const LP_ON = ENV.LOLBET_LP !== "0";
+const LP_PAGES = (ENV.LOLBET_LP_PAGES || "World Championship/2026/Swiss Stage").split(",").map((x) => x.trim()).filter(Boolean);
+const LP_UA = "discord-activity-lolbet/1.0 (personal hobby bot)";
+const LP_ALIAS = { lyon: "lyongaming", secretwhales: "teamsecretwhales" };
+const norm = (n) => { const k = String(n || "").toLowerCase().replace(/[^a-z0-9]/g, ""); return LP_ALIAS[k] || k; };
+const sameTeam = (a, b) => { a = norm(a); b = norm(b); return !!a && !!b && (a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a) || a.endsWith(b) || b.endsWith(a)))); };
+let lp = { at: 0, list: [] };
+function parseMatchlists(html) {
+  const out = [];
+  for (const chunk of html.split('class="brkts-matchlist-match ').slice(1)) {
+    const teams = [...chunk.matchAll(/brkts-matchlist-opponent[^"]*"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1].replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, "&"));
+    const scores = [...chunk.matchAll(/brkts-matchlist-score[^"]*"[^>]*aria-label="[^"]*"><div class="brkts-matchlist-cell-content">\s*(\d*)\s*<\/div>/g)].map((m) => m[1]);
+    const ts = chunk.match(/data-timestamp="(\d+)"/);
+    if (teams.length < 2 || scores.length < 2 || scores[0] === "" || scores[1] === "") continue;     // 還沒打完（沒有比分）
+    const sa = Number(scores[0]), sb = Number(scores[1]);
+    if (sa === sb) continue;
+    out.push({ a: teams[0], b: teams[1], sa, sb, ts: ts ? Number(ts[1]) * 1000 : 0 });
+  }
+  return out;
+}
+async function lpFetch(now, force) {
+  if (!LP_ON || !LP_PAGES.length) return;
+  if (!force && now - lp.at < 8 * 60e3) return;
+  lp.at = now;                                                  // 失敗也算一次，不要連續重試
+  const list = [];
+  for (const page of LP_PAGES) {
+    const u = "https://liquipedia.net/leagueoflegends/api.php?" + new URLSearchParams({ action: "parse", page, prop: "text", format: "json", disablelimitreport: "1", disableeditsection: "1" });
+    try {
+      const r = await fetch(u, { headers: { "User-Agent": LP_UA }, signal: AbortSignal.timeout(30000) });
+      if (!r.ok) throw new Error("http " + r.status);
+      const j = await r.json(); list.push(...parseMatchlists(String(j?.parse?.text?.["*"] || "")));
+    } catch (e) { console.log("世界賽運彩 Liquipedia 抓取失敗：", page, e && e.message); }
+    await new Promise((ok) => setTimeout(ok, 2500));
+  }
+  if (list.length) lp.list = list;
+}
+function lpMatch(f) {
+  for (const r of lp.list) {
+    const fw = sameTeam(f.home, r.a) && sameTeam(f.away, r.b), bw = sameTeam(f.home, r.b) && sameTeam(f.away, r.a);
+    if (!fw && !bw) continue;
+    if (r.ts && Math.abs(r.ts - f.start) > 8 * 3600e3) continue;
+    return fw ? [r.sa, r.sb] : [r.sb, r.sa];
+  }
+  return null;
+}
+function lpApply(f) {                                           // 用 Liquipedia 的結果把這場標成已結束並記下比分
+  const sc = lpMatch(f); if (!sc) return false;
+  f.score = sc; f.statusId = 2; f.statusName = "Finished";
+  st.results[f.id] = { id: f.id, home: f.home, away: f.away, start: f.start, score: sc }; save();
+  return true;
+}
+
 let settling = false;
 export const lolSettle = () => settleAll();
 async function settleAll() {
   if (settling) return; settling = true;
   try {
     const now = Date.now();
-    const running = (f) => f && !isFinished(f) && !isVoid(f) && now - f.start > FIRST_CHECK && now - f.start < 12 * 3600e3;
+    const started = [...fixtures.values()].filter((f) => !isFinished(f) && !isVoid(f) && now - f.start > 25 * 60e3 && now - f.start < 12 * 3600e3);
+    const hasBet = (f) => st.bets.some((b) => b.fixtureId === f.id && b.status === "open");
+    if (LP_ON && started.length && (watchers.size > 0 || started.some(hasBet))) { await lpFetch(now); for (const f of started) lpApply(f); }
+    if (LP_ON && st.backfill) { await lpFetch(now, true); for (const f of fixtures.values()) if (isFinished(f) && !f.score && !st.results[f.id]) lpApply(f); }
+    // OddsPapi 的狀態檢查只當備援：Liquipedia 在 3 小時內都沒給出結果的場次才用（例如淘汰賽頁面抓不到）
+    const running = (f) => f && !isFinished(f) && !isVoid(f) && now - f.start > (LP_ON ? 3 * 3600e3 : FIRST_CHECK) && now - f.start < 12 * 3600e3;
     const due = st.bets.some((b) => b.status === "open" && running(fixtures.get(b.fixtureId))) || (watchers.size > 0 && [...fixtures.values()].some(running));
     if (due && now - lastCheck > plan().checkMs) { lastCheck = now; try { await loadFixtures(now, true); } catch (e) { console.log("世界賽運彩 賽果檢查失敗：", e && e.message); } }   // 一次呼叫就能更新所有場次的狀態
     let got = 0;
     for (const f of fixtures.values()) {                         // 剛打完的比賽（12 小時內）先查比分，顯示在「最近結果」；每輪最多 6 場
       if (got >= 6) break;
       if (!isFinished(f) || f.score || st.results[f.id] || (now - f.start > 12 * 3600e3 && !st.backfill)) continue;
+      if (LP_ON && lpApply(f)) continue;
       if (st.api && st.api.used >= BUDGET - 8) break;             // 快沒額度了：只留給有注單的場次
       got++; try { await getScore(f); } catch {} await new Promise((r) => setTimeout(r, 1100));
     }
