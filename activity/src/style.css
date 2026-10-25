@@ -1053,3 +1053,4 @@ body.tv-fs{overflow:hidden}
 .card.wide.lolcard:hover { border-color:#b3261e; filter:brightness(1.04); }
 .card.wide.lolcard b { color:#1b1b1b; } .card.wide.lolcard em { color:#7a2418; } .card.wide.lolcard small { color:#3a342a; max-width:62%; opacity:.95; }
 @media (max-width:520px){ .card.wide.lolcard, .card.wide.lolcard:hover { min-height:170px; background:linear-gradient(90deg, rgba(247,243,232,.95) 0%, rgba(247,243,232,.8) 48%, rgba(247,243,232,0) 78%), #e9e2cf url("./lol-bg.jpg") 62% 60%/cover no-repeat; } .card.wide.lolcard small { max-width:55%; } }
+.lolbet .lbseed{font-size:11px;color:#9aa3b5;font-weight:400;text-align:center;line-height:1.3}

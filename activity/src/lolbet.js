@@ -11,6 +11,11 @@ const ERR = {
 // 隊伍圖標：scripts/fetch_lol_logos.py 抓到 public/teams/，index.json 是「隊名 → 檔名」。沒有圖的隊伍顯示縮寫圓章。
 let logoIdx = null;
 fetch("teams/index.json").then((r) => (r.ok ? r.json() : {})).then((j) => { logoIdx = j; }).catch(() => { logoIdx = {}; });
+// 賽區與賽區種子：scripts/fetch_lol_seeds.py 產生 public/teams/seeds.json
+let seedIdx = null;
+fetch("teams/seeds.json").then((r) => (r.ok ? r.json() : {})).then((j) => { seedIdx = j; }).catch(() => { seedIdx = {}; });
+const REGION = { LCK: "韓國", LPL: "中國", LCS: "北美", LEC: "歐洲", LCP: "亞太", CBLOL: "巴西" };
+const seedTag = (name) => { const x = seedIdx && seedIdx[name]; return x ? `<small class="lbseed" title="${esc(REGION[x.region] || "")}賽區">${esc(x.region)} ${x.seed} 號種子${x.note ? "・" + esc(x.note) : ""}</small>` : ""; };
 const logo = (name) => {
   const f = logoIdx && logoIdx[name];
   if (f) return `<img class="lblogo" src="teams/${f}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'lblogo lbfb',textContent:'${esc(name).slice(0, 2).toUpperCase()}'}))">`;
@@ -88,7 +93,7 @@ export function mountLolBet(root, { env, back }) {
     const score = f.score ? `<b class="lbsc">${f.score[0]} : ${f.score[1]}</b>` : `<i>vs</i>`;
     const winner = f.state === "finished" && f.score && f.score[0] !== f.score[1] ? (f.score[0] > f.score[1] ? 0 : 1) : -1;
     const open = f.state === "open";
-    const btn = (side, name, odds, w) => `<button class="lbteam${sel && sel.id === f.id && sel.side === side ? " on" : ""}${w ? " win" : ""}" data-f="${f.id}" data-s="${side}" ${open ? "" : "disabled"}>${logo(name)}<span>${esc(name)}</span>${odds ? `<em>${odds}</em>` : ""}</button>`;
+    const btn = (side, name, odds, w) => `<button class="lbteam${sel && sel.id === f.id && sel.side === side ? " on" : ""}${w ? " win" : ""}" data-f="${f.id}" data-s="${side}" ${open ? "" : "disabled"}>${logo(name)}<span>${esc(name)}</span>${seedTag(name)}${odds ? `<em>${odds}</em>` : ""}</button>`;
     const tag = { open: "可下注", live: "已截止／進行中", finished: "已結束", void: "取消", closed: "暫無盤口" }[f.state];
     return `<div class="lbcard ${f.state}"><div class="lbtop"><span>${fmtTime(f.start)}</span><span class="lbtag">${tag}</span></div>
       <div class="lbrow">${btn("home", f.home, f.oh, winner === 0)}${score}${btn("away", f.away, f.oa, winner === 1)}</div>${mine}</div>`;
@@ -159,7 +164,7 @@ export function mountLolBet(root, { env, back }) {
 
   function destroy() { closed = true; timers.forEach(clearTimeout); clearInterval(tick); try { ws && ws.close(); } catch {} }
   const tick = setInterval(() => { if (st && !sel) render(); }, 30000);   // 讓「幾分鐘前」和開賽時間保持新鮮
-  const lw = setInterval(() => { if (logoIdx) { clearInterval(lw); render(); } }, 300); timers.push(lw);
+  const lw = setInterval(() => { if (logoIdx && seedIdx) { clearInterval(lw); render(); } }, 300); timers.push(lw);
   render(); connect();
   return destroy;
 }

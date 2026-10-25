@@ -1,0 +1,97 @@
+{
+ "Gen.g Esports": {
+  "region": "LCK",
+  "seed": 1,
+  "note": ""
+ },
+ "Hanwha Life Esports": {
+  "region": "LCK",
+  "seed": 2,
+  "note": "MSI 冠軍"
+ },
+ "T1": {
+  "region": "LCK",
+  "seed": 3,
+  "note": ""
+ },
+ "Dplus": {
+  "region": "LCK",
+  "seed": 4,
+  "note": ""
+ },
+ "Anyones Legend": {
+  "region": "LPL",
+  "seed": 1,
+  "note": ""
+ },
+ "Bilibili Gaming": {
+  "region": "LPL",
+  "seed": 2,
+  "note": ""
+ },
+ "TOP Esports": {
+  "region": "LPL",
+  "seed": 3,
+  "note": ""
+ },
+ "Invictus Gaming": {
+  "region": "LPL",
+  "seed": 4,
+  "note": ""
+ },
+ "Team Liquid": {
+  "region": "LCS",
+  "seed": 1,
+  "note": ""
+ },
+ "Lyon Gaming": {
+  "region": "LCS",
+  "seed": 2,
+  "note": ""
+ },
+ "G2 Esports": {
+  "region": "LEC",
+  "seed": 1,
+  "note": ""
+ },
+ "Movistar Koi": {
+  "region": "LEC",
+  "seed": 2,
+  "note": ""
+ },
+ "Team Secret Whales": {
+  "region": "LCP",
+  "seed": 1,
+  "note": ""
+ },
+ "Ctbc Flying Oyster": {
+  "region": "LCP",
+  "seed": 2,
+  "note": ""
+ },
+ "Los": {
+  "region": "CBLOL",
+  "seed": 1,
+  "note": ""
+ },
+ "Cloud9": {
+  "region": "LCS",
+  "seed": 3,
+  "note": ""
+ },
+ "Karmine Corp": {
+  "region": "LEC",
+  "seed": 3,
+  "note": ""
+ },
+ "MVK Esports": {
+  "region": "LCP",
+  "seed": 3,
+  "note": ""
+ },
+ "FURIA": {
+  "region": "CBLOL",
+  "seed": 2,
+  "note": ""
+ }
+}
