@@ -8,6 +8,14 @@ const ERR = {
   need_login: "要先登入才能下注", stale: "賠率正在更新，請幾秒後再按一次", quota: "賠率資料來源額度已用完，暫停下注", closed: "這場已經截止下注", bad_amount: "金額不合法", odds_changed: "賠率剛剛變了，請看新賠率再下注",
   too_much: "這場你下的總額已達上限", insufficient: "代幣不夠", bot_down: "機器人暫時連不上，稍後再試", bad_request: "下注內容有誤",
 };
+// 隊伍圖標：scripts/fetch_lol_logos.py 抓到 public/teams/，index.json 是「隊名 → 檔名」。沒有圖的隊伍顯示縮寫圓章。
+let logoIdx = null;
+fetch("teams/index.json").then((r) => (r.ok ? r.json() : {})).then((j) => { logoIdx = j; }).catch(() => { logoIdx = {}; });
+const logo = (name) => {
+  const f = logoIdx && logoIdx[name];
+  if (f) return `<img class="lblogo" src="teams/${f}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'lblogo lbfb',textContent:'${esc(name).slice(0, 2).toUpperCase()}'}))">`;
+  return `<span class="lblogo lbfb">${esc(name).replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?"}</span>`;
+};
 const BSTAT = { open: "進行中", won: "贏了", lost: "輸了", void: "已退款", unpaid: "派彩中" };
 
 export function mountLolBet(root, { env, back }) {
@@ -80,7 +88,7 @@ export function mountLolBet(root, { env, back }) {
     const score = f.score ? `<b class="lbsc">${f.score[0]} : ${f.score[1]}</b>` : `<i>vs</i>`;
     const winner = f.state === "finished" && f.score && f.score[0] !== f.score[1] ? (f.score[0] > f.score[1] ? 0 : 1) : -1;
     const open = f.state === "open";
-    const btn = (side, name, odds, w) => `<button class="lbteam${sel && sel.id === f.id && sel.side === side ? " on" : ""}${w ? " win" : ""}" data-f="${f.id}" data-s="${side}" ${open ? "" : "disabled"}><span>${esc(name)}</span>${odds ? `<em>${odds}</em>` : ""}</button>`;
+    const btn = (side, name, odds, w) => `<button class="lbteam${sel && sel.id === f.id && sel.side === side ? " on" : ""}${w ? " win" : ""}" data-f="${f.id}" data-s="${side}" ${open ? "" : "disabled"}>${logo(name)}<span>${esc(name)}</span>${odds ? `<em>${odds}</em>` : ""}</button>`;
     const tag = { open: "可下注", live: "已截止／進行中", finished: "已結束", void: "取消", closed: "暫無盤口" }[f.state];
     return `<div class="lbcard ${f.state}"><div class="lbtop"><span>${fmtTime(f.start)}</span><span class="lbtag">${tag}</span></div>
       <div class="lbrow">${btn("home", f.home, f.oh, winner === 0)}${score}${btn("away", f.away, f.oa, winner === 1)}</div>${mine}</div>`;
@@ -116,7 +124,7 @@ export function mountLolBet(root, { env, back }) {
     const key = sel.id + sel.side + odds;
     if (key !== sheetKey) {
       sheetKey = key; el.hidden = false;
-      el.innerHTML = `<div class="lbsl">押 <b>${esc(name)}</b> 贏　賠率 <b>${odds}</b><button class="lbx">✕</button></div>
+      el.innerHTML = `<div class="lbsl">押 ${logo(name)}<b>${esc(name)}</b> 贏　賠率 <b>${odds}</b><button class="lbx">✕</button></div>
         <div class="lbamts">${[10, 50, 100, 500].map((n) => `<button data-n="${n}">${n}</button>`).join("")}<input class="lbin" type="number" min="1" step="1" inputmode="numeric" placeholder="自訂"></div>
         <div class="lbpay"></div><button class="lbgo">確認下注</button>`;
       el.querySelector(".lbx").addEventListener("click", () => { sel = null; render(); });
@@ -146,6 +154,7 @@ export function mountLolBet(root, { env, back }) {
 
   function destroy() { closed = true; timers.forEach(clearTimeout); clearInterval(tick); try { ws && ws.close(); } catch {} }
   const tick = setInterval(() => { if (st && !sel) render(); }, 30000);   // 讓「幾分鐘前」和開賽時間保持新鮮
+  const lw = setInterval(() => { if (logoIdx) { clearInterval(lw); render(); } }, 300); timers.push(lw);
   render(); connect();
   return destroy;
 }

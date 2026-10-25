@@ -1044,3 +1044,6 @@ body.tv-fs{overflow:hidden}
 .lolbet .lbfoot{font-size:12px;color:#7d869a;text-align:center;margin-top:8px}
 .lolbet .lbhbtn{align-self:center;margin:6px 0;padding:6px 14px;border:0;border-radius:8px;background:#3b4252;color:#fff;cursor:pointer}
 .dcm .lolbet{padding-top:58px}
+.lolbet .lblogo{width:44px;height:44px;object-fit:contain;flex:none}
+.lolbet .lbsl .lblogo{width:28px;height:28px}
+.lolbet .lbfb{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#3b4252;color:#cfd6e4;font-weight:700;font-size:14px}

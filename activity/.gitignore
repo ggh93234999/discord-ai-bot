@@ -30,3 +30,4 @@ server/farm.json
 # 圖創區：使用者畫的圖與紀錄
 server/gallery_data
 server/lolbet_state.json
+public/teams/*.png
