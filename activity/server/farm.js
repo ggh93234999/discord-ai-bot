@@ -13,12 +13,12 @@ import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botInfo } from "./bet.js";
 
 export const CROPS = [
-  { id: "radish", icon: "🥕", name: "蘿蔔", seed: 10, min: 3, y: 5 },
-  { id: "cabbage", icon: "🥬", name: "小白菜", seed: 30, min: 10, y: 5 },
-  { id: "tomato", icon: "🍅", name: "番茄", seed: 80, min: 30, y: 5 },
-  { id: "corn", icon: "🌽", name: "玉米", seed: 200, min: 60, y: 4 },
-  { id: "pumpkin", icon: "🎃", name: "南瓜", seed: 600, min: 180, y: 4 },
-  { id: "melon", icon: "🍉", name: "西瓜", seed: 1500, min: 480, y: 4 },
+  { id: "radish", icon: "🥕", name: "蘿蔔", seed: 10, min: 3, y: 20, y0: 5 },
+  { id: "cabbage", icon: "🥬", name: "小白菜", seed: 30, min: 10, y: 20, y0: 5 },
+  { id: "tomato", icon: "🍅", name: "番茄", seed: 80, min: 30, y: 24, y0: 5 },
+  { id: "corn", icon: "🌽", name: "玉米", seed: 200, min: 60, y: 26, y0: 4 },
+  { id: "pumpkin", icon: "🎃", name: "南瓜", seed: 600, min: 180, y: 28, y0: 4 },
+  { id: "melon", icon: "🍉", name: "西瓜", seed: 1500, min: 480, y: 30, y0: 4 },
   // 果樹：seed = 樹苗價（只買一次），min = 每輪結果要幾分鐘，y = 每輪結幾個
   { id: "cherry", icon: "🍒", name: "櫻桃", seed: 60, min: 60, y: 20, tree: true },
   { id: "blueberry", icon: "🫐", name: "藍莓", seed: 120, min: 120, y: 22, tree: true },
@@ -30,11 +30,11 @@ export const CROPS = [
 ];
 const CROP = Object.fromEntries(CROPS.map((c) => [c.id, c]));
 const yieldOf = (c) => CROP[c].y;                // 每塊地一次收幾個（每種作物不同，見 CROPS）
-const UNIT_RATE = 0.36;                          // 單個賣價 = 種子價 × 0.36；靠產量（4～5 個）讓被偷 1 個後還是賺，單價不隨被偷調整
+const UNIT_RATE = 0.36;                          // 單個賣價 = 種子價 × 0.36 × y0 ÷ y（y0 是舊的產量 4～5 個，y 是現在的產量）：產量變多但每塊地的總收入不變，單價不隨被偷調整
 const TREE_PROFIT = 1.25;                         // 果樹：被偷到只剩一半時，主人這一輪的收入至少是樹苗價的幾倍
 const keepMin = (c) => Math.ceil(CROP[c].y / 2);   // 果樹每輪最少能留給主人的數量
 const stealMax = (c) => (CROP[c].tree ? Math.floor(CROP[c].y / 2) : STEAL_PER_PLOT);   // 每塊地（每棵樹）每輪最多被偷幾個
-export const unitPrice = (c) => (CROP[c].tree ? Math.ceil((CROP[c].seed * TREE_PROFIT) / keepMin(c)) : Math.max(1, Math.round(CROP[c].seed * UNIT_RATE)));
+export const unitPrice = (c) => (CROP[c].tree ? Math.ceil((CROP[c].seed * TREE_PROFIT) / keepMin(c)) : Math.max(1, Math.round((CROP[c].seed * UNIT_RATE * CROP[c].y0) / CROP[c].y)));   // 蔬菜產量跟果樹差不多（20～30 個），單價相應變小，每塊地一輪的總收入和以前（y0 個）差不多
 // 稀有變種：每個收成各自抽一次
 export const VARIANTS = { n: { name: "", mult: 1 }, big: { name: "大顆", mult: 2 }, gold: { name: "金色", mult: 5 } };
 const rollVariant = () => { const r = randomInt(1000); return r < 10 ? "gold" : r < 60 ? "big" : "n"; };
