@@ -7,7 +7,7 @@ export const rankOf = (c) => (c % 13) + 2;
 export const rstr = (c) => (rankOf(c) === 2 ? 15 : rankOf(c));          // 點數強度（2 最大）
 export const strength = (c) => rstr(c) * 4 + suitOf(c);                  // 單張強度（含花色）
 export const CLUB3 = 1;                                                  // ♣3
-export const TYPE_NAMES = { 1: "單張", 2: "對子", 4: "順子", 6: "葫蘆", 7: "鐵支", 8: "同花順", 9: "一條龍" };
+export const TYPE_NAMES = { 1: "單張", 2: "對子", 3: "三條", 4: "順子", 6: "葫蘆", 7: "鐵支", 8: "同花順", 9: "一條龍" };
 
 // 判斷一組牌是什麼牌型。回傳 { n, type, k, top }；k 是同張數下可比大小的數字。不是合法牌型回傳 null。
 export function classify(cards) {
@@ -16,6 +16,10 @@ export function classify(cards) {
   if (n === 2) {
     if (rstr(cards[0]) !== rstr(cards[1])) return null;
     return { n, type: 2, k: Math.max(strength(cards[0]), strength(cards[1])), top: strength(cards[0]) > strength(cards[1]) ? cards[0] : cards[1] };
+  }
+  if (n === 3) {                                                          // 三條：三張同點，比點數
+    if (!(rstr(cards[0]) === rstr(cards[1]) && rstr(cards[1]) === rstr(cards[2]))) return null;
+    return { n, type: 3, k: rstr(cards[0]), top: cards.reduce((a, b) => (strength(b) > strength(a) ? b : a)) };
   }
   if (n === 13) {                                                         // 一條龍：3 到 2 每個點數各一張
     const rs = new Set(cards.map(rstr));
