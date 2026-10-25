@@ -51,7 +51,7 @@ function startGame(t) {
   const want = Math.max(MINP, Math.min(MAXP, Math.max(t.cfg.n, t.players.length)));
   while (t.players.length < want) t.players.push(mkP({ bot: true, name: pickBotName(t) }));
   const n = t.players.length;
-  t.g = { n, roles: assignRoles(n, t.cfg), leader: randomInt(n), round: 0, rejects: 0, results: [], fails: [], team: [], votes: {}, qvotes: {}, voteRes: null, questRes: null, sus: Array(n).fill(0), botAt: 0, winner: null, why: "", assassin: -1, target: -1 };
+  t.g = { n, roles: assignRoles(n, t.cfg), leader: randomInt(n), round: 0, rejects: 0, results: [], fails: [], hist: [], team: [], votes: {}, qvotes: {}, voteRes: null, questRes: null, sus: Array(n).fill(0), botAt: 0, winner: null, why: "", assassin: -1, target: -1 };
   t.started = true; t.final = null; t.phase = "team";
   t.log = `開始！${n} 人（好人 ${GOOD_N[n]}、壞人 ${n - GOOD_N[n]}）。身分只有你自己看得到，按住「看我的身分」`;
   setBot(t);
@@ -87,6 +87,7 @@ function doVote(t, i, ok) {
   if (Object.keys(g.votes).length === g.n) {
     const yes = Object.values(g.votes).filter(Boolean).length, pass = yes * 2 > g.n;
     g.voteRes = { votes: Array.from({ length: g.n }, (_, k) => g.votes[k]), yes, no: g.n - yes, pass };
+    g.hist.push({ round: g.round, no: g.rejects + 1, leader: g.leader, team: g.team.slice(), votes: g.voteRes.votes.slice(), pass });
     t.phase = "voteres";
     t.log = pass ? `隊伍通過（${yes} 贊成／${g.n - yes} 反對）` : `隊伍被否決（${yes} 贊成／${g.n - yes} 反對）`;
   }
@@ -100,6 +101,7 @@ function doQuestVote(t, i, ok) {
     const fails = Object.values(g.qvotes).filter((x) => !x).length, success = fails < needFails(g);
     g.results.push(success ? "s" : "f"); g.fails.push(fails);
     if (fails) for (const k of g.team) g.sus[k] += fails / g.team.length;
+    { const h = g.hist[g.hist.length - 1]; if (h) h.q = { success, fails }; }
     g.questRes = { round: g.round, success, fails, size: g.team.length, team: g.team.slice() };
     t.phase = "questres";
     t.log = `第 ${g.round + 1} 次任務${success ? "成功" : "失敗"}（${fails} 張失敗票）`;
@@ -185,6 +187,7 @@ function view(t, ws) {
     if (t.phase === "voteres") v.voteRes = g.voteRes;
     if (t.phase === "questres") v.questRes = g.questRes;
     if (t.phase === "assassin") v.assassin = g.assassin;
+    v.hist = g.hist;
     v.roleList = [...g.roles].sort().map((r) => ROLE_NAME[r]);
     if (you >= 0) {
       const r = g.roles[you]; v.me = { role: r, roleName: ROLE_NAME[r], evil: isEvil(r), ...knowledge(t, you) };

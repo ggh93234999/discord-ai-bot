@@ -74,6 +74,7 @@ export function mountAvalon(opts = {}) {
       const comp = `<div class="avcomp"><b>${total} 人局</b>：<span class="g">好人 ${cp.goodN} 人（${cp.good}）</span><span class="e">壞人 ${cp.evilN} 人（${cp.evil}）</span></div>`;
       body.innerHTML = `<div class="avlobby"><div class="avplist">${list}</div>${comp}${!me && !spectate ? `<button class="mb sit">入座</button>` : ""}${cfg}<small>沒有計時：每個公開的畫面（投票結果、任務結果）都要有人按「下一步」才會繼續。身分只有自己看得到。</small>${me && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : `等開局（${st.players.length} 人入座）`;
+      const hd = body.querySelector(".avhist"); if (hd) hd.addEventListener("toggle", () => { histOpen = hd.open; });
       const q = (s) => body.querySelector(s);
       q(".sit") && q(".sit").addEventListener("click", () => send({ t: "avsit" }));
       q(".stand") && q(".stand").addEventListener("click", () => send({ t: "avstand" }));
@@ -141,12 +142,22 @@ export function mountAvalon(opts = {}) {
       const rows = e.roles.map((r) => `<div class="avrow ${r.evil ? "evil" : "good"}${r.i === e.target ? " hit" : ""}"><b>${esc(r.name)}</b><span>${esc(r.role)}${r.i === e.target ? "（被刺殺）" : ""}</span></div>`).join("");
       return `<div class="mresult avend ${e.winner === "good" ? "ok" : "bad"}"><h3>${e.winner === "good" ? "好人獲勝！" : "壞人獲勝！"}</h3><div>${esc(e.why)}</div><div class="avroles">${rows}</div>${seated() ? `<div class="btbtns"><button class="mb avagain">再來一場</button><button class="mb ghost avlobby">回大廳</button></div>` : ""}</div>`;
     }
+    let histOpen = false;
+    function histHTML() {
+      const h = st.hist || []; if (!h.length) return "";
+      const nm = (i) => esc(st.players[i]?.name || "?");
+      const rows = h.slice().reverse().map((e) => {
+        const yes = e.votes.map((v, i) => v ? nm(i) : null).filter(Boolean), no = e.votes.map((v, i) => v ? null : nm(i)).filter(Boolean);
+        return `<div class="avh ${e.pass ? "ok" : "bad"}"><div><b>任務 ${e.round + 1}</b>・第 ${e.no} 次提案　隊長 ${nm(e.leader)}　${e.pass ? "✅通過" : "❌否決"}${e.q ? `　→ 任務${e.q.success ? "成功" : "失敗"}（${e.q.fails} 張失敗）` : ""}</div><div>隊伍：${e.team.map(nm).join("、")}</div><div>👍 ${yes.join("、") || "無"}</div><div>👎 ${no.join("、") || "無"}</div></div>`;
+      }).join("");
+      return `<details class="avhist"${histOpen ? " open" : ""}><summary>📜 投票紀錄（${h.length}）</summary>${rows}</details>`;
+    }
     function renderGame() {
       const key = st.phase + "|" + st.round + "|" + st.leader + "|" + st.rejects;
       if (key !== selKey) { selKey = key; sel = new Set(); }
       const pickable = (st.phase === "team" && st.leader === st.you) || (st.phase === "assassin" && st.you === st.assassin);
       const vres = st.phase === "voteres" ? st.voteRes : null;
-      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${roleCard()}<small class="avroster">本局角色：${st.roleList.map(esc).join("、")}</small>${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
+      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${roleCard()}${histHTML()}<small class="avroster">本局角色：${st.roleList.map(esc).join("、")}</small>${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
       statusEl.textContent = st.phase === "end" ? "阿瓦隆　結束" : `阿瓦隆　第 ${st.round + 1} 次任務　隊長 ${st.players[st.leader]?.name || ""}`;
       const q = (s) => body.querySelector(s);
       if (pickable) body.querySelectorAll(".avpl.pick").forEach((el) => el.addEventListener("click", () => {
