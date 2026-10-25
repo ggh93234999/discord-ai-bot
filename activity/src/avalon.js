@@ -135,14 +135,14 @@ export function mountAvalon(opts = {}) {
       if (ph === "vote") {
         const mine = st.myVote;
         if (!seated()) return `<div class="mhint">投票中（${st.voted.length}/${st.n}）</div>`;
-        return mine === undefined ? `<div class="mhint">要不要讓這支隊伍出任務？（過半贊成才通過）</div><div class="btbtns"><button class="mb avv" data-ok="1">👍 贊成</button><button class="mb ghost avv" data-ok="0">👎 反對</button></div>` : `<div class="mhint">你投了${mine ? "贊成" : "反對"}，等其他人（${st.voted.length}/${st.n}）…</div>`;
+        return mine === undefined ? `<div class="mhint">要不要讓這支隊伍出任務？（過半贊成才通過）</div><div class="btbtns"><button class="mb avv yes" data-ok="1">👍 贊成</button><button class="mb avv no" data-ok="0">👎 反對</button></div>` : `<div class="mhint">你投了${mine ? "贊成" : "反對"}，等其他人（${st.voted.length}/${st.n}）…</div>`;
       }
       if (ph === "voteres") return `<div class="avres ${st.voteRes.pass ? "ok" : "bad"}">${st.voteRes.pass ? "隊伍通過" : "隊伍被否決"}　👍 ${st.voteRes.yes}　👎 ${st.voteRes.no}</div>${nextBtn}`;
       if (ph === "quest") {
         const inT = st.team.includes(me);
         if (!inT || !seated()) return `<div class="mhint">任務隊員選擇中（${st.qdone.length}/${st.team.length}）…</div>`;
         if (st.myQ !== undefined) return `<div class="mhint">你已經出牌，等其他隊員（${st.qdone.length}/${st.team.length}）…</div>`;
-        return `<div class="mhint">你是任務隊員：選成功或失敗（好人只能選成功）</div><div class="btbtns"><button class="mb avq-ok" data-ok="1">✔ 成功</button><button class="mb ghost avq-ok" data-ok="0"${st.me.evil ? "" : " disabled"}>✘ 失敗</button></div>`;
+        return `<div class="mhint">你是任務隊員：選成功或失敗（好人只能選成功）</div><div class="btbtns"><button class="mb avq-ok yes" data-ok="1">✔ 成功</button><button class="mb avq-ok no" data-ok="0"${st.me.evil ? "" : " disabled"}>✘ 失敗</button></div>`;
       }
       if (ph === "questres") { const r = st.questRes; return `<div class="avres ${r.success ? "ok" : "bad"}">第 ${r.round + 1} 次任務${r.success ? "成功" : "失敗"}（${r.fails} 張失敗票）</div>${nextBtn}`; }
       if (ph === "assassin") {

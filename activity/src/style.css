@@ -980,3 +980,7 @@ body.tv-fs{overflow:hidden}
 .rulesbox .rgrp.g{background:rgba(76,175,80,.1);border-color:rgba(76,175,80,.5)}.rulesbox .rgrp.b{background:rgba(229,57,53,.1);border-color:rgba(229,57,53,.5)}
 .rulesbox .rgh{font-weight:700;font-size:14px;margin-bottom:4px}.rulesbox .rgrp.g .rgh{color:#81c784}.rulesbox .rgrp.b .rgh{color:#ef9a9a}
 .rulesbox .rrole{padding:3px 0;line-height:1.55;border-top:1px solid rgba(255,255,255,.08)}.rulesbox .rrole b{margin-right:8px;color:#fff}
+
+.av .mb.yes{background:#2e7d32;color:#fff}.av .mb.no{background:#c62828;color:#fff}
+.av .mb.yes:hover:not(:disabled){background:#388e3c}.av .mb.no:hover:not(:disabled){background:#d32f2f}
+.av .mb.no:disabled,.av .mb.yes:disabled{opacity:.45}
