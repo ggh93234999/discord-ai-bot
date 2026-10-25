@@ -14,6 +14,7 @@ import { mountBigtwo } from "./bigtwo.js";
 import { mountAvalon } from "./avalon.js";
 import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
+import { mountLolBet } from "./lolbet.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
 import { mountFarm } from "./farm.js";
@@ -97,6 +98,7 @@ const GAMES = [
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
+  { id: "lolbet", cat: "casino", icon: "🏆", name: "世界賽運彩", players: "全服共用", desc: "英雄聯盟世界賽單場勝負，賠率同步 Pinnacle 真實盤口，賽後自動派彩", mount: mountLolBet },
   { id: "spectate", cat: "casino", icon: "👀", name: "旁觀大廳", players: "不限", desc: "看有哪些房間在玩，按下去同步旁觀", mount: mountSpectateLobby },
 ].filter((g) => typeof g.mount === "function");
 
