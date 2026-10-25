@@ -44,18 +44,15 @@ const watchers = new Set();
 const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
 
-// 從 Pinnacle 的盤口裡找「全場單場勝負」（路徑結尾 /0/moneyline，id 通常是 181）
+// 從 Pinnacle 的盤口裡找「全場單場勝負」＝ market 181：outcome 181 是第 1 隊（participant1）贏、182 是第 2 隊贏。
+// 注意不能用 bookmakerOutcomeId 的 home/away：那是 Pinnacle 自己的主客順序，有些場次跟隊伍順序是反的。
 function pickMoneyline(markets) {
-  if (!markets) return null;
-  let best = null;
-  for (const [mid, m] of Object.entries(markets)) {
-    const bm = String(m.bookmakerMarketId || "");
-    if (!/\/0\/moneyline$/.test(bm) || m.marketActive === false) continue;
-    const out = Object.values(m.outcomes || {}).map((o) => o.players && o.players["0"]).filter(Boolean);
-    const h = out.find((o) => o.bookmakerOutcomeId === "home"), a = out.find((o) => o.bookmakerOutcomeId === "away");
-    if (h && a && h.price > 1 && a.price > 1 && h.active !== false && a.active !== false) { if (!best || mid === "181") best = { oh: h.price, oa: a.price }; }
-  }
-  return best;
+  const m = markets && markets["181"];
+  if (!m || m.marketActive === false || !/\/0\/moneyline$/.test(String(m.bookmakerMarketId || ""))) return null;
+  const a = m.outcomes && m.outcomes["181"] && m.outcomes["181"].players && m.outcomes["181"].players["0"];
+  const b = m.outcomes && m.outcomes["182"] && m.outcomes["182"].players && m.outcomes["182"].players["0"];
+  if (!a || !b || !(a.price > 1) || !(b.price > 1) || a.active === false || b.active === false) return null;
+  return { oh: a.price, oa: b.price };
 }
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
