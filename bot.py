@@ -891,12 +891,28 @@ def strip_meta(text: str) -> str:
     return out or text
 
 
+# 冷門工具只在使用者這句話提到相關字眼時才放進工具清單（工具說明每次都會算進 token，不常用的別一直帶著）
+ACT_RE = re.compile(r"activity|遊戲間|在玩|在打|玩什麼|玩啥|誰在(玩|打)|有人(在)?(玩|打)|開著", re.I)
+
+
+def last_user_text(conversation: list[dict]) -> str:
+    for m in reversed(conversation):
+        if m.get("role") == "user":
+            c = m.get("content")
+            if isinstance(c, str):
+                return c
+            if isinstance(c, list):
+                return " ".join(str(x.get("text", "")) for x in c if isinstance(x, dict))
+            return ""
+    return ""
+
+
 async def ask_model(conversation: list[dict], on_status=None, msg: discord.Message | None = None,
                     actions: list | None = None) -> str:
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, actstatus.TOOL] + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
