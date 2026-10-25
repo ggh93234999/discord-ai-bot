@@ -992,3 +992,6 @@ body.tv-fs{overflow:hidden}
 .mtab i{font-style:normal;font-size:11px;background:rgba(255,255,255,.12);border-radius:9px;padding:0 6px;color:#9aa3b5}
 .mtab.on{background:#3a56b0;border-color:#6f8bff;color:#fff;font-weight:700}.mtab.on i{background:rgba(255,255,255,.25);color:#fff}
 .dcm .mtabs{top:48px}
+/* 分頁列改成自動換行（不再橫向捲動，最右邊的分頁才不會被切掉） */
+.mtabs{flex-wrap:wrap;justify-content:center;overflow:visible;position:static;padding:6px 0 10px}
+.mtab{padding:7px 12px;font-size:14px}
