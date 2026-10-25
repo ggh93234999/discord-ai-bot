@@ -155,21 +155,38 @@ export function mountAvalon(opts = {}) {
       return `<div class="mresult avend ${e.winner === "good" ? "ok" : "bad"}"><h3>${e.winner === "good" ? "好人獲勝！" : "壞人獲勝！"}</h3><div>${esc(e.why)}</div><div class="avroles">${rows}</div>${seated() ? `<div class="btbtns"><button class="mb avagain">再來一場</button><button class="mb ghost avlobby">回大廳</button></div>` : ""}</div>`;
     }
     let histOpen = false;
+    function rosterHTML() {
+      const EV = new Set(["刺客", "莫甘娜", "莫德雷德", "奧伯倫", "莫德雷德的爪牙"]);
+      const cnt = (arr) => Object.entries(arr.reduce((m, r) => ((m[r] = (m[r] || 0) + 1), m), {})).map(([r, k]) => `${esc(r)}${k > 1 ? ` ×${k}` : ""}`).join("、");
+      const g = st.roleList.filter((r) => !EV.has(r)), e = st.roleList.filter((r) => EV.has(r));
+      return `<div class="avcomp avroster2"><span class="g">好人 ${g.length} 人：${cnt(g)}</span><span class="e">壞人 ${e.length} 人：${cnt(e)}</span></div>`;
+    }
     function histHTML() {
       const h = st.hist || []; if (!h.length) return "";
       const nm = (i) => esc(st.players[i]?.name || "?");
-      const rows = h.slice().reverse().map((e) => {
-        const yes = e.votes.map((v, i) => v ? nm(i) : null).filter(Boolean), no = e.votes.map((v, i) => v ? null : nm(i)).filter(Boolean);
-        return `<div class="avh ${e.pass ? "ok" : "bad"}"><div><b>任務 ${e.round + 1}</b>・第 ${e.no} 次提案　隊長 ${nm(e.leader)}　${e.pass ? "✅通過" : "❌否決"}${e.q ? `　→ 任務${e.q.success ? "成功" : "失敗"}（${e.q.fails} 張失敗）` : ""}</div><div>隊伍：${e.team.map(nm).join("、")}</div><div>👍 ${yes.join("、") || "無"}</div><div>👎 ${no.join("、") || "無"}</div></div>`;
+      const chips = (arr, cls) => arr.length ? arr.map((i) => `<span class="avchip ${cls || ""}">${nm(i)}</span>`).join("") : `<span class="avnone">無</span>`;
+      const rounds = [...new Set(h.map((e) => e.round))].reverse();
+      const body = rounds.map((r) => {
+        const es = h.filter((e) => e.round === r), qr = es.find((e) => e.q)?.q;
+        const head = `<div class="avrh">第 ${r + 1} 次任務${qr ? `<span class="${qr.success ? "ok" : "bad"}">${qr.success ? "成功" : "失敗"}（${qr.fails} 張失敗票）</span>` : `<span class="pend">進行中</span>`}</div>`;
+        const cards = es.slice().reverse().map((e) => {
+          const yes = [], no = []; e.votes.forEach((v, i) => (v ? yes : no).push(i));
+          return `<div class="avh ${e.pass ? "ok" : "bad"}"><div class="avht"><b>第 ${e.no} 次提案</b><em>${e.pass ? "✅ 通過" : "❌ 否決"}（${yes.length}：${no.length}）</em></div>
+            <div class="avhr"><span>隊長</span><div>${chips([e.leader], "ld")}</div></div>
+            <div class="avhr"><span>隊伍</span><div>${chips(e.team, "tm")}</div></div>
+            <div class="avhr"><span>👍 贊成</span><div>${chips(yes, "y")}</div></div>
+            <div class="avhr"><span>👎 反對</span><div>${chips(no, "n")}</div></div></div>`;
+        }).join("");
+        return `<div class="avround">${head}${cards}</div>`;
       }).join("");
-      return `<details class="avhist"${histOpen ? " open" : ""}><summary>📜 投票紀錄（${h.length}）</summary>${rows}</details>`;
+      return `<details class="avhist"${histOpen ? " open" : ""}><summary>📜 投票紀錄（${h.length} 次提案）</summary>${body}</details>`;
     }
     function renderGame() {
       const key = st.phase + "|" + st.round + "|" + st.leader + "|" + st.rejects;
       if (key !== selKey) { selKey = key; sel = new Set(); }
       const pickable = (st.phase === "team" && st.leader === st.you) || (st.phase === "assassin" && st.you === st.assassin);
       const vres = st.phase === "voteres" ? st.voteRes : null;
-      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${roleCard()}${histHTML()}<small class="avroster">本局角色：${st.roleList.map(esc).join("、")}</small>${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
+      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${roleCard()}${histHTML()}${rosterHTML()}${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
       statusEl.textContent = st.phase === "end" ? "阿瓦隆　結束" : `阿瓦隆　第 ${st.round + 1} 次任務　隊長 ${st.players[st.leader]?.name || ""}`;
       const hd = body.querySelector(".avhist"); if (hd) hd.addEventListener("toggle", () => { histOpen = hd.open; });
       const q = (s) => body.querySelector(s);
