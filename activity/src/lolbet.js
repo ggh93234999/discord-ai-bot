@@ -149,7 +149,12 @@ export function mountLolBet(root, { env, back }) {
     if (!showHist) { el.innerHTML = ""; return; }
     if (!session) { el.innerHTML = `<div class="mempty">登入後才看得到注單。</div>`; return; }
     if (!hist) { el.innerHTML = `<div class="mempty">載入中…</div>`; return; }
-    el.innerHTML = hist.length ? hist.map((b) => `<div class="lbmine ${b.status}">${fmtTime(b.at)}　${esc(b.label)}　押${b.side === "home" ? "左" : "右"}　${money(b.amount)} × ${b.odds}　${BSTAT[b.status] || b.status}${b.payout && b.status !== "lost" ? ` +${money(b.payout)}` : ""}</div>`).join("") : `<div class="mempty">還沒有注單。</div>`;
+    const row = (b) => {
+      const [h, a] = b.home ? [b.home, b.away] : (b.label || " vs ").split(" vs "), mine = b.side === "home" ? h : a;
+      const res = b.score ? ` ${b.score[0]}:${b.score[1]}（${b.score[0] > b.score[1] ? h : a} 勝）` : "";
+      return `<div class="lbmine ${b.status}">${fmtTime(b.at)}　${esc(h)} vs ${esc(a)}${res}<br>押 ${esc(mine)}　${money(b.amount)} × ${b.odds}　${BSTAT[b.status] || b.status}${b.payout && b.status !== "lost" ? ` +${money(b.payout)}` : ""}</div>`;
+    };
+    el.innerHTML = hist.length ? hist.map(row).join("") : `<div class="mempty">還沒有注單。</div>`;
   }
 
   function destroy() { closed = true; timers.forEach(clearTimeout); clearInterval(tick); try { ws && ws.close(); } catch {} }

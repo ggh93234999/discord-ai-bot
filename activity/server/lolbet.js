@@ -142,6 +142,7 @@ async function settleAll() {
       else if (f && isVoid(f)) outcome = "void";
       else if (f && isFinished(f)) {
         const sc = await getScore(f).catch(() => null);
+        if (sc) b.score = sc;
         if (sc && sc[0] !== sc[1]) outcome = (sc[0] > sc[1]) === (b.side === "home") ? "win" : "lose";
         else if (sc && sc[0] === sc[1]) outcome = "void";
       } else if (now - (f ? f.start : b.at) > VOID_AFTER) outcome = "void";
@@ -181,7 +182,7 @@ export async function handleLol(ws, m) {
   if (m.t === "lolget") { watchers.add(ws); send(ws, viewFor(ws)); if (Date.now() - updatedAt > POLL_MS_NOW()) lolPoll(); return true; }
   if (m.t === "lolhist") {
     const uid = ws.user && ws.user.uid;
-    const list = uid ? st.bets.filter((b) => b.uid === uid).slice(-30).reverse().map((b) => ({ label: b.label, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0, at: b.at })) : [];
+    const list = uid ? st.bets.filter((b) => b.uid === uid).slice(-30).reverse().map((b) => ({ label: b.label, home: b.home || "", away: b.away || "", score: b.score || null, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0, at: b.at })) : [];
     send(ws, { t: "lolhist", list }); return true;
   }
   if (m.t !== "lolbet") return false;
@@ -204,7 +205,7 @@ export async function handleLol(ws, m) {
     let r; try { r = await _deps.settle(u.uid, u.name, amount, 0, `世界賽運彩 ${label}`); } catch { return err("bot_down"); }
     if (!r || !r.ok) return err((r && r.error) || "insufficient", { balance: r && r.balance });
     if (f.start - LOCK_MS <= Date.now()) { try { await _deps.pay(u.uid, u.name, amount, "世界賽運彩 鎖盤退款"); } catch {} return err("closed"); }   // 扣款期間剛好鎖盤：退款
-    const bet = { id: ++st.seq, uid: u.uid, name: u.name, fixtureId: f.id, label, side, amount, odds: cur, at: Date.now(), status: "open" };
+    const bet = { id: ++st.seq, uid: u.uid, name: u.name, fixtureId: f.id, label, home: f.home, away: f.away, side, amount, odds: cur, at: Date.now(), status: "open" };
     st.bets.push(bet); save();
     send(ws, { t: "lolres", ok: true, balance: r.balance, bet: { id: bet.id, side, amount, odds: cur } });
     send(ws, viewFor(ws));
