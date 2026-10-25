@@ -34,8 +34,8 @@ async function fetchJson(path, params, prio) {
 }
 export const _deps = { settle: botSettle, pay: botPay, fetchJson };
 
-let st = { bets: [], seq: 0 };
-try { st = { bets: [], seq: 0, ...JSON.parse(fs.readFileSync(SFILE, "utf8")) }; } catch {}
+let st = { bets: [], seq: 0, results: {} };
+try { st = { bets: [], seq: 0, results: {}, ...JSON.parse(fs.readFileSync(SFILE, "utf8")) }; } catch {}
 const save = () => { try { fs.writeFileSync(SFILE, JSON.stringify(st)); } catch (e) { console.log("世界賽運彩存檔失敗", e.message); } };
 
 let fixtures = new Map();     // fixtureId -> { id, home, away, start, statusId, statusName, hasOdds, oh, oa, suspended, score }
@@ -118,7 +118,10 @@ async function getScore(f) {
   if (f.score) return f.score;
   const j = await _deps.fetchJson("scores", { fixtureId: f.id }, true);
   const p = j && j.scores && j.scores.periods && (j.scores.periods.result || j.scores.periods.fulltime);
-  if (p && Number.isFinite(p.participant1Score) && Number.isFinite(p.participant2Score)) f.score = [p.participant1Score, p.participant2Score];
+  if (p && Number.isFinite(p.participant1Score) && Number.isFinite(p.participant2Score)) {
+    f.score = [p.participant1Score, p.participant2Score];
+    st.results[f.id] = { id: f.id, home: f.home, away: f.away, start: f.start, score: f.score }; save();   // 比分記下來，之後顯示在「最近結果」
+  }
   return f.score || null;
 }
 
@@ -129,8 +132,16 @@ async function settleAll() {
   if (settling) return; settling = true;
   try {
     const now = Date.now();
-    const due = st.bets.some((b) => { const f = fixtures.get(b.fixtureId); return b.status === "open" && f && !isFinished(f) && !isVoid(f) && now - f.start > FIRST_CHECK; });
+    const running = (f) => f && !isFinished(f) && !isVoid(f) && now - f.start > FIRST_CHECK && now - f.start < 12 * 3600e3;
+    const due = st.bets.some((b) => b.status === "open" && running(fixtures.get(b.fixtureId))) || (watchers.size > 0 && [...fixtures.values()].some(running));
     if (due && now - lastCheck > plan().checkMs) { lastCheck = now; try { await loadFixtures(now, true); } catch (e) { console.log("世界賽運彩 賽果檢查失敗：", e && e.message); } }   // 一次呼叫就能更新所有場次的狀態
+    let got = 0;
+    for (const f of fixtures.values()) {                         // 剛打完的比賽（12 小時內）先查比分，顯示在「最近結果」；每輪最多 6 場
+      if (got >= 6) break;
+      if (!isFinished(f) || f.score || st.results[f.id] || now - f.start > 12 * 3600e3) continue;
+      if (st.api && st.api.used >= BUDGET - 8) break;             // 快沒額度了：只留給有注單的場次
+      got++; try { await getScore(f); } catch {} await new Promise((r) => setTimeout(r, 1100));
+    }
     for (const b of st.bets) {
       if (b.status !== "open" && b.status !== "unpaid") continue;
       let f = fixtures.get(b.fixtureId);
@@ -167,11 +178,13 @@ function fview(f, uid) {
   else if (f.start - LOCK_MS <= now) state = "live";
   else if (hasLine && !f.suspended && f.hasOdds) state = "open";
   const mine = uid ? st.bets.filter((b) => b.uid === uid && b.fixtureId === f.id).map((b) => ({ id: b.id, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) : [];
-  return { id: f.id, home: f.home, away: f.away, start: f.start, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || null, mine };
+  return { id: f.id, home: f.home, away: f.away, start: f.start, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine };
 }
 function viewFor(ws) {
   const uid = ws.user && ws.user.uid;
   const list = [...fixtures.values()].sort((a, b) => a.start - b.start).map((f) => fview(f, uid));
+  for (const r of Object.values(st.results)) if (!fixtures.has(r.id)) list.unshift({ id: r.id, home: r.home, away: r.away, start: r.start, state: "finished", oh: null, oa: null, score: r.score, mine: [] });   // 已經掉出賽程視窗的舊場次
+  list.sort((a, b) => a.start - b.start);
   return { t: "lolstate", ok: lolEnabled(), now: Date.now(), updatedAt, err: lastErr ? 1 : 0, dead: plan().dead ? 1 : 0, every: Math.round(plan().oddsMs / 60000), limit: betLimit(), maxFixture: betLimit() * MAX_PER_FIXTURE, list, you: uid ? ws.user.name : null };
 }
 function pushAll() { for (const ws of watchers) send(ws, viewFor(ws)); }
@@ -216,5 +229,5 @@ export async function handleLol(ws, m) {
 // 每分鐘看一次：有人在看且賠率過期就更新；有待結算的注單就檢查賽果（實際會不會打 API 由上面的間隔決定）
 if (lolEnabled()) setInterval(() => {
   if (watchers.size && Date.now() - updatedAt > POLL_MS_NOW()) lolPoll();
-  if (st.bets.some((b) => b.status === "open" || b.status === "unpaid")) { if (!fixtures.size && !polling) lolPoll().then(settleAll); else settleAll().then(() => { if (watchers.size) pushAll(); }); }
+  if (watchers.size || st.bets.some((b) => b.status === "open" || b.status === "unpaid")) { if (!fixtures.size && !polling) lolPoll().then(settleAll); else settleAll().then(() => { if (watchers.size) pushAll(); }); }
 }, 60000).unref();
