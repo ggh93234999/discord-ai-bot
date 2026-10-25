@@ -3,7 +3,8 @@
 // 先進房間的是黑（c4 是紅），第二個是白（c4 是黃），其他人旁觀。棋盤只存在記憶體，重啟會清掉。
 import http from "node:http";
 import { WebSocketServer } from "ws";
-import { handleApi, getSession, botInfo, botSettle, betLimit } from "./bet.js";
+import { handleApi, getSession, botInfo, botSettle, betLimit, internalKey } from "./bet.js";
+import { timingSafeEqual } from "node:crypto";
 import { spin as slotSpin, KINDS as SLOT_KINDS } from "./slots.js";
 import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
@@ -235,7 +236,22 @@ function place(room, role, m) {
 }
 
 
+// 誰在玩哪個遊戲（給大笨bot 用）：每個玩家的瀏覽器會用一條連線回報目前在哪個遊戲，主選單算 "menu"
+const presence = new Set();
+function servePresence(req, res) {
+  const key = internalKey(), got = String(req.headers["x-key"] || "");
+  const ok = key.length >= 32 && got.length === key.length && timingSafeEqual(Buffer.from(got), Buffer.from(key));
+  if (!ok) { res.writeHead(403); res.end("{}"); return; }
+  const gid = new URL(req.url, "http://x").searchParams.get("gid") || "";
+  const now = Date.now(), players = [];
+  for (const w of presence) {
+    const p = w.pres; if (!p || p.gid !== gid || w.readyState !== 1) continue;
+    players.push({ game: p.game, name: p.name || w.user?.name || "", sec: Math.round((now - p.since) / 1000) });
+  }
+  res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ players }));
+}
 const httpServer = http.createServer((req, res) => {
+  if (req.url.startsWith("/api/internal/presence")) return servePresence(req, res);
   if (req.url.startsWith("/api/gallery/img/") && serveGallery(req, res)) return;
   if (req.url.startsWith("/api/tv/sub/")) return void serveSub(req, res).then((ok) => { if (!ok) { res.writeHead(404); res.end(); } });
   if (req.url.startsWith("/api/tv/") && serveVideo(req, res)) return;
@@ -260,6 +276,12 @@ wss.on("connection", (ws, req) => {
     try { m = JSON.parse(raw.toString()); } catch { return; }
     if (ws.mtypes.length < 6) ws.mtypes.push(m.t);
     if (m.t === "ping") { send(ws, { t: "pong", ts: m.ts }); return; }
+    if (m.t === "hpres") {
+      const gid = /^\d{5,25}$/.test(String(m.gid)) ? String(m.gid) : "", game = /^[a-z0-9_-]{1,20}$/.test(String(m.game)) ? String(m.game) : "menu";
+      const name = String(m.name || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12);
+      ws.pres = { gid, game, name, since: ws.pres && ws.pres.game === game ? ws.pres.since : Date.now() };
+      presence.add(ws); return;
+    }
     // 老虎機練習模式：每條連線一份練習幣，不碰真代幣
     if (m.t === "slotjoin") { ws.practice = ws.practice ?? 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
     if (m.t === "slotreset") { ws.practice = 1000; return send(ws, { t: "slotinit", balance: ws.practice }); }
@@ -407,6 +429,7 @@ wss.on("connection", (ws, req) => {
   });
 
   ws.on("close", (code, reason) => {
+    presence.delete(ws);
     console.log(`ws close code=${code} reason=${String(reason || "").slice(0, 40)} ua=${ws.ua} msgs=${ws.mtypes.join(",")} age=${Math.round((Date.now() - ws.born) / 1000)}s missed=${ws.missed} room=${ws.cr ? ws.cr.key : ws.room ? "board" : ws.multi ? "multi" : "-"}`);
     casinoClose(ws);
     pokerClose(ws);

@@ -24,6 +24,7 @@ const BOT_API = ENV.BOT_API || "http://127.0.0.1:3107";
 let INTERNAL_KEY = "";
 try { INTERNAL_KEY = fs.readFileSync(dir + "internal.key", "utf8").trim(); } catch {}
 
+export const internalKey = () => INTERNAL_KEY;
 export const betEnabled = () => !!(CLIENT_SECRET && INTERNAL_KEY);
 
 // ---- 登入憑證：隨機字串 → 玩家身分，只存在記憶體，12 小時過期

@@ -1,6 +1,6 @@
 import { DiscordSDK } from "@discord/embedded-app-sdk";
 import "./style.css";
-import { mountGomoku } from "./gomoku.js";
+import { mountGomoku, wsUrl } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";
 import { mountReversi } from "./reversi.js";
 import { mountSlots } from "./slots.js";
@@ -40,6 +40,26 @@ if (inDiscord && clientId) {
 }
 
 const app = document.getElementById("app");
+
+// 回報「我現在在玩哪個遊戲」（給大笨bot 回答「大家在玩什麼」；只傳伺服器 id、遊戲代號和名稱）
+let presWs = null, presGame = "menu", presTimer = 0;
+function presSend() {
+  if (!presWs || presWs.readyState !== 1) return;
+  let name = ""; try { name = localStorage.getItem("pokername") || ""; } catch {}
+  if (env.session && !presWs._auth) { presWs._auth = true; presWs.send(JSON.stringify({ t: "bauth", token: env.session.token })); }
+  presWs.send(JSON.stringify({ t: "hpres", gid: env.guildId || "", game: presGame, name }));
+}
+function presConnect() {
+  try {
+    presWs = new WebSocket(wsUrl(env.inDiscord));
+    presWs.onopen = presSend;
+    presWs.onclose = () => { presWs = null; clearTimeout(presTimer); presTimer = setTimeout(presConnect, 5000); };
+    presWs.onerror = () => {};
+  } catch {}
+}
+function presence(game) { presGame = game; presSend(); }
+presConnect();
+setInterval(() => presSend(), 60000);
 
 // cat：選單分類；players：人數標籤
 const CATS = [
@@ -81,6 +101,7 @@ const GAMES = [
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {
+  presence("menu");
   const card = (g) => `<button class="card${g.wide ? " wide" : ""}" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
   const tabs = CATS.filter((c) => GAMES.some((g) => g.cat === c.id));
   let tab = ""; try { tab = localStorage.getItem("menutab") || ""; } catch {}
@@ -95,7 +116,7 @@ function showMenu() {
     </div>`;
   const gn = app.querySelector(".gname");
   try { gn.value = localStorage.getItem("pokername") || ""; } catch {}
-  gn.addEventListener("change", () => { const v = gn.value.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12); gn.value = v; try { localStorage.setItem("pokername", v); } catch {} });
+  gn.addEventListener("change", () => { const v = gn.value.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12); gn.value = v; try { localStorage.setItem("pokername", v); } catch {} presSend(); });
   app.querySelectorAll(".mtab").forEach((b) => b.addEventListener("click", () => { try { localStorage.setItem("menutab", b.dataset.t); } catch {} showMenu(); }));
   app.querySelectorAll(".card").forEach((b) => {
     b.addEventListener("click", () => start(b.dataset.g));
@@ -105,6 +126,7 @@ function showMenu() {
 let cleanup = null;
 function start(id) {
   const g = GAMES.find((x) => x.id === id);
+  presence(id);
   app.innerHTML = "";
   cleanup = g.mount(app, { env, back: () => { if (cleanup) cleanup(); cleanup = null; showMenu(); } }) || null;
 }
