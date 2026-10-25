@@ -155,7 +155,7 @@ def tarot(spread: str, question: str) -> str:
     except Exception as e:
         logging.getLogger("discord-ai-bot.divination").warning("塔羅圖片失敗：%r", e)
     return (head + "\n" + "\n".join(card_lines) + DIVIDER + "\n".join(detail) +
-            "\n解讀方式：依牌陣位置逐張說明，再把整體串成一個故事回答問題；逆位通常是能量受阻、不足或過度，不一定是壞事。" + img)
+            "\n解讀方式：結果卡已經把牌名、位置、正逆位貼給使用者了，回覆不要再重複列出抽到的牌；直接依牌陣位置說明每張牌在這個問題上代表什麼，再把整體串成一個故事回答問題；逆位通常是能量受阻、不足或過度，不一定是壞事。" + img)
 
 
 # ---------------------------------------------------------------- 擲筊
@@ -198,7 +198,7 @@ def qian(question: str) -> str:
     card = (f"{head}\n{re_draw}擲筊：🌗 聖筊，確認是這支籤\n"
             f"**第 {q['n']} 籤　{q['gz']}**（{q['attr']}）\n> {q['poem'][0]}\n> {q['poem'][1]}")
     detail = (f"籤詩：{q['poem'][0]}{q['poem'][1]}\n籤頭屬性：{q['attr']}\n卦頭故事：{q['story'] or '（無）'}\n"
-              "解讀方式：先用白話解釋籤詩意思，再針對對方問的事（感情、工作、考試、財運、健康、尋物等）給具體建議；"
+              "解讀方式：結果卡已經貼了籤號和籤詩，不要重抄一遍；先用白話解釋籤詩意思，再針對對方問的事（感情、工作、考試、財運、健康、尋物等）給具體建議；"
               "可以提一下卦頭故事的寓意。不要誇大或嚇人，健康、法律、金錢的重大決定要提醒對方以專業意見為準。")
     return card + DIVIDER + detail + _img("qian_img", q["n"], q["gz"], q["attr"], q["poem"], q["story"], question)
 
@@ -257,7 +257,7 @@ def iching(question: str) -> str:
         detail.append(f"之卦 {h2['name']}：卦辭「{h2['gua']}」；大象「{h2['xiang']}」")
         detail.append("之卦爻辭：" + "／".join(h2["yao"]))
     detail.append("看法：" + focus)
-    detail.append("解讀方式：先說明卦名和卦象（上下卦代表的自然現象）的意思，再用白話解釋該看的卦辭／爻辭，"
+    detail.append("解讀方式：結果卡已經貼了卦名和爻，不要重複列出；直接說明卦名和卦象（上下卦代表的自然現象）的意思，再用白話解釋該看的卦辭／爻辭，"
                   "最後針對對方的問題給建議；原文要引用時照上面的字，不要自己改字。")
     return card + DIVIDER + "\n".join(detail) + _img("iching_img", h1, base, vals, h2, rel if moving else None, TRI_NATURE, question, focus)
 
