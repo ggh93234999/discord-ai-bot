@@ -6,7 +6,7 @@
 // 果樹（tree:true）：種一次不用再買，每隔一段時間結一次果（一次至少 20 個），收成後樹還在、重新計時；
 //   別人可以偷，同一個人每棵樹每輪只能偷 1 個，很多人偷的話最多偷到剩一半（floor(產量/2)）。
 //   單價 = 樹苗價 × 1.25 ÷ 一半的數量（進位），所以就算被偷到只剩一半，主人這一輪賣掉也至少賺回樹苗錢的 1.25 倍，不會虧本。
-// 偷菜：別人的田成熟 5 分鐘後才能偷，每塊地（每棵樹）每人每輪只能偷 1 個，很多人偷的話最多偷到剩一半（floor(產量/2)）；蔬菜每人每天最多偷 20 個，果樹不限。
+// 偷菜：別人的田成熟 5 分鐘後才能偷，每塊地（每棵樹）每人每輪只能偷 1 個，很多人偷的話最多偷到剩一半（floor(產量/2)）；偷菜沒有每天次數上限。
 import fs from "node:fs";
 import { randomInt, randomBytes, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -40,7 +40,7 @@ export const VARIANTS = { n: { name: "", mult: 1 }, big: { name: "大顆", mult:
 const rollVariant = () => { const r = randomInt(1000); return r < 10 ? "gold" : r < 60 ? "big" : "n"; };
 const START_PLOTS = 6, MAX_PLOTS = 24, PRACTICE_START = 300;
 const plotCost = (np) => 500 * (np - START_PLOTS + 1);          // 從 np 塊買到 np+1 塊
-const STEAL_GRACE = 5 * 60_000, STEAL_PER_PLOT = 1, STEAL_PER_DAY = 20, LOG_MAX = 20;
+const STEAL_GRACE = 5 * 60_000, STEAL_PER_PLOT = 1, LOG_MAX = 20;
 const ripeAt = (p) => p.at + CROP[p.c].min * 60_000;
 
 // ---- 存檔
@@ -95,7 +95,7 @@ function viewOf(ws, f, real, bal) {
     t: "fm", a: "view", real, now, np: f.plots.length, max: MAX_PLOTS, plotCost: f.plots.length < MAX_PLOTS ? plotCost(f.plots.length) : 0,
     plots: f.plots.map((p) => (p ? { c: p.c, left: Math.max(0, ripeAt(p) - now), grace: Math.max(0, ripeAt(p) + STEAL_GRACE - now), got: yieldOf(p.c) - p.st.length, stolen: p.st.length } : null)),
     inv, invValue: inv.reduce((s, x) => s + x.unit * x.n, 0),
-    balance: real ? bal : f.coin, stealLeft: Math.max(0, STEAL_PER_DAY - used),
+    balance: real ? bal : f.coin, 
     log: f.log.slice(-8).reverse(),
     crops: CROPS.map((c) => ({ id: c.id, icon: c.icon, name: c.name, seed: c.seed, min: c.min, y: c.y, unit: unitPrice(c.id), tree: !!c.tree })),
   };
@@ -156,7 +156,6 @@ export async function handleFarm(ws, m) {
       const p = Number.isInteger(i) ? g.plots[i] : null;
       if (!p) { err("bad_plot"); return; }
       const tree = !!CROP[p.c].tree;
-      if (!tree && f.st.n >= STEAL_PER_DAY) { err("steal_cap"); return; }      // 果樹不受每天次數限制
       if (Date.now() < ripeAt(p) + STEAL_GRACE) { err("not_ripe"); return; }
       if (p.st.includes(key)) { err("no_more"); return; }                  // 每個人每塊地（每棵樹）每輪只能偷 1 個
       if (p.st.length >= stealMax(p.c)) { err("tree_half"); return; }      // 很多人偷也只能偷到剩一半
@@ -164,7 +163,7 @@ export async function handleFarm(ws, m) {
       p.st.push(key); if (!tree) f.st.n++; addInv(f, p.c, v);
       addLog(g, `${name} 偷走了你的 ${VARIANTS[v].name}${CROP[p.c].icon}`, tree ? `${key}|${p.c}|${v}` : "");
       farmSave(true);
-      out(ws, { t: "fm", a: "stole", c: p.c, v, tree, left: STEAL_PER_DAY - f.st.n, treeLeft: Math.max(0, stealMax(p.c) - p.st.length) });
+      out(ws, { t: "fm", a: "stole", c: p.c, v, tree, treeLeft: Math.max(0, stealMax(p.c) - p.st.length) });
     }
     out(ws, visitView(ws, tk, g, key));
     return;
