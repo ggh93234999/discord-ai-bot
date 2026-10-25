@@ -728,7 +728,7 @@ body.tv-fs{overflow:hidden}
 .btag{display:inline-block;font-size:10px;line-height:1.4;padding:0 5px;border-radius:8px;background:rgba(255,255,255,.14);color:#ffe0a3;margin-left:3px;font-weight:400;white-space:nowrap}
 
 /* 手機版 Discord：頂端有一條蓋在 Activity 上的列（約 45px），把遊戲畫面往下推才看得到「← 選單」 */
-.dcm .game{padding-top:58px}
+.dcm .game.game{padding-top:58px}
 .mj .mhand .mt.sel{transform:translateY(-12px);outline:2px solid #ffd54f;outline-offset:1px}
 
 /* ---- 種菜 ---- */
