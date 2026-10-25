@@ -941,3 +941,6 @@ body.tv-fs{overflow:hidden}
 .av .avchip.tm{background:rgba(255,213,79,.2)}.av .avchip.y{background:rgba(76,175,80,.3)}.av .avchip.n{background:rgba(229,57,53,.3)}.av .avchip.ld{background:rgba(100,181,246,.25)}
 .av .avnone{color:#777;font-size:12px}
 .av .avroster2{margin-top:6px;text-align:left;font-size:12px}
+
+.bt .brhand .bc.can{touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.bt .brhand .bc.drag{opacity:.55;transform:translateY(-18px) scale(1.08);box-shadow:0 0 0 3px #64b5f6;z-index:3}

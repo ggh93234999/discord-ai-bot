@@ -1,7 +1,7 @@
 // 大老二（台灣玩法，練習點數）：發牌、判定、計分、電腦都在伺服器（server/bigtwo.js），這裡只畫畫面和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
-import { classify, beats, suitOf, rankOf, SUITS, CLUB3 } from "../shared/bigtwo_rules.js";
+import { classify, beats, suitOf, rankOf, rstr, strength, SUITS, CLUB3 } from "../shared/bigtwo_rules.js";
 
 const RN = { 11: "J", 12: "Q", 13: "K", 14: "A" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -26,7 +26,7 @@ export function mountBigtwo(opts = {}) {
     attachRules(root.querySelector(".game"), "bigtwo");
     const $ = (s) => root.querySelector(s);
     const statusEl = $(".status"), body = $(".brbody"), logEl = $(".brlog"), watchEl = $(".watch");
-    let ws = null, closed = false, retry = 0, st = null, timer = 0, sel = new Set(), selKey = "";
+    let ws = null, closed = false, retry = 0, st = null, timer = 0, sel = new Set(), selKey = "", myOrder = [], ordHand = -1, nextSort = 0, dragging = false, pendRender = false;
     const pid = getPid();
     const room = spectate ? spectate.room : env.instanceId;
     const send = (o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
@@ -115,7 +115,48 @@ export function mountBigtwo(opts = {}) {
       return true;
     }
 
+    function orderedHand() {
+      const h = st.hand || [];
+      if (ordHand !== st.handNo) { ordHand = st.handNo; myOrder = h.slice(); nextSort = 0; }
+      myOrder = myOrder.filter((c) => h.includes(c)); for (const c of h) if (!myOrder.includes(c)) myOrder.push(c);
+      return myOrder;
+    }
+    // 手牌可以拖曳換位置（滑鼠直接拖；手機長按一下再拖）
+    function wireDrag(handEl) {
+      let d = null, just = false;
+      const start = () => { if (!d || d.on) return; d.on = true; dragging = true; d.el.classList.add("drag"); try { handEl.setPointerCapture(d.id); } catch {} };
+      handEl.addEventListener("pointerdown", (e) => {
+        const el = e.target.closest(".bc.can"); if (!el) return;
+        d = { el, x: e.clientX, y: e.clientY, on: false, id: e.pointerId, touch: e.pointerType === "touch", timer: 0 };
+        if (d.touch) d.timer = setTimeout(start, 260);
+      });
+      handEl.addEventListener("pointermove", (e) => {
+        if (!d) return;
+        if (!d.on) {
+          const mv = Math.hypot(e.clientX - d.x, e.clientY - d.y);
+          if (d.touch) { if (mv > 10) { clearTimeout(d.timer); d = null; } return; }
+          if (mv > 6) start(); else return;
+        }
+        e.preventDefault();
+        const t = document.elementFromPoint(e.clientX, e.clientY)?.closest(".bc.can");
+        if (t && t !== d.el && t.parentNode === handEl) { const r = t.getBoundingClientRect(); handEl.insertBefore(d.el, e.clientX < r.left + r.width / 2 ? t : t.nextSibling); }
+      });
+      handEl.addEventListener("touchmove", (e) => { if (d && d.on) e.preventDefault(); }, { passive: false });
+      const end = () => {
+        if (!d) return; clearTimeout(d.timer);
+        if (d.on) {
+          d.el.classList.remove("drag"); dragging = false; just = true; setTimeout(() => { just = false; }, 0);
+          myOrder = [...handEl.querySelectorAll(".bc.can")].map((x) => Number(x.dataset.c));
+        }
+        d = null;
+        if (pendRender) { pendRender = false; renderTable(); }
+      };
+      handEl.addEventListener("pointerup", end); handEl.addEventListener("pointercancel", end);
+      handEl.addEventListener("click", (e) => { if (just) { e.stopPropagation(); e.preventDefault(); } }, true);
+    }
+
     function renderTable() {
+      if (dragging) { pendRender = true; return; }
       const you = st.you, me = you >= 0 ? st.seats[you] : null, play = st.phase === "play";
       const order = [2, 1, 3, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
       const mid = play ? midHTML() : `<div class="brmid">${st.result ? resultHTML(st.result) : ""}</div>`;
@@ -125,9 +166,9 @@ export function mountBigtwo(opts = {}) {
         const key = (st.hand || []).join(",") + "|" + st.handNo;
         if (key !== selKey) { selKey = key; sel = new Set(); }
         sel = new Set([...sel].filter((c) => (st.hand || []).includes(c)));
-        const hand = `<div class="brhand bthand${myTurn ? " act" : ""}">${(st.hand || []).map((c) => card(c, `big can${sel.has(c) ? " sel" : ""}`, `data-c="${c}"`)).join("")}</div>`;
+        const hand = `<div class="brhand bthand${myTurn ? " act" : ""}">${orderedHand().map((c) => card(c, `big can${sel.has(c) ? " sel" : ""}`, `data-c="${c}"`)).join("")}</div>`;
         const tip = myTurn ? (st.last ? "輪到你：選牌壓過桌上的牌，或按「過」" : st.mustClub ? "你先出，牌裡要包含 ♣3" : "輪到你，隨便出一種牌型") : `等 ${nm(st.turn)} 出牌…`;
-        below = `<div class="mhint">${tip}</div>${hand}<div class="btbtns"><button class="mb btplay" ${canPlay() ? "" : "disabled"}>出牌</button><button class="mb ghost btpass" ${myTurn && st.canPass ? "" : "disabled"}>過</button><button class="mb ghost btclear">清除選擇</button></div>`;
+        below = `<div class="mhint">${tip}</div>${hand}<div class="btbtns"><button class="mb btplay" ${canPlay() ? "" : "disabled"}>出牌</button><button class="mb ghost btpass" ${myTurn && st.canPass ? "" : "disabled"}>過</button><button class="mb ghost btclear">清除選擇</button><button class="mb ghost btsort">整理（${nextSort ? "依花色" : "依大小"}）</button></div>`;
       } else if (play) {
         below = `<div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div>`;
       }
@@ -140,6 +181,11 @@ export function mountBigtwo(opts = {}) {
       }));
       const pb = body.querySelector(".btplay"); pb && pb.addEventListener("click", () => { if (canPlay()) { send({ t: "btact", a: "play", cards: [...sel] }); sel = new Set(); } });
       const ps = body.querySelector(".btpass"); ps && ps.addEventListener("click", () => send({ t: "btact", a: "pass" }));
+      const hEl = body.querySelector(".bthand"); if (hEl) wireDrag(hEl);
+      const so = body.querySelector(".btsort"); so && so.addEventListener("click", () => {
+        myOrder = (st.hand || []).slice().sort(nextSort ? (a, b) => suitOf(a) - suitOf(b) || strength(a) - strength(b) : (a, b) => strength(a) - strength(b));
+        nextSort = 1 - nextSort; renderTable();
+      });
       const cl = body.querySelector(".btclear"); cl && cl.addEventListener("click", () => { sel = new Set(); body.querySelectorAll(".brhand .bc.sel").forEach((e) => e.classList.remove("sel")); const p = body.querySelector(".btplay"); if (p) p.disabled = true; });
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "btsit", seat: Number(el.dataset.sit) })));
       const sb = body.querySelector(".stand"); sb && sb.addEventListener("click", () => send({ t: "btstand" }));
