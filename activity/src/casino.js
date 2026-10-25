@@ -57,6 +57,7 @@ export function mountCasino(game, opts = {}) {
     const statusEl = $(".status"), stage = $(".cstage"), ctl = $(".cctl"), balEl = $(".bal b"), resetBtn = $(".reset");
     const gameEl = $(".casino"), confirmEl = $(".confirm"), betsEl = $(".bets");
     $(".back").addEventListener("click", back);
+    if (game === "stone") gameEl.classList.add("stg");   // 賭石：石頭固定在上面、操作鈕固定在下面（style.css .stg）
     attachRules(root, game);
     const watch = spectate ? { setYou() {}, update() {}, destroy() {} } : createWatch(gameEl);
     if (spectate) gameEl.classList.add("spectating");

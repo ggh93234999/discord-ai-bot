@@ -944,3 +944,18 @@ body.tv-fs{overflow:hidden}
 
 .bt .brhand .bc.can{touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .bt .brhand .bc.drag{opacity:.55;transform:translateY(-18px) scale(1.08);box-shadow:0 0 0 3px #64b5f6;z-index:3}
+
+/* ---- 賭石版面：一頁內同時看得到石頭和操作按鈕 ---- */
+.casino.stg .cstage{max-width:none}
+.casino.stg .stslot{position:sticky;top:0;z-index:6;background:#101412;padding:4px 0;border-radius:0 0 12px 12px}
+.dcm .casino.stg .stslot{top:48px}
+.casino.stg .s3d{max-width:min(100%,34vh);min-width:190px}
+.casino.stg .cctl{position:sticky;bottom:0;z-index:6;background:rgba(14,18,16,.97);padding:6px 4px;margin:0;gap:6px;border-top:1px solid rgba(255,255,255,.12);flex-wrap:nowrap}
+.casino.stg .cctl button{padding:8px 6px;font-size:14px;flex:1 1 0;min-width:0}
+@media (min-width:900px){
+  .game.slots.casino.stg{max-width:1000px}
+  .casino.stg .cstage{display:grid;grid-template-columns:minmax(320px,460px) 1fr;gap:8px 20px;align-items:start;justify-content:stretch}
+  .casino.stg .cstage>*{grid-column:2}
+  .casino.stg .cstage>.stslot{grid-column:1;grid-row:1/span 30;top:8px;background:transparent}
+  .casino.stg .s3d{max-width:460px}
+}
