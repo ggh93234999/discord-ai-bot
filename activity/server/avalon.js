@@ -51,7 +51,7 @@ function startGame(t) {
   const want = Math.max(MINP, Math.min(MAXP, Math.max(t.cfg.n, t.players.length)));
   while (t.players.length < want) t.players.push(mkP({ bot: true, name: pickBotName(t) }));
   const n = t.players.length;
-  t.g = { n, roles: assignRoles(n, t.cfg), leader: randomInt(n), round: 0, rejects: 0, results: [], fails: [], hist: [], team: [], votes: {}, qvotes: {}, voteRes: null, questRes: null, sus: Array(n).fill(0), botAt: 0, winner: null, why: "", assassin: -1, target: -1 };
+  t.g = { n, roles: assignRoles(n, t.cfg), leader: randomInt(n), round: 0, rejects: 0, gid: randomBytes(4).toString("hex"), results: [], fails: [], hist: [], team: [], votes: {}, qvotes: {}, voteRes: null, questRes: null, sus: Array(n).fill(0), botAt: 0, winner: null, why: "", assassin: -1, target: -1 };
   t.started = true; t.final = null; t.phase = "team";
   t.log = `開始！${n} 人（好人 ${GOOD_N[n]}、壞人 ${n - GOOD_N[n]}）。身分只有你自己看得到，按住「看我的身分」`;
   setBot(t);
@@ -187,7 +187,7 @@ function view(t, ws) {
     if (t.phase === "voteres") v.voteRes = g.voteRes;
     if (t.phase === "questres") v.questRes = g.questRes;
     if (t.phase === "assassin") v.assassin = g.assassin;
-    v.hist = g.hist;
+    v.hist = g.hist; v.gid = g.gid;
     v.roleList = [...g.roles].sort().map((r) => ROLE_NAME[r]);
     if (you >= 0) {
       const r = g.roles[you]; v.me = { role: r, roleName: ROLE_NAME[r], evil: isEvil(r), ...knowledge(t, you) };

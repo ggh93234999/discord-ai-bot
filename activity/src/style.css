@@ -964,3 +964,8 @@ body.tv-fs{overflow:hidden}
 .menu .namebar label{display:flex;gap:8px;align-items:center;font-size:15px}
 .menu .namebar input{background:#1d2230;border:1px solid #3a4258;border-radius:8px;color:#fff;padding:6px 10px;font-size:15px;width:190px}
 .menu .namebar small{color:#8a93a6;font-size:12px}
+
+.av .avmk{margin-top:4px;background:rgba(0,0,0,.3);border:1px dashed #667;border-radius:10px;color:#bbb;font-size:11px;padding:1px 8px;cursor:pointer}
+.av .avmk.on{border-style:solid;color:#fff}.av .avmk.m1{background:#2e7d32}.av .avmk.m2{background:#b71c1c}.av .avmk.m3{background:#e65100}.av .avmk.m4{background:#6a1b9a}
+.av .avnote{width:100%;font-size:13px}.av .avnote summary{cursor:pointer;padding:6px 4px;color:#90caf9}
+.av .avnote-ta{width:100%;box-sizing:border-box;min-height:80px;background:#1b1e26;color:#fff;border:1px solid #444;border-radius:8px;padding:6px;font-size:14px}
