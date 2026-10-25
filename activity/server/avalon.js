@@ -191,8 +191,8 @@ const LLM_EFFORT = ENV.AVALON_LLM_REASONING ?? "none";      // 思考模式（no
 const LLM_TIMEOUT = Number(ENV.AVALON_LLM_TIMEOUT || 60) * 1000;
 export const llmEnabled = () => !!(LLM_URL && llmModel());
 const RULES_TXT = "阿瓦隆規則：好人要 3 次任務成功；壞人要 3 次任務失敗、或連續 5 次隊伍被否決、或好人完成 3 次後刺客刺中梅林。隊長選指定人數的隊伍，所有人公開投贊成／反對（過半贊成才通過）。通過後隊員各出『成功』或『失敗』牌，好人只能出成功，壞人可以出失敗。任務只要有失敗票就失敗（7 人以上的第 4 次要 2 張）。";
-const say = (t, i, text) => { const g = t.g, s = String(text || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 60); if (!g || !s) return; g.chat.push({ i, name: pname(t, i), text: s, round: g.round }); if (g.chat.length > 80) g.chat.shift(); };
-function llmPrompt(t, i) {
+const say = (t, i, text) => { const g = t.g, s = String(text || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 80); if (!g || !s) return; g.chat.push({ i, name: pname(t, i), text: s, round: g.round }); if (g.chat.length > 80) g.chat.shift(); };
+function llmPrompt(t, i, mode) {
   const g = t.g, role = g.roles[i], evil = isEvil(role), kn = knowledge(t, i);
   const nm = (k) => `${k}號${pname(t, k)}`;
   const hist = g.hist.map((h) => `任務${h.round + 1}第${h.no}次提案：隊長${nm(h.leader)}，隊伍[${h.team.map(nm).join("、")}]，贊成[${h.votes.map((v, k) => (v ? nm(k) : null)).filter(Boolean).join("、") || "無"}]，反對[${h.votes.map((v, k) => (v ? null : nm(k))).filter(Boolean).join("、") || "無"}]，${h.pass ? "通過" : "否決"}${h.q ? `，任務${h.q.success ? "成功" : "失敗"}（${h.q.fails}張失敗）` : ""}`).join("\n") || "（還沒有紀錄）";
@@ -200,18 +200,21 @@ function llmPrompt(t, i) {
   const talk = g.chat.slice(-12).map((c) => `${c.i}號${c.name}：${c.text}`).join("\n") || "（還沒有人說話）";
   const state = `公開討論（最近的發言，大家都看得到）：\n${talk}\n\n目前第 ${g.round + 1} 次任務（需 ${questSize(g)} 人，${needFails(g) > 1 ? "要 2 張失敗票才失敗" : "1 張失敗票就失敗"}），已成功 ${g.results.filter((x) => x === "s").length} 次、失敗 ${g.results.filter((x) => x !== "s").length} 次，連續否決 ${g.rejects} 次，隊長是 ${nm(g.leader)}。\n歷史紀錄：\n${hist}`;
   let ask;
-  if (t.phase === "team") ask = `你是隊長，選 ${questSize(g)} 人（可以包含自己）。輸出 {"team":[號碼,...],"reason":"一句話（只有你自己知道）","say":"對大家說的一句話（20 字內，可以空字串）"}`;
-  else if (t.phase === "vote") ask = `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]。${g.rejects >= 4 ? "（這是第 5 次提案，再否決壞人就贏了）" : ""}輸出 {"approve":true或false,"reason":"一句話（只有你自己知道）","say":"對大家說的一句話（20 字內，可以空字串）"}`;
+  if (mode === "talk") ask = t.phase === "team"
+    ? `現在隊長 ${nm(g.leader)} 準備選隊伍，還沒決定。請先在公開討論發言：根據前面任務與投票的結果，說說你覺得該帶誰、不該帶誰、或你懷疑誰，要點名並給理由（40 字內）；也可以回應別人剛說的話，不要重複別人說過的。${evil ? "你是壞人，要裝成好人、可以引導大家選到對你有利的隊伍。" : ""}只輸出 {"say":"你的發言"}`
+    : `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]，大家還沒投票。請先在公開討論發言：你贊成還是反對這隊、為什麼，要點名具體的人或引用前面的任務／投票結果（40 字內）；可以回應別人剛說的話或質疑某人，不要重複別人說過的。${evil ? "你是壞人，要裝成好人。" : ""}只輸出 {"say":"你的發言"}`;
+  else if (t.phase === "team") ask = `你是隊長，選 ${questSize(g)} 人（可以包含自己）。輸出 {"team":[號碼,...],"reason":"一句話（只有你自己知道）","say":"對大家說的一句話（20 字內，可以空字串）"}`;
+  else if (t.phase === "vote") ask = `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]。${g.rejects >= 4 ? "（這是第 5 次提案，再否決壞人就贏了）" : ""}輸出 {"approve":true或false,"reason":"一句話（只有你自己知道）","say":"已討論過了，除非立場改變，請留空字串"}`;
   else if (t.phase === "quest") ask = `你在任務隊伍裡 [${g.team.map(nm).join("、")}]。${evil ? "你可以出成功或失敗。" : "你是好人，只能出成功。"}輸出 {"success":true或false,"reason":"一句話（只有你自己知道）","say":"可以空字串"}`;
   else ask = `好人完成了 3 次任務，你是刺客，要刺殺你認為是梅林的好人（不能選壞人）。可選：${g.roles.map((r, k) => (isEvil(r) ? null : nm(k))).filter(Boolean).join("、")}。輸出 {"target":號碼,"reason":"一句話","say":"可以空字串"}`;
   return [{ role: "system", content: sys }, { role: "user", content: `${state}\n\n${ask}` }];
 }
-async function llmDecide(t, i) {
+async function llmDecide(t, i, mode) {
   const ac = new AbortController(), to = setTimeout(() => ac.abort(), LLM_TIMEOUT);
   try {
     const r = await fetch(LLM_URL + "/chat/completions", {
       method: "POST", signal: ac.signal, headers: { "Content-Type": "application/json", ...(LLM_KEY ? { Authorization: "Bearer " + LLM_KEY } : {}) },
-      body: JSON.stringify({ model: llmModel(), messages: llmPrompt(t, i), temperature: 0.8, max_tokens: 400, stream: false, ...(LLM_EFFORT ? { reasoning_effort: LLM_EFFORT } : {}) }),
+      body: JSON.stringify({ model: llmModel(), messages: llmPrompt(t, i, mode), temperature: 0.8, max_tokens: 400, stream: false, ...(LLM_EFFORT ? { reasoning_effort: LLM_EFFORT } : {}) }),
     });
     if (!r.ok) throw new Error("http " + r.status + " " + String(await r.text().catch(() => "")).slice(0, 160));
     const j = await r.json(), txt = String(j?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/g, "");
@@ -228,6 +231,28 @@ function llmApply(t, i, d) {
   if (t.phase === "quest") { if (typeof d.success !== "boolean") return false; return doQuestVote(t, i, isEvil(g.roles[i]) ? d.success : true); }
   if (t.phase === "assassin") return assassinate(t, i, Number(d.target));
   return false;
+}
+function discussStep(t) {                                  // 先討論再決定：回傳 true 表示討論結束
+  const g = t.g, key = `${t.phase}|${g.round}|${g.rejects}|${g.hist.length}`;
+  let d = g.disc;
+  if (!d || d.key !== key) {
+    let sp = [];
+    for (let k = 0; k < g.n; k++) if (isAuto(t.players[k]) && !(t.phase === "team" && k === g.leader)) sp.push(k);
+    for (let k = sp.length - 1; k > 0; k--) { const r = randomInt(k + 1); [sp[k], sp[r]] = [sp[r], sp[k]]; }
+    d = g.disc = { key, queue: sp.slice(0, 4), busy: false, end: 0 };
+    if (!d.queue.length) d.end = now();
+  }
+  if (d.busy) return false;
+  if (d.queue.length) {
+    const i = d.queue.shift(); d.busy = true; (g.llmBusy ||= {})[i] = key; push(t);
+    (async () => {
+      try { const r = await llmDecide(t, i, "talk"); if (t.g === g && g.disc === d && typeof r.say === "string") say(t, i, r.say); }
+      catch (e) { if (t.g === g) (g.tok ||= { calls: 0, fail: 0, in: 0, out: 0, by: {} }).fail++; console.log("阿瓦隆 討論失敗：", e && e.message); }
+      finally { if (t.g === g) { delete g.llmBusy[i]; if (g.disc === d) { d.busy = false; if (!d.queue.length) d.end = now() + 2500; } try { push(t); } catch {} } }
+    })();
+    return false;
+  }
+  return d.end > 0 && now() >= d.end;
 }
 function botAct(t, i) {
   if (!t.cfg.llm || !llmEnabled()) return botActRule(t, i);
@@ -293,6 +318,7 @@ function tick() {
     try {
       if (n < g.botAt) continue;
       let acted = false;
+      if (t.cfg.llm && llmEnabled() && ((t.phase === "team" && isAuto(t.players[g.leader])) || t.phase === "vote") && !discussStep(t)) continue;
       if (t.phase === "team") acted = isAuto(t.players[g.leader]) && botAct(t, g.leader);
       else if (t.phase === "vote") { if (t.cfg.llm) { for (let k = 0; k < g.n; k++) if (isAuto(t.players[k]) && g.votes[k] === undefined) botAct(t, k); } else { const i = t.players.findIndex((p, k) => isAuto(p) && g.votes[k] === undefined); if (i >= 0) acted = botAct(t, i); } }
       else if (t.phase === "quest") { const i = g.team.find((k) => isAuto(t.players[k]) && g.qvotes[k] === undefined); if (i !== undefined) acted = botAct(t, i); }
