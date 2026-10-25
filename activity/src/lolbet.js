@@ -5,7 +5,7 @@ import { ensureSession } from "./wager.js";
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const money = (n) => Number(n).toLocaleString();
 const ERR = {
-  need_login: "要先登入才能下注", stale: "賠率正在更新，請幾秒後再按一次", closed: "這場已經截止下注", bad_amount: "金額不合法", odds_changed: "賠率剛剛變了，請看新賠率再下注",
+  need_login: "要先登入才能下注", stale: "賠率正在更新，請幾秒後再按一次", quota: "賠率資料來源額度已用完，暫停下注", closed: "這場已經截止下注", bad_amount: "金額不合法", odds_changed: "賠率剛剛變了，請看新賠率再下注",
   too_much: "這場你下的總額已達上限", insufficient: "代幣不夠", bot_down: "機器人暫時連不上，稍後再試", bad_request: "下注內容有誤",
 };
 const BSTAT = { open: "進行中", won: "贏了", lost: "輸了", void: "已退款", unpaid: "派彩中" };
@@ -18,7 +18,7 @@ export function mountLolBet(root, { env, back }) {
   root.innerHTML = `
     <div class="game lolbet">
       <header><button class="back">← 選單</button><h2>🏆 世界賽運彩</h2><span class="lbbal"></span></header>
-      <div class="lbinfo">英雄聯盟世界賽，單場勝負。賠率同步自 Pinnacle 的盤口，約每 10 分鐘更新（有人開著頁面時）；下注後賠率以下注當下為準，開賽前 1 分鐘截止，賽果出來自動派彩。用的是 bot 的虛擬代幣，打平或比賽取消會退款。</div>
+      <div class="lbinfo">英雄聯盟世界賽，單場勝負。賠率同步自 Pinnacle 的盤口。賠率資料來源有呼叫次數限制，為了撐完整個世界賽，更新頻率很低（約每幾個小時一次，只有比賽快開始且有人開著頁面才更新）；下注後賠率以下注當下為準，開賽前 1 分鐘截止，賽果出來自動派彩。用的是 bot 的虛擬代幣，打平或比賽取消會退款。</div>
       <div class="lbauth"></div>
       <div class="lbsheet" hidden></div>
       <div class="lbnote"></div>
@@ -96,7 +96,7 @@ export function mountLolBet(root, { env, back }) {
     const fin = g(["finished", "void"]).reverse().slice(0, 8);
     el.innerHTML = (st.list.length ? "" : `<div class="mempty">目前沒有世界賽場次。</div>`)
       + sec("可下注", g(["open"])) + sec("已截止／進行中", g(["live", "closed"])) + sec("最近結果", fin)
-      + `<div class="lbfoot">賠率更新：${fmtAgo(st.updatedAt)}${st.err ? "（最近一次同步失敗，賠率可能不是最新）" : ""}　單注上限 ${money(st.limit)}，每場合計上限 ${money(st.maxFixture)}</div>`
+      + `<div class="lbfoot">賠率更新：${fmtAgo(st.updatedAt)}${st.dead ? "（資料來源額度已用完，賠率不再更新，暫停下注）" : st.err ? "（最近一次同步失敗，賠率可能不是最新）" : `（目前約每 ${st.every >= 120 ? Math.round(st.every / 60) + " 小時" : st.every + " 分鐘"}更新一次）`}　單注上限 ${money(st.limit)}，每場合計上限 ${money(st.maxFixture)}</div>`
       + `<button class="lbhbtn">${showHist ? "收起" : "我的注單紀錄"}</button>`;
     el.querySelectorAll(".lbteam").forEach((b) => b.addEventListener("click", () => {
       if (b.disabled) return; sel = { id: b.dataset.f, side: b.dataset.s }; note = ""; render(); renderSheet();
