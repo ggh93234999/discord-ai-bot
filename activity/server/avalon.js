@@ -53,7 +53,7 @@ function startGame(t) {
   const want = Math.max(MINP, Math.min(MAXP, Math.max(t.cfg.n, t.players.length)));
   while (t.players.length < want) t.players.push(mkP({ bot: true, name: pickBotName(t) }));
   const n = t.players.length;
-  t.g = { n, roles: assignRoles(n, t.cfg), leader: randomInt(n), round: 0, rejects: 0, gid: randomBytes(4).toString("hex"), results: [], fails: [], hist: [], team: [], votes: {}, qvotes: {}, voteRes: null, questRes: null, sus: Array(n).fill(0), botAt: 0, winner: null, why: "", assassin: -1, target: -1 };
+  t.g = { n, roles: assignRoles(n, t.cfg), leader: randomInt(n), round: 0, rejects: 0, gid: randomBytes(4).toString("hex"), chat: [], results: [], fails: [], hist: [], team: [], votes: {}, qvotes: {}, voteRes: null, questRes: null, sus: Array(n).fill(0), botAt: 0, winner: null, why: "", assassin: -1, target: -1 };
   t.started = true; t.final = null; t.phase = "team";
   t.log = `開始！${n} 人（好人 ${GOOD_N[n]}、壞人 ${n - GOOD_N[n]}）。身分只有你自己看得到，按住「看我的身分」`;
   setBot(t);
@@ -191,17 +191,19 @@ const LLM_EFFORT = ENV.AVALON_LLM_REASONING ?? "none";      // 思考模式（no
 const LLM_TIMEOUT = Number(ENV.AVALON_LLM_TIMEOUT || 60) * 1000;
 export const llmEnabled = () => !!(LLM_URL && llmModel());
 const RULES_TXT = "阿瓦隆規則：好人要 3 次任務成功；壞人要 3 次任務失敗、或連續 5 次隊伍被否決、或好人完成 3 次後刺客刺中梅林。隊長選指定人數的隊伍，所有人公開投贊成／反對（過半贊成才通過）。通過後隊員各出『成功』或『失敗』牌，好人只能出成功，壞人可以出失敗。任務只要有失敗票就失敗（7 人以上的第 4 次要 2 張）。";
+const say = (t, i, text) => { const g = t.g, s = String(text || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 60); if (!g || !s) return; g.chat.push({ i, name: pname(t, i), text: s, round: g.round }); if (g.chat.length > 80) g.chat.shift(); };
 function llmPrompt(t, i) {
   const g = t.g, role = g.roles[i], evil = isEvil(role), kn = knowledge(t, i);
   const nm = (k) => `${k}號${pname(t, k)}`;
   const hist = g.hist.map((h) => `任務${h.round + 1}第${h.no}次提案：隊長${nm(h.leader)}，隊伍[${h.team.map(nm).join("、")}]，贊成[${h.votes.map((v, k) => (v ? nm(k) : null)).filter(Boolean).join("、") || "無"}]，反對[${h.votes.map((v, k) => (v ? null : nm(k))).filter(Boolean).join("、") || "無"}]，${h.pass ? "通過" : "否決"}${h.q ? `，任務${h.q.success ? "成功" : "失敗"}（${h.q.fails}張失敗）` : ""}`).join("\n") || "（還沒有紀錄）";
-  const sys = `你在玩桌遊阿瓦隆，扮演玩家「${pname(t, i)}」（${i}號）。${RULES_TXT}\n你的身分：${ROLE_NAME[role]}（${evil ? "壞人" : "好人"}）。${kn.text}${kn.names.length ? kn.names.join("、") : ""}\n玩家：${t.players.map((p, k) => nm(k)).join("、")}（共 ${g.n} 人）。\n像真人一樣判斷：好人要從投票和任務結果找壞人；壞人要藏好身分、可以偶爾幫好人、爭取信任；梅林不能太明顯。只輸出一個 JSON，不要多餘文字。`;
-  const state = `目前第 ${g.round + 1} 次任務（需 ${questSize(g)} 人，${needFails(g) > 1 ? "要 2 張失敗票才失敗" : "1 張失敗票就失敗"}），已成功 ${g.results.filter((x) => x === "s").length} 次、失敗 ${g.results.filter((x) => x !== "s").length} 次，連續否決 ${g.rejects} 次，隊長是 ${nm(g.leader)}。\n歷史紀錄：\n${hist}`;
+  const sys = `你在玩桌遊阿瓦隆，扮演玩家「${pname(t, i)}」（${i}號）。${RULES_TXT}\n你的身分：${ROLE_NAME[role]}（${evil ? "壞人" : "好人"}）。${kn.text}${kn.names.length ? kn.names.join("、") : ""}\n玩家：${t.players.map((p, k) => nm(k)).join("、")}（共 ${g.n} 人）。\n像真人一樣判斷：好人要從投票和任務結果找壞人；壞人要藏好身分、可以偶爾幫好人、爭取信任；梅林不能太明顯。說話規則：say 是公開發言，所有人都聽得到，像真人隨口說，口語、簡短、不要每次都說；壞人可以說謊或誤導，但不能直接說出自己的身分；好人也不要直接洩漏自己的特殊身分（梅林尤其要小心）；可以回應別人剛說的話。只輸出一個 JSON，不要多餘文字。`;
+  const talk = g.chat.slice(-12).map((c) => `${c.i}號${c.name}：${c.text}`).join("\n") || "（還沒有人說話）";
+  const state = `公開討論（最近的發言，大家都看得到）：\n${talk}\n\n目前第 ${g.round + 1} 次任務（需 ${questSize(g)} 人，${needFails(g) > 1 ? "要 2 張失敗票才失敗" : "1 張失敗票就失敗"}），已成功 ${g.results.filter((x) => x === "s").length} 次、失敗 ${g.results.filter((x) => x !== "s").length} 次，連續否決 ${g.rejects} 次，隊長是 ${nm(g.leader)}。\n歷史紀錄：\n${hist}`;
   let ask;
-  if (t.phase === "team") ask = `你是隊長，選 ${questSize(g)} 人（可以包含自己）。輸出 {"team":[號碼,...],"reason":"一句話"}`;
-  else if (t.phase === "vote") ask = `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]。${g.rejects >= 4 ? "（這是第 5 次提案，再否決壞人就贏了）" : ""}輸出 {"approve":true或false,"reason":"一句話"}`;
-  else if (t.phase === "quest") ask = `你在任務隊伍裡 [${g.team.map(nm).join("、")}]。${evil ? "你可以出成功或失敗。" : "你是好人，只能出成功。"}輸出 {"success":true或false,"reason":"一句話"}`;
-  else ask = `好人完成了 3 次任務，你是刺客，要刺殺你認為是梅林的好人（不能選壞人）。可選：${g.roles.map((r, k) => (isEvil(r) ? null : nm(k))).filter(Boolean).join("、")}。輸出 {"target":號碼,"reason":"一句話"}`;
+  if (t.phase === "team") ask = `你是隊長，選 ${questSize(g)} 人（可以包含自己）。輸出 {"team":[號碼,...],"reason":"一句話（只有你自己知道）","say":"對大家說的一句話（20 字內，可以空字串）"}`;
+  else if (t.phase === "vote") ask = `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]。${g.rejects >= 4 ? "（這是第 5 次提案，再否決壞人就贏了）" : ""}輸出 {"approve":true或false,"reason":"一句話（只有你自己知道）","say":"對大家說的一句話（20 字內，可以空字串）"}`;
+  else if (t.phase === "quest") ask = `你在任務隊伍裡 [${g.team.map(nm).join("、")}]。${evil ? "你可以出成功或失敗。" : "你是好人，只能出成功。"}輸出 {"success":true或false,"reason":"一句話（只有你自己知道）","say":"可以空字串"}`;
+  else ask = `好人完成了 3 次任務，你是刺客，要刺殺你認為是梅林的好人（不能選壞人）。可選：${g.roles.map((r, k) => (isEvil(r) ? null : nm(k))).filter(Boolean).join("、")}。輸出 {"target":號碼,"reason":"一句話","say":"可以空字串"}`;
   return [{ role: "system", content: sys }, { role: "user", content: `${state}\n\n${ask}` }];
 }
 async function llmDecide(t, i) {
@@ -214,6 +216,8 @@ async function llmDecide(t, i) {
     if (!r.ok) throw new Error("http " + r.status + " " + String(await r.text().catch(() => "")).slice(0, 160));
     const j = await r.json(), txt = String(j?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/g, "");
     const m = txt.match(/\{[\s\S]*\}/); if (!m) throw new Error("no json");
+    const u = j.usage || {}; (t.g.tok ||= { calls: 0, fail: 0, in: 0, out: 0, by: {} });
+    const tk = t.g.tok, ti = Number(u.prompt_tokens) || 0, to2 = Number(u.completion_tokens) || 0; tk.calls++; tk.in += ti; tk.out += to2; (tk.by[i] ||= { calls: 0, in: 0, out: 0 }); tk.by[i].calls++; tk.by[i].in += ti; tk.by[i].out += to2;
     return JSON.parse(m[0]);
   } finally { clearTimeout(to); }
 }
@@ -233,7 +237,7 @@ function botAct(t, i) {
   g.llmBusy[i] = key; push(t);
   (async () => {
     let done = false;
-    try { const d = await llmDecide(t, i); done = llmApply(t, i, d); console.log(`阿瓦隆 AI ${pname(t, i)}（${g.roles[i]}）${t.phase}：${JSON.stringify(d).slice(0, 160)}${done ? "" : "（不合法，改用規則）"}`); } catch (e) { console.log("阿瓦隆 LLM 失敗，改用規則：", e && e.message); }
+    try { const d = await llmDecide(t, i); done = llmApply(t, i, d); if (done && t.g === g && typeof d.say === "string") say(t, i, d.say); console.log(`阿瓦隆 AI ${pname(t, i)}（${g.roles[i]}）${t.phase}：${JSON.stringify(d).slice(0, 160)}${done ? "" : "（不合法，改用規則）"}`); } catch (e) { if (t.g === g) (g.tok ||= { calls: 0, fail: 0, in: 0, out: 0, by: {} }).fail++; console.log("阿瓦隆 LLM 失敗，改用規則：", e && e.message); }
     if (t.g !== g) return;                                  // 這局已經結束或重開
     if (!done && `${t.phase}|${g.round}|${g.rejects}|${g.hist.length}` === key) { try { done = botActRule(t, i); } catch {} }
     delete g.llmBusy[i];
@@ -255,14 +259,14 @@ function view(t, ws) {
     if (t.phase === "voteres") v.voteRes = g.voteRes;
     if (t.phase === "questres") v.questRes = g.questRes;
     if (t.phase === "assassin") v.assassin = g.assassin;
-    v.hist = g.hist; v.gid = g.gid; v.thinking = Object.keys(g.llmBusy || {}).map(Number);
+    v.hist = g.hist; v.gid = g.gid; v.thinking = Object.keys(g.llmBusy || {}).map(Number); v.chat = g.chat.slice(-40); v.tok = g.tok ? { calls: g.tok.calls, fail: g.tok.fail, in: g.tok.in, out: g.tok.out } : null;
     v.roleList = [...g.roles].sort().map((r) => ROLE_NAME[r]);
     if (you >= 0) {
       const r = g.roles[you]; v.me = { role: r, roleName: ROLE_NAME[r], evil: isEvil(r), ...knowledge(t, you) };
       if (t.phase === "vote") v.myVote = g.votes[you];
       if (t.phase === "quest") v.myQ = g.qvotes[you];
     }
-    if (t.phase === "end") { v.end = { winner: g.winner, why: g.why, roles: g.roles.map((r, i) => ({ i, name: pname(t, i), role: ROLE_NAME[r], evil: isEvil(r) })), target: g.target }; }
+    if (t.phase === "end") { v.end = { winner: g.winner, why: g.why, roles: g.roles.map((r, i) => ({ i, name: pname(t, i), role: ROLE_NAME[r], evil: isEvil(r) })), target: g.target, tok: g.tok ? { ...g.tok, by: Object.entries(g.tok.by).map(([k, o]) => ({ name: pname(t, Number(k)), ...o })) } : null }; console.log(g.tok ? `阿瓦隆 AI 這局共 ${g.tok.calls} 次，輸入 ${g.tok.in}、輸出 ${g.tok.out} tokens，失敗 ${g.tok.fail} 次` : ""); }
   }
   return v;
 }
@@ -344,6 +348,10 @@ export function handleAvalon(ws, m) {
     const i = Number(m.seat);
     if (mine < 0 || t.started || !t.players[i] || !t.players[i].bot) return true;
     t.players.splice(i, 1); push(t);
+  } else if (m.t === "avchat") {
+    if (mine < 0 || !t.g || !t.started) return true;
+    const now2 = Date.now(); if (now2 - (ws.avchatAt || 0) < 800) return true; ws.avchatAt = now2;
+    say(t, mine, m.text); push(t);
   } else if (m.t === "avname") {
     const nm = cleanName(m.name); if (!nm) return true;
     ws.avname = nm; if (mine >= 0) t.players[mine].name = nm; push(t);

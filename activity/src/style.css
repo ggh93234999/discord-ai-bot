@@ -997,3 +997,10 @@ body.tv-fs{overflow:hidden}
 .mtab{padding:7px 12px;font-size:14px}
 
 .casino .stbanner small{display:block;font-size:12px;opacity:.85;margin-top:2px}
+
+.av .avchat{width:100%;display:flex;flex-direction:column;gap:6px}
+.av .avchl{max-height:150px;overflow-y:auto;background:rgba(0,0,0,.25);border-radius:10px;padding:6px 8px;font-size:13px;line-height:1.5}
+.av .avcl b{color:#90caf9;margin-right:6px}.av .avcl.me b{color:#ffd54f}
+.av .avchi{display:flex;gap:6px}.av .avchat-in{flex:1;min-width:0;background:#1b1e26;color:#fff;border:1px solid #444;border-radius:8px;padding:6px 8px;font-size:14px}
+
+.av .avtok{display:block;color:#9aa3b5;font-size:12px;text-align:center;margin:4px 0;line-height:1.6}

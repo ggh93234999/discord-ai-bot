@@ -154,8 +154,9 @@ export function mountAvalon(opts = {}) {
     function endHTML() {
       const e = st.end;
       const rows = e.roles.map((r) => `<div class="avrow ${r.evil ? "evil" : "good"}${r.i === e.target ? " hit" : ""}"><b>${esc(r.name)}</b><span>${esc(r.role)}${r.i === e.target ? "（被刺殺）" : ""}</span></div>`).join("");
-      return `<div class="mresult avend ${e.winner === "good" ? "ok" : "bad"}"><h3>${e.winner === "good" ? "好人獲勝！" : "壞人獲勝！"}</h3><div>${esc(e.why)}</div><div class="avroles">${rows}</div>${seated() ? `<div class="btbtns"><button class="mb avagain">再來一場</button><button class="mb ghost avlobby">回大廳</button></div>` : ""}</div>`;
+      return `<div class="mresult avend ${e.winner === "good" ? "ok" : "bad"}"><h3>${e.winner === "good" ? "好人獲勝！" : "壞人獲勝！"}</h3><div>${esc(e.why)}</div><div class="avroles">${rows}</div>${tokHTML(e.tok, true)}${seated() ? `<div class="btbtns"><button class="mb avagain">再來一場</button><button class="mb ghost avlobby">回大廳</button></div>` : ""}</div>`;
     }
+    const tokHTML = (k, full) => !k ? "" : `<small class="avtok">🤖 AI 用量：${k.calls} 次思考　輸入 ${k.in.toLocaleString()}　輸出 ${k.out.toLocaleString()}　共 ${(k.in + k.out).toLocaleString()} tokens${k.fail ? `　（失敗 ${k.fail} 次改用規則）` : ""}${full && k.by && k.by.length ? "<br>" + k.by.map((b) => `${esc(b.name)} ${b.calls} 次 ${(b.in + b.out).toLocaleString()}`).join("　") : ""}</small>`;
     let histOpen = false, pendG = false;
     // 私人筆記：只存在自己的瀏覽器，別人和伺服器都看不到（每一局各自一份）
     const MK = ["", "✅ 好人", "❌ 壞人", "❓ 可疑", "🧙 梅林?"];
@@ -192,16 +193,28 @@ export function mountAvalon(opts = {}) {
       }).join("");
       return `<details class="avhist"${histOpen ? " open" : ""}><summary>📜 投票紀錄（${h.length} 次提案）</summary>${body}</details>`;
     }
+    function chatHTML() {
+      const ch = st.chat || []; if (!ch.length && !seated()) return "";
+      const rows = ch.map((c) => `<div class="avcl${c.i === st.you ? " me" : ""}"><b>${esc(c.name)}</b>${esc(c.text)}</div>`).join("") || `<div class="avnone">還沒有人說話</div>`;
+      return `<div class="avchat"><div class="avchl">${rows}</div>${seated() && !spectate ? `<div class="avchi"><input class="avchat-in" maxlength="60" placeholder="跟大家說句話…"><button class="mb avchat-go">送出</button></div>` : ""}</div>`;
+    }
     function renderGame() {
+      const ae = document.activeElement, keepChat = ae && ae.classList && ae.classList.contains("avchat-in") ? { v: ae.value, s: ae.selectionStart } : null;
       if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("avnote-ta")) { pendG = true; return; }
       const key = st.phase + "|" + st.round + "|" + st.leader + "|" + st.rejects;
       if (key !== selKey) { selKey = key; sel = new Set(); }
       const pickable = (st.phase === "team" && st.leader === st.you) || (st.phase === "assassin" && st.you === st.assassin);
       const vres = st.phase === "voteres" ? st.voteRes : null;
-      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${st.thinking && st.thinking.length && st.phase !== "end" ? `<div class="mhint avthink">🤖 AI 思考中：${st.thinking.map((k) => esc(st.players[k]?.name || "")).join("、")}…</div>` : ""}${roleCard()}${noteHTML()}${histHTML()}${rosterHTML()}${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
+      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${st.thinking && st.thinking.length && st.phase !== "end" ? `<div class="mhint avthink">🤖 AI 思考中：${st.thinking.map((k) => esc(st.players[k]?.name || "")).join("、")}…</div>` : ""}${chatHTML()}${st.phase !== "end" ? tokHTML(st.tok) : ""}${roleCard()}${noteHTML()}${histHTML()}${rosterHTML()}${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
       statusEl.textContent = st.phase === "end" ? "阿瓦隆　結束" : `阿瓦隆　第 ${st.round + 1} 次任務　隊長 ${st.players[st.leader]?.name || ""}`;
       const hd = body.querySelector(".avhist"); if (hd) hd.addEventListener("toggle", () => { histOpen = hd.open; });
       body.querySelectorAll(".avmk").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); const n = loadNote(), i = Number(b.dataset.i); n.marks[i] = ((n.marks[i] || 0) + 1) % MK.length; if (!n.marks[i]) delete n.marks[i]; saveNote(n); renderGame(); }));
+      const cl = body.querySelector(".avchl"); if (cl) cl.scrollTop = cl.scrollHeight;
+      const ci = body.querySelector(".avchat-in"), cg = body.querySelector(".avchat-go");
+      if (ci && keepChat) { ci.value = keepChat.v; ci.focus(); try { ci.setSelectionRange(keepChat.s, keepChat.s); } catch {} }
+      const sendChat = () => { const v = ci.value.trim(); if (v) { send({ t: "avchat", text: v }); ci.value = ""; } };
+      if (cg) cg.addEventListener("click", sendChat);
+      if (ci) { ci.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); sendChat(); } }); }
       const ta = body.querySelector(".avnote-ta"); if (ta) {
         ta.addEventListener("input", () => { const n = loadNote(); n.text = ta.value; saveNote(n); });
         ta.addEventListener("blur", () => { if (pendG) { pendG = false; renderGame(); } });

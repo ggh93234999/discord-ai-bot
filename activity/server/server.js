@@ -331,7 +331,7 @@ wss.on("connection", (ws, req) => {
     if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|cstone|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
-    if (typeof m.t === "string" && /^(avjoin|avsit|avstart|avstand|avaddbot|avdelbot|avact|avname|avcfg|avlobby)$/.test(m.t)) { handleAvalon(ws, m); return; }
+    if (typeof m.t === "string" && /^(avjoin|avsit|avstart|avstand|avaddbot|avdelbot|avact|avname|avcfg|avlobby|avchat)$/.test(m.t)) { handleAvalon(ws, m); return; }
     if (typeof m.t === "string" && /^(btjoin|btsit|btstart|btstand|btaddbot|btdelbot|btact|btname|btcfg)$/.test(m.t)) { handleBigtwo(ws, m); return; }
     if (typeof m.t === "string" && /^(brjoin|brsit|brstart|brstand|braddbot|brdelbot|bract|brname|brcfg)$/.test(m.t)) { handleBridge(ws, m); return; }
     if (typeof m.t === "string" && /^(tjoin|tname|tadd|tqual|tplay|tpause|tseek|tspeed|tskip|tremove|tup)$/.test(m.t)) { handleTheater(ws, m).catch(() => {}); return; }
