@@ -77,7 +77,7 @@ export function mountAvalon(opts = {}) {
       if (me && !spectate) {
         const chk = (k, label) => `<label><input type="checkbox" class="cf-${k}"${c[k] ? " checked" : ""}> ${label}</label>`;
         cfg = `<div class="mjcfg"><label>人數 <select class="cf-n">${[5, 6, 7, 8, 9, 10].map((v) => `<option value="${v}"${Math.max(c.n, st.players.length) === v ? " selected" : ""}>${v} 人</option>`).join("")}</select></label>
-          ${chk("percival", "派西維爾＋莫甘娜")}${chk("mordred", "莫德雷德")}${chk("oberon", "奧伯倫")}</div>
+          ${chk("percival", "派西維爾＋莫甘娜")}${chk("mordred", "莫德雷德")}${chk("oberon", "奧伯倫")}${st.llmOk ? chk("llm", "電腦用 AI 思考（較慢）") : ""}</div>
           <div class="btbtns"><button class="mb ghost addbot"${st.players.length >= st.maxp ? " disabled" : ""}>＋電腦</button><button class="mb start">▶ 開始（不足人數由電腦補）</button></div>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」加入，5～10 人，不夠的人數由電腦補。</div>`;
       const total = Math.max(c.n, st.players.length), cp = composition(total, c);
@@ -93,8 +93,8 @@ export function mountAvalon(opts = {}) {
       q(".addbot") && q(".addbot").addEventListener("click", () => send({ t: "avaddbot" }));
       q(".start") && q(".start").addEventListener("click", () => send({ t: "avstart" }));
       body.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => send({ t: "avdelbot", seat: Number(b.dataset.del) })));
-      const sendCfg = () => send({ t: "avcfg", n: Number(q(".cf-n").value), percival: q(".cf-percival").checked, mordred: q(".cf-mordred").checked, oberon: q(".cf-oberon").checked });
-      ["n", "percival", "mordred", "oberon"].forEach((k) => q(".cf-" + k) && q(".cf-" + k).addEventListener("change", sendCfg));
+      const sendCfg = () => send({ t: "avcfg", n: Number(q(".cf-n").value), percival: q(".cf-percival").checked, mordred: q(".cf-mordred").checked, oberon: q(".cf-oberon").checked, llm: q(".cf-llm") ? q(".cf-llm").checked : false });
+      ["n", "percival", "mordred", "oberon", "llm"].forEach((k) => q(".cf-" + k) && q(".cf-" + k).addEventListener("change", sendCfg));
     }
 
     // ---------------- 遊戲中
@@ -198,7 +198,7 @@ export function mountAvalon(opts = {}) {
       if (key !== selKey) { selKey = key; sel = new Set(); }
       const pickable = (st.phase === "team" && st.leader === st.you) || (st.phase === "assassin" && st.you === st.assassin);
       const vres = st.phase === "voteres" ? st.voteRes : null;
-      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${roleCard()}${noteHTML()}${histHTML()}${rosterHTML()}${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
+      body.innerHTML = `${track()}${st.phase === "end" ? "" : players({ pickable, voteRes: vres })}${st.phase === "end" ? endHTML() : panel()}${st.thinking && st.thinking.length && st.phase !== "end" ? `<div class="mhint avthink">🤖 AI 思考中：${st.thinking.map((k) => esc(st.players[k]?.name || "")).join("、")}…</div>` : ""}${roleCard()}${noteHTML()}${histHTML()}${rosterHTML()}${seated() && st.phase !== "end" && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}${!seated() && !spectate && st.phase !== "end" ? `<div class="mhint">想加入？可以接手電腦：${st.players.map((p) => (p.bot ? `<button class="mb ghost" data-sit="${p.i}">接手 ${esc(p.name)}</button>` : "")).join("")}</div>` : ""}`;
       statusEl.textContent = st.phase === "end" ? "阿瓦隆　結束" : `阿瓦隆　第 ${st.round + 1} 次任務　隊長 ${st.players[st.leader]?.name || ""}`;
       const hd = body.querySelector(".avhist"); if (hd) hd.addEventListener("toggle", () => { histOpen = hd.open; });
       body.querySelectorAll(".avmk").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); const n = loadNote(), i = Number(b.dataset.i); n.marks[i] = ((n.marks[i] || 0) + 1) % MK.length; if (!n.marks[i]) delete n.marks[i]; saveNote(n); renderGame(); }));

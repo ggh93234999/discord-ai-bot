@@ -3,6 +3,8 @@
 // 角色：梅林、刺客一定有；可選派西維爾＋莫甘娜、莫德雷德、奧伯倫。其餘是忠臣（好）或爪牙（壞）。
 // 電腦會補位、斷線的人也由電腦代打。伺服器負責發身分、判定和電腦；前端只畫畫面。沒有點數，只分勝負。
 import { randomInt, randomBytes } from "node:crypto";
+import { ENV } from "./bet.js";
+import fs from "node:fs";
 
 const MAXP = 10, MINP = 5;
 const GOOD_N = { 5: 3, 6: 4, 7: 4, 8: 5, 9: 6, 10: 6 };
@@ -12,7 +14,7 @@ const EVIL_ROLES = new Set(["assassin", "morgana", "mordred", "oberon", "minion"
 const isEvil = (r) => EVIL_ROLES.has(r);
 const BOT_MS = [900, 1800];
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "豆豆", "阿嬤", "亞瑟", "胖虎", "蘭斯", "高文"];
-const DEFAULT_CFG = { n: 5, percival: true, mordred: false, oberon: false };
+const DEFAULT_CFG = { n: 5, percival: true, mordred: false, oberon: false, llm: false };
 
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const cleanName = (v) => String(v || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12);
@@ -142,7 +144,7 @@ function reset(t) {                                        // 結束後回到大
 }
 
 // ---------------------------------------------------------------- 電腦
-function botAct(t, i) {
+function botActRule(t, i) {
   const g = t.g, role = g.roles[i], evil = isEvil(role);
   if (t.phase === "team" && g.leader === i) {
     const k = questSize(g), pool = shuffle([...Array(g.n).keys()].filter((x) => x !== i)).sort((a, b) => (evil || role === "merlin" ? 0 : g.sus[a] - g.sus[b]));
@@ -174,10 +176,76 @@ function botAct(t, i) {
   return false;
 }
 
+// ---------------------------------------------------------------- 電腦用 LLM 思考（大廳勾「電腦用 AI」才會用；失敗或太慢就退回上面的規則）
+// 模型位址／金鑰沿用機器人的 .env（LLM_BASE_URL、LLM_API_KEY），可用 AVALON_LLM_MODEL 指定模型，沒設就用 LLM_MODEL。
+const LLM_URL = String(ENV.AVALON_LLM_BASE_URL || ENV.LLM_BASE_URL || "").replace(/\/+$/, "");
+const LLM_KEY = ENV.AVALON_LLM_API_KEY || ENV.LLM_API_KEY || "";
+const STATE_FILE = new URL("../../state.json", import.meta.url);
+// 模型：AVALON_LLM_MODEL > 機器人目前用的模型（/模型 切換後存在 state.json）> LLM_MODEL
+function llmModel() {
+  if (ENV.AVALON_LLM_MODEL) return ENV.AVALON_LLM_MODEL;
+  try { const m = JSON.parse(fs.readFileSync(STATE_FILE, "utf8")).model; if (m) return String(m); } catch {}
+  return ENV.LLM_MODEL || "";
+}
+const LLM_EFFORT = ENV.AVALON_LLM_REASONING ?? "none";      // 思考模式（none＝不思考，省錢又快）
+const LLM_TIMEOUT = Number(ENV.AVALON_LLM_TIMEOUT || 60) * 1000;
+export const llmEnabled = () => !!(LLM_URL && llmModel());
+const RULES_TXT = "阿瓦隆規則：好人要 3 次任務成功；壞人要 3 次任務失敗、或連續 5 次隊伍被否決、或好人完成 3 次後刺客刺中梅林。隊長選指定人數的隊伍，所有人公開投贊成／反對（過半贊成才通過）。通過後隊員各出『成功』或『失敗』牌，好人只能出成功，壞人可以出失敗。任務只要有失敗票就失敗（7 人以上的第 4 次要 2 張）。";
+function llmPrompt(t, i) {
+  const g = t.g, role = g.roles[i], evil = isEvil(role), kn = knowledge(t, i);
+  const nm = (k) => `${k}號${pname(t, k)}`;
+  const hist = g.hist.map((h) => `任務${h.round + 1}第${h.no}次提案：隊長${nm(h.leader)}，隊伍[${h.team.map(nm).join("、")}]，贊成[${h.votes.map((v, k) => (v ? nm(k) : null)).filter(Boolean).join("、") || "無"}]，反對[${h.votes.map((v, k) => (v ? null : nm(k))).filter(Boolean).join("、") || "無"}]，${h.pass ? "通過" : "否決"}${h.q ? `，任務${h.q.success ? "成功" : "失敗"}（${h.q.fails}張失敗）` : ""}`).join("\n") || "（還沒有紀錄）";
+  const sys = `你在玩桌遊阿瓦隆，扮演玩家「${pname(t, i)}」（${i}號）。${RULES_TXT}\n你的身分：${ROLE_NAME[role]}（${evil ? "壞人" : "好人"}）。${kn.text}${kn.names.length ? kn.names.join("、") : ""}\n玩家：${t.players.map((p, k) => nm(k)).join("、")}（共 ${g.n} 人）。\n像真人一樣判斷：好人要從投票和任務結果找壞人；壞人要藏好身分、可以偶爾幫好人、爭取信任；梅林不能太明顯。只輸出一個 JSON，不要多餘文字。`;
+  const state = `目前第 ${g.round + 1} 次任務（需 ${questSize(g)} 人，${needFails(g) > 1 ? "要 2 張失敗票才失敗" : "1 張失敗票就失敗"}），已成功 ${g.results.filter((x) => x === "s").length} 次、失敗 ${g.results.filter((x) => x !== "s").length} 次，連續否決 ${g.rejects} 次，隊長是 ${nm(g.leader)}。\n歷史紀錄：\n${hist}`;
+  let ask;
+  if (t.phase === "team") ask = `你是隊長，選 ${questSize(g)} 人（可以包含自己）。輸出 {"team":[號碼,...],"reason":"一句話"}`;
+  else if (t.phase === "vote") ask = `隊長 ${nm(g.leader)} 提出隊伍 [${g.team.map(nm).join("、")}]。${g.rejects >= 4 ? "（這是第 5 次提案，再否決壞人就贏了）" : ""}輸出 {"approve":true或false,"reason":"一句話"}`;
+  else if (t.phase === "quest") ask = `你在任務隊伍裡 [${g.team.map(nm).join("、")}]。${evil ? "你可以出成功或失敗。" : "你是好人，只能出成功。"}輸出 {"success":true或false,"reason":"一句話"}`;
+  else ask = `好人完成了 3 次任務，你是刺客，要刺殺你認為是梅林的好人（不能選壞人）。可選：${g.roles.map((r, k) => (isEvil(r) ? null : nm(k))).filter(Boolean).join("、")}。輸出 {"target":號碼,"reason":"一句話"}`;
+  return [{ role: "system", content: sys }, { role: "user", content: `${state}\n\n${ask}` }];
+}
+async function llmDecide(t, i) {
+  const ac = new AbortController(), to = setTimeout(() => ac.abort(), LLM_TIMEOUT);
+  try {
+    const r = await fetch(LLM_URL + "/chat/completions", {
+      method: "POST", signal: ac.signal, headers: { "Content-Type": "application/json", ...(LLM_KEY ? { Authorization: "Bearer " + LLM_KEY } : {}) },
+      body: JSON.stringify({ model: llmModel(), messages: llmPrompt(t, i), temperature: 0.8, max_tokens: 400, stream: false, ...(LLM_EFFORT ? { reasoning_effort: LLM_EFFORT } : {}) }),
+    });
+    if (!r.ok) throw new Error("http " + r.status + " " + String(await r.text().catch(() => "")).slice(0, 160));
+    const j = await r.json(), txt = String(j?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/g, "");
+    const m = txt.match(/\{[\s\S]*\}/); if (!m) throw new Error("no json");
+    return JSON.parse(m[0]);
+  } finally { clearTimeout(to); }
+}
+function llmApply(t, i, d) {
+  const g = t.g;
+  if (t.phase === "team") { const team = Array.isArray(d.team) ? d.team.map(Number) : []; return propose(t, i, team); }
+  if (t.phase === "vote") return typeof d.approve === "boolean" ? doVote(t, i, d.approve) : false;
+  if (t.phase === "quest") { if (typeof d.success !== "boolean") return false; return doQuestVote(t, i, isEvil(g.roles[i]) ? d.success : true); }
+  if (t.phase === "assassin") return assassinate(t, i, Number(d.target));
+  return false;
+}
+function botAct(t, i) {
+  if (!t.cfg.llm || !llmEnabled()) return botActRule(t, i);
+  const g = t.g; g.llmBusy ||= {};
+  const key = `${t.phase}|${g.round}|${g.rejects}|${g.hist.length}`;
+  if (g.llmBusy[i] === key) return false;                  // 這個人這一步已經在想了
+  g.llmBusy[i] = key; push(t);
+  (async () => {
+    let done = false;
+    try { const d = await llmDecide(t, i); done = llmApply(t, i, d); console.log(`阿瓦隆 AI ${pname(t, i)}（${g.roles[i]}）${t.phase}：${JSON.stringify(d).slice(0, 160)}${done ? "" : "（不合法，改用規則）"}`); } catch (e) { console.log("阿瓦隆 LLM 失敗，改用規則：", e && e.message); }
+    if (t.g !== g) return;                                  // 這局已經結束或重開
+    if (!done && `${t.phase}|${g.round}|${g.rejects}|${g.hist.length}` === key) { try { done = botActRule(t, i); } catch {} }
+    delete g.llmBusy[i];
+    if (done) { try { setBot(t); push(t); } catch {} }
+  })();
+  return false;
+}
+
 // ---------------------------------------------------------------- 畫面資料
 function view(t, ws) {
   const you = t.players.findIndex((p) => p.ws === ws && !ws.avspec), g = t.g;
-  const v = { t: "avstate", phase: t.phase, started: t.started, cfg: t.cfg, you, log: t.log, now: now(), watchers: [...t.members].filter((w) => w.avspec).length, maxp: MAXP, minp: MINP,
+  const v = { t: "avstate", phase: t.phase, started: t.started, cfg: t.cfg, you, log: t.log, now: now(), watchers: [...t.members].filter((w) => w.avspec).length, maxp: MAXP, minp: MINP, llmOk: llmEnabled(),
     players: t.players.map((p, i) => ({ i, name: p.name, bot: p.bot, away: !p.bot && !p.ws })) };
   if (g) {
     Object.assign(v, { n: g.n, leader: g.leader, round: g.round, rejects: g.rejects, results: g.results, fails: g.fails, sizes: QUEST[g.n], need2: g.n >= 7, team: g.team, goodN: GOOD_N[g.n] });
@@ -187,7 +255,7 @@ function view(t, ws) {
     if (t.phase === "voteres") v.voteRes = g.voteRes;
     if (t.phase === "questres") v.questRes = g.questRes;
     if (t.phase === "assassin") v.assassin = g.assassin;
-    v.hist = g.hist; v.gid = g.gid;
+    v.hist = g.hist; v.gid = g.gid; v.thinking = Object.keys(g.llmBusy || {}).map(Number);
     v.roleList = [...g.roles].sort().map((r) => ROLE_NAME[r]);
     if (you >= 0) {
       const r = g.roles[you]; v.me = { role: r, roleName: ROLE_NAME[r], evil: isEvil(r), ...knowledge(t, you) };
@@ -222,7 +290,7 @@ function tick() {
       if (n < g.botAt) continue;
       let acted = false;
       if (t.phase === "team") acted = isAuto(t.players[g.leader]) && botAct(t, g.leader);
-      else if (t.phase === "vote") { const i = t.players.findIndex((p, k) => isAuto(p) && g.votes[k] === undefined); if (i >= 0) acted = botAct(t, i); }
+      else if (t.phase === "vote") { if (t.cfg.llm) { for (let k = 0; k < g.n; k++) if (isAuto(t.players[k]) && g.votes[k] === undefined) botAct(t, k); } else { const i = t.players.findIndex((p, k) => isAuto(p) && g.votes[k] === undefined); if (i >= 0) acted = botAct(t, i); } }
       else if (t.phase === "quest") { const i = g.team.find((k) => isAuto(t.players[k]) && g.qvotes[k] === undefined); if (i !== undefined) acted = botAct(t, i); }
       else if (t.phase === "assassin") acted = isAuto(t.players[g.assassin]) && botAct(t, g.assassin);
       else if ((t.phase === "voteres" || t.phase === "questres") && autoNext(t)) acted = next(t);
@@ -283,6 +351,7 @@ export function handleAvalon(ws, m) {
     if (mine < 0 || t.started) return true;
     const n = Number(m.n); if (n >= MINP && n <= MAXP) t.cfg.n = n;
     for (const k of ["percival", "mordred", "oberon"]) if (typeof m[k] === "boolean") t.cfg[k] = m[k];
+    if (typeof m.llm === "boolean") t.cfg.llm = m.llm && llmEnabled();
     push(t);
   } else if (m.t === "avstart") {
     if (mine < 0 || t.started) return true;
