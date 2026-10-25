@@ -26,7 +26,6 @@ export function mountPoker(opts = {}) {
       <div class="game slots poker">
         <header><button class="back">← 選單</button><h2>德州撲克</h2><span class="watch"></span></header>
         <div class="status">連線中…</div>
-        ${spectate ? "" : `<div class="pnamebar">名稱 <input class="pnm" maxlength="12" placeholder="輸入你的名稱"></div>`}
         <div class="ptable"><div class="pfelt"><div class="pcenter"><div class="ptimer"></div><div class="ppot"></div><div class="pboard"></div></div></div><div class="pseats"></div></div>
         <div class="pmybest" hidden></div>
         <div class="plog"></div>

@@ -56,7 +56,7 @@ export function mountFarm(root, { env, back }) {
   let st = null, base = 0, sel = "radish", list = null, vis = null, visBase = 0, tick = 0;
   const real = () => mode === "real";
   let pend = "";      // 等伺服器回應的動作（種植／擴地），回應來了才播音效
-  const send = (o) => { if (o.a === "plant" || o.a === "buyplot") pend = o.a; return ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "fm", real: real(), pid: pidOf(), ...o })); };
+  const send = (o) => { if (o.a === "plant" || o.a === "buyplot") pend = o.a; return ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "fm", real: real(), pid: pidOf(), name: (() => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } })(), ...o })); };
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));

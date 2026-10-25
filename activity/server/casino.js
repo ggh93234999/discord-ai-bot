@@ -84,7 +84,7 @@ const betRef = (ws, real, bet) => ({ ws, real, bet, uid: ws.user?.uid, name: nam
 // ---- 房間與旁觀名單
 const rooms = new Map();
 let guestN = 0;
-function nameOf(ws) { return ws.user?.name || (ws.guest ||= "路人" + String(++guestN).padStart(2, "0")); }
+function nameOf(ws) { return ws.gname || ws.user?.name || (ws.guest ||= "路人" + String(++guestN).padStart(2, "0")); }
 function roomOf(game, id) {
   const key = game + ":" + id;
   if (!rooms.has(key)) rooms.set(key, { key, game, id, members: new Set(), h: null, round: 0 });
@@ -349,6 +349,7 @@ export function casinoReclaim(ws) {
 const fail = (ws, r, extra = {}) => out(ws, { t: "cerr", error: r.error || "error", balance: r.balance, ...extra });
 
 export async function handleCasino(ws, m) {
+  if (typeof m.name === "string") { const n = m.name.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12); ws.gname = n || undefined; }   // 主選單設定的名稱（沒填就用帳號名稱或路人編號）
   if (m.t === "clogq") { sendLog(ws); return true; }
   if (m.t === "clist") { out(ws, { t: "clist", rooms: listRooms() }); return true; }
   // 切換練習／真代幣模式：同房玩家面板跟著顯示該模式的餘額

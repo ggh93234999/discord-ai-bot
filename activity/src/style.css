@@ -959,3 +959,8 @@ body.tv-fs{overflow:hidden}
   .casino.stg .cstage>.stslot{grid-column:1;grid-row:1/span 30;top:8px;background:transparent}
   .casino.stg .s3d{max-width:460px}
 }
+
+.menu .namebar{display:flex;flex-direction:column;align-items:center;gap:4px;margin:4px 0 14px}
+.menu .namebar label{display:flex;gap:8px;align-items:center;font-size:15px}
+.menu .namebar input{background:#1d2230;border:1px solid #3a4258;border-radius:8px;color:#fff;padding:6px 10px;font-size:15px;width:190px}
+.menu .namebar small{color:#8a93a6;font-size:12px}

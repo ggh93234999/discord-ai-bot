@@ -119,6 +119,7 @@ const findBySid = (prefix, id) => Object.keys(db.farms).find((k) => k.startsWith
 const locks = new Set();
 
 export async function handleFarm(ws, m) {
+  if (typeof m.name === "string") { const n = m.name.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12); ws.gname = n || undefined; }
   const real = !!m.real;
   let id;
   if (real) { if (!ws.user) { out(ws, { t: "fm", a: "err", error: "need_login" }); return; } id = ws.user.uid; }
@@ -127,7 +128,7 @@ export async function handleFarm(ws, m) {
   const err = (error, extra = {}) => out(ws, { t: "fm", a: "err", error, ...extra });
   const f = farmOf(key);
   if (ws.user && f.nm !== ws.user.name) { f.nm = ws.user.name; farmSave(); }
-  const name = ws.user ? ws.user.name : "匿名農夫";
+  const name = ws.gname || (ws.user ? ws.user.name : "匿名農夫");
   const send = async () => out(ws, viewOf(ws, f, real, real ? await realBalance(ws) : null));
   const a = m.a;
 

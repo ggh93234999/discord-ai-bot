@@ -38,7 +38,6 @@ export function mountTheater() {
         <div class="tvmsg"></div>
         <div class="tvqueue"></div>
         <div class="tvviewers"></div>
-        <div class="tvname">名稱 <input class="tvnm" maxlength="20" placeholder="你的名稱"></div>
       </div>`;
     const $ = (s) => root.querySelector(s);
     const video = $(".tv"), playBtn = $(".play"), seek = $(".tvseek"), timeEl = $(".tvtime"), nowEl = $(".tvnow"), msgEl = $(".tvmsg"),
@@ -64,8 +63,6 @@ export function mountTheater() {
     video.volume = volOf(lsGet("tvvol2", "60"));
     video.muted = lsGet("tvmute") === "1";
     $(".mute").textContent = video.muted ? "🔇" : "🔊";
-    const nm = $(".tvnm"); nm.value = lsGet("pokername");
-    nm.addEventListener("change", () => { const v = nm.value.trim(); lsSet("pokername", v); if (v) send({ t: "tname", name: v }); });
 
     function connect() {
       ws = new WebSocket(wsUrl(env.inDiscord));

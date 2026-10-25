@@ -71,7 +71,7 @@ export function mountCasino(game, opts = {}) {
     const timers = [];
     const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
     const real = () => mode === "real";
-    const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+    const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify({ name: (() => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } })(), ...o }));
 
     const forgePid = () => { try { let p = localStorage.getItem("forgepid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("forgepid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
     const forge = game === "forge" && !spectate ? createForge({ stage, ctl, statusEl, send: (o) => send(o), getReal: () => real(), setBal: (m) => setBal(m), pid: forgePid() }) : null;

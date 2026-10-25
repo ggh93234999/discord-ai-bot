@@ -87,11 +87,15 @@ function showMenu() {
   app.innerHTML = `
     <div class="menu">
       <h1>遊戲間</h1>
+      <div class="namebar"><label>👤 你的名稱 <input class="gname" maxlength="12" placeholder="輸入名稱，所有遊戲通用"></label><small>沒填的話，有登入就用你的 Discord 名稱，否則自動編號</small></div>
       ${CATS.map((c) => {
         const list = GAMES.filter((g) => g.cat === c.id);
         return list.length ? `<section class="cat"><h2>${c.icon} ${c.name}<small>${c.note}</small></h2><div class="cards">${list.map(card).join("")}</div></section>` : "";
       }).join("")}
     </div>`;
+  const gn = app.querySelector(".gname");
+  try { gn.value = localStorage.getItem("pokername") || ""; } catch {}
+  gn.addEventListener("change", () => { const v = gn.value.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12); gn.value = v; try { localStorage.setItem("pokername", v); } catch {} });
   app.querySelectorAll(".card").forEach((b) => {
     b.addEventListener("click", () => start(b.dataset.g));
   });
