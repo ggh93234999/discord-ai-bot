@@ -7,7 +7,7 @@ const ERR = {
   need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_empty: "沒有空地可以種", bad_crop: "沒有這種作物", none_ripe: "還沒有成熟的作物", nothing: "沒有東西可以賣", max_plots: "田已經擴到最大了",
   no_farm: "找不到這塊農場", self: "不能偷自己的菜", steal_cap: "你今天已經偷夠了（每天最多 20 個）", not_ripe: "還不能偷：剛成熟的 5 分鐘內主人優先",
-  no_more: "這塊地你不能再偷了（每個人只能偷一次，每塊地最多被偷 1 個）", bad_plot: "這塊地沒有作物", tree_half: "這棵樹已經被偷走一半了，剩下的要留給主人", error: "發生錯誤，再試一次",
+  no_more: "這塊地你已經偷過了（每個人每塊地每輪只能偷 1 個）", bad_plot: "這塊地沒有作物", tree_half: "這塊已經被偷走一半了，剩下的要留給主人", error: "發生錯誤，再試一次",
 };
 const VNAME = { n: "", big: "大顆", gold: "金色" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -70,7 +70,7 @@ export function mountFarm(root, { env, back }) {
       else if (m.a === "visit") { vis = m; visBase = Date.now(); if (tab === "visit") draw(); }
       else if (m.a === "got") { statusEl.textContent = "收成了 " + summarize(m.got); sfx.harvest(m.got); }
       else if (m.a === "sold") { statusEl.textContent = "賣出了，拿到 " + money(m.amount) + " 代幣"; sfx.sell(); }
-      else if (m.a === "stole") { statusEl.textContent = m.tree ? `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！果樹不限次數，這棵還能偷 ${m.treeLeft} 個` : `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！今天還能偷 ${m.left} 個`; sfx.steal(); }
+      else if (m.a === "stole") { statusEl.textContent = m.tree ? `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！這棵樹還能被別人偷 ${m.treeLeft} 個` : `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！今天還能偷 ${m.left} 個`; sfx.steal(); }
       else if (m.a === "err") {
         statusEl.textContent = (ERR[m.error] || ERR.error); pend = ""; sfx.err();
         if (m.balance != null && st) { st.balance = m.balance; showBal(); }
@@ -146,10 +146,10 @@ export function mountFarm(root, { env, back }) {
         const c = cropOf(p.c), left = Math.max(0, p.left - el), grace = Math.max(0, p.grace - el);
         if (left > 0) return `<div class="plot grow" data-end="${visBase + p.left}"><span class="pi sm">${c.icon}</span><small>${fmt(left)}</small></div>`;
         if (grace > 0) return `<div class="plot wait" data-end="${visBase + p.grace}" data-pre="主人優先 "><span class="pi">${c.icon}</span><small>主人優先 ${fmt(grace)}</small></div>`;
-        if (p.canSteal) return `<button class="plot ripe steal${p.tree ? " tree" : ""}" data-i="${i}"><span class="pi">${c.icon}</span><small>偷一個${p.tree ? `（還能偷 ${p.stealLeft}）` : ""}</small></button>`;
-        return `<div class="plot done${p.tree ? " tree" : ""}"><span class="pi">${c.icon}</span><small>${p.mineDone ? "你偷過了" : p.full ? (p.tree ? "已被偷走一半" : "被偷光了") : "不能偷"}</small></div>`;
+        if (p.canSteal) return `<button class="plot ripe steal${p.tree ? " tree" : ""}" data-i="${i}"><span class="pi">${c.icon}</span><small>偷一個（這塊還剩 ${p.stealLeft} 個可偷）</small></button>`;
+        return `<div class="plot done${p.tree ? " tree" : ""}"><span class="pi">${c.icon}</span><small>${p.mineDone ? "你偷過了" : p.full ? "已被偷走一半" : "不能偷"}</small></div>`;
       }).join("");
-      body.innerHTML = `<div class="ftitle"><button class="vback">← 農場列表</button><b>🏡 ${esc(vis.name)} 的農場</b></div><div class="fgrid">${plots}</div><p class="fnote">${st ? `蔬菜你今天還能偷 ${st.stealLeft} 個；果樹不限次數，但每棵每輪最多被偷走一半。` : ""}偷來的放進自己的倉庫，到「我的農場」賣掉。</p>`;
+      body.innerHTML = `<div class="ftitle"><button class="vback">← 農場列表</button><b>🏡 ${esc(vis.name)} 的農場</b></div><div class="fgrid">${plots}</div><p class="fnote">${st ? `每人每塊地（每棵樹）每輪只能偷 1 個，每塊最多被偷到剩一半；蔬菜你今天還能偷 ${st.stealLeft} 個，果樹不限。` : ""}偷來的放進自己的倉庫，到「我的農場」賣掉。</p>`;
       body.querySelector(".vback").addEventListener("click", () => { vis = null; send({ a: "list" }); draw(); });
       body.querySelectorAll(".steal").forEach((b) => b.addEventListener("click", () => send({ a: "steal", id: vis.id, i: +b.dataset.i })));
       return;
