@@ -66,7 +66,8 @@ export function mountBigtwo(opts = {}) {
       const c = st.cfg;
       if (seated && !spectate) {
         cfg = `<div class="mjcfg"><label>長度 <select class="cf-len">${st.lens.map((v) => `<option value="${v}"${c.len === v ? " selected" : ""}>${v} 手</option>`).join("")}</select></label>
-          <label>每張牌 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label></div>
+          <label>每張牌 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label>
+          <label><input type="checkbox" class="cf-triple"${c.triple ? " checked" : ""}> 可出三條</label></div>
           <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，最多 4 人，空位可以加電腦。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k === 0 ? " top" : ""}"><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
@@ -78,9 +79,10 @@ export function mountBigtwo(opts = {}) {
       const q = (s) => body.querySelector(s);
       q(".start") && q(".start").addEventListener("click", () => send({ t: "btstart" }));
       q(".stand") && q(".stand").addEventListener("click", () => send({ t: "btstand" }));
-      const sendCfg = () => send({ t: "btcfg", len: Number(q(".cf-len").value), base: Number(q(".cf-base").value) });
+      const sendCfg = () => send({ t: "btcfg", len: Number(q(".cf-len").value), base: Number(q(".cf-base").value), triple: q(".cf-triple").checked });
       q(".cf-len") && q(".cf-len").addEventListener("change", sendCfg);
       q(".cf-base") && q(".cf-base").addEventListener("change", sendCfg);
+      q(".cf-triple") && q(".cf-triple").addEventListener("change", sendCfg);
     }
 
     // ---------------- 牌桌
@@ -107,7 +109,7 @@ export function mountBigtwo(opts = {}) {
     function myCombo() { return classify([...sel]); }
     function canPlay() {
       if (!st || st.phase !== "play" || st.turn !== st.you || !sel.size) return false;
-      const cb = myCombo(); if (!cb) return false;
+      const cb = myCombo(); if (!cb || (cb.type === 3 && !st.cfg.triple)) return false;
       if (st.mustClub && !sel.has(CLUB3)) return false;
       if (st.last && !beats(cb, classify(st.last.cards))) return false;
       return true;

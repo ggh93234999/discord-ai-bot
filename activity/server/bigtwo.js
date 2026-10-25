@@ -7,7 +7,7 @@ import { randomInt, randomBytes } from "node:crypto";
 import { classify, beats, cardsText, sortHand, strength, rstr, suitOf, CLUB3, TYPE_NAMES } from "../shared/bigtwo_rules.js";
 
 const START_POINTS = 10000;
-const DEFAULT_CFG = { len: 3, base: 20 };
+const DEFAULT_CFG = { len: 3, base: 20, triple: false };
 const LENS = [1, 3, 5, 10];
 const STAKES = [5, 10, 20, 50, 100];
 const TURN_MS = 30000, RESULT_MS = 10000, BOT_MS = [700, 1500];
@@ -65,7 +65,7 @@ function checkPlay(h, i, cards) {
   if (!Array.isArray(cards) || !cards.length || cards.length > 13) return null;
   const mine = new Set(h.hands[i]);
   if (new Set(cards).size !== cards.length || !cards.every((c) => Number.isInteger(c) && mine.has(c))) return null;
-  const combo = classify(cards); if (!combo) return null;
+  const combo = classify(cards); if (!combo || (combo.type === 3 && !t.cfg.triple)) return null;
   if (h.mustClub && !cards.includes(CLUB3)) return null;
   if (h.last && !beats(combo, h.last.combo)) return null;
   return combo;
@@ -140,7 +140,7 @@ function combos(hand) {
 }
 function botMove(t, i) {
   const h = t.h, hand = h.hands[i];
-  let cands = combos(hand).filter((x) => (!h.mustClub || x.cards.includes(CLUB3)) && (!h.last || beats(x.combo, h.last.combo)));
+  let cands = combos(hand).filter((x) => (t.cfg.triple || x.combo.type !== 3) && (!h.mustClub || x.cards.includes(CLUB3)) && (!h.last || beats(x.combo, h.last.combo)));
   if (!cands.length) return null;                                       // 只能過
   const fin = cands.find((x) => x.cards.length === hand.length);
   if (fin) return fin.cards;
@@ -263,6 +263,7 @@ export function handleBigtwo(ws, m) {
     if (mine < 0 || t.started) return true;
     if (LENS.includes(Number(m.len))) t.cfg.len = Number(m.len);
     if (STAKES.includes(Number(m.base))) t.cfg.base = Number(m.base);
+    if (m.triple !== undefined) t.cfg.triple = !!m.triple;
     t.log = `${nameOf(ws)} 調整設定`; push(t);
   } else if (m.t === "btstart") {
     if (mine < 0 || t.started) return true;
