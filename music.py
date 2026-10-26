@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import random
+import os
 import re
 import time
 from pathlib import Path
@@ -297,6 +298,45 @@ def _stream_info(url: str) -> dict:
                 log.info("串流網址改用 %s 才能播：%s", client, info.get("title"))
             return info
     return first
+
+
+# ---------------------------------------------------------------- 音量平衡
+# 每首歌開播前先量一小段的響度（LUFS），算出要加減多少 dB 讓大家差不多大聲。
+NORMALIZE = os.getenv("MUSIC_NORMALIZE", "1") != "0"
+TARGET_LUFS = float(os.getenv("MUSIC_TARGET_LUFS", "-16"))
+_gain_cache: dict[str, float] = {}
+
+
+async def measure_gain(url: str, stream_url: str, headers: str, duration) -> float | None:
+    """回傳要加的 dB（可為負）；量不到就回 None（照原音量播）。"""
+    if not NORMALIZE:
+        return None
+    if url in _gain_cache:
+        return _gain_cache[url]
+    seek = ["-ss", "20"] if duration and duration >= 120 else []
+    cmd = ["ffmpeg", "-hide_banner", "-nostats", *seek, "-t", "40"]
+    if headers:
+        cmd += ["-headers", headers]
+    cmd += ["-i", stream_url, "-vn", "-af", "ebur128", "-f", "null", "-"]
+    try:
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+        _, err = await asyncio.wait_for(proc.communicate(), timeout=20)
+    except Exception as e:
+        log.info("量音量失敗，照原音量播：%r", e)
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return None
+    m = re.findall(r"I:\s+(-?\d+(?:\.\d+)?) LUFS", err.decode("utf-8", "ignore"))
+    if not m:
+        return None
+    gain = max(-12.0, min(9.0, TARGET_LUFS - float(m[-1])))
+    _gain_cache[url] = gain
+    if len(_gain_cache) > 500:
+        _gain_cache.pop(next(iter(_gain_cache)))
+    log.info("音量平衡：%s 響度 %s LUFS → 調整 %+.1f dB", url[-24:], m[-1], gain)
+    return gain
 
 
 # ---------------------------------------------------------------- 面板按鈕
@@ -621,7 +661,9 @@ class GuildPlayer:
                     headers = "".join(f"{k}: {v}\r\n" for k, v in (info.get("http_headers") or {}).items())
                     offset, self.resume_offset = self.resume_offset, 0
                     before = (f"-ss {int(offset)} " if offset > 5 else "") + FFMPEG_BEFORE + (f' -headers "{headers}"' if headers else "")
-                    base = await asyncio.to_thread(discord.FFmpegPCMAudio, info["url"], before_options=before, options="-vn")
+                    gain = await measure_gain(track.url, info["url"], headers, track.duration)
+                    opts = "-vn" + (f" -af volume={gain:.1f}dB,alimiter=limit=0.97" if gain is not None else "")
+                    base = await asyncio.to_thread(discord.FFmpegPCMAudio, info["url"], before_options=before, options=opts)
                     source = discord.PCMVolumeTransformer(base, volume=get_volume(self.guild.id) / 100)  # 這樣才能即時調音量
                 except Exception as e:
                     log.warning("無法播放 %s：%r", track.url, e)
