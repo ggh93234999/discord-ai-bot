@@ -41,14 +41,14 @@ function deal() {
 function startGame(t) {
   for (let i = 0; i < 4; i++) if (!t.seats[i]) t.seats[i] = mkSeat({ bot: true, name: pickBotName(t) });
   for (const s of t.seats) s.points = START_POINTS;
-  t.g = { handNo: 0, lead: -1 };
+  t.g = { handNo: 0, lead: t.lastLead ?? -1 };   // 上一局的贏家繼續先出；桌子剛開才由 ♣3 先出
   t.started = true; t.final = null;
   startHand(t);
 }
 function startHand(t) {
   const g = t.g; g.handNo++;
   const hands = deal();
-  const club = g.lead < 0;                                   // 第一手：♣3 的人先出
+  const club = g.lead < 0;                                   // 桌子的第一手：♣3 的人先出，之後都是上一手贏家先出
   const first = club ? hands.findIndex((h) => h.includes(CLUB3)) : g.lead;
   t.h = { hands, turn: first, last: null, passes: 0, passed: new Set(), mustClub: club, deadline: 0, botAt: 0 };
   t.result = null; t.phase = "play";
@@ -105,7 +105,7 @@ function settle(t, w) {
   t.result = { handNo: t.g.handNo, winner: w, deltas, left: h.hands.map((x) => x.length), hands: h.hands.map((x) => x.slice()), gameOver };
   t.log = `${t.seats[w].name} 先出完，贏了第 ${t.g.handNo} 手`;
   t.phase = "result"; t.nextAt = now() + RESULT_MS;
-  t.g.lead = w;
+  t.g.lead = w; t.lastLead = w;
 }
 function finishGame(t) {
   t.final = t.seats.map((s) => ({ name: s.name, points: s.points })).sort((a, b) => b.points - a.points);
@@ -198,7 +198,7 @@ function tick() {
     if (!t.members.size) { if (n - (t.emptyAt || (t.emptyAt = n)) > 120000) tables.delete(key); continue; }
     t.emptyAt = 0;
     const humans = t.seats.filter((s) => s && !s.bot && s.ws);
-    if (!humans.length && t.phase !== "wait" && t.phase !== "end") { t.seats = [null, null, null, null]; t.phase = "wait"; t.started = false; t.h = null; t.g = null; t.result = null; t.log = "等玩家入座…"; push(t); continue; }
+    if (!humans.length && t.phase !== "wait" && t.phase !== "end") { t.seats = [null, null, null, null]; t.lastLead = -1; t.phase = "wait"; t.started = false; t.h = null; t.g = null; t.result = null; t.log = "等玩家入座…"; push(t); continue; }
     try {
       if (t.phase === "result") { if (n >= t.nextAt) { if (t.result.gameOver) finishGame(t); else startHand(t); push(t); } continue; }
       if (t.phase !== "play") continue;
