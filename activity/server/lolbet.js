@@ -241,14 +241,23 @@ function fview(f, uid) {
   else if (f.start - LOCK_MS <= now) state = "live";
   else if (hasLine && !f.suspended && f.hasOdds) state = "open";
   const mine = uid ? st.bets.filter((b) => b.uid === uid && b.fixtureId === f.id).map((b) => ({ id: b.id, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) : [];
-  return { id: f.id, home: f.home, away: f.away, start: f.start, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine };
+  return { id: f.id, home: f.home, away: f.away, start: f.start, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine,
+    all: st.bets.filter((b) => b.fixtureId === f.id && b.uid !== uid).map((b) => ({ name: b.name, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) };   // 別人下的注（公開）
 }
 function viewFor(ws) {
   const uid = ws.user && ws.user.uid;
   const list = [...fixtures.values()].sort((a, b) => a.start - b.start).map((f) => fview(f, uid));
-  for (const r of Object.values(st.results)) if (!fixtures.has(r.id)) list.unshift({ id: r.id, home: r.home, away: r.away, start: r.start, state: "finished", oh: null, oa: null, score: r.score, mine: [] });   // 已經掉出賽程視窗的舊場次
+  for (const r of Object.values(st.results)) if (!fixtures.has(r.id)) list.unshift({ id: r.id, home: r.home, away: r.away, start: r.start, state: "finished", oh: null, oa: null, score: r.score, mine: [], all: [] });   // 已經掉出賽程視窗的舊場次
   list.sort((a, b) => a.start - b.start);
-  return { t: "lolstate", ok: lolEnabled(), now: Date.now(), updatedAt, err: lastErr ? 1 : 0, dead: plan().dead ? 1 : 0, every: Math.round(plan().oddsMs / 60000), limit: betLimit(), maxFixture: betLimit() * MAX_PER_FIXTURE, list, you: uid ? ws.user.name : null };
+  const net = new Map();                                        // 輸贏榜：每人已結算的注單淨損益（贏＝派彩−本金，輸＝−本金，退款＝0）
+  for (const b of st.bets) {
+    if (b.status === "open" || b.status === "unpaid") continue;
+    const k = b.uid, o = net.get(k) || { name: b.name, net: 0, n: 0, w: 0 };
+    o.name = b.name; o.n++; if (b.status === "won") { o.net += (b.payout || 0) - b.amount; o.w++; } else if (b.status === "lost") o.net -= b.amount;
+    net.set(k, o);
+  }
+  const board = [...net.values()].sort((a, b) => b.net - a.net).slice(0, 10);
+  return { t: "lolstate", board, ok: lolEnabled(), now: Date.now(), updatedAt, err: lastErr ? 1 : 0, dead: plan().dead ? 1 : 0, every: Math.round(plan().oddsMs / 60000), limit: betLimit(), maxFixture: betLimit() * MAX_PER_FIXTURE, list, you: uid ? ws.user.name : null };
 }
 function pushAll() { for (const ws of watchers) send(ws, viewFor(ws)); }
 

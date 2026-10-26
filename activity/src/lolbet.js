@@ -90,13 +90,14 @@ export function mountLolBet(root, { env, back }) {
 
   function card(f) {
     const mine = f.mine.map((b) => `<div class="lbmine ${b.status}">我押 ${esc(b.side === "home" ? f.home : f.away)}　${money(b.amount)} × ${b.odds}　${BSTAT[b.status] || b.status}${b.status === "won" || b.status === "void" ? ` +${money(b.payout)}` : ""}</div>`).join("");
+    const others = (f.all && f.all.length) ? `<div class="lball"><b>👥 大家的注（${f.all.length}）</b>${f.all.map((b) => `<div class="lbo ${b.status}">${esc(b.name)} 押 ${esc(b.side === "home" ? f.home : f.away)}　${money(b.amount)} × ${b.odds}　${BSTAT[b.status] || b.status}${b.status === "won" ? ` +${money(b.payout - b.amount)}` : b.status === "lost" ? ` -${money(b.amount)}` : ""}</div>`).join("")}</div>` : "";
     const score = f.score ? `<b class="lbsc">${f.score[0]} : ${f.score[1]}</b>` : `<i>vs</i>`;
     const winner = f.state === "finished" && f.score && f.score[0] !== f.score[1] ? (f.score[0] > f.score[1] ? 0 : 1) : -1;
     const open = f.state === "open";
     const btn = (side, name, odds, w) => `<button class="lbteam${sel && sel.id === f.id && sel.side === side ? " on" : ""}${w ? " win" : ""}" data-f="${f.id}" data-s="${side}" ${open ? "" : "disabled"}>${logo(name)}<span>${esc(name)}</span>${seedTag(name)}${odds ? `<em>${odds}</em>` : ""}</button>`;
     const tag = { open: "可下注", live: "已截止／進行中", finished: "已結束", void: "取消", closed: "暫無盤口" }[f.state];
     return `<div class="lbcard ${f.state}"><div class="lbtop"><span>${fmtTime(f.start)}</span><span class="lbtag">${tag}</span></div>
-      <div class="lbrow">${btn("home", f.home, f.oh, winner === 0)}${score}${btn("away", f.away, f.oa, winner === 1)}</div>${mine}</div>`;
+      <div class="lbrow">${btn("home", f.home, f.oh, winner === 0)}${score}${btn("away", f.away, f.oa, winner === 1)}</div>${mine}${others}</div>`;
   }
 
   function render() {
@@ -109,6 +110,7 @@ export function mountLolBet(root, { env, back }) {
     const fin = g(["finished", "void"]).reverse().slice(0, 8);
     el.innerHTML = (st.list.length ? "" : `<div class="mempty">目前沒有世界賽場次。</div>`)
       + sec("可下注", g(["open"])) + sec("已截止／進行中", g(["live", "closed"])) + sec("最近結果", fin)
+      + (st.board && st.board.length ? `<h3 class="lbh">🏅 輸贏榜（已結算的注單）</h3><div class="lbboard">${st.board.map((r, i) => `<div class="lbrank"><span>${i + 1}</span><b>${esc(r.name)}</b><em class="${r.net >= 0 ? "up" : "down"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</em><small>${r.w}／${r.n} 贏</small></div>`).join("")}</div>` : "")
       + `<div class="lbfoot">賠率更新：${fmtAgo(st.updatedAt)}${st.dead ? "（資料來源額度已用完，賠率不再更新，暫停下注）" : st.err ? "（最近一次同步失敗，賠率可能不是最新）" : `（目前約每 ${st.every >= 120 ? Math.round(st.every / 60) + " 小時" : st.every + " 分鐘"}更新一次）`}　單注上限 ${money(st.limit)}，每場合計上限 ${money(st.maxFixture)}</div>`
       + `<button class="lbhbtn">${showHist ? "收起" : "我的注單紀錄"}</button>`;
     el.querySelectorAll(".lbteam").forEach((b) => b.addEventListener("click", () => {
