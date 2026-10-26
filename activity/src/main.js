@@ -14,7 +14,7 @@ import { mountBigtwo } from "./bigtwo.js";
 import { mountAvalon } from "./avalon.js";
 import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
-import { mountLolBet } from "./lolbet.js";
+import { mountLolBet } from "../lolbet/client.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
 import { mountFarm } from "./farm.js";

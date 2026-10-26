@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""從 Liquipedia 的世界賽頁面整理每隊的賽區與賽區種子，寫到 activity/public/teams/seeds.json（OddsPapi 隊名 → {region, seed, note}）。
+"""從 Liquipedia 的世界賽頁面整理每隊的賽區與賽區種子，寫到 activity/lolbet/teams/seeds.json（OddsPapi 隊名 → {region, seed, note}）。
 只打 1 次 API（遵守他們的規則：帶 User-Agent）。用法：python3 scripts/fetch_lol_seeds.py [頁面名，預設 World Championship/2026]
 """
 import gzip, json, os, re, sys, urllib.parse, urllib.request
 
 UA = "discord-activity-logo-fetch/1.0 (personal hobby bot)"
 PAGE = sys.argv[1] if len(sys.argv) > 1 else "World Championship/2026"
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public", "teams", "seeds.json")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "teams", "seeds.json")
 # Liquipedia 隊名 → OddsPapi 隊名（不一樣的才需要寫）
 NAMES = {"Gen.G Esports": "Gen.g Esports", "Top Esports": "TOP Esports", "LYON": "Lyon Gaming", "Movistar KOI": "Movistar Koi",
          "Secret Whales": "Team Secret Whales", "CTBC Flying Oyster": "Ctbc Flying Oyster", "LOS": "Los", "Anyone's Legend": "Anyones Legend"}

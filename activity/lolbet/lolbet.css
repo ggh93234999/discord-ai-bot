@@ -1,0 +1,57 @@
+/* 世界賽運彩 */
+.lolbet{align-items:stretch;gap:8px;max-width:560px;margin:0 auto;width:100%}
+.lolbet .lbbal{margin-left:auto;font-weight:700;color:#ffd54f}
+.lolbet .lbinfo{font-size:12px;color:#9aa3b5;line-height:1.6}
+.lolbet .lbauth{display:flex;justify-content:center}
+.lolbet .lblogin{padding:8px 16px;border:0;border-radius:10px;background:#5865f2;color:#fff;font-size:14px;cursor:pointer}
+.lolbet .lbme{font-size:13px;color:#cfd6e4}
+.lolbet .lbnote{min-height:18px;text-align:center;font-size:13px;color:#ffd54f}
+.lolbet .lbh{margin:8px 0 2px;font-size:14px;color:#cfd6e4}
+.lolbet .lbcard{background:#232733;border-radius:12px;padding:10px;margin:6px 0}
+.lolbet .lbcard.finished,.lolbet .lbcard.void,.lolbet .lbcard.closed{opacity:.8}
+.lolbet .lbtop{display:flex;justify-content:space-between;font-size:12px;color:#9aa3b5;margin-bottom:6px}
+.lolbet .lbtag{padding:1px 8px;border-radius:999px;background:#2b2f3a}
+.lolbet .lbcard.open .lbtag{background:#2f6f4f;color:#fff}
+.lolbet .lbrow{display:flex;align-items:stretch;gap:6px}
+.lolbet .lbrow i{align-self:center;color:#7d869a;font-style:normal;font-size:12px}
+.lolbet .lbsc{align-self:center;color:#ffd54f}
+.lolbet .lbteam{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border:2px solid transparent;border-radius:10px;background:#323847;color:#fff;font-size:14px;cursor:pointer}
+.lolbet .lbteam span{word-break:break-word;text-align:center}
+.lolbet .lbteam em{font-style:normal;font-weight:700;color:#ffd54f;font-size:16px}
+.lolbet .lbteam:disabled{cursor:default;opacity:.85}
+.lolbet .lbteam.on{border-color:#e0a526;background:#3b4252}
+.lolbet .lbteam.win{border-color:#4caf50}
+.lolbet .lbmine{font-size:12px;margin-top:6px;padding:4px 8px;border-radius:8px;background:#2b2f3a;color:#cfd6e4}
+.lolbet .lbmine.won{background:#1f4d33;color:#c8f0d4}.lolbet .lbmine.lost{color:#9aa3b5}.lolbet .lbmine.unpaid{background:#5a4a1a}
+.lolbet .lbsheet{position:sticky;top:0;z-index:5;background:#1f2330;border:1px solid #e0a526;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.lolbet .lbsheet[hidden]{display:none}
+.lolbet .lbsl{display:flex;align-items:center;gap:6px}
+.lolbet .lbx{margin-left:auto;border:0;background:transparent;color:#9aa3b5;font-size:18px;cursor:pointer}
+.lolbet .lbamts{display:flex;gap:6px;flex-wrap:wrap}
+.lolbet .lbamts button{padding:6px 12px;border:0;border-radius:8px;background:#3b4252;color:#fff;cursor:pointer}
+.lolbet .lbamts button.sel{background:#e0a526;color:#1b1b1b;font-weight:700}
+.lolbet .lbin{width:90px;background:#1b1e26;color:#fff;border:1px solid #444;border-radius:8px;padding:6px}
+.lolbet .lbpay{font-size:13px;color:#cfd6e4}
+.lolbet .lbgo{padding:10px;border:0;border-radius:10px;background:#2f6f4f;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.lolbet .lbgo:disabled{opacity:.6}
+.lolbet .lbfoot{font-size:12px;color:#7d869a;text-align:center;margin-top:8px}
+.lolbet .lbhbtn{align-self:center;margin:6px 0;padding:6px 14px;border:0;border-radius:8px;background:#3b4252;color:#fff;cursor:pointer}
+.dcm .lolbet{padding-top:58px}
+.lolbet .lblogo{width:44px;height:44px;object-fit:contain;flex:none}
+.lolbet .lbsl .lblogo{width:28px;height:28px}
+.lolbet .lbfb{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#3b4252;color:#cfd6e4;font-weight:700;font-size:14px}
+
+/* 世界賽運彩：賭場最上面整排的大卡片（水墨風背景圖 src/lol-bg.jpg） */
+.card.wide.lolcard, .card.wide.lolcard:hover { grid-column:1 / -1; min-height:190px; justify-content:flex-start; border-color:#8a7a55; background:linear-gradient(90deg, rgba(247,243,232,.92) 0%, rgba(247,243,232,.55) 42%, rgba(247,243,232,0) 70%), #e9e2cf url("./lol-bg.jpg") center 60%/cover no-repeat; }
+.card.wide.lolcard:hover { border-color:#b3261e; filter:brightness(1.04); }
+.card.wide.lolcard b { color:#1b1b1b; } .card.wide.lolcard em { color:#7a2418; } .card.wide.lolcard small { color:#3a342a; max-width:62%; opacity:.95; }
+@media (max-width:520px){ .card.wide.lolcard, .card.wide.lolcard:hover { min-height:170px; background:linear-gradient(90deg, rgba(247,243,232,.95) 0%, rgba(247,243,232,.8) 48%, rgba(247,243,232,0) 78%), #e9e2cf url("./lol-bg.jpg") 62% 60%/cover no-repeat; } .card.wide.lolcard small { max-width:55%; } }
+.lolbet .lbseed{font-size:11px;color:#9aa3b5;font-weight:400;text-align:center;line-height:1.3}
+.lolbet .lball{margin-top:6px;font-size:12px;color:#9aa3b5;display:flex;flex-direction:column;gap:2px}
+.lolbet .lball b{color:#cfd6e4;font-weight:600}
+.lolbet .lbo.won{color:#8fe3a5}.lolbet .lbo.lost{color:#9aa3b5;text-decoration:line-through;text-decoration-color:#555}.lolbet .lbo.open{color:#cfd6e4}
+.lolbet .lbboard{background:#232733;border-radius:12px;padding:6px 10px}
+.lolbet .lbrank{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px}
+.lolbet .lbrank span{width:20px;color:#7d869a}.lolbet .lbrank b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lolbet .lbrank em{font-style:normal;font-weight:700}.lolbet .lbrank em.up{color:#8fe3a5}.lolbet .lbrank em.down{color:#ef9a9a}
+.lolbet .lbrank small{color:#7d869a;font-size:11px}

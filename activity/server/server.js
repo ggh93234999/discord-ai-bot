@@ -19,7 +19,7 @@ import { handleMahjong, mjClose } from "./mahjong.js";
 import { handleBridge, bridgeClose } from "./bridge.js";
 import { handleBigtwo, bigtwoClose } from "./bigtwo.js";
 import { handleAvalon, avalonClose } from "./avalon.js";
-import { handleLol, lolClose } from "./lolbet.js";
+import { handleLol, lolClose } from "../lolbet/server.js";
 import { handleTheater, theaterClose, serveVideo, serveSub } from "./theater.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
 import { thinkMove, LEVELS as BOT_LEVELS } from "./bots.js";

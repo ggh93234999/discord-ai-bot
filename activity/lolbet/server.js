@@ -4,7 +4,21 @@ import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { ENV, botSettle, botPay, betLimit } from "./bet.js";
+import { ENV as ROOT_ENV, botSettle, botPay, betLimit } from "../server/bet.js";
+
+// 這個功能自己的設定（含 OddsPapi 金鑰）放在 lolbet/lolbet.env，不混進專案的 .env；
+// 移除功能時整個資料夾刪掉即可。同名變數以 lolbet.env 為準。
+const LENV = (() => {
+  const o = {};
+  try {
+    for (const line of fs.readFileSync(fileURLToPath(new URL("./lolbet.env", import.meta.url)), "utf8").split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m && !line.trim().startsWith("#")) o[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
+    }
+  } catch {}
+  return o;
+})();
+const ENV = { ...ROOT_ENV, ...LENV };
 
 const KEY = ENV.ODDSPAPI_KEY || "";
 const BASE = "https://api.oddspapi.io/v4";
@@ -18,7 +32,7 @@ const END = Date.parse(ENV.LOLBET_END || "2026-11-16T00:00:00+08:00");
 const LOCK_MS = 60 * 1000;                                           // 開賽前 1 分鐘鎖盤
 const VOID_AFTER = 3 * 24 * 3600 * 1000;                             // 開賽後 3 天還沒結果就退款
 const MAX_PER_FIXTURE = 5;                                           // 每人每場最多下注總額 = 單注上限 × 5
-const SFILE = fileURLToPath(new URL("./lolbet_state.json", import.meta.url));
+const SFILE = fileURLToPath(new URL("./state.json", import.meta.url));
 
 export const lolEnabled = () => !!KEY;
 

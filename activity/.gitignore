@@ -29,5 +29,8 @@ server/farm.json
 
 # 圖創區：使用者畫的圖與紀錄
 server/gallery_data
-server/lolbet_state.json
-public/teams/*.png
+
+# 世界賽運彩（整個功能在 lolbet/）：金鑰、額度計數與隊徽圖片不上傳
+lolbet/lolbet.env
+lolbet/state.json
+lolbet/teams/*.png

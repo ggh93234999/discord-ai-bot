@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""下載世界賽隊伍圖標到 activity/public/teams/，並產生 index.json（OddsPapi 的隊名 → 檔名）。
+"""下載世界賽隊伍圖標到 activity/lolbet/teams/，並產生 index.json（OddsPapi 的隊名 → 檔名）。
 資料來源 Liquipedia（遵守他們的 API 規則：帶 User-Agent、請求間隔 2 秒以上）。圖標只抓一次，之後從本機提供。
 用法：python3 scripts/fetch_lol_logos.py
 """
 import gzip, json, os, re, sys, time, urllib.parse, urllib.request
 
 UA = "discord-activity-logo-fetch/1.0 (personal hobby bot)"
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public", "teams")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "teams")
 WIKI = "https://liquipedia.net/leagueoflegends/api.php"
 # OddsPapi 的隊名 → Liquipedia 頁面名稱
 TEAMS = {

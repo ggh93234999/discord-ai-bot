@@ -1,6 +1,11 @@
 // 英雄聯盟世界賽運彩：賠率同步 Pinnacle，單場勝負，用 bot 的虛擬幣下注。
-import { wsUrl } from "./gomoku.js";
-import { ensureSession } from "./wager.js";
+import "./lolbet.css";
+import { wsUrl } from "../src/gomoku.js";
+import { ensureSession } from "../src/wager.js";
+// 隊伍資料與圖標都放在 lolbet/teams/，由打包工具處理（不用 public/）
+import logoIndex from "./teams/index.json";
+import seedIndex from "./teams/seeds.json";
+const LOGO_URLS = import.meta.glob("./teams/*.png", { eager: true, query: "?url", import: "default" });
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const money = (n) => Number(n).toLocaleString();
@@ -8,17 +13,16 @@ const ERR = {
   need_login: "要先登入才能下注", stale: "賠率正在更新，請幾秒後再按一次", quota: "賠率資料來源額度已用完，暫停下注", closed: "這場已經截止下注", bad_amount: "金額不合法", odds_changed: "賠率剛剛變了，請看新賠率再下注",
   too_much: "這場你下的總額已達上限", insufficient: "代幣不夠", bot_down: "機器人暫時連不上，稍後再試", bad_request: "下注內容有誤",
 };
-// 隊伍圖標：scripts/fetch_lol_logos.py 抓到 public/teams/，index.json 是「隊名 → 檔名」。沒有圖的隊伍顯示縮寫圓章。
-let logoIdx = null;
-fetch("teams/index.json").then((r) => (r.ok ? r.json() : {})).then((j) => { logoIdx = j; }).catch(() => { logoIdx = {}; });
-// 賽區與賽區種子：scripts/fetch_lol_seeds.py 產生 public/teams/seeds.json
-let seedIdx = null;
-fetch("teams/seeds.json").then((r) => (r.ok ? r.json() : {})).then((j) => { seedIdx = j; }).catch(() => { seedIdx = {}; });
+// 隊伍圖標：lolbet/scripts/fetch_lol_logos.py 抓到 lolbet/teams/，index.json 是「隊名 → 檔名」。沒有圖的隊伍顯示縮寫圓章。
+const logoIdx = logoIndex;
+// 賽區與賽區種子：lolbet/scripts/fetch_lol_seeds.py 產生 lolbet/teams/seeds.json
+const seedIdx = seedIndex;
 const REGION = { LCK: "韓國", LPL: "中國", LCS: "北美", LEC: "歐洲", LCP: "亞太", CBLOL: "巴西" };
 const seedTag = (name) => { const x = seedIdx && seedIdx[name]; return x ? `<small class="lbseed" title="${esc(REGION[x.region] || "")}賽區">${esc(x.region)} ${x.seed} 號種子${x.note ? "・" + esc(x.note) : ""}</small>` : ""; };
 const logo = (name) => {
   const f = logoIdx && logoIdx[name];
-  if (f) return `<img class="lblogo" src="teams/${f}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'lblogo lbfb',textContent:'${esc(name).slice(0, 2).toUpperCase()}'}))">`;
+  const u = f && LOGO_URLS["./teams/" + f];
+  if (u) return `<img class="lblogo" src="${u}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'lblogo lbfb',textContent:'${esc(name).slice(0, 2).toUpperCase()}'}))">`;
   return `<span class="lblogo lbfb">${esc(name).replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?"}</span>`;
 };
 const BSTAT = { open: "進行中", won: "贏了", lost: "輸了", void: "已退款", unpaid: "派彩中" };
