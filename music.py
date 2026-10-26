@@ -266,6 +266,16 @@ def _playable(info: dict) -> bool:
         return True            # 網路抖動等不確定的情況：照原本的流程走
 
 
+def _wait_available(info: dict, cap: float = 15.0) -> None:
+    """yt-dlp 2026.10.21 起，格式帶 available_at：串流網址在那個時間之前會回 403，要等到才給 ffmpeg 讀。"""
+    times = [info.get("available_at")] + [f.get("available_at") for f in (info.get("requested_formats") or [])]
+    t = max([x for x in times if isinstance(x, (int, float))], default=0)
+    wait = t - time.time()
+    if 0 < wait:
+        log.info("串流網址 %.1f 秒後才生效，先等一下：%s", wait, info.get("title"))
+        time.sleep(min(wait + 0.5, cap))
+
+
 def _stream_info(url: str) -> dict:
     first = None
     for client in (None, *_YT_FALLBACK_CLIENTS):
@@ -281,6 +291,7 @@ def _stream_info(url: str) -> dict:
             continue
         if first is None:
             first = info
+        _wait_available(info)
         if not info.get("url") or _playable(info):
             if client:
                 log.info("串流網址改用 %s 才能播：%s", client, info.get("title"))
