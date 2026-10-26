@@ -436,7 +436,7 @@ class GuildPlayer:
                 await self.restore_status()
                 await self.vc.move_to(channel)
         else:
-            await channel.connect(self_deaf=True)
+            await channel.connect(self_deaf=False)   # 不自己拒聽：被當成閒置而移到不活躍頻道的機率較低
 
     def ensure_loop(self):
         if self._task is None or self._task.done():
@@ -1347,6 +1347,20 @@ async def on_voice_state_update(member: discord.Member, before, after):
     client = _client
     p = players.get(member.guild.id)
     if not p:
+        return
+    if (member.id == client.user.id and before.channel and after.channel
+            and after.channel != before.channel and after.channel == member.guild.afk_channel):
+        # 被伺服器的「不活躍」機制移進掛機頻道：自己移回原本的頻道
+        log.warning("機器人被移到不活躍頻道 %s，嘗試移回 %s", after.channel.name, before.channel.name)
+        async def back():
+            await asyncio.sleep(1)
+            try:
+                if p.vc:
+                    await p.vc.move_to(before.channel)
+                    log.info("已移回 %s", before.channel.name)
+            except Exception as e:
+                log.warning("移回原頻道失敗：%r", e)
+        asyncio.create_task(back())
         return
     if member.id == client.user.id and after.channel is None:
         # 被踢出或斷線：清掉佇列，迴圈會把面板改成「已離開」
