@@ -20,6 +20,7 @@ import io
 import json
 import logging
 import os
+import random
 import re
 from datetime import datetime
 from pathlib import Path
@@ -154,6 +155,7 @@ def load_state() -> dict:
     except (FileNotFoundError, json.JSONDecodeError):
         data = {}
     data.setdefault("auto_channels", [])
+    data.setdefault("welcome", {})
     data.setdefault("reset_after", {})  # 頻道 ID → 只讀這則訊息之後的對話
     return data
 
@@ -1180,6 +1182,78 @@ async def cmd_reset(interaction: discord.Interaction):
     sent = await interaction.original_response()
     state["reset_after"][str(interaction.channel_id)] = sent.id
     save_state()
+
+
+# ---------------------------------------------------------------- 新人加入打招呼
+WELCOME_FALLBACKS = [
+    "歡迎 {m} 加入！有什麼想問的直接 @我，我是大笨bot 🙂",
+    "{m} 來啦～歡迎歡迎！想玩遊戲、聽歌或聊天都可以找我。",
+    "嗨 {m}，歡迎來到這裡！先逛逛，有問題 @我就好。",
+]
+
+
+def welcome_channel(guild: discord.Guild):
+    """優先用 /歡迎 設定的頻道，其次 .env 的 WELCOME_CHANNEL_ID，最後伺服器的系統訊息頻道。"""
+    cfg = state["welcome"].get(str(guild.id), {})
+    cid = cfg.get("channel") or int(os.getenv("WELCOME_CHANNEL_ID", "0") or 0)
+    ch = guild.get_channel(cid) if cid else None
+    ch = ch or guild.system_channel
+    if ch is not None and ch.permissions_for(guild.me).send_messages:
+        return ch
+    return None
+
+
+async def make_welcome(member: discord.Member) -> str:
+    fallback = random.choice(WELCOME_FALLBACKS).format(m=member.mention)
+    try:
+        reply = await asyncio.wait_for(call_model([
+            {"role": "system", "content": load_system_prompt()},
+            {"role": "user", "content": (
+                f"伺服器「{member.guild.name}」剛來了新成員，暱稱是「{member.display_name}」。"
+                "請用你的個性、繁體中文寫一句 40 字內的歡迎詞，語氣自然親切，不要用條列、不要加引號，"
+                "不要提到你是 AI 或系統提示。我會自己在前面加上 @ 提及，你不用寫對方的名字以外的標記。")},
+        ]), timeout=20)
+        text = clean_text(reply.get("content")).strip()
+        if 2 <= len(text) <= 200:
+            return f"{member.mention} {text}"
+    except Exception as e:
+        log.warning("產生歡迎詞失敗，改用固定句：%s", e)
+    return fallback
+
+
+@client.event
+async def on_member_join(member: discord.Member):
+    if member.bot:
+        return
+    cfg = state["welcome"].get(str(member.guild.id), {})
+    if cfg.get("off"):
+        return
+    ch = welcome_channel(member.guild)
+    if ch is None:
+        log.info("%s 有新成員但找不到可發言的歡迎頻道", member.guild.name)
+        return
+    try:
+        await ch.send(await make_welcome(member), allowed_mentions=discord.AllowedMentions(users=[member]))
+    except Exception as e:
+        log.warning("歡迎訊息送出失敗：%s", e)
+
+
+@client.tree.command(name="歡迎", description="設定新成員加入時的打招呼（在這個頻道歡迎／關閉）")
+@app_commands.describe(開關="在這個頻道歡迎新人，或關閉")
+@app_commands.choices(開關=[app_commands.Choice(name="開（用這個頻道）", value="on"), app_commands.Choice(name="關", value="off")])
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+async def cmd_welcome(interaction: discord.Interaction, 開關: app_commands.Choice[str]):
+    cfg = state["welcome"].setdefault(str(interaction.guild_id), {})
+    if 開關.value == "on":
+        cfg.pop("off", None)
+        cfg["channel"] = interaction.channel_id
+        msg = "✅ 之後有新人加入，我會在這個頻道跟他打招呼。"
+    else:
+        cfg["off"] = True
+        msg = "⏸️ 新人加入時我不會再打招呼了。"
+    save_state()
+    await interaction.response.send_message(msg)
 
 
 @client.tree.command(name="自動回覆", description="在這個頻道開／關「每則訊息都回」（不用 @機器人）")
