@@ -1,6 +1,8 @@
 // 英雄聯盟世界賽運彩：賠率同步 OddsPapi（Pinnacle 盤口），用 bot 的虛擬幣下注單場勝負。
 // 賠率每幾分鐘更新一次，開賽前鎖盤；賽果出來後自動派彩（賠率以下注當下為準）。
 import fs from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { ENV, botSettle, botPay, betLimit } from "./bet.js";
 
@@ -128,6 +130,7 @@ async function getScore(f) {
 // 結算：贏的派彩、輸的標記、比賽取消或太久沒結果的退款。派彩失敗的留著，下一輪再試。
 // ---- 賽果優先從 Liquipedia 的世界賽頁面拿（公開資料，不花 OddsPapi 額度）：瑞士輪頁面解析後依「兩隊＋開賽時間」對上場次。
 // 頁面請求有間隔限制（每次至少隔 8 分鐘，且只有「有人在看或有人下注」時才抓）。抓不到（例如淘汰賽頁面格式不同）再退回 OddsPapi。
+const execFileP = promisify(execFile);
 const LP_ON = ENV.LOLBET_LP !== "0";
 const LP_PAGES = (ENV.LOLBET_LP_PAGES || "World Championship/2026/Swiss Stage").split(",").map((x) => x.trim()).filter(Boolean);
 const LP_UA = "discord-activity-lolbet/1.0 (personal hobby bot)";
@@ -154,12 +157,11 @@ async function lpFetch(now, force) {
   lp.at = now;                                                  // 失敗也算一次，不要連續重試
   const list = [];
   for (const page of LP_PAGES) {
-    const u = "https://liquipedia.net/leagueoflegends/api.php?" + new URLSearchParams({ action: "parse", page, prop: "text", format: "json", disablelimitreport: "1", disableeditsection: "1" });
-    try {
-      const r = await fetch(u, { headers: { "User-Agent": LP_UA }, signal: AbortSignal.timeout(30000) });
-      if (!r.ok) throw new Error("http " + r.status);
-      const j = await r.json(); list.push(...parseMatchlists(String(j?.parse?.text?.["*"] || "")));
-    } catch (e) { console.log("世界賽運彩 Liquipedia 抓取失敗：", page, e && e.message); }
+    const u = "https://liquipedia.net/leagueoflegends/api.php?" + new URLSearchParams({ action: "parse", page, prop: "text", format: "json", disablelimitreport: "1", disableeditsection: "1" }).toString();
+    try {                                                       // 用 curl：這台伺服器上 node 的 fetch 連 Liquipedia 會逾時（curl 正常），而且對方要求 gzip
+      const { stdout } = await execFileP("curl", ["-sS", "--compressed", "-m", "40", "-A", LP_UA, u], { maxBuffer: 32 * 1024 * 1024 });
+      const j = JSON.parse(stdout); list.push(...parseMatchlists(String(j?.parse?.text?.["*"] || "")));
+    } catch (e) { console.log("世界賽運彩 Liquipedia 抓取失敗：", page, String(e && e.message || e).slice(0, 120)); }
     await new Promise((ok) => setTimeout(ok, 2500));
   }
   if (list.length) lp.list = list;
