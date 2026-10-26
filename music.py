@@ -248,9 +248,44 @@ def _search(query: str, requester: str, n: int = 5) -> list[Track]:
     return tracks[:n]
 
 
+# 備援用的 YouTube 用戶端：預設的 client 對部分影片會給出「播的時候 403」的網址，換 web_embedded 就能播
+_YT_FALLBACK_CLIENTS = ("web_embedded", "mweb")
+
+
+def _playable(info: dict) -> bool:
+    """先用 1 byte 的 Range 請求試一下串流網址，403／401 代表 ffmpeg 一定打不開。"""
+    import urllib.error
+    import urllib.request
+    try:
+        req = urllib.request.Request(info["url"], headers={**(info.get("http_headers") or {}), "Range": "bytes=0-1"})
+        urllib.request.urlopen(req, timeout=10).close()
+        return True
+    except urllib.error.HTTPError as e:
+        return e.code not in (401, 403)
+    except Exception:
+        return True            # 網路抖動等不確定的情況：照原本的流程走
+
+
 def _stream_info(url: str) -> dict:
-    with yt_dlp.YoutubeDL({**YDL_BASE, "format": "bestaudio/best", "noplaylist": True}) as ydl:
-        return ydl.extract_info(url, download=False)
+    first = None
+    for client in (None, *_YT_FALLBACK_CLIENTS):
+        opts = {**YDL_BASE, "format": "bestaudio/best", "noplaylist": True}
+        if client:
+            opts["extractor_args"] = {"youtube": {"player_client": [client]}}
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except Exception:
+            if client is None:
+                raise
+            continue
+        if first is None:
+            first = info
+        if not info.get("url") or _playable(info):
+            if client:
+                log.info("串流網址改用 %s 才能播：%s", client, info.get("title"))
+            return info
+    return first
 
 
 # ---------------------------------------------------------------- 面板按鈕
