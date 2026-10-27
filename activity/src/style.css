@@ -1173,3 +1173,6 @@ body.tv-fs{overflow:hidden}
 .mt.back{background:linear-gradient(160deg,#35a07a,#23785a 60%,#1b6049);border-bottom-color:#124232;border-right-color:#1b6049;
   box-shadow:0 1px 0 #7fd3b2 inset,0 3px 4px rgba(0,0,0,.55)}
 .mt.back::after{content:"";width:55%;height:55%;border:1px solid rgba(255,255,255,.25);border-radius:3px}
+/* 人頭牌的圖不要蓋住角標 */
+:is(.casino,.poker) .mid:has(.court){left:25%;right:25%;top:12%;bottom:12%}
+:is(.casino,.poker) .court img{inset:1px;width:calc(100% - 2px);height:calc(100% - 2px)}
