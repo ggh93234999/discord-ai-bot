@@ -1,6 +1,13 @@
 // 自動化工廠（原型）：把礦挖出來、熔成鐵板、做成齒輪等產品，用傳送帶送去出貨口換錢。
 import { W, H, DX, DY, BELT_STEP, KINDS, ITEMS, RECIPES, POWER_USE, POWER_PRICE, makeOre, newGame, canPlace, place, remove, setRecipe, machineState, step, perMinute, powerRate, buyPower, serialize, load } from "./factory_sim.js";
 
+// AI 畫的圖示（factory-art/*.png，檔名＝機器或物品代號）。圖還沒載入或缺圖時，退回原本的色塊畫法。
+const IMG = {};
+for (const [pth, url] of Object.entries(import.meta.glob("./factory-art/*.png", { eager: true, query: "?url", import: "default" }))) {
+  const n = pth.split("/").pop().slice(0, -4), im = new Image(); im.src = url; IMG[n] = { im, url };
+}
+const ready = (n) => IMG[n] && IMG[n].im.complete && IMG[n].im.naturalWidth > 0;
+const artTag = (n, px, fallback) => (IMG[n] ? `<img class="fart" src="${IMG[n].url}" width="${px}" height="${px}" alt="">` : fallback);
 const CELL = 40, SAVE_KEY = "factory_v1", SEEN_KEY = "factory_help_seen";
 const TOOLS = [
   { k: "inspect",  ic: "👆", nm: "檢視",   tip: "點機器看它在做什麼、缺什麼；點組裝機還能直接選配方。這個工具不會放東西，也不會花錢。" },
@@ -42,8 +49,8 @@ export function mountFactory(root, { env, back }) {
           <p>每台機器的黃色小箭頭是<b>出口方向</b>，放之前先用「方向」鈕（或鍵盤 R）轉好；放錯了，用「方向」再點一次同一台機器也能轉。</p>
         </details>
         <details class="fh"><summary>配方表</summary>
-          <div class="frec">${RECIPES.map((R) => `<div><i style="background:${ITEMS[R.make].color}"></i><b>${ITEMS[R.make].name}</b> $${ITEMS[R.make].value}<span>${recipeText(R)}（${(R.time / 10).toFixed(0)} 秒）</span></div>`).join("")}
-            <div><i style="background:${ITEMS.iron_plate.color}"></i><b>熔爐</b><span>1 鐵礦 → 1 鐵板；1 銅礦 → 1 銅板（2 秒）</span></div></div>
+          <div class="frec">${RECIPES.map((R) => `<div>${artTag(R.make, 20, `<i style="background:${ITEMS[R.make].color}"></i>`)}<b>${ITEMS[R.make].name}</b> $${ITEMS[R.make].value}<span>${recipeText(R)}（${(R.time / 10).toFixed(0)} 秒）</span></div>`).join("")}
+            <div>${artTag("smelter", 20, "")}<b>熔爐</b><span>1 鐵礦 → 1 鐵板；1 銅礦 → 1 銅板（2 秒）</span></div></div>
           <p>組裝機剛放下是做齒輪；用「檢視」點它，下面的面板可以選配方。換配方會清空機器裡的材料。</p>
         </details>
         <details class="fh"><summary>電費（用完就停工）</summary>
@@ -75,7 +82,7 @@ export function mountFactory(root, { env, back }) {
 
   // ---- 工具列
   const bar = $(".ftools");
-  bar.innerHTML = TOOLS.map((t, i) => `<button data-k="${t.k}" title="${t.tip}"><span>${t.ic}</span><b>${t.nm}</b><small>${t.k === "erase" ? "退一半" : t.k === "inspect" ? "不花錢" : "$" + KINDS[t.k].cost}</small><em>${i + 1}</em></button>`).join("");
+  bar.innerHTML = TOOLS.map((t, i) => `<button data-k="${t.k}" title="${t.tip}"><span>${artTag(t.k, 30, t.ic)}</span><b>${t.nm}</b><small>${t.k === "erase" ? "退一半" : t.k === "inspect" ? "不花錢" : "$" + KINDS[t.k].cost}</small><em>${i + 1}</em></button>`).join("");
   function pickTool(k) {
     tool = k; if (k !== "inspect") sel = null;
     bar.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x.dataset.k === k));
@@ -170,13 +177,24 @@ export function mountFactory(root, { env, back }) {
       ctx.save(); ctx.translate(px + CELL / 2, py + CELL / 2); ctx.rotate(c.dir * Math.PI / 2);
       ctx.strokeStyle = "rgba(255,255,255,.28)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, -7); ctx.lineTo(3, 0); ctx.lineTo(-6, 7); ctx.stroke(); ctx.restore();
     } else {
-      ctx.fillStyle = COLOR[c.k]; rrect(px + 3, py + 3, CELL - 6, CELL - 6, 7); ctx.fill();
-      ctx.fillStyle = "#fff"; ctx.font = "20px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(ICON[c.k], px + CELL / 2, py + CELL / 2);
+      if (ready(c.k)) {
+        ctx.fillStyle = "#2b3345"; rrect(px + 2, py + 2, CELL - 4, CELL - 4, 8); ctx.fill();
+        ctx.strokeStyle = COLOR[c.k]; ctx.lineWidth = 2; ctx.stroke();
+        ctx.drawImage(IMG[c.k].im, px + 4, py + 3, CELL - 8, CELL - 8);
+      } else {
+        ctx.fillStyle = COLOR[c.k]; rrect(px + 3, py + 3, CELL - 6, CELL - 6, 7); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.font = "20px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(ICON[c.k], px + CELL / 2, py + CELL / 2);
+      }
       if (c.k !== "shipper") {
         drawArrow(px, py, c.dir, "#ffe082");
         const n = Object.values(c.inv).reduce((a, b) => a + b, 0);
         if (n) { ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left"; ctx.fillText(n, px + 6, py + 9); }
-        if (c.k === "assembler") { ctx.fillStyle = ITEMS[RECIPES[c.r].make].color; ctx.beginPath(); ctx.arc(px + CELL - 9, py + 9, 5, 0, 7); ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 1; ctx.stroke(); }
+        if (c.k === "assembler") {
+          const mk = RECIPES[c.r].make;
+          ctx.fillStyle = "rgba(20,26,38,.85)"; ctx.beginPath(); ctx.arc(px + CELL - 9, py + 9, 8, 0, 7); ctx.fill();
+          if (ready(mk)) ctx.drawImage(IMG[mk].im, px + CELL - 16, py + 2, 14, 14);
+          else { ctx.fillStyle = ITEMS[mk].color; ctx.beginPath(); ctx.arc(px + CELL - 9, py + 9, 5, 0, 7); ctx.fill(); }
+        }
         if (c.k !== "splitter") {                               // 狀態燈
           const st = machineState(c);
           if (STATE_COLOR[st.s]) { ctx.fillStyle = STATE_COLOR[st.s]; ctx.beginPath(); ctx.arc(px + 9, py + CELL - 9, 4, 0, 7); ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 1; ctx.stroke(); }
@@ -187,10 +205,15 @@ export function mountFactory(root, { env, back }) {
     if (item) {
       let ox = 0, oy = 0;
       if (c.k === "belt") { const bk = c.ago < BELT_STEP ? 1 - c.ago / BELT_STEP : 0; ox = -DX[c.dir] * bk * CELL * 0.8; oy = -DY[c.dir] * bk * CELL * 0.8; }
-      const cx = px + CELL / 2 + ox, cy = py + CELL / 2 + oy, big = item === "gear" || item === "motor";
-      ctx.fillStyle = ITEMS[item].color; ctx.beginPath(); ctx.arc(cx, cy, big ? 7 : 6, 0, 7); ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.lineWidth = 1.5; ctx.stroke();
-      if (item === "gear") { ctx.fillStyle = "#1c2330"; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, 7); ctx.fill(); }
+      const onMachine = c.k !== "belt" && c.k !== "splitter";                // 機器的成品畫在出口那一側，看得出往哪送
+      const cx = px + CELL / 2 + ox + (onMachine ? DX[c.dir] * 10 : 0), cy = py + CELL / 2 + oy + (onMachine ? DY[c.dir] * 10 : 0);
+      if (ready(item)) { const sz = onMachine ? 16 : 22; ctx.drawImage(IMG[item].im, cx - sz / 2, cy - sz / 2, sz, sz); }
+      else {
+        const big = item === "gear" || item === "motor";
+        ctx.fillStyle = ITEMS[item].color; ctx.beginPath(); ctx.arc(cx, cy, big ? 7 : 6, 0, 7); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.lineWidth = 1.5; ctx.stroke();
+        if (item === "gear") { ctx.fillStyle = "#1c2330"; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, 7); ctx.fill(); }
+      }
     }
   }
   function draw() {
@@ -239,7 +262,7 @@ export function mountFactory(root, { env, back }) {
     if (c.k === "miner") html += `<div>挖的是${c.ore === "copper" ? "銅礦" : "鐵礦"}，每 1.5 秒 1 個</div>`;
     if (c.k === "smelter") html += `<div>機器裡：${inv}</div>`;
     if (c.k === "assembler") {
-      html += `<div>機器裡：${inv}</div><div class="fi-rec">${RECIPES.map((R, i) => `<button data-r="${i}" class="${i === c.r ? "on" : ""}"><i style="background:${ITEMS[R.make].color}"></i>${ITEMS[R.make].name}<small>${recipeText(R)}</small></button>`).join("")}</div>`;
+      html += `<div>機器裡：${inv}</div><div class="fi-rec">${RECIPES.map((R, i) => `<button data-r="${i}" class="${i === c.r ? "on" : ""}">${artTag(R.make, 18, `<i style="background:${ITEMS[R.make].color}"></i>`)}${ITEMS[R.make].name}<small>${recipeText(R)}</small></button>`).join("")}</div>`;
     }
     if (c.k === "belt") html += `<div>${c.item ? "帶子上有：" + ITEMS[c.item].name : "帶子上沒有東西"}</div>`;
     if (c.k === "splitter") html += `<div>${c.item ? "手上拿著：" + ITEMS[c.item].name : "沒有東西"}。輪流丟給前、右、左。</div>`;
@@ -250,7 +273,7 @@ export function mountFactory(root, { env, back }) {
   let priceDone = false;
   function hud() {
     $(".fmoney").textContent = `💰 ${g.money}`;
-    if (!priceDone) { priceDone = true; $(".fprice").innerHTML = Object.values(ITEMS).map((it) => `<span><i style="background:${it.color}"></i>${it.name} $${it.value}</span>`).join(""); }
+    if (!priceDone) { priceDone = true; $(".fprice").innerHTML = Object.entries(ITEMS).map(([k, it]) => `<span>${artTag(k, 18, `<i style="background:${it.color}"></i>`)}${it.name} $${it.value}</span>`).join(""); }
     const t = performance.now() - msgAt < 2500 ? msg : "";
     const el = $(".fstat"); el.textContent = t || `每分鐘出貨 $${perMinute(g)}　累計出貨 $${g.shipped}`; el.classList.toggle("warn", !!t);
     renderInfo(); renderPower();

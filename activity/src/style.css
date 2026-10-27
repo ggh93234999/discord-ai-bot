@@ -1070,3 +1070,7 @@ body.tv-fs{overflow:hidden}
 .card.wide.factorycard:hover { border-color:#b3261e; filter:brightness(1.04); }
 .card.wide.factorycard b { color:#1b1b1b; } .card.wide.factorycard em { color:#7a2418; } .card.wide.factorycard small { color:#3a342a; max-width:60%; opacity:.95; }
 @media (max-width:520px){ .card.wide.factorycard, .card.wide.factorycard:hover { background:linear-gradient(90deg, rgba(246,243,234,.95) 0%, rgba(246,243,234,.82) 50%, rgba(246,243,234,0) 80%), #e9e5d8 url("./factory-bg.jpg") 72% 55%/cover no-repeat; } .card.wide.factorycard small { max-width:55%; } }
+.factory .fart{display:inline-block;vertical-align:middle;object-fit:contain}
+.factory .fprice span,.factory .frec div,.factory .fi-rec button{align-items:center}
+.factory .fprice .fart{margin-right:4px}.factory .frec .fart{margin-right:0}
+.factory .fi-rec button .fart{margin-right:5px;vertical-align:-4px}
