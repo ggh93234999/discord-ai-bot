@@ -9,6 +9,10 @@ const ERR = {
   no_farm: "找不到這塊農場", self: "不能偷自己的菜", not_ripe: "還不能偷：剛成熟的 5 分鐘內主人優先",
   no_more: "這塊地你已經偷過了（每個人每塊地每輪只能偷 1 個）", bad_plot: "這塊地沒有作物", tree_half: "這塊已經被偷走一半了，剩下的要留給主人", error: "發生錯誤，再試一次",
 };
+// AI 畫的作物圖示（farm-art/<作物代號>.png）；缺圖時退回 emoji。圖示用 em 當單位，跟著周圍的字級縮放。
+const ARTURL = {};
+for (const [pth, url] of Object.entries(import.meta.glob("./farm-art/*.png", { eager: true, query: "?url", import: "default" }))) ARTURL[pth.split("/").pop().slice(0, -4)] = url;
+const ic = (c) => (ARTURL[c.id] ? `<img class="cart" src="${ARTURL[c.id]}" alt="${c.name}">` : c.icon);
 const VNAME = { n: "", big: "大顆", gold: "金色" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const money = (n) => Number(n).toLocaleString();
@@ -70,7 +74,7 @@ export function mountFarm(root, { env, back }) {
       else if (m.a === "visit") { vis = m; visBase = Date.now(); if (tab === "visit") draw(); }
       else if (m.a === "got") { statusEl.textContent = "收成了 " + summarize(m.got); sfx.harvest(m.got); }
       else if (m.a === "sold") { statusEl.textContent = "賣出了，拿到 " + money(m.amount) + " 代幣"; sfx.sell(); }
-      else if (m.a === "stole") { statusEl.textContent = `偷到了 ${VNAME[m.v]}${cropOf(m.c).icon}！這${m.tree ? "棵樹" : "塊地"}還能被別人偷 ${m.treeLeft} 個`; sfx.steal(); }
+      else if (m.a === "stole") { statusEl.textContent = `偷到了 ${VNAME[m.v]}${cropOf(m.c).name}！這${m.tree ? "棵樹" : "塊地"}還能被別人偷 ${m.treeLeft} 個`; sfx.steal(); }
       else if (m.a === "err") {
         statusEl.textContent = (ERR[m.error] || ERR.error); pend = ""; sfx.err();
         if (m.balance != null && st) { st.balance = m.balance; showBal(); }
@@ -84,7 +88,7 @@ export function mountFarm(root, { env, back }) {
   const fillCrops = (c) => { CROPS_BY = c; };
   const cropOf = (id) => CROPS_BY.find((c) => c.id === id) || { icon: "🌱", name: id, seed: 0, min: 0, unit: 0 };
   function summarize(got) {
-    const cnt = {}; for (const g of got) { const k = (VNAME[g.v] || "") + cropOf(g.c).icon; cnt[k] = (cnt[k] || 0) + 1; }
+    const cnt = {}; for (const g of got) { const k = (VNAME[g.v] || "") + cropOf(g.c).name; cnt[k] = (cnt[k] || 0) + 1; }
     return Object.entries(cnt).map(([k, n]) => k + "×" + n).join(" ");
   }
   function showBal() {
@@ -104,22 +108,22 @@ export function mountFarm(root, { env, back }) {
     if (tab === "visit") return drawVisit();
     if (!st) { body.innerHTML = `<p class="fempty">讀取農場中…</p>`; return; }
     const el = elapsed();
-    const seedCard = (c) => `<button class="seed${c.id === sel ? " sel" : ""}${c.tree ? " tree" : ""}" data-c="${c.id}"><span>${c.icon}</span><b>${c.name}</b><small>${c.tree ? `樹苗 ${money(c.seed)} 代幣<br>每 ${fmt(c.min * 60000)} 結 ${c.y} 個` : `${money(c.seed)} 代幣<br>${fmt(c.min * 60000)}・產 ${c.y}`}</small></button>`;
+    const seedCard = (c) => `<button class="seed${c.id === sel ? " sel" : ""}${c.tree ? " tree" : ""}" data-c="${c.id}"><span>${ic(c)}</span><b>${c.name}</b><small>${c.tree ? `樹苗 ${money(c.seed)} 代幣<br>每 ${fmt(c.min * 60000)} 結 ${c.y} 個` : `${money(c.seed)} 代幣<br>${fmt(c.min * 60000)}・產 ${c.y}`}</small></button>`;
     const seeds = `<div class="seeds">${st.crops.filter((c) => !c.tree).map(seedCard).join("")}</div>`
       + (st.crops.some((c) => c.tree) ? `<div class="seedtitle">🌳 果樹：只買一次，收成後樹還在，每隔一段時間再結果</div><div class="seeds">${st.crops.filter((c) => c.tree).map(seedCard).join("")}</div>` : "");
     const plots = st.plots.map((p, i) => {
       if (!p) return `<button class="plot empty" data-i="${i}"><span class="pi">＋</span><small>種${cropOf(sel).name}</small></button>`;
       const left = Math.max(0, p.left - el), c = cropOf(p.c);
       const chop = c.tree ? `<span class="chop" data-i="${i}" title="砍掉這棵樹">🪓</span>` : "";
-      if (left > 0) return `<div class="plot grow${c.tree ? " tree" : ""}" data-i="${i}" data-end="${base + p.left}">${chop}<span class="pi sm">${c.icon}</span><small>${fmt(left)}</small><i style="--pr:${Math.max(0.05, 1 - left / (c.min * 60000))}"></i></div>`;
-      return `<button class="plot ripe${c.tree ? " tree" : ""}" data-i="${i}">${chop}<span class="pi">${c.icon}</span><small>可收成 ×${p.got}${p.stolen ? `（被偷 ${p.stolen}）` : ""}</small></button>`;
+      if (left > 0) return `<div class="plot grow${c.tree ? " tree" : ""}" data-i="${i}" data-end="${base + p.left}">${chop}<span class="pi sm">${ic(c)}</span><small>${fmt(left)}</small><i style="--pr:${Math.max(0.05, 1 - left / (c.min * 60000))}"></i></div>`;
+      return `<button class="plot ripe${c.tree ? " tree" : ""}" data-i="${i}">${chop}<span class="pi">${ic(c)}</span><small>可收成 ×${p.got}${p.stolen ? `（被偷 ${p.stolen}）` : ""}</small></button>`;
     }).join("");
     const emptyN = st.plots.filter((p) => !p).length, ripeN = st.plots.filter((p) => p && p.left - el <= 0).length;
-    const inv = st.inv.map((x) => `<button class="item" data-k="${x.k}" title="賣出這個">${VNAME[x.v] ? `<em>${VNAME[x.v]}</em>` : ""}${cropOf(x.c).icon}<b>×${x.n}</b><small>${money(x.unit)}/個</small></button>`).join("");
+    const inv = st.inv.map((x) => `<button class="item" data-k="${x.k}" title="賣出這個">${VNAME[x.v] ? `<em>${VNAME[x.v]}</em>` : ""}${ic(cropOf(x.c))}<b>×${x.n}</b><small>${money(x.unit)}/個</small></button>`).join("");
     const log = st.log.length ? `<div class="flog"><b>最近發生的事</b>${st.log.map((l) => `<div><span class="ftime">${logTime(l.ts)}</span>${esc(l.txt)}</div>`).join("")}</div>` : "";
     body.innerHTML = `
       ${seeds}
-      <div class="fact"><button class="plantall" ${emptyN ? "" : "disabled"}>全部種${cropOf(sel).icon}（${emptyN} 塊）</button><button class="harvall" ${ripeN ? "" : "disabled"}>全部收成（${ripeN} 塊）</button></div>
+      <div class="fact"><button class="plantall" ${emptyN ? "" : "disabled"}>全部種${ic(cropOf(sel))}（${emptyN} 塊）</button><button class="harvall" ${ripeN ? "" : "disabled"}>全部收成（${ripeN} 塊）</button></div>
       <div class="fgrid">${plots}</div>
       <div class="finv"><div class="ftitle">🧺 倉庫${st.invValue ? `<button class="sellall">全部賣出 +${money(st.invValue)}</button>` : ""}</div>${inv || `<p class="fempty">空的。收成後的菜會放在這裡，按一下就能賣。</p>`}</div>
       ${log}
@@ -144,10 +148,10 @@ export function mountFarm(root, { env, back }) {
       const plots = vis.plots.map((p, i) => {
         if (!p) return `<div class="plot none"><span class="pi sm">·</span></div>`;
         const c = cropOf(p.c), left = Math.max(0, p.left - el), grace = Math.max(0, p.grace - el);
-        if (left > 0) return `<div class="plot grow" data-end="${visBase + p.left}"><span class="pi sm">${c.icon}</span><small>${fmt(left)}</small></div>`;
-        if (grace > 0) return `<div class="plot wait" data-end="${visBase + p.grace}" data-pre="主人優先 "><span class="pi">${c.icon}</span><small>主人優先 ${fmt(grace)}</small></div>`;
-        if (p.canSteal) return `<button class="plot ripe steal${p.tree ? " tree" : ""}" data-i="${i}"><span class="pi">${c.icon}</span><small>偷一個（這塊還剩 ${p.stealLeft} 個可偷）</small></button>`;
-        return `<div class="plot done${p.tree ? " tree" : ""}"><span class="pi">${c.icon}</span><small>${p.mineDone ? "你偷過了" : p.full ? "已被偷走一半" : "不能偷"}</small></div>`;
+        if (left > 0) return `<div class="plot grow" data-end="${visBase + p.left}"><span class="pi sm">${ic(c)}</span><small>${fmt(left)}</small></div>`;
+        if (grace > 0) return `<div class="plot wait" data-end="${visBase + p.grace}" data-pre="主人優先 "><span class="pi">${ic(c)}</span><small>主人優先 ${fmt(grace)}</small></div>`;
+        if (p.canSteal) return `<button class="plot ripe steal${p.tree ? " tree" : ""}" data-i="${i}"><span class="pi">${ic(c)}</span><small>偷一個（這塊還剩 ${p.stealLeft} 個可偷）</small></button>`;
+        return `<div class="plot done${p.tree ? " tree" : ""}"><span class="pi">${ic(c)}</span><small>${p.mineDone ? "你偷過了" : p.full ? "已被偷走一半" : "不能偷"}</small></div>`;
       }).join("");
       body.innerHTML = `<div class="ftitle"><button class="vback">← 農場列表</button><b>🏡 ${esc(vis.name)} 的農場</b></div><div class="fgrid">${plots}</div><p class="fnote">${st ? `每人每塊地（每棵樹）每輪只能偷 1 個，每塊最多被偷到剩一半。` : ""}偷來的放進自己的倉庫，到「我的農場」賣掉。</p>`;
       body.querySelector(".vback").addEventListener("click", () => { vis = null; send({ a: "list" }); draw(); });
