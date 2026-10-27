@@ -150,7 +150,7 @@ export function mountBridge(opts = {}) {
         let ctl;
         if (st.stage === "bid") ctl = (myTurn ? bidPanel() : `<div class="mhint">等 ${nm(st.turn)} 叫牌…</div>`) + `<div class="mhint brhcp">你的大牌點 ${st.hcp} 點（A 4、K 3、Q 2、J 1）${st.canRedeal ? `<button class="mb brredeal">🔄 要求重洗</button>` : ""}</div>`;
         else ctl = `<div class="mhint">${myTurn && st.stage === "play" ? (st.trick.length ? "輪到你出牌（要跟同花色，沒有才可以王吃或墊牌）" : "輪到你先出一張") : st.stage === "trick" ? "" : `等 ${nm(st.turn)} 出牌…`}</div>`;
-        below = `${st.stage === "bid" ? bidsHTML() : ""}${ctl}${hand}`;
+        below = `${st.stage === "bid" ? bidsHTML() : ""}<div class="brctl${st.stage === "bid" ? " bid" : ""}">${ctl}</div>${hand}`;
       } else if (play) {
         below = `${st.stage === "bid" ? bidsHTML() : ""}<div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div>`;
       }

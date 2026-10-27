@@ -1219,3 +1219,24 @@ body.tv-fs{overflow:hidden}
 @media (min-width:521px){.bt .brhand{min-height:84px}}
 .bt .brseat{min-height:64px}
 .bt .brbub{position:absolute;top:-9px;right:6px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+/* 橋牌：各區塊固定高度，叫牌／出牌／換手時版面不跳動 */
+.br:not(.bt) .brtable{grid-template-rows:66px 250px 66px}
+.br:not(.bt) .brmid{height:250px;overflow:hidden;justify-content:flex-start}
+.br:not(.bt) .brinfo{height:54px;justify-content:flex-start}
+.br:not(.bt) .brseat{min-height:62px;overflow:visible}
+.br:not(.bt) .brbub{position:absolute;top:-9px;right:6px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.br:not(.bt) .brhand{min-height:119px;align-content:flex-start}
+.br:not(.bt) .mhint{min-height:22px;line-height:22px}
+.br:not(.bt) .brlog{min-height:34px}
+/* 德州撲克：下注控制列固定高度 */
+.poker .pctl{min-height:190px}
+.br:not(.bt) .brctl{display:flex;flex-direction:column;align-items:center;width:100%}
+.br:not(.bt) .brctl.bid{min-height:348px;justify-content:flex-start}
+.br:not(.bt) .brbids{min-height:51px}
+.br:not(.bt) .brbids{height:104px;min-height:0;overflow-y:auto}
+/* 麻將：牌桌與操作列固定高度，牌河變長、出現碰吃槓按鈕時版面不跳動 */
+.mj .mseat.r2 .mriver,.mj .mseat.r0 .mriver{min-height:64px}
+.mj .mseat.r1 .mriver,.mj .mseat.r3 .mriver{min-height:120px}
+.mj .mctl{min-height:72px;justify-content:flex-start}
+.mj .mseat.r1,.mj .mseat.r3{min-height:290px}
+.mj .mseat.r2,.mj .mseat.r0{min-height:138px}
