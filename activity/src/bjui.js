@@ -21,7 +21,7 @@ function faceHtml(c) {
     const u = U[{ J: "jack", Q: "queen", K: "king" }[r]];
     mid = u ? `<div class="court"><img src="${u}" alt=""></div>` : `<b class="cl">${r}</b>`;
   }
-  return `<div class="cf${red ? " red" : ""}"><div class="ix tl"><b>${r}</b><span>${g}</span></div><div class="ix br"><b>${r}</b><span>${g}</span></div><div class="mid">${mid}</div></div>`;
+  return `<div class="cf${red ? " red" : ""}" data-s="${s}"><div class="ix tl"><b>${r}</b><span>${g}</span></div><div class="ix br"><b>${r}</b><span>${g}</span></div><div class="mid">${mid}</div></div>`;
 }
 // kind: "" 靜止、"deal" 從牌靴飛進來並翻面、"flip" 蓋著的牌翻開
 export function cardHtml(c, kind, delay) {

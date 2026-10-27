@@ -1159,7 +1159,7 @@ body.tv-fs{overflow:hidden}
 .br .bc u{position:absolute;right:2px;bottom:-2px;text-decoration:none;font-size:30px;line-height:1;opacity:.9}
 .br .bc.xs u,.br .bc.xs::after{display:none}
 .br .bc.xs{padding:1px 0 0 2px;border-radius:3px}
-.br .bc.s0,.br .bc.s3{color:#15151c}.br .bc.s1,.br .bc.s2{color:#c4202c}
+.br .bc.s0{color:#2e7d32}.br .bc.s1{color:#e65100}.br .bc.s2{color:#d32f2f}.br .bc.s3{color:#15151c}
 .br .bc.back{background-size:cover;background-position:center;border:1px solid #1d2a55;padding:0}
 .br .bc.back::after{display:none}
 .br .bc.big.can:hover{box-shadow:0 1px 0 #fff inset,0 8px 12px rgba(0,0,0,.5)}
@@ -1181,3 +1181,12 @@ body.tv-fs{overflow:hidden}
 .poker .pkw.sm .mid,.poker .pkw.sm .ix.br{display:none}
 .poker .pkw.sm .ix.tl{top:50%;left:50%;transform:translate(-50%,-50%);gap:2px}
 .poker .pkw.sm .ix b{font-size:36px}.poker .pkw.sm .ix span{font-size:34px;margin-top:2px}
+/* 德州撲克牌面：回到簡潔版（大點數＋大花色），四色花色 */
+.poker .pkw .mid,.poker .pkw .ix.br{display:none}
+.poker .pkw .ix.tl{top:50%;left:50%;transform:translate(-50%,-50%);gap:2px}
+.poker .pkw .ix b{font-size:36px}.poker .pkw .ix span{font-size:34px;margin-top:2px}
+.poker .pkw .cf[data-s^="♠"]{color:#15151c}
+.poker .pkw .cf[data-s^="♥"]{color:#d32f2f}.poker .pkw .cf[data-s^="♥"]{background:linear-gradient(160deg,#fff5f5,#fbdede)}
+.poker .pkw .cf[data-s^="♦"]{color:#1565c0}.poker .pkw .cf[data-s^="♦"]{background:linear-gradient(160deg,#f3f8ff,#d9e8fb)}
+.poker .pkw .cf[data-s^="♣"]{color:#2e7d32}.poker .pkw .cf[data-s^="♣"]{background:linear-gradient(160deg,#f3fbf3,#d8eed9)}
+.poker .pkw .cf{border-radius:7px}
