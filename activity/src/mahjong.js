@@ -1,6 +1,7 @@
 // 麻將（練習點數）：台灣 16 張（rule "tw"）和日本立直（rule "jp"）共用這個畫面。
 // 洗牌、判定、計分都在伺服器（server/mahjong.js），這裡只畫牌桌和送操作。
 import { wsUrl } from "./gomoku.js";
+import WAN from "./mj-art/wan.png";
 import { attachRules } from "./rules.js";
 import { GUIDE, guideItem, parseTiles } from "./mjguide.js";
 import { mjSfx, mjSfxOn, setMjSfx } from "./mjsfx.js";
@@ -26,7 +27,7 @@ function tile(t, cls = "", attrs = "", noDora = false) {
   let body, k;
   if (t >= 34) { k = "f"; body = `<b>${FLO[t - 34]}</b><i>${(t - 34) % 4 + 1}</i>`; }
   else if (t >= 27) { k = ["w", "w", "w", "w", "dw", "dg", "dr"][t - 27]; body = `<b>${t === 31 ? "" : HON[t - 27]}</b>`; }
-  else { const s = Math.floor(t / 9); k = ["m", "p", "s"][s]; body = s === 0 ? `<b>${NUM[t % 9]}</b><i>萬</i>` : tileSvg(t); }   // 筒子、條子畫圖
+  else { const s = Math.floor(t / 9); k = ["m", "p", "s"][s]; body = s === 0 ? `<b>${NUM[t % 9]}</b><i><img class="wan" src="${WAN}" alt="萬"></i>` : tileSvg(t); }   // 筒子、條子畫圖
   return `<span class="mt k${k} ${cls}" data-k="${t}" ${attrs}>${body}</span>`;
 }
 const meldHTML = (m) => `<span class="mmeld">${m.tiles.map((x, k) => tile(m.k === "ankan" && (k === 0 || k === 3) ? -1 : x, "sm")).join("")}</span>`;

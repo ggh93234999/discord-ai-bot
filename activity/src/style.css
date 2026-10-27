@@ -1190,3 +1190,8 @@ body.tv-fs{overflow:hidden}
 .poker .pkw .cf[data-s^="♦"]{color:#1565c0}.poker .pkw .cf[data-s^="♦"]{background:linear-gradient(160deg,#f3f8ff,#d9e8fb)}
 .poker .pkw .cf[data-s^="♣"]{color:#2e7d32}.poker .pkw .cf[data-s^="♣"]{background:linear-gradient(160deg,#f3fbf3,#d8eed9)}
 .poker .pkw .cf{border-radius:7px}
+.bjtab .dvl{font-style:normal;animation:bjfade .35s ease-out both}
+/* 麻將萬子的「萬」：AI 重畫的毛筆字 */
+.mt.km i{line-height:0;margin-top:2px}
+.mt.km i img.wan{display:block;height:1.45em;width:auto;pointer-events:none}
+.mt.km.xs i{margin-top:1px}

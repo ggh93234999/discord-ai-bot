@@ -393,6 +393,7 @@ export function mountCasino(game, opts = {}) {
       showBalance(); draw();
     }
     const bjst = newBjState();
+    let bjT = 0;
     function bjShow(m) {
       inHand = !m.done; busy = false;
       const { html: tab, rdelay } = bjHtml(m, bjst);
@@ -401,7 +402,8 @@ export function mountCasino(game, opts = {}) {
         html += `<div class="cresult bjres ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}" style="animation-delay:${rdelay}s">${m.text} ${resultLine(m)}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
         statusEl.textContent = "再來一局？";
       } else statusEl.textContent = "要牌或停牌";
-      stage.innerHTML = html; showBalance(); draw();
+      stage.innerHTML = html; clearTimeout(bjT); if (m.done) bjT = setTimeout(() => { showBalance(); draw(); }, rdelay * 1000); else showBalance();
+      draw();
     }
 
     // ---- 賽馬（全房一起押）

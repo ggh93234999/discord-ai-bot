@@ -52,7 +52,7 @@ export function bjHtml(m, st) {
   return {
     rdelay,
     html: `<div class="bjtab"><div class="bjshoe"></div>
-      <div class="bjrow"><small>莊家${m.done ? `（${m.dv} 點）` : ""}</small><div class="hand" style="--ov:${ov(dealerN)}px">${dl}</div></div>
+      <div class="bjrow"><small>莊家${m.done ? `（<em class="dvl" style="animation-delay:${rdelay}s">${m.dv} 點</em>）` : ""}</small><div class="hand" style="--ov:${ov(dealerN)}px">${dl}</div></div>
       <div class="bjmid"><span>BLACKJACK　2.5 倍</span>${chipHtml(m.bet)}</div>
       <div class="bjrow"><small>你（${m.pv} 點）</small><div class="hand" style="--ov:${ov(m.player.length)}px">${pl}</div></div></div>`,
   };
