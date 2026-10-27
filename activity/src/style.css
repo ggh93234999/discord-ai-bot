@@ -1050,3 +1050,5 @@ body.tv-fs{overflow:hidden}
 .factory .frec span{color:#9aa3b5;flex-basis:100%;padding-left:16px}
 .factory .fnote{font-size:12px;color:#6b7589;text-align:center}
 .factory .finfo:empty{display:none}
+.game.factory{height:auto;min-height:100vh}
+.factory > *{flex:none}
