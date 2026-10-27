@@ -40,7 +40,7 @@ export function mountReversi(root, { env, back }) {
 
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));
-    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game: "rv", room: env.instanceId, spectate: specFirst() })); wg.onOpen(); };
+    ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t: "join", game: "rv", room: env.instanceId, spectate: !!env.watchOnly || specFirst() })); wg.onOpen(); };
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
       if (m.t === "state") {

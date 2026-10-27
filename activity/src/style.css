@@ -1195,3 +1195,5 @@ body.tv-fs{overflow:hidden}
 .mt.km i{line-height:0;margin-top:2px}
 .mt.km i img.wan{display:block;height:1.45em;width:auto;pointer-events:none}
 .mt.km.xs i{margin-top:1px}
+/* 旁觀大廳進入棋類房間：只看，不顯示入座／認輸／下注 */
+.watchonly .seatbar,.watchonly .actions,.watchonly .wager,.watchonly .botbar{display:none!important}

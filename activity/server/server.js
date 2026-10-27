@@ -11,7 +11,7 @@ import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onP
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
 import { handleFarm, recoverFarmPending } from "./farm.js";
 import { handleGallery, serveGallery } from "./gallery.js";
-import { handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./casino.js";
+import { listRooms, handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./casino.js";
 import * as chessEng from "./chess.js";
 import * as xqEng from "./xq.js";
 import { handlePoker, pokerClose } from "./poker.js";
@@ -68,6 +68,20 @@ function newRoom(game) {
            pika: game === "pika" ? createPika() : null,
            input: { b: {}, w: {} },
            speed: 1, acc: 0, ping: { b: null, w: null } };
+}
+
+// 旁觀大廳要列的棋類房間：至少有一位真人入座才列
+function listBoardRooms() {
+  const out = [];
+  for (const [key, room] of rooms) {
+    const i = key.indexOf(":"), game = key.slice(0, i);
+    if (!["gomoku", "c4", "rv", "chess", "xq"].includes(game)) continue;
+    const ps = ["b", "w"].map((c) => room.players[c]).filter(Boolean);
+    if (!ps.some((p) => p !== BOT)) continue;
+    out.push({ game, id: key.slice(i + 1), players: ps.map((p) => ({ name: p === BOT ? "電腦" : (p.gname || (p.user && p.user.name) || "玩家"), real: false, playing: false })),
+               watchers: [...room.clients].filter((c) => roleOf(room, c) === "s").length });
+  }
+  return out;
 }
 
 function getRoom(game, id) {
@@ -329,6 +343,7 @@ wss.on("connection", (ws, req) => {
     }
     if (m.t === "gl") { handleGallery(ws, m).catch((e) => console.log("圖創區錯誤", e && e.message)); return; }
     if (m.t === "fm") { handleFarm(ws, m).catch((e) => console.log("農場錯誤", e && e.message)); return; }
+    if (m.t === "clist") { send(ws, { t: "clist", rooms: [...listRooms(), ...listBoardRooms()] }); return; }     // 旁觀大廳：賭場／牌桌＋棋類
     if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|cstone|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
     if (typeof m.t === "string" && /^(pjoin|psit|pstart|pstand|paddbot|pdelbot|pact|pname|preset|pcfg)$/.test(m.t)) { handlePoker(ws, m); return; }
     if (typeof m.t === "string" && /^(mjoin|msit|mstart|mstand|maddbot|mdelbot|mact|mname|mcfg)$/.test(m.t)) { handleMahjong(ws, m); return; }
