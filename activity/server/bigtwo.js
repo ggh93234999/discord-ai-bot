@@ -50,7 +50,7 @@ function startHand(t) {
   const hands = deal();
   const club = true;                                        // 每一手都是持有 ♣3 的人先出（不論上一手誰贏）
   const first = hands.findIndex((h) => h.includes(CLUB3));
-  t.h = { hands, turn: first, last: null, passes: 0, passed: new Set(), mustClub: club, deadline: 0, botAt: 0 };
+  t.h = { hands, turn: first, last: null, passes: 0, passed: new Set(), mustClub: club, trail: [], deadline: 0, botAt: 0 };
   t.result = null; t.phase = "play";
   t.log = `第 ${g.handNo} 手，由 ${t.seats[first].name} 先出${club ? "（持有 ♣3）" : ""}`;
   setTurn(t, first);
@@ -75,7 +75,9 @@ function doPlay(t, i, cards) {
   const combo = checkPlay(t, h, i, cards); if (!combo) return false;
   const set = new Set(cards);
   h.hands[i] = h.hands[i].filter((c) => !set.has(c));
+  if (!h.last) h.trail = [];                                    // 自由出牌：前一輪的紀錄到這時才清掉
   h.last = { seat: i, cards: sortHand(cards.slice()), combo, name: TYPE_NAMES[combo.type] };
+  h.trail.push({ seat: i, cards: h.last.cards, name: h.last.name });
   h.passes = 0; h.passed = new Set(); h.mustClub = false;
   t.log = `${t.seats[i].name} 出${h.last.name}：${cardsText(h.last.cards)}`;
   if (!h.hands[i].length) { settle(t, i); return true; }
@@ -174,7 +176,7 @@ function view(t, ws) {
     watchers: [...t.members].filter((w) => w.btspec).length, final: t.final, handNo: t.g ? t.g.handNo : 0 };
   v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0 });
   if (h && t.phase === "play") {
-    Object.assign(v, { turn: h.turn, last: h.last && { seat: h.last.seat, cards: h.last.cards, name: h.last.name }, passed: [...h.passed], mustClub: h.mustClub, deadline: h.deadline });
+    Object.assign(v, { turn: h.turn, last: h.last && { seat: h.last.seat, cards: h.last.cards, name: h.last.name }, passed: [...h.passed], mustClub: h.mustClub, trail: h.trail, deadline: h.deadline });
     if (you >= 0) { v.hand = h.hands[you]; v.canPass = h.turn === you && !!h.last && h.last.seat !== you; }
   }
   if (t.phase === "result") { v.result = t.result; v.nextAt = t.nextAt; }

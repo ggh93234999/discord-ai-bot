@@ -1197,3 +1197,10 @@ body.tv-fs{overflow:hidden}
 .mt.km.xs i{margin-top:1px}
 /* 旁觀大廳進入棋類房間：只看，不顯示入座／認輸／下注 */
 .watchonly .seatbar,.watchonly .actions,.watchonly .wager,.watchonly .botbar{display:none!important}
+/* 大老二：這一輪大家出過的牌 */
+.bt .bttrail{display:flex;flex-direction:column;gap:2px;align-items:center;margin-top:3px;max-width:100%}
+.bt .bttrail>div{display:flex;align-items:center;gap:2px;flex-wrap:wrap;justify-content:center}
+.bt .bttrail>div>span{font-size:11px;color:#cfe3d4;margin-right:3px;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt .bttrail.old{opacity:.45}
+.br .bc.sm{width:22px;height:31px;border-radius:4px;padding:2px 0 0 2px}
+.br .bc.sm b{font-size:11px}.br .bc.sm i{font-size:10px}.br .bc.sm u,.br .bc.sm::after{display:none}
