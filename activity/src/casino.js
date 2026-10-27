@@ -9,6 +9,7 @@ import { addBetInput } from "./betinput.js";
 import { horseCards } from "./horsecards.js";
 import { createForge } from "./forgeui.js";
 import { prodUrl, dealerUrl } from "./stoneart.js";
+import { bjHtml, newBjState } from "./bjui.js";
 import { horseSheet, FW as HFW, FH as HFH, FRAMES as HFR } from "./horseart.js";
 
 const BETS = [10, 50, 100, 500];
@@ -391,12 +392,13 @@ export function mountCasino(game, opts = {}) {
       } else v.preview(null);
       showBalance(); draw();
     }
+    const bjst = newBjState();
     function bjShow(m) {
       inHand = !m.done; busy = false;
-      let html = `<div class="bjrow"><small>莊家${m.done ? `（${m.dv} 點）` : ""}</small><div>${m.done ? cardsHtml(m.dealer) : cardsHtml([m.dealerUp], true)}</div></div>
-        <div class="bjrow"><small>你（${m.pv} 點）</small><div>${cardsHtml(m.player)}</div></div>`;
+      const { html: tab, rdelay } = bjHtml(m, bjst);
+      let html = tab;
       if (m.done) {
-        html += `<div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">${m.text} ${resultLine(m)}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
+        html += `<div class="cresult bjres ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}" style="animation-delay:${rdelay}s">${m.text} ${resultLine(m)}${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
         statusEl.textContent = "再來一局？";
       } else statusEl.textContent = "要牌或停牌";
       stage.innerHTML = html; showBalance(); draw();

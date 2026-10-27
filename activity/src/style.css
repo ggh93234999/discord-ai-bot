@@ -1090,3 +1090,39 @@ body.tv-fs{overflow:hidden}
 /* 擲骰子／硬幣的 3D 桌面 */
 .casino .t3d{width:100%;max-width:460px;margin:0 auto}.casino .t3dslot{width:100%;display:flex;justify-content:center}
 .casino .tleg{display:flex;justify-content:center;gap:18px;font-size:13px;opacity:.8;margin-bottom:4px}
+
+/* 21 點牌桌 */
+.casino .bjtab{position:relative;width:100%;max-width:440px;margin:0 auto;padding:12px 8px 14px;border-radius:22px;border:7px solid #5b3a1e;background:radial-gradient(ellipse at 50% 38%,#238150,#10482a 72%);box-shadow:inset 0 0 46px rgba(0,0,0,.6),0 8px 20px rgba(0,0,0,.5);overflow:hidden}
+.casino .bjtab::before{content:"";position:absolute;inset:8px;border:1.5px solid rgba(255,215,130,.28);border-radius:16px;pointer-events:none}
+.casino .bjshoe{position:absolute;top:-18px;right:-14px;width:70px;height:46px;border-radius:0 0 0 14px;background:linear-gradient(#222,#0b0b0b);box-shadow:0 4px 10px rgba(0,0,0,.6)}
+.casino .bjrow{text-align:center;position:relative}.casino .bjrow small{display:block;opacity:.85;margin-bottom:6px;color:#f3ecd0;text-shadow:0 1px 2px #000}
+.casino .hand{display:flex;justify-content:center;min-height:98px;padding-left:max(var(--ov,30px),0px)}
+.casino .bjmid{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0;color:rgba(255,222,150,.65);font-size:12px;letter-spacing:.14em}
+.casino .bjchips{position:relative;width:42px;height:38px}
+.casino .chip{position:absolute;left:0;width:36px;height:36px;border-radius:50%;border:3px dashed rgba(255,255,255,.85);box-shadow:inset 0 0 0 3px rgba(0,0,0,.25),0 2px 3px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;letter-spacing:0}
+.casino .chip.b{top:6px;left:4px}.casino .chip:not(.b){top:0}
+.casino .chip.c0{background:#c8d0d8;color:#222;border-color:#556}.casino .chip.c1{background:#c9302c}.casino .chip.c2{background:#2455b5}.casino .chip.c3{background:#1c1c20;border-color:#e8c25a}
+/* 牌 */
+.casino .bjc{width:64px;height:90px;margin-left:calc(var(--ov,30px) * -1);perspective:600px;flex:none}
+.casino .bjc.deal{animation:bjdeal .42s cubic-bezier(.2,.7,.3,1) var(--dl) both}
+@keyframes bjdeal{from{transform:translate(150px,-130px) rotate(28deg) scale(.7);opacity:0}30%{opacity:1}}
+.casino .bjin{position:relative;width:100%;height:100%;transform-style:preserve-3d;border-radius:7px}
+.casino .bjin.down{transform:rotateY(180deg)}
+.casino .bjin.deal{animation:bjflip .38s ease-out calc(var(--dl) + .32s) both}
+.casino .bjin.flip{animation:bjflip .42s ease-out var(--dl) both}
+@keyframes bjflip{from{transform:rotateY(180deg)}to{transform:rotateY(0)}}
+.casino .bjf,.casino .bjb{position:absolute;inset:0;border-radius:7px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 3px 7px rgba(0,0,0,.55)}
+.casino .bjb{transform:rotateY(180deg);background:#223a7a center/cover;border:2.5px solid #f2efe6}
+.casino .bjf{background:linear-gradient(160deg,#fff,#efeadb);color:#17181d;font-family:Georgia,"Noto Serif TC",serif}
+.casino .cf{position:absolute;inset:0}.casino .cf.red{color:#c8232c}
+.casino .ix{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1;font-weight:700}
+.casino .ix b{font-size:15px}.casino .ix span{font-size:13px;margin-top:1px}
+.casino .ix.tl{top:4px;left:5px}.casino .ix.br{bottom:4px;right:5px;transform:rotate(180deg)}
+.casino .mid{position:absolute;left:19%;right:19%;top:9%;bottom:9%}
+.casino .pip{position:absolute;transform:translate(-50%,-50%);font-style:normal;font-size:17px;line-height:1}
+.casino .pip.flip{transform:translate(-50%,-50%) rotate(180deg)}.casino .pip.ace{font-size:34px}
+.casino .court{position:absolute;inset:0;border:1.5px solid rgba(0,0,0,.35);border-radius:3px;background:linear-gradient(135deg,#fbf3d2,#f1e2a8);overflow:hidden}
+.casino .court .half{position:absolute;left:0;right:0;top:0;height:50%;overflow:hidden}.casino .court .half.f{top:50%;transform:rotate(180deg)}
+.casino .court img{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);object-fit:contain}
+.casino .cl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:38px}
+.casino .bjres{animation:bjfade .35s ease-out both}@keyframes bjfade{from{opacity:0;transform:translateY(6px)}}
