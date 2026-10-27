@@ -1,5 +1,6 @@
 // 黑白棋（兩人，透過 WebSocket 同步）：8×8，夾住對方的棋就翻面，沒地方下會自動跳過
 import { wsUrl } from "./gomoku.js";
+import { wood, woodRegion, vignette, stone } from "./boardfx.js";
 import { createWager } from "./wager.js";
 import { createSeat, specFirst } from "./seat.js";
 const N = 8;
@@ -75,14 +76,12 @@ export function mountReversi(root, { env, back }) {
 
   function disc(cx, cy, r, c, sx = 1) {
     ctx.save(); ctx.translate(cx, cy); ctx.scale(sx, 1);
-    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
-    if (c === "b") { g.addColorStop(0, "#666"); g.addColorStop(1, "#080808"); } else { g.addColorStop(0, "#fff"); g.addColorStop(1, "#cfcfcf"); }
-    ctx.fillStyle = g; ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); ctx.restore();
+    stone(ctx, 0, 0, r, c); ctx.restore();
   }
 
   function draw() {
-    ctx.fillStyle = "#1f7a3d"; ctx.fillRect(0, 0, px, px);
+    const fg = ctx.createRadialGradient(px / 2, px / 2, px * 0.1, px / 2, px / 2, px * 0.75); fg.addColorStop(0, "#2a9150"); fg.addColorStop(1, "#14592b");
+    ctx.fillStyle = fg; ctx.fillRect(0, 0, px, px); wood(ctx, px, px, "rgba(0,0,0,0)", "#0b3a1a", 3);
     ctx.strokeStyle = "#0e4a22"; ctx.lineWidth = 1.5;
     for (let i = 0; i <= N; i++) {
       ctx.beginPath(); ctx.moveTo(i * cell, 0); ctx.lineTo(i * cell, px); ctx.stroke();

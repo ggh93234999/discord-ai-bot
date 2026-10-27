@@ -1,4 +1,5 @@
 import { createWager } from "./wager.js";
+import { wood, woodRegion, vignette, stone } from "./boardfx.js";
 import { createSeat, specFirst } from "./seat.js";
 // 五子棋（兩人，透過 WebSocket 同步）
 const SIZE = 15;
@@ -60,7 +61,7 @@ export function mountGomoku(root, { env, back }) {
 
   function draw() {
     const size = canvas._size || 300;
-    ctx.fillStyle = "#d9b45f"; ctx.fillRect(0, 0, size, size);
+    wood(ctx, size, size, "#dcb466", "#8a5a1c", 7); vignette(ctx, size, size, 0.22);
     ctx.strokeStyle = "#5b4510"; ctx.lineWidth = 1;
     for (let i = 0; i < SIZE; i++) {
       const [x0, y0] = pos(0, i), [x1] = pos(SIZE - 1, i);
@@ -78,10 +79,7 @@ export function mountGomoku(root, { env, back }) {
       const c = st.board[y * SIZE + x];
       if (c === ".") continue;
       const [px, py] = pos(x, y);
-      const g = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, r * 0.1, px, py, r);
-      if (c === "b") { g.addColorStop(0, "#666"); g.addColorStop(1, "#000"); } else { g.addColorStop(0, "#fff"); g.addColorStop(1, "#cfcfcf"); }
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1; ctx.stroke();
+      stone(ctx, px, py, r, c);
     }
     if (st.last) {
       const [px, py] = pos(st.last[0], st.last[1]);

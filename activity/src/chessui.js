@@ -1,5 +1,6 @@
 // 西洋棋、象棋（兩人，透過 WebSocket 同步）：規則和合法走法都在伺服器，這裡只畫棋盤、點選棋子、送出走法。
 import { wsUrl } from "./gomoku.js";
+import { wood, woodRegion, vignette, stone } from "./boardfx.js";
 import { createWager } from "./wager.js";
 import { createSeat, specFirst } from "./seat.js";
 
@@ -84,7 +85,7 @@ export function mountBoard(game) {
     function drawChess() {
       for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
         const [cx, cy] = toScreen(r, c);
-        ctx.fillStyle = (r + c) % 2 ? "#b58863" : "#f0d9b5"; ctx.fillRect(cx - cell / 2, cy - cell / 2, cell, cell);
+        (r + c) % 2 ? woodRegion(ctx, cell * 8, cell * 8, cx - cell / 2, cy - cell / 2, cell, cell, "#b07c52", "#5a3414", 11) : woodRegion(ctx, cell * 8, cell * 8, cx - cell / 2, cy - cell / 2, cell, cell, "#f2dcb4", "#b8935a", 5);
       }
       const hl = (i, col) => { const [cx, cy] = toScreen(i >> 3, i & 7); ctx.fillStyle = col; ctx.fillRect(cx - cell / 2, cy - cell / 2, cell, cell); };
       if (st) {
@@ -97,7 +98,7 @@ export function mountBoard(game) {
         const p = st.board[i]; if (p === ".") continue;
         const [cx, cy] = toScreen(i >> 3, i & 7), up = isUp(p);
         ctx.lineWidth = Math.max(1.5, cell * 0.04); ctx.strokeStyle = up ? "#222" : "#eee"; ctx.fillStyle = up ? "#fff" : "#111";
-        ctx.strokeText(GL[p.toLowerCase()], cx, cy + cell * 0.04); ctx.fillText(GL[p.toLowerCase()], cx, cy + cell * 0.04);
+        ctx.save(); ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = cell * 0.09; ctx.shadowOffsetY = cell * 0.04; ctx.strokeText(GL[p.toLowerCase()], cx, cy + cell * 0.04); ctx.restore(); ctx.fillText(GL[p.toLowerCase()], cx, cy + cell * 0.04);
       }
       ctx.font = `${cell * 0.16}px sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "top";
       for (let k = 0; k < 8; k++) {
@@ -119,7 +120,7 @@ export function mountBoard(game) {
     }
 
     function drawXq() {
-      ctx.fillStyle = "#e8c98a"; ctx.fillRect(0, 0, w, h);
+      wood(ctx, w, h, "#e9c88a", "#9a6a2a", 3); vignette(ctx, w, h, 0.2);
       const X = (c) => c * cell + cell / 2, Y = (r) => r * cell + cell / 2;
       ctx.strokeStyle = "#5b3a1a"; ctx.lineWidth = 1.5;
       for (let r = 0; r < H; r++) { ctx.beginPath(); ctx.moveTo(X(0), Y(r)); ctx.lineTo(X(W - 1), Y(r)); ctx.stroke(); }
@@ -142,7 +143,9 @@ export function mountBoard(game) {
       for (let i = 0; i < W * H; i++) {
         const p = st.board[i]; if (p === ".") continue;
         const [cx, cy] = S(i), red = isUp(p);
-        ctx.beginPath(); ctx.arc(cx, cy, cell * 0.43, 0, 7); ctx.fillStyle = "#f6e3b4"; ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2; ctx.fill(); ctx.shadowColor = "transparent";
+        ctx.beginPath(); ctx.arc(cx, cy + cell * 0.04, cell * 0.43, 0, 7); ctx.fillStyle = "#a9793a"; ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = cell * 0.1; ctx.shadowOffsetY = cell * 0.05; ctx.fill(); ctx.shadowColor = "transparent";
+        const pg = ctx.createRadialGradient(cx - cell * 0.14, cy - cell * 0.16, cell * 0.04, cx, cy, cell * 0.43); pg.addColorStop(0, "#fff6dc"); pg.addColorStop(0.7, "#f1d9a0"); pg.addColorStop(1, "#dcb771");
+        ctx.beginPath(); ctx.arc(cx, cy, cell * 0.43, 0, 7); ctx.fillStyle = pg; ctx.fill();
         ctx.lineWidth = 2; ctx.strokeStyle = red ? "#c62828" : "#222"; ctx.stroke();
         ctx.beginPath(); ctx.arc(cx, cy, cell * 0.36, 0, 7); ctx.lineWidth = 1; ctx.stroke();
         ctx.fillStyle = red ? "#c62828" : "#222"; ctx.fillText(red ? XQ_RED[p] : XQ_BLK[p], cx, cy + cell * 0.03);

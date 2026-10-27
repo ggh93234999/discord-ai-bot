@@ -1,5 +1,6 @@
 // 四連棋（兩人，透過 WebSocket 同步）：7 欄 × 6 列，棋子往下掉，先連四顆獲勝
 import { wsUrl } from "./gomoku.js";
+import { wood, woodRegion, vignette, stone } from "./boardfx.js";
 import { createWager } from "./wager.js";
 import { createSeat, specFirst } from "./seat.js";
 const W = 7, H = 6;
@@ -53,18 +54,21 @@ export function mountConnect4(root, { env, back }) {
   const colFull = (c) => st.board[c] !== ".";
 
   function draw() {
-    ctx.fillStyle = "#1e4fc4"; ctx.fillRect(0, 0, W_px, H_px);
+    const bg = ctx.createLinearGradient(0, 0, 0, H_px); bg.addColorStop(0, "#2a63e0"); bg.addColorStop(1, "#173f9e");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W_px, H_px);
     const r = cell * 0.4;
     const win = new Set((st && st.line || []).map(([x, y]) => y * W + x));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const px = (x + 0.5) * cell, py = (y + 0.5) * cell;
       const c = st ? st.board[y * W + x] : ".";
-      if (c === ".") { ctx.fillStyle = "#0d2a6e"; }
+      ctx.beginPath(); ctx.arc(px, py, r + cell * 0.04, 0, 7); ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.fill();
+      if (c === ".") { const hg = ctx.createLinearGradient(0, py - r, 0, py + r); hg.addColorStop(0, "#08184a"); hg.addColorStop(1, "#13307f"); ctx.fillStyle = hg; }
       else {
-        const g = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, r * 0.1, px, py, r);
-        g.addColorStop(0, COLORS[c][0]); g.addColorStop(1, COLORS[c][1]); ctx.fillStyle = g;
+        const g = ctx.createRadialGradient(px - r * 0.3, py - r * 0.35, r * 0.05, px, py, r);
+        g.addColorStop(0, "#fff"); g.addColorStop(0.12, COLORS[c][0]); g.addColorStop(1, COLORS[c][1]); ctx.fillStyle = g;
       }
       ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+      if (c !== ".") { ctx.beginPath(); ctx.arc(px, py, r * 0.68, 0, 7); ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth = cell * 0.04; ctx.stroke(); }
       if (win.has(y * W + x)) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.stroke(); }
       else if (st && st.last && st.last[0] === x && st.last[1] === y) { ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
     }
