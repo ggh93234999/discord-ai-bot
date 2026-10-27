@@ -8,6 +8,7 @@ import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
 import { horseCards } from "./horsecards.js";
 import { createForge } from "./forgeui.js";
+import { prodUrl, dealerUrl } from "./stoneart.js";
 
 const BETS = [10, 50, 100, 500];
 const ERR = {
@@ -335,7 +336,8 @@ export function mountCasino(game, opts = {}) {
       if (m.done) {
         html += `<div class="stcuts"><div class="stcp"><div class="stcimg" data-i="r"></div><small>整顆石頭裡面最大的切面（${AXN[m.section.axis]} ${fp(m.section.pos)}）</small></div></div>
           <div class="strow big">${m.q ? `裡面其實是：<b>${esc(m.tname)}</b>，翡翠約占石頭 ${m.volPct}%${m.cf < 1 ? `，裂使價值打 ${m.cf} 折` : ""}` : "裡面<b>沒有翡翠</b>"}　（整顆如果完整處理約值 ${money(m.value)}）</div>
-          <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">全部賣完　${resultLine(m)}（含切石費 ${money(m.fees)}）${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
+          <div class="stprod"><img src="${prodUrl(m.q)}" alt="${m.q ? esc(m.tname) : "沒有翡翠"}"></div>
+          <div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">${dealerUrl() ? `<img class="stdealer" src="${dealerUrl()}" alt="收購商">` : ""}全部賣完　${resultLine(m)}（含切石費 ${money(m.fees)}）${m.payfail ? "（派彩失敗，請聯絡管理員）" : ""}</div>`;
         statusEl.textContent = "再逛一輪？";
       }
       stage.innerHTML = html; stage.querySelector(".stslot").append(slotEl); slotEl.style.display = ""; v.resize();

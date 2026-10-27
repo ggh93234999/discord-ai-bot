@@ -1075,3 +1075,9 @@ body.tv-fs{overflow:hidden}
 .factory .fprice .fart{margin-right:4px}.factory .frec .fart{margin-right:0}
 .factory .fi-rec button .fart{margin-right:5px;vertical-align:-4px}
 .farm .cart{width:1.2em;height:1.2em;object-fit:contain;vertical-align:-.2em;pointer-events:none}
+
+/* 賭石：結算成品圖、收購商、市場背景（AI 繪製） */
+.casino .stprod{display:flex;justify-content:center;margin:2px 0 0}.casino .stprod img{width:min(46vw,190px);height:auto;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55));animation:stpop .5s ease-out}
+@keyframes stpop{from{transform:scale(.6);opacity:0}}
+.casino .stdealer{width:44px;height:44px;border-radius:50%;vertical-align:middle;margin-right:8px;background:#e9dfc6;border:2px solid #b89a5a;object-fit:cover}
+.casino.g-stone{background:linear-gradient(rgba(10,14,12,.86),rgba(10,14,12,.93)),url(./stone-art/market.jpg) center/cover no-repeat}

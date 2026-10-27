@@ -11,6 +11,21 @@ import { mulberry, hash3, fbm, shapeParams, surfacePoint, AXES, GRID, GS, OUT, p
 export const TIER_COL = ["#7a7468", "#b9c4ac", "#a8c79c", "#86c488", "#5db878", "#a7e0cc", "#3fc968", "#1fc46e", "#08d878"];
 const ROCK = "#7d7769", HAZE = "#d9d5c6", CRACK = "#2e2a27";
 
+// AI 畫的材質（128px，鏡像重複取樣所以沒有接縫）：t0 岩石切面、t1–t8 各等級翡翠、skin 外皮顆粒。還沒載入完就退回程式算的雜訊。
+const TEXD = {};
+for (const [pth, url] of Object.entries(import.meta.glob("./stone-art/{t[0-8],skin}.png", { eager: true, query: "?url", import: "default" }))) {
+  const k = pth.split("/").pop().slice(0, -4), im = new Image();
+  im.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"); x.drawImage(im, 0, 0, 128, 128); TEXD[k] = x.getImageData(0, 0, 128, 128).data; };
+  im.src = url;
+}
+const mir = (v) => { v = ((v % 2) + 2) % 2; return v > 1 ? 2 - v : v; };
+const texAt = (k, u, v) => { const d = TEXD[k]; if (!d) return null; const o = (Math.min(127, Math.floor(mir(v) * 128)) * 128 + Math.min(127, Math.floor(mir(u) * 128))) * 4; return [d[o], d[o + 1], d[o + 2]]; };
+const skinLum = (d) => {                                // 三向取樣，球面上不會有接縫；回傳 0..1，約 0.5 為平均
+  if (!TEXD.skin) return 0.5;
+  const wx = Math.abs(d[0]) ** 4, wy = Math.abs(d[1]) ** 4, wz = Math.abs(d[2]) ** 4, L = (u, v) => { const t = texAt("skin", u, v); return (t[0] * 0.3 + t[1] * 0.59 + t[2] * 0.11) / 255; };
+  return (wx * L((d[1] + 1) * 1.1, (d[2] + 1) * 1.1) + wy * L((d[0] + 1) * 1.1, (d[2] + 1) * 1.1) + wz * L((d[0] + 1) * 1.1, (d[1] + 1) * 1.1)) / (wx + wy + wz);
+};
+
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const D = (a) => new THREE.Vector3(a[0], a[1], a[2]);
 
@@ -32,6 +47,7 @@ export function buildStone(p) {                         // p: { ...pub, cuts:[{a
     a.setXYZ(i, pt[0], pt[1], pt[2]);
     const grain = fbm(d[0] * 22, d[1] * 22, d[2] * 22, sd + 11, 2), blotch = fbm(d[0] * 3, d[1] * 3, d[2] * 3, sd + 5, 3);
     c.copy(c0).lerp(c1, blotch).multiplyScalar(0.55 + 0.9 * grain + 0.25 * (blotch - 0.5)).multiplyScalar(0.9 + 0.2 * hash3(i, 3, 7, sd));
+    c.multiplyScalar(0.72 + 0.56 * skinLum(d));                                      // 外皮的沙粒顆粒（AI 畫的材質）
     if (blotch > 0.64) c.lerp(pale, (blotch - 0.64) * 1.2);                           // 風化發白
     if (hd) { const h = smooth(0.62, 0.9, d[0] * hd[0] + d[1] * hd[1] + d[2] * hd[2]) * (0.55 + 0.45 * fbm(d[0] * 6, d[1] * 6, d[2] * 6, sd + 91, 2)); if (h > 0) c.lerp(hcol, 0.62 * h); }   // 霧：一片淡淡的顏色罩在皮上
     if (pd) {                                                                          // 松花：黃綠小點，集中在某一側
@@ -84,6 +100,8 @@ export function gridCanvas(b64, seed, px = 192) {
     const base = code === 9 ? ck : code === 10 ? hz : pal[code];
     const n = fbm(xx / px * 9, y / px * 9, 3, seed + code * 7, 3), fine = hash3(xx, y, 5, seed);
     let k = code === 0 ? 0.7 + 0.5 * n + 0.15 * fine : code === 10 ? 0.85 + 0.25 * n : 0.62 + 0.75 * n + 0.08 * fine;   // 翡翠有雲霧般的深淺
+    const tx = code <= 8 ? texAt("t" + code, xx / px * 2 + (seed % 97) / 97, y / px * 2 + (seed % 89) / 89) : null;   // AI 畫的材質：混進顏色，等級的色調仍由伺服器格子決定
+    if (tx) { const w = code === 0 ? 0.45 : 0.62; im.data[o] = Math.min(255, base[0] * k * (1 - w) + tx[0] * w); im.data[o + 1] = Math.min(255, base[1] * k * (1 - w) + tx[1] * w); im.data[o + 2] = Math.min(255, base[2] * k * (1 - w) + tx[2] * w); im.data[o + 3] = 255; continue; }
     im.data[o] = Math.min(255, base[0] * k); im.data[o + 1] = Math.min(255, base[1] * k); im.data[o + 2] = Math.min(255, base[2] * k); im.data[o + 3] = 255;
   }
   x.putImageData(im, 0, 0);
