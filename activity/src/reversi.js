@@ -158,7 +158,8 @@ export function mountReversi(root, { env, back }) {
   });
 
   window.addEventListener("resize", resize);
+  let ro = null; try { ro = new ResizeObserver(() => resize()); ro.observe(root.querySelector(".cwrap")); } catch {}
   connect();
   requestAnimationFrame(resize);
-  return () => { closed = true; cancelAnimationFrame(raf); window.removeEventListener("resize", resize); try { ws.close(); } catch {} };
+  return () => { closed = true; try { ro && ro.disconnect(); } catch {} cancelAnimationFrame(raf); window.removeEventListener("resize", resize); try { ws.close(); } catch {} };
 }
