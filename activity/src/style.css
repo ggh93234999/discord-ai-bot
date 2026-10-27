@@ -1148,3 +1148,28 @@ body.tv-fs{overflow:hidden}
 .poker .pseat.turn{border-color:#ffd54f;box-shadow:0 0 14px #ffd54f}
 .poker .prh{display:inline-flex;gap:2px;vertical-align:middle}
 .poker .pseat.me{width:140px}
+
+/* 大老二／橋牌：質感撲克牌（象牙白牌面、角標＋大花色、真牌背） */
+.br .bc{position:relative;align-items:flex-start;justify-content:flex-start;padding:3px 0 0 4px;box-sizing:border-box;border-radius:7px;
+  background:linear-gradient(155deg,#fffef9 0%,#f4eedd 100%);border:1px solid #cfc6ad;
+  box-shadow:0 1px 0 #fff inset,0 2px 5px rgba(0,0,0,.55);overflow:hidden}
+.br .bc::after{content:"";position:absolute;inset:2px;border:1px solid rgba(120,100,60,.22);border-radius:5px;pointer-events:none}
+.br .bc b{font-family:Georgia,"Noto Serif TC",serif;line-height:.95}
+.br .bc i{line-height:1;margin-top:1px;font-size:.78em}
+.br .bc u{position:absolute;right:2px;bottom:-2px;text-decoration:none;font-size:30px;line-height:1;opacity:.9}
+.br .bc.xs u,.br .bc.xs::after{display:none}
+.br .bc.xs{padding:1px 0 0 2px;border-radius:3px}
+.br .bc.s0,.br .bc.s3{color:#15151c}.br .bc.s1,.br .bc.s2{color:#c4202c}
+.br .bc.back{background-size:cover;background-position:center;border:1px solid #1d2a55;padding:0}
+.br .bc.back::after{display:none}
+.br .bc.big.can:hover{box-shadow:0 1px 0 #fff inset,0 8px 12px rgba(0,0,0,.5)}
+@media (max-width:520px){.br .bc u{font-size:24px}.bt .bc u{font-size:20px;right:1px}}
+
+/* 麻將牌：厚牌立體感（象牙面、翡翠牌背、高光與側邊） */
+.mt{background:linear-gradient(160deg,#fffdf5 0%,#f1e9d2 70%,#e6dcc0 100%);border-bottom:4px solid #2a8f68;border-right:1px solid #cfc6a6;
+  box-shadow:0 1px 0 #fff inset,1px 0 0 #fff8 inset,0 3px 4px rgba(0,0,0,.55),0 1px 0 #174a33}
+.mt.sm,.mt.xs{border-bottom-width:3px}
+.mt b{text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.mt.back{background:linear-gradient(160deg,#35a07a,#23785a 60%,#1b6049);border-bottom-color:#124232;border-right-color:#1b6049;
+  box-shadow:0 1px 0 #7fd3b2 inset,0 3px 4px rgba(0,0,0,.55)}
+.mt.back::after{content:"";width:55%;height:55%;border:1px solid rgba(255,255,255,.25);border-radius:3px}

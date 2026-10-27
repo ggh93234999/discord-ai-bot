@@ -1,6 +1,7 @@
 // 橋牌（台灣簡易版，練習點數）：叫牌、出牌、判定、計分都在伺服器（server/bridge.js），這裡只畫畫面和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { backUrl } from "./bjui.js";
 
 const SUIT = ["♣", "♦", "♥", "♠", "無王"];
 const DIR = ["南", "西", "北", "東"];                       // 座位 0..3 順時針；0、2 南北隊，1、3 東西隊
@@ -12,9 +13,9 @@ const bidName = (b) => (b ? `${b.l}${SUIT[b.s]}` : "Pass");
 const bidHTML = (b) => (b ? `${b.l}<span class="bs s${b.s}">${SUIT[b.s]}</span>` : `<span class="bpass">Pass</span>`);
 const higher = (a, b) => !b || a.l > b.l || (a.l === b.l && a.s > b.s);
 function card(c, cls = "", attrs = "") {
-  if (c == null || c < 0) return `<span class="bc back ${cls}" ${attrs}></span>`;
+  if (c == null || c < 0) return `<span class="bc back ${cls}" ${attrs}${backUrl ? ` style="background-image:url(${backUrl})"` : ""}></span>`;
   const r = rankOf(c);
-  return `<span class="bc s${suitOf(c)} ${cls}" ${attrs}><b>${RN[r] || r}</b><i>${SUIT[suitOf(c)]}</i></span>`;
+  return `<span class="bc s${suitOf(c)} ${cls}" ${attrs}><b>${RN[r] || r}</b><i>${SUIT[suitOf(c)]}︎</i><u>${SUIT[suitOf(c)]}︎</u></span>`;
 }
 function getPid() { try { let p = localStorage.getItem("brpid"); if (!p) { p = Math.random().toString(36).slice(2, 10); localStorage.setItem("brpid", p); } return p; } catch { return Math.random().toString(36).slice(2, 10); } }
 const lsName = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };

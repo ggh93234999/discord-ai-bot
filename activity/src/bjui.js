@@ -9,6 +9,7 @@ const PIPS = {
   9: [[30, 17], [70, 17], [30, 39], [70, 39], [50, 50], [30, 61], [70, 61], [30, 83], [70, 83]],
   10: [[30, 17], [70, 17], [50, 28], [30, 39], [70, 39], [30, 61], [70, 61], [50, 72], [30, 83], [70, 83]],
 };
+export const backUrl = U.back || "";
 export const parseCard = (c) => { const m = /^([♠♥♦♣])️?(.+)$/.exec(String(c)); return m ? { s: m[1], r: m[2] } : { s: "♠", r: String(c) }; };
 
 function faceHtml(c) {

@@ -1,14 +1,15 @@
 // 大老二（台灣玩法，練習點數）：發牌、判定、計分、電腦都在伺服器（server/bigtwo.js），這裡只畫畫面和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { backUrl } from "./bjui.js";
 import { classify, beats, suitOf, rankOf, rstr, strength, SUITS, CLUB3 } from "../shared/bigtwo_rules.js";
 
 const RN = { 11: "J", 12: "Q", 13: "K", 14: "A" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function card(c, cls = "", attrs = "") {
-  if (c == null || c < 0) return `<span class="bc back ${cls}" ${attrs}></span>`;
+  if (c == null || c < 0) return `<span class="bc back ${cls}" ${attrs}${backUrl ? ` style="background-image:url(${backUrl})"` : ""}></span>`;
   const r = rankOf(c);
-  return `<span class="bc s${suitOf(c)} ${cls}" ${attrs}><b>${RN[r] || r}</b><i>${SUITS[suitOf(c)]}</i></span>`;
+  return `<span class="bc s${suitOf(c)} ${cls}" ${attrs}><b>${RN[r] || r}</b><i>${SUITS[suitOf(c)]}︎</i><u>${SUITS[suitOf(c)]}︎</u></span>`;
 }
 function getPid() { try { let p = localStorage.getItem("btpid"); if (!p) { p = Math.random().toString(36).slice(2, 10); localStorage.setItem("btpid", p); } return p; } catch { return Math.random().toString(36).slice(2, 10); } }
 const lsName = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
