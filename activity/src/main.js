@@ -20,6 +20,7 @@ import { mountForgeBoard } from "./forgeboard.js";
 import { mountDown } from "./stairs.js";
 import { mountFarm } from "./farm.js";
 import { mountGallery } from "./gallery.js";
+import { iconHtml } from "./iconart.js";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
 const optional = import.meta.glob(["./pikachu_online.js", "./lf2.js"], { eager: true });
@@ -106,7 +107,7 @@ const GAMES = [
 
 function showMenu() {
   presence("menu");
-  const card = (g) => `<button class="card${g.wide ? " wide" : ""}${g.cls ? " " + g.cls : ""}" data-g="${g.id}"><span class="icon">${g.icon}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
+  const card = (g) => `<button class="card${g.wide ? " wide" : ""}${g.cls ? " " + g.cls : ""}" data-g="${g.id}"><span class="icon">${iconHtml(g.id, g.icon, g.name)}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
   const tabs = CATS.filter((c) => GAMES.some((g) => g.cat === c.id));
   let tab = ""; try { tab = localStorage.getItem("menutab") || ""; } catch {}
   if (!tabs.some((c) => c.id === tab)) tab = tabs[0].id;
@@ -115,8 +116,8 @@ function showMenu() {
     <div class="menu">
       <h1>遊戲間</h1>
       <div class="namebar"><label>👤 你的名稱 <input class="gname" maxlength="12" placeholder="輸入名稱，所有遊戲通用"></label><small>沒填的話，有登入就用你的 Discord 名稱，否則自動編號</small></div>
-      <nav class="mtabs">${tabs.map((c) => `<button class="mtab${c.id === tab ? " on" : ""}" data-t="${c.id}"><span>${c.icon}</span>${c.name}<i>${GAMES.filter((g) => g.cat === c.id).length}</i></button>`).join("")}</nav>
-      <section class="cat"><h2>${cur.icon} ${cur.name}<small>${cur.note}</small></h2><div class="cards">${GAMES.filter((g) => g.cat === tab).map(card).join("")}</div></section>
+      <nav class="mtabs">${tabs.map((c) => `<button class="mtab${c.id === tab ? " on" : ""}" data-t="${c.id}"><span>${iconHtml("c_" + c.id, c.icon)}</span>${c.name}<i>${GAMES.filter((g) => g.cat === c.id).length}</i></button>`).join("")}</nav>
+      <section class="cat"><h2>${iconHtml("c_" + cur.id, cur.icon)} ${cur.name}<small>${cur.note}</small></h2><div class="cards">${GAMES.filter((g) => g.cat === tab).map(card).join("")}</div></section>
     </div>`;
   const gn = app.querySelector(".gname");
   try { gn.value = localStorage.getItem("pokername") || ""; } catch {}
