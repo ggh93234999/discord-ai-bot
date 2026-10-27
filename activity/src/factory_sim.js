@@ -41,7 +41,7 @@ export function makeOre() {
   return ore;
 }
 
-const newCell = (k, dir, ore) => ({ k, dir, item: null, out: [], inv: {}, prog: 0, ago: 99, rr: 0, r: 0, ore: ore || null, cur: null });
+const newCell = (k, dir, ore) => ({ k, dir, item: null, out: [], inv: {}, prog: 0, ago: 99, rr: 0, r: 0, ore: ore || null, cur: null, stall: 0 });
 export function newGame() { return { cells: new Array(W * H).fill(null), money: START_MONEY, tick: 0, shipped: 0, log: [] }; }
 const at = (g, x, y) => (x < 0 || y < 0 || x >= W || y >= H ? null : g.cells[y * W + x]);
 const invN = (c) => Object.values(c.inv).reduce((s, n) => s + n, 0);
@@ -58,15 +58,21 @@ function accepts(c, item, srcDir, pend) {
   return false;
 }
 
-export function place(g, ore, x, y, k, dir) {
+// 這格能不能放這種東西（不改任何東西）；回傳錯誤說明，空字串代表可以
+export function canPlace(g, ore, x, y, k, dir) {
   if (x < 0 || y < 0 || x >= W || y >= H) return "出界";
   const i = y * W + x, cur = g.cells[i];
-  if (cur && cur.k === k) { if (cur.dir !== dir) { cur.dir = dir; return ""; } return "這格已經有了"; }
+  if (cur && cur.k === k) return cur.dir !== dir ? "" : "這格已經有了";
   if (cur) return "這格有東西，先拆掉";
   if (k === "miner" && !ore.has(i)) return "採礦機只能放在礦點上";
-  const cost = KINDS[k].cost;
-  if (g.money < cost) return "錢不夠";
-  g.money -= cost;
+  if (g.money < KINDS[k].cost) return "錢不夠";
+  return "";
+}
+export function place(g, ore, x, y, k, dir) {
+  const err = canPlace(g, ore, x, y, k, dir); if (err) return err;
+  const i = y * W + x, cur = g.cells[i];
+  if (cur) { cur.dir = dir; return ""; }          // 同種機器：只是轉方向
+  g.money -= KINDS[k].cost;
   g.cells[i] = newCell(k, dir, k === "miner" ? ore.get(i) : null);
   return "";
 }
@@ -75,9 +81,22 @@ export function remove(g, x, y) {
   g.money += Math.floor(KINDS[c.k].cost / 2); g.cells[i] = null;
 }
 // 組裝機換下一個配方（機器裡的材料清掉）
-export function cycleRecipe(g, x, y) {
-  const c = at(g, x, y); if (!c || c.k !== "assembler") return false;
-  c.r = (c.r + 1) % RECIPES.length; c.inv = {}; c.out = []; c.prog = 0; return true;
+export function setRecipe(g, x, y, r) {
+  const c = at(g, x, y); if (!c || c.k !== "assembler" || c.r === r) return false;
+  c.r = r; c.inv = {}; c.out = []; c.prog = 0; return true;
+}
+export function cycleRecipe(g, x, y) { const c = at(g, x, y); return !!c && c.k === "assembler" && setRecipe(g, x, y, (c.r + 1) % RECIPES.length); }
+// 給畫面用：機器現在的狀態。work 工作中／wait 等材料／blocked 出口堵住／idle 空閒
+export function machineState(c) {
+  if (c.out.length && c.stall > 10) return { s: "blocked", text: "出口堵住了：前面那格收不下（帶子滿了、方向不對，或前方的機器不收這種東西）" };
+  if (c.k === "miner") return { s: "work", text: "採礦中" };
+  if (c.prog > 0) return { s: "work", text: "工作中" };
+  if (c.k === "smelter") return { s: "wait", text: "等材料：需要鐵礦或銅礦" };
+  if (c.k === "assembler") {
+    const R = RECIPES[c.r], miss = Object.entries(R.in).filter(([k, n]) => (c.inv[k] || 0) < n).map(([k, n]) => `${ITEMS[k].name} ×${n - (c.inv[k] || 0)}`);
+    return miss.length ? { s: "wait", text: "還缺：" + miss.join("、") } : { s: "work", text: "準備開工" };
+  }
+  return { s: "idle", text: "" };
 }
 
 // 前進一個 tick
@@ -115,8 +134,8 @@ export function step(g) {
     }
     if (c.out.length) {
       const t = at(g, x + DX[c.dir], y + DY[c.dir]);
-      if (accepts(t, c.out[0], c.dir)) { give(g, t, c.out.shift()); }
-    }
+      if (accepts(t, c.out[0], c.dir)) { give(g, t, c.out.shift()); c.stall = 0; } else c.stall++;
+    } else c.stall = 0;
   }
   // 2) 傳送帶：每 BELT_STEP 個 tick 前進一次
   for (const c of g.cells) if (c && c.k === "belt") c.ago++;

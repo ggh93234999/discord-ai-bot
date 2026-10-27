@@ -1018,3 +1018,35 @@ body.tv-fs{overflow:hidden}
 .factory .cwrap{flex:none}
 .factory .fprice{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;margin:8px auto 0;font-size:12px;color:#cfd8dc}
 .factory .fprice i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+/* 自動化工廠：介面強化 */
+.factory .fstat.warn{color:#ffab91}
+.factory .ftools{gap:6px;margin:8px 0 4px}
+.factory .ftools button{position:relative;min-width:68px}
+.factory .ftools button em{position:absolute;top:3px;right:6px;font-size:10px;font-style:normal;color:#6b7589}
+.factory .ftip{max-width:640px;margin:2px auto 8px;font-size:13px;line-height:1.6;color:#cfd8dc;text-align:center;min-height:2.6em}
+.factory .finfo{width:100%;max-width:640px;margin:8px auto 0;min-height:56px;padding:10px 12px;border-radius:10px;background:#242b3a;font-size:13px;line-height:1.7;color:#e6e9ef;text-align:left;box-sizing:border-box}
+.factory .fi-empty{color:#9aa3b5;text-align:center}
+.factory .fi-h{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.factory .fi-h b{font-size:15px}.factory .fi-h span{color:#9aa3b5}
+.factory .fi-h button,.factory .fi-rec button{border:0;border-radius:8px;background:#3a4357;color:#fff;cursor:pointer;font-size:12px;padding:4px 10px}
+.factory .fi-s{display:flex;align-items:center;gap:6px;font-weight:700}
+.factory .fi-s i{width:10px;height:10px;border-radius:50%;background:#9aa3b5}
+.factory .s-work{color:#81c784}.factory .s-work i{background:#66bb6a}
+.factory .s-wait{color:#ffd54f}.factory .s-wait i{background:#ffca28}
+.factory .s-blocked{color:#ef9a9a}.factory .s-blocked i{background:#ef5350}
+.factory .fi-rec{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-top:6px}
+.factory .fi-rec button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 10px;text-align:left;border:2px solid transparent}
+.factory .fi-rec button.on{border-color:#ffd54f;background:#2d3647}
+.factory .fi-rec button i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.factory .fi-rec button small{font-size:11px;color:#9aa3b5}
+.factory .fhelp{max-width:640px;width:100%;margin:10px auto 0;font-size:13px;line-height:1.75;color:#cfd8dc;text-align:left}
+.factory .fh{background:#202735;border-radius:10px;margin-bottom:8px;padding:8px 12px}
+.factory .fh summary{cursor:pointer;font-weight:700;color:#fff}
+.factory .fh ol,.factory .fh ul{margin:6px 0 4px;padding-left:20px}
+.factory .fh p{margin:6px 0 2px;color:#9aa3b5}
+.factory .frec{display:grid;gap:6px;margin-top:6px}
+.factory .frec div{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.factory .frec i{width:10px;height:10px;border-radius:50%}
+.factory .frec span{color:#9aa3b5;flex-basis:100%;padding-left:16px}
+.factory .fnote{font-size:12px;color:#6b7589;text-align:center}
+.factory .finfo:empty{display:none}
