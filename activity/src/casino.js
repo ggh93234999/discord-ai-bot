@@ -229,23 +229,41 @@ export function mountCasino(game, opts = {}) {
       else if (m.g === "bj") bjShow(m);
       else if (m.g === "stone") stoneShow(m);
     }
-    function coinAnim(m) {
-      stage.innerHTML = `<div class="coin flip">🪙</div>`;
-      later(() => {
-        stage.innerHTML = `<div class="coin">${m.res === "heads" ? "🟡 正面" : "⚪ 反面"}</div><div class="cresult ${m.back ? "win" : "lose"}">${m.res === m.pick ? "猜中了！" : "猜錯了…"} ${resultLine(m)}</div>`;
-        busy = false; statusEl.textContent = "再來一把？"; draw();
-      }, 900);
+    // ---- 擲硬幣／骰子：3D 桌面（dice3d.js），結果由伺服器決定，動畫只是讓它真的滾過去、停在那一面
+    let table = null, tableHost = null;
+    async function ensureTable(slot) {
+      if (!tableHost) { tableHost = document.createElement("div"); tableHost.className = "t3d"; }
+      slot.append(tableHost);
+      if (!table) { const mod = await import("./dice3d.js"); if (closed) return null; table = mod.createTable(tableHost); } else table.resize();
+      return table;
     }
-    function diceAnim(m) {
-      stage.innerHTML = `<div class="dice"><div><small>你</small><span class="d">🎲</span><span class="d">🎲</span></div><div><small>莊家</small><span class="d">🎲</span><span class="d">🎲</span></div></div>`;
-      const ds = stage.querySelectorAll(".d"); ds.forEach((d) => d.classList.add("roll"));
-      later(() => {
-        const vals = [...m.me, ...m.bot];
-        ds.forEach((d, i) => { d.classList.remove("roll"); d.textContent = dieFace(vals[i]); });
-        const a = m.me[0] + m.me[1], b = m.bot[0] + m.bot[1];
+    async function coinAnim(m) {
+      stage.innerHTML = `<div class="t3dslot"></div>`;
+      let t = null; try { t = await ensureTable(stage.querySelector(".t3dslot")); } catch { t = null; }
+      if (closed) return;
+      const fin = () => {
+        stage.insertAdjacentHTML("beforeend", `<div class="cresult ${m.back ? "win" : "lose"}">${m.res === "heads" ? "正面" : "反面"}，${m.res === m.pick ? "猜中了！" : "猜錯了…"} ${resultLine(m)}</div>`);
+        busy = false; statusEl.textContent = "再來一把？"; draw();
+      };
+      if (!t) { stage.innerHTML = `<div class="coin flip">🪙</div>`; later(() => { stage.innerHTML = ""; fin(); }, 900); return; }
+      await t.flipCoin(m.res); if (!closed) fin();
+    }
+    async function diceAnim(m) {
+      stage.innerHTML = `<div class="t3dslot"></div>`;
+      let t = null; try { t = await ensureTable(stage.querySelector(".t3dslot")); } catch { t = null; }
+      if (closed) return;
+      const a = m.me[0] + m.me[1], b = m.bot[0] + m.bot[1];
+      const fin = () => {
         stage.insertAdjacentHTML("beforeend", `<div class="cresult ${m.back > m.bet ? "win" : m.back === m.bet ? "" : "lose"}">你 ${a} 點 vs 莊家 ${b} 點　${resultLine(m)}</div>`);
         busy = false; statusEl.textContent = "再來一把？"; draw();
-      }, 800);
+      };
+      if (!t) {
+        stage.innerHTML = `<div class="dice"><div><small>你</small><span class="d">🎲</span><span class="d">🎲</span></div><div><small>莊家</small><span class="d">🎲</span><span class="d">🎲</span></div></div>`;
+        const ds = stage.querySelectorAll(".d"); ds.forEach((d) => d.classList.add("roll"));
+        later(() => { const vals = [...m.me, ...m.bot]; ds.forEach((d, i) => { d.classList.remove("roll"); d.textContent = dieFace(vals[i]); }); fin(); }, 800); return;
+      }
+      stage.insertAdjacentHTML("afterbegin", `<div class="tleg"><span>⚪ 你</span><span>🔴 莊家</span></div>`);
+      await t.rollDice([...m.me, ...m.bot], ["you", "you", "bank", "bank"]); if (!closed) fin();
     }
     function cardsHtml(list, hideSecond) {
       return list.map((c) => `<span class="pcard ${/♥|♦/.test(c) ? "red" : ""}">${c}</span>`).join("") + (hideSecond ? `<span class="pcard back">?</span>` : "");
@@ -651,6 +669,6 @@ export function mountCasino(game, opts = {}) {
 
     connect();
     draw();
-    return () => { closed = true; try { viewer && viewer.destroy(); } catch {} window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); blog.destroy(); try { ws.close(); } catch {} };
+    return () => { closed = true; try { table && table.destroy(); } catch {} try { viewer && viewer.destroy(); } catch {} window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); clearInterval(tickTimer); timers.forEach(clearTimeout); watch.destroy(); blog.destroy(); try { ws.close(); } catch {} };
   };
 }

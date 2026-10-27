@@ -1086,3 +1086,7 @@ body.tv-fs{overflow:hidden}
 .card .icon .aico{width:52px;height:52px;object-fit:contain;display:block;margin:0 auto;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
 .mtab span .aico{width:24px;height:24px;object-fit:contain;vertical-align:middle}
 .cat h2 .aico{width:28px;height:28px;object-fit:contain;vertical-align:middle;margin-right:2px}
+
+/* 擲骰子／硬幣的 3D 桌面 */
+.casino .t3d{width:100%;max-width:460px;margin:0 auto}.casino .t3dslot{width:100%;display:flex;justify-content:center}
+.casino .tleg{display:flex;justify-content:center;gap:18px;font-size:13px;opacity:.8;margin-bottom:4px}
