@@ -1004,3 +1004,15 @@ body.tv-fs{overflow:hidden}
 .av .avchi{display:flex;gap:6px}.av .avchat-in{flex:1;min-width:0;background:#1b1e26;color:#fff;border:1px solid #444;border-radius:8px;padding:6px 8px;font-size:14px}
 
 .av .avtok{display:block;color:#9aa3b5;font-size:12px;text-align:center;margin:4px 0;line-height:1.6}
+
+/* 自動化工廠 */
+.factory .cwrap canvas{width:100%;max-width:800px;height:auto;aspect-ratio:20/12;background:#1c2330;border-radius:10px;touch-action:none;image-rendering:auto}
+.factory .fmoney{font-weight:700;color:#ffd54f}
+.factory .ftools{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
+.factory .ftools button{display:flex;flex-direction:column;align-items:center;min-width:64px;padding:6px 8px;border:2px solid transparent;border-radius:10px;background:#242b3a;color:#e6e9ef;cursor:pointer}
+.factory .ftools button span{font-size:20px}.factory .ftools button b{font-size:12px}.factory .ftools button small{font-size:11px;color:#9aa3b5}
+.factory .ftools button.sel{border-color:#ffd54f;background:#2d3647}
+.factory .factions{display:flex;gap:8px;justify-content:center}
+.factory .factions button{padding:8px 16px;border:0;border-radius:8px;background:#3a4357;color:#fff;font-weight:700;cursor:pointer}
+.factory .fhelp{font-size:12px;line-height:1.7;color:#9aa3b5;max-width:640px;margin:8px auto 0;text-align:left}
+.factory .cwrap{flex:none}
