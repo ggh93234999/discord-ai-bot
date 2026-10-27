@@ -1204,3 +1204,8 @@ body.tv-fs{overflow:hidden}
 .bt .bttrail.old{opacity:.45}
 .br .bc.sm{width:22px;height:31px;border-radius:4px;padding:2px 0 0 2px}
 .br .bc.sm b{font-size:11px}.br .bc.sm i{font-size:10px}.br .bc.sm u,.br .bc.sm::after{display:none}
+/* 大老二牌桌固定高度：出的牌再多，桌子也不會變大（最多顯示最近 4 手，舊的從上面擠掉） */
+.bt .brtable{grid-template-rows:auto 250px auto}
+.bt .brmid{height:250px;overflow:hidden;justify-content:flex-start}
+.bt .bttrail{flex:1;min-height:0;overflow:hidden;justify-content:flex-end;width:100%}
+.bt .btlast{flex:none}

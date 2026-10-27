@@ -100,7 +100,7 @@ export function mountBigtwo(opts = {}) {
     function midHTML() {
       let info = `<div class="brct">${st.last ? `${nm(st.last.seat)} 出${st.last.name}` : st.mustClub ? "先出的人要包含 ♣3" : "桌上沒牌，自由出牌"}</div>`;
       const cards = st.last ? `<div class="btlast">${st.last.cards.map((c) => card(c, "big")).join("")}</div>` : "";
-      const tr = st.trail || [], old = !st.last, shown = old ? tr : tr.slice(0, -1);   // 這一輪大家出過的牌（最新一手用大牌顯示在下面）
+      const tr = st.trail || [], old = !st.last, shown = (old ? tr : tr.slice(0, -1)).slice(-4);   // 這一輪大家出過的牌（最新一手用大牌顯示在下面）
       const trail = shown.length ? `<div class="bttrail${old ? " old" : ""}">${shown.map((x) => `<div><span>${nm(x.seat)}</span>${x.cards.map((c) => card(c, "sm")).join("")}</div>`).join("")}</div>` : "";
       return `<div class="brmid"><div class="brinfo">${info}<div class="brtimer"></div></div>${trail}${cards}</div>`;
     }
