@@ -23,7 +23,7 @@ function faceHtml(c) {
   return `<div class="cf${red ? " red" : ""}"><div class="ix tl"><b>${r}</b><span>${g}</span></div><div class="ix br"><b>${r}</b><span>${g}</span></div><div class="mid">${mid}</div></div>`;
 }
 // kind: "" 靜止、"deal" 從牌靴飛進來並翻面、"flip" 蓋著的牌翻開
-function cardHtml(c, kind, delay) {
+export function cardHtml(c, kind, delay) {
   const down = c == null;
   return `<div class="bjc${kind === "deal" ? " deal" : ""}" style="--dl:${delay || 0}s"><div class="bjin${down ? " down" : ""}${kind && !(down && kind === "deal") ? " " + kind : ""}"><div class="bjf">${down ? "" : faceHtml(c)}</div><div class="bjb"${U.back ? ` style="background-image:url(${U.back})"` : ""}></div></div></div>`;
 }

@@ -1,16 +1,16 @@
 // 德州撲克（練習籌碼）：2～6 人，可加電腦，其他人旁觀。發牌與判定都在伺服器，這裡只畫畫面和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { cardHtml } from "./bjui.js";
 
 const SUITS = ["♠", "♥", "♦", "♣"], RED = [false, true, true, false];
 const RK = { 11: "J", 12: "Q", 13: "K", 14: "A" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let BEST = new Set();       // 自己目前最大牌型用到的牌（標亮）
-const card = (c, small) => {
-  if (c < 0) return `<span class="pcard back${small ? " sm" : ""}"></span>`;
-  const r = (c % 13) + 2, s = Math.floor(c / 13);
-  return `<span class="pcard su${s}${small ? " sm" : ""}${BEST.has(c) ? " best" : ""}"><b>${RK[r] || r}</b><i>${SUITS[s]}</i></span>`;
-};
+const cstr = (c) => SUITS[Math.floor(c / 13)] + (RK[(c % 13) + 2] || (c % 13) + 2);
+// size: "md" 公牌、"lg" 自己的底牌、"sm" 別人的底牌／攤牌列表；kind："" 靜止、"deal" 發牌、"flip" 翻開
+const card = (c, size = "md", kind = "", delay = 0) =>
+  `<span class="pkw ${size}${c >= 0 && BEST.has(c) ? " best" : ""}">${cardHtml(c < 0 ? null : cstr(c), kind, delay)}</span>`;
 const PHASE = { wait: "等玩家", preflop: "翻牌前", flop: "翻牌", turn: "轉牌", river: "河牌", result: "結算" };
 // 6 個座位在橢圓桌上的位置（百分比），第 0 個是自己（下方），順時針
 const POS = [[50, 90], [9, 68], [9, 24], [50, 8], [91, 24], [91, 68]];
@@ -35,7 +35,7 @@ export function mountPoker(opts = {}) {
     attachRules(root.querySelector(".game"), "poker");
     const $ = (s) => root.querySelector(s);
     const statusEl = $(".status"), potEl = $(".ppot"), timerEl = $(".ptimer"), boardEl = $(".pboard"), seatsEl = $(".pseats"), logEl = $(".plog"), ctl = $(".pctl"), cfgEl = $(".pcfg"), watchEl = $(".watch");
-    let cfgSig = "", cfgOpen = false;
+    let cfgSig = "", cfgOpen = false, prevBoard = [], prevHole = {}, prevPhase = "";
     let ws = null, closed = false, retry = 0, st = null, timer = 0, raiseTo = 0, ctlKey = "";
     const pid = getPid();
     const nmIn = $(".pnm"), lsGet = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
@@ -63,14 +63,16 @@ export function mountPoker(opts = {}) {
       if (!st) return;
       const you = st.you, seated = you >= 0;
       watchEl.textContent = st.watchers ? `👀 ${st.watchers} 人旁觀` : "";
-      potEl.textContent = st.pot ? `底池 ${st.pot}` : "";
+      potEl.innerHTML = st.pot ? `<span class="potst"><i class="mchip"></i><i class="mchip"></i><i class="mchip"></i></span>底池 ${st.pot}` : "";
       const mb = st.mybest, mbEl = $(".pmybest"), folded = seated && st.seats[you] && st.seats[you].folded;
       BEST = new Set(mb && !folded && st.phase !== "wait" ? mb.cards : []);
       if (mbEl) {
         mbEl.hidden = !mb || st.phase === "wait";
         if (mb) mbEl.innerHTML = `<span class="pmbl">${folded ? "你已蓋牌，原本是" : "你目前最大"}</span><b class="pmbc c${mb.cat}">${esc(mb.text)}</b>`;
       }
-      boardEl.innerHTML = Array.from({ length: 5 }, (_, i) => (st.board[i] != null ? card(st.board[i]) : `<span class="pcard empty"></span>`)).join("");
+      if ((prevPhase === "result" || prevPhase === "wait" || !prevPhase) && st.phase === "preflop") prevHole = {};
+      let nb = 0;
+      boardEl.innerHTML = Array.from({ length: 5 }, (_, i) => (st.board[i] != null ? card(st.board[i], "md", prevBoard[i] == null ? "deal" : "", prevBoard[i] == null ? 0.1 + 0.18 * nb++ : 0) : `<span class="pkw md empty"></span>`)).join("");
       const base = seated ? you : 0;
       seatsEl.innerHTML = POS.map((pos, k) => {
         const i = (base + k) % 6, s = st.seats[i];
@@ -80,14 +82,14 @@ export function mountPoker(opts = {}) {
         }
         const turn = st.toAct === i, win = st.result && st.result.winners.some((w) => w.i === i);
         const cls = ["pseat", s.folded ? "folded" : "", turn ? "turn" : "", win ? "win" : "", i === you ? "me" : "", s.away ? "away" : ""].join(" ");
-        const hole = s.hole && s.hole.length ? s.hole.map((c) => card(c, i !== you)).join("") : "";
+        const ph = prevHole[i] || [], hole = s.hole && s.hole.length ? s.hole.map((c, k) => card(c, i === you ? "lg" : "sm", ph[k] === undefined ? "deal" : ph[k] < 0 && c >= 0 ? "flip" : "", ph[k] === undefined ? 0.15 * k + 0.05 * i : 0)).join("") : "";
         return `<div class="${cls}" style="${style}">
           ${st.dealer === i ? `<span class="pdealer">D</span>` : ""}
           <div class="phole">${hole}</div>
           <div class="pname">${esc(s.name)}${s.away ? "（離線）" : ""}</div>${s.bot ? `<div class="ptag">？</div>` : ""}
           <div class="pchips">💰 ${s.chips}${s.allin ? " 全下" : ""}</div>
           ${s.hand ? `<div class="phand">${s.hand}</div>` : s.last ? `<div class="plast">${esc(s.last)}</div>` : ""}
-          ${s.bet ? `<div class="pbet">${s.bet}</div>` : ""}
+          ${s.bet ? `<div class="pbet"><i class="mchip"></i>${s.bet}</div>` : ""}
           ${seated && s.bot ? `<button class="pdel" data-del="${i}" title="移除電腦">✕</button>` : ""}
         </div>`;
       }).join("");
@@ -97,10 +99,11 @@ export function mountPoker(opts = {}) {
       if (st.phase === "result" && st.result && st.result.showdown) {
         const rows = st.seats.filter((s) => s && s.inHand && !s.folded && s.hand).map((s) => {
           const w = st.result.winners.find((x) => x.i === s.i);
-          return `<div class="prr${w ? " win" : ""}"><b>${esc(s.name)}</b><span class="prh">${s.hole.map((c) => card(c, true)).join("")}</span><em>${s.hand}</em>${w ? `<strong>🏆 +${w.amount}</strong>` : ""}</div>`;
+          return `<div class="prr${w ? " win" : ""}"><b>${esc(s.name)}</b><span class="prh">${s.hole.map((c) => card(c, "sm")).join("")}</span><em>${s.hand}</em>${w ? `<strong>🏆 +${w.amount}</strong>` : ""}</div>`;
         }).join("");
         logEl.innerHTML = `<div class="prt">攤牌　公開牌型</div>${rows}`;
       } else logEl.textContent = st.log || "";
+      prevBoard = st.board.slice(); prevHole = {}; st.seats.forEach((x, i) => { if (x && x.hole && x.hole.length) prevHole[i] = x.hole.slice(); }); prevPhase = st.phase;
       renderCtl();
       renderCfg();
       tickStatus();
