@@ -21,6 +21,7 @@ import { mountDown } from "./stairs.js";
 import { mountFarm } from "./farm.js";
 import { mountGallery } from "./gallery.js";
 import { iconHtml } from "./iconart.js";
+import "./gamebg.css";
 
 // 可選遊戲（檔案不存在就不顯示選單項目；這些檔案不放進公開 repo）
 const optional = import.meta.glob(["./pikachu_online.js", "./lf2.js"], { eager: true });
@@ -106,7 +107,7 @@ const GAMES = [
 ].filter((g) => typeof g.mount === "function");
 
 function showMenu() {
-  presence("menu");
+  presence("menu"); delete document.body.dataset.game;
   const card = (g) => `<button class="card${g.wide ? " wide" : ""}${g.cls ? " " + g.cls : ""}" data-g="${g.id}"><span class="icon">${iconHtml(g.id, g.icon, g.name)}</span><b>${g.name}</b><em>${g.players}</em><small>${g.desc}</small></button>`;
   const tabs = CATS.filter((c) => GAMES.some((g) => g.cat === c.id));
   let tab = ""; try { tab = localStorage.getItem("menutab") || ""; } catch {}
@@ -131,7 +132,7 @@ function showMenu() {
 let cleanup = null;
 function start(id) {
   const g = GAMES.find((x) => x.id === id);
-  presence(id);
+  presence(id); document.body.dataset.game = id;
   app.innerHTML = "";
   cleanup = g.mount(app, { env, back: () => { if (cleanup) cleanup(); cleanup = null; showMenu(); } }) || null;
 }
