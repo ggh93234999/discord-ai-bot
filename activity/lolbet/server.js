@@ -86,14 +86,41 @@ let polling = false, fixturesAt = 0;
 const FIX_TTL = 24 * 3600 * 1000, FIRST_CHECK = 35 * 60 * 1000;
 let lastCheck = 0;
 
+// 賽程名單：近 8 天每次都抓（賠率與狀態要新）；8 天以後到世界賽結束的「遠期」場次每 2 天才抓一次，
+// 這樣畫面上能看到整個世界賽的賽程，又不會多花太多額度（OddsPapi 的 fixtures 一次最多 10 天）。
+let farAt = 0, farMap = new Map();
+const FAR_TTL = 48 * 3600 * 1000;
+function mapFix(f, old) {
+  return { id: f.fixtureId, home: f.participant1Name, away: f.participant2Name, start: Date.parse(f.startTime), statusId: f.statusId, statusName: f.statusName || "", hasOdds: !!f.hasOdds, oh: old?.oh, oa: old?.oa, suspended: old?.suspended, score: old?.score, chk: old?.chk };
+}
 async function loadFixtures(now, prio) {
   const fx = await _deps.fetchJson("fixtures", { sportId: 18, from: day(now - 86400000), to: day(now + 8 * 86400000) }, prio);
   const next = new Map();
   for (const f of Array.isArray(fx) ? fx : []) {
     if (f.tournamentId !== TOURNAMENT) continue;
-    const old = fixtures.get(f.fixtureId);
-    next.set(f.fixtureId, { id: f.fixtureId, home: f.participant1Name, away: f.participant2Name, start: Date.parse(f.startTime), statusId: f.statusId, statusName: f.statusName || "", hasOdds: !!f.hasOdds, oh: old?.oh, oa: old?.oa, suspended: old?.suspended, score: old?.score, chk: old?.chk });
+    next.set(f.fixtureId, mapFix(f, fixtures.get(f.fixtureId)));
   }
+  // 遠期場次：失敗不影響近期名單
+  if (now - farAt > FAR_TTL && now + 8 * 86400000 < END + 86400000) {
+    try {
+      const far = new Map();
+      for (let from = now + 8 * 86400000; from < END + 86400000; from += 10 * 86400000) {
+        await new Promise((r) => setTimeout(r, 6000));          // 同一個介面連續呼叫太快會被 429
+        const q = { sportId: 18, from: day(from), to: day(Math.min(from + 10 * 86400000, END + 86400000)) };
+        let rows;
+        try { rows = await _deps.fetchJson("fixtures", q, prio); }
+        catch (e) {
+          const m = String(e && e.message);
+          if (/404/.test(m)) rows = [];            // 那段期間還沒有任何場次（淘汰賽對戰組合出來才會有）
+          else if (!/429/.test(m)) throw e;
+          else { await new Promise((r) => setTimeout(r, 10000)); rows = await _deps.fetchJson("fixtures", q, prio); }
+        }
+        for (const f of Array.isArray(rows) ? rows : []) if (f.tournamentId === TOURNAMENT) far.set(f.fixtureId, mapFix(f, fixtures.get(f.fixtureId)));
+      }
+      farMap = far; farAt = now;
+    } catch (e) { console.log("世界賽運彩：遠期賽程抓取失敗", String(e && e.message || e).replace(KEY, "***").slice(0, 80)); }
+  }
+  for (const [id, f] of farMap) if (!next.has(id)) next.set(id, fixtures.get(id) || f);
   for (const [id, f] of fixtures) if (!next.has(id) && st.bets.some((b) => b.fixtureId === id && (b.status === "open" || b.status === "unpaid"))) next.set(id, f);   // 還有人下注的場次要留著好結算
   fixtures = next; fixturesAt = now;
 }

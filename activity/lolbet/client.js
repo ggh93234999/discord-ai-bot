@@ -113,7 +113,7 @@ export function mountLolBet(root, { env, back }) {
     const sec = (title, arr) => arr.length ? `<h3 class="lbh">${title}</h3>${arr.map(card).join("")}` : "";
     const fin = g(["finished", "void"]).reverse().slice(0, 8);
     el.innerHTML = (st.list.length ? "" : `<div class="mempty">目前沒有世界賽場次。</div>`)
-      + sec("可下注", g(["open"])) + sec("已截止／進行中", g(["live", "closed"])) + sec("最近結果", fin)
+      + sec("可下注", g(["open"])) + sec("已截止／進行中", g(["live"])) + sec("賽程・尚未開盤", g(["closed"])) + sec("最近結果", fin)
       + (st.board && st.board.length ? `<h3 class="lbh">🏅 輸贏榜（已結算的注單）</h3><div class="lbboard">${st.board.map((r, i) => `<div class="lbrank"><span>${i + 1}</span><b>${esc(r.name)}</b><em class="${r.net >= 0 ? "up" : "down"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</em><small>${r.w}／${r.n} 贏</small></div>`).join("")}</div>` : "")
       + `<div class="lbfoot">賠率更新：${fmtAgo(st.updatedAt)}${st.dead ? "（資料來源額度已用完，賠率不再更新，暫停下注）" : st.err ? "（最近一次同步失敗，賠率可能不是最新）" : `（目前約每 ${st.every >= 120 ? Math.round(st.every / 60) + " 小時" : st.every + " 分鐘"}更新一次）`}　單注上限 ${money(st.limit)}，每場合計上限 ${money(st.maxFixture)}</div>`
       + `<button class="lbhbtn">${showHist ? "收起" : "我的注單紀錄"}</button>`;
