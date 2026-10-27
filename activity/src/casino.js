@@ -9,6 +9,7 @@ import { addBetInput } from "./betinput.js";
 import { horseCards } from "./horsecards.js";
 import { createForge } from "./forgeui.js";
 import { prodUrl, dealerUrl } from "./stoneart.js";
+import { horseSheet, FW as HFW, FH as HFH, FRAMES as HFR } from "./horseart.js";
 
 const BETS = [10, 50, 100, 500];
 const ERR = {
@@ -479,6 +480,19 @@ export function mountCasino(game, opts = {}) {
       return g * g * 0.18 + g * 0.82;            // 起跑稍慢，之後加速
     }
     // 一匹馬（朝右）。S = 大小（約等於馬長），ph = 步伐相位，run = 是否在跑
+    // AI 畫的馬：8 格奔跑動作依步頻輪播，騎師和彩服用程式畫在背上
+    function drawSprite(c, sh, cx, cy, S, ph, run, silk, num) {
+      const fr = run ? Math.floor((((ph / 6.283) % 1) + 1) % 1 * HFR) : 1, dw = S * 1.6, dh = dw * HFH / HFW;
+      c.drawImage(sh, fr * HFW, 0, HFW, HFH, cx - dw * 0.5, cy - dh * 0.42, dw, dh);
+      const bx = cx - dw * 0.03, by = cy - dh * 0.42 + dh * 0.33, lean = run ? 0.5 : 0.15;
+      c.save(); c.translate(bx, by); c.rotate(-lean);
+      c.fillStyle = silk; c.strokeStyle = "rgba(0,0,0,.55)"; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(0, -S * 0.03, S * 0.1, S * 0.055, 0, 0, 7); c.fill(); c.stroke();
+      c.fillStyle = "#e8c39a"; c.beginPath(); c.arc(S * 0.1, -S * 0.07, S * 0.04, 0, 7); c.fill(); c.stroke();
+      c.fillStyle = silk; c.beginPath(); c.arc(S * 0.1, -S * 0.085, S * 0.04, Math.PI, 0); c.fill(); c.stroke();
+      c.restore();
+      c.fillStyle = "#fff"; c.font = `bold ${Math.round(S * 0.16)}px sans-serif`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(num), bx - S * 0.07, by + S * 0.02);
+    }
     function drawHorse(c, cx, cy, S, ph, run, coat, mane, silk, num) {
       const k = (v) => v * S, OUT = "rgba(0,0,0,.5)";
       const limb = (x1, y1, x2, y2, w, col) => {
@@ -572,7 +586,9 @@ export function mountCasino(game, opts = {}) {
         if (mine && mine.idx === i) { c.strokeStyle = "#e0a526"; c.lineWidth = 2; c.strokeRect(1, top + i * laneH + 1, rW - 2, laneH - 2); }
         const S = laneH * 1.02;
         if (run && Math.random() < 70 * dt) rparts.push({ x: x - S * 0.3, y: yc + S * 0.38, vx: -35 - Math.random() * 45, vy: -Math.random() * 20, life: 0.55, max: 0.55, r: 2 + Math.random() * 2.5, dust: 1 });
-        drawHorse(c, x, yc - S * 0.04, S, rph[i], run, info.coat || "#a9754b", info.mane || "#2a1a10", SILK[i % 6], i + 1);
+        const sh = horseSheet(hs.names[i]);
+        if (sh) drawSprite(c, sh, x, yc - S * 0.04, S, rph[i], run, SILK[i % 6], i + 1);
+        else drawHorse(c, x, yc - S * 0.04, S, rph[i], run, info.coat || "#a9754b", info.mane || "#2a1a10", SILK[i % 6], i + 1);
         // 左邊：名次獎牌／號碼 + 名字 + 跑法
         c.textAlign = "left"; c.textBaseline = "middle";
         const pl = hs.order && p >= 1 ? hs.order.indexOf(i) : -1;
