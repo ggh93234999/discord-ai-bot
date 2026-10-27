@@ -1,5 +1,7 @@
 // 鍛造（獨立玩法）的畫面：100 階的劍（程式畫的 SVG，越高階越華麗）＋鍛造／賣劍操作。所有數字和亂數都在伺服器（forge.js / casino.js）。
 import { sfx, sfxOn, setSfx } from "./forgesfx.js";
+const SWURL = {};
+for (const [pth, url] of Object.entries(import.meta.glob("./sword-art/*.png", { eager: true, query: "?url", import: "default" }))) SWURL[pth.split("/").pop().slice(0, -4)] = url;
 const RANKS = ["木劍", "青銅劍", "鐵劍", "鋼劍", "銀劍", "黃金劍", "秘銀劍", "精金劍", "龍鋼劍", "神劍"];
 const EPI = ["學徒", "尋常", "精良", "百煉", "名匠", "傳世", "無雙", "絕世", "神鑄", "至尊"];
 // 每個材質一組顏色：[刀刃暗, 刀刃亮, 護手, 握把, 寶石/發光]
@@ -39,6 +41,9 @@ export function swordSvg(t, uid = "s", opts = {}) {
   s += `<ellipse cx="${cx}" cy="338" rx="${48 + rank * 3}" ry="8" fill="#0007"/>`;
   // 火焰（龍鋼以上）
   if (rank >= 8) for (let k = 0; k < 6 + sub; k++) { const y = 70 + R() * 170, side = R() < 0.5 ? -1 : 1, x = cx + side * (w + 2 + R() * 6); s += `<path d="M${x},${y} q${side * 6},-10 0,-22 q${side * -2},10 ${side * -3},22 z" fill="${rank === 9 ? "#fff3b0" : "#ff7a3d"}" opacity=".8" class="fsw-flame" style="animation-delay:${(R() * 1.5).toFixed(2)}s"/>`; }
+  const ART = SWURL["r" + rank];
+  if (ART) s += `<g filter="url(#${id("f")})"><image href="${ART}" x="0" y="8" width="220" height="340" preserveAspectRatio="xMidYMid meet"/></g>`;
+  else {
   // 刀身：高階帶弧度（葉形）
   const bulge = rank >= 5 ? 4 + (rank - 5) * 1.2 : 0;
   const blade = `M${cx},${tip} L${cx + w * 0.4},${top} Q${cx + w + bulge},${(top + base) / 2} ${cx + w},${base} L${cx - w},${base} Q${cx - w - bulge},${(top + base) / 2} ${cx - w * 0.4},${top} Z`;
@@ -60,8 +65,9 @@ export function swordSvg(t, uid = "s", opts = {}) {
   s += `<rect x="${cx - 5}" y="${base + 14}" width="10" height="58" rx="3" fill="${grip}"/>`;
   for (let y = base + 18; y < base + 70; y += 9) s += `<path d="M${cx - 5},${y} l10,5" stroke="${acc}" stroke-opacity=".55" stroke-width="1.4"/>`;
   s += `<circle cx="${cx}" cy="${base + 82}" r="${8 + Math.min(5, rank * 0.6)}" fill="url(#${id("g")})" stroke="${gd}"/><circle cx="${cx}" cy="${base + 82}" r="3.4" fill="${acc}"/>`;
+  }
   // 刀身上的寶石（子階越高越多）
-  const gems = sub >= 7 ? 3 : sub >= 4 ? 2 : sub >= 2 ? 1 : 0;
+  const gems = ART ? 0 : sub >= 7 ? 3 : sub >= 4 ? 2 : sub >= 2 ? 1 : 0;
   for (let k = 0; k < gems; k++) s += `<path d="M${cx},${base - 40 - k * 36} l5,6 l-5,6 l-5,-6 z" fill="${acc}" stroke="#fff" stroke-width=".8" class="fsw-pulse"/>`;
   // 閃光
   const sp = Math.floor(t / 7) + (t >= 90 ? 4 : 0);
