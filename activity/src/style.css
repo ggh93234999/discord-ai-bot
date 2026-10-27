@@ -1209,3 +1209,13 @@ body.tv-fs{overflow:hidden}
 .bt .brmid{height:250px;overflow:hidden;justify-content:flex-start}
 .bt .bttrail{flex:1;min-height:0;overflow:hidden;justify-content:flex-end;width:100%}
 .bt .btlast{flex:none}
+/* 大老二：各區塊高度固定，出牌、換人、換階段時版面不跳動 */
+.bt .mhint{min-height:22px;line-height:22px}
+.bt .brinfo{height:46px;justify-content:flex-start}
+.bt .brhand{min-height:92px;align-content:flex-start}
+.bt .btbtns{min-height:44px}
+.bt .brlog{min-height:34px}
+.bt .btspacer{height:170px}
+@media (min-width:521px){.bt .brhand{min-height:84px}}
+.bt .brseat{min-height:64px}
+.bt .brbub{position:absolute;top:-9px;right:6px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.5)}

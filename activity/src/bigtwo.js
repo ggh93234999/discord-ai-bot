@@ -163,7 +163,7 @@ export function mountBigtwo(opts = {}) {
       const you = st.you, me = you >= 0 ? st.seats[you] : null, play = st.phase === "play";
       const order = [2, 1, 3, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
       const mid = play ? midHTML() : `<div class="brmid">${st.result ? resultHTML(st.result) : ""}</div>`;
-      let below = "";
+      let below = `<div class="btspacer"></div>`;
       if (play && me) {
         const myTurn = st.turn === you;
         const key = (st.hand || []).join(",") + "|" + st.handNo;
