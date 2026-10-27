@@ -1052,3 +1052,21 @@ body.tv-fs{overflow:hidden}
 .factory .finfo:empty{display:none}
 .game.factory{height:auto;min-height:100vh}
 .factory > *{flex:none}
+.factory .fpower{width:100%;max-width:640px;margin:8px auto 0;padding:8px 12px;border-radius:10px;background:#242b3a;text-align:left;font-size:13px;box-sizing:border-box}
+.factory .fp-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.factory .fp-v{font-weight:700;color:#ffd54f;font-size:15px}.factory .fp-s{color:#cfd8dc}
+.factory .fp-bar{height:6px;border-radius:3px;background:#161b26;margin:6px 0;overflow:hidden}
+.factory .fp-bar i{display:block;height:100%;background:#ffd54f;transition:width .3s}
+.factory .fpower.low .fp-bar i{background:#ff9800}.factory .fpower.low .fp-s{color:#ffcc80}
+.factory .fpower.off .fp-bar i{background:#ef5350}.factory .fpower.off .fp-s,.factory .fpower.off .fp-v{color:#ef9a9a}
+.factory .fp-buy{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.factory .fp-buy span{color:#9aa3b5;margin-right:4px}
+.factory .fp-buy button{display:flex;flex-direction:column;align-items:center;border:0;border-radius:8px;background:#3a4357;color:#fff;cursor:pointer;font-size:12px;padding:5px 12px}
+.factory .fp-buy button small{font-size:11px;color:#9aa3b5}
+.factory .fp-buy button[hidden]{display:none}
+.factory .fi-p{color:#9aa3b5;font-size:12px}
+/* 自動化工廠：經營頁的大卡片（水墨風封面 src/factory-bg.jpg） */
+.card.wide.factorycard, .card.wide.factorycard:hover { min-height:170px; justify-content:flex-start; border-color:#6b6559; background:linear-gradient(90deg, rgba(246,243,234,.94) 0%, rgba(246,243,234,.62) 40%, rgba(246,243,234,0) 68%), #e9e5d8 url("./factory-bg.jpg") 70% 55%/cover no-repeat; }
+.card.wide.factorycard:hover { border-color:#b3261e; filter:brightness(1.04); }
+.card.wide.factorycard b { color:#1b1b1b; } .card.wide.factorycard em { color:#7a2418; } .card.wide.factorycard small { color:#3a342a; max-width:60%; opacity:.95; }
+@media (max-width:520px){ .card.wide.factorycard, .card.wide.factorycard:hover { background:linear-gradient(90deg, rgba(246,243,234,.95) 0%, rgba(246,243,234,.82) 50%, rgba(246,243,234,0) 80%), #e9e5d8 url("./factory-bg.jpg") 72% 55%/cover no-repeat; } .card.wide.factorycard small { max-width:55%; } }

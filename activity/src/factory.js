@@ -1,5 +1,5 @@
 // 自動化工廠（原型）：把礦挖出來、熔成鐵板、做成齒輪等產品，用傳送帶送去出貨口換錢。
-import { W, H, DX, DY, BELT_STEP, KINDS, ITEMS, RECIPES, makeOre, newGame, canPlace, place, remove, setRecipe, machineState, step, perMinute, serialize, load } from "./factory_sim.js";
+import { W, H, DX, DY, BELT_STEP, KINDS, ITEMS, RECIPES, POWER_USE, POWER_PRICE, makeOre, newGame, canPlace, place, remove, setRecipe, machineState, step, perMinute, powerRate, buyPower, serialize, load } from "./factory_sim.js";
 
 const CELL = 40, SAVE_KEY = "factory_v1", SEEN_KEY = "factory_help_seen";
 const TOOLS = [
@@ -25,6 +25,7 @@ export function mountFactory(root, { env, back }) {
       <header><button class="back">← 選單</button><h2>自動化工廠</h2><span class="right fmoney"></span></header>
       <div class="status fstat"></div>
       <div class="cwrap"><canvas width="${W * CELL}" height="${H * CELL}"></canvas></div>
+      <div class="fpower"></div>
       <div class="finfo"></div>
       <div class="ftools"></div>
       <div class="ftip"></div>
@@ -45,11 +46,17 @@ export function mountFactory(root, { env, back }) {
             <div><i style="background:${ITEMS.iron_plate.color}"></i><b>熔爐</b><span>1 鐵礦 → 1 鐵板；1 銅礦 → 1 銅板（2 秒）</span></div></div>
           <p>組裝機剛放下是做齒輪；用「檢視」點它，下面的面板可以選配方。換配方會清空機器裡的材料。</p>
         </details>
+        <details class="fh"><summary>電費（用完就停工）</summary>
+          <p>每台機器每分鐘都會耗電，電用完<b>整座工廠立刻停工</b>（帶子、機器全部停住，不會損失東西），儲值之後從原地繼續。</p>
+          <div class="frec">${Object.entries(POWER_USE).map(([k, v]) => `<div><b>${KINDS[k].name}</b><span>每分鐘 ${v} 度</span></div>`).join("")}</div>
+          <p>1 度 = $${POWER_PRICE}。機器越多耗電越多，記得看畫面上「撐得了幾分鐘」。電不夠時，錢也可能不夠買電，所以出貨口別拆光。起始送 100 度。</p>
+        </details>
         <details class="fh"><summary>機器不動？常見原因</summary>
           <ul>
             <li><b>點「檢視」再點那台機器</b>：面板會寫「還缺：電線 ×3」之類的原因，狀態燈是 🟢 工作中、🟡 等材料、🔴 出口堵住。</li>
             <li><b>同一條帶子混著不同東西</b>：排頭的東西機器暫時不收，後面的就進不去，整條停住。讓每條帶子只送一種，或用分流器把不要的分出去。</li>
             <li><b>出口堵住</b>：出口那格不是帶子（或帶子是反方向、已經滿了）。接上出貨口或把帶子接通。</li>
+            <li><b>整座工廠都不動</b>：看畫面上的 ⚡ 剩餘電量，是 0 的話就是停電了，儲值就會繼續。</li>
             <li><b>採礦機放不下去</b>：只能放在褐色／灰色礦點上。</li>
             <li><b>帶子迎面相對</b>：兩條帶子互相面對，東西過不去。</li>
           </ul>
@@ -92,6 +99,24 @@ export function mountFactory(root, { env, back }) {
   };
   window.addEventListener("keydown", kd);
 
+  // ---- 電費面板
+  const pw = $(".fpower");
+  pw.innerHTML = `<div class="fp-top"><span class="fp-v"></span><span class="fp-s"></span></div><div class="fp-bar"><i></i></div>
+    <div class="fp-buy"><span>儲值電費</span>${[20, 100, 500].map((n) => `<button data-u="${n}">+${n} 度<small>$${n * POWER_PRICE}</small></button>`).join("")}<button data-rescue hidden>手搖發電 +5 度</button></div>`;
+  let rescueAt = 0;
+  pw.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.rescue !== undefined) { if (Date.now() - rescueAt < 10000) { say("手搖發電機還在冷卻（每 10 秒一次）"); return; } rescueAt = Date.now(); g.power += 5; say("手搖發電 +5 度"); return; }
+    const err = buyPower(g, +b.dataset.u); say(err || `已儲值 ${b.dataset.u} 度`);
+  });
+  function renderPower() {
+    const rate = powerRate(g), mins = rate > 0 ? g.power / rate : Infinity;
+    pw.querySelector(".fp-v").textContent = `⚡ 剩餘 ${g.power.toFixed(g.power < 10 ? 1 : 0)} 度`;
+    pw.querySelector(".fp-s").textContent = g.off ? "停電中，工廠已停工" : rate > 0 ? `每分鐘耗電 ${rate.toFixed(1)} 度，約撐 ${mins >= 100 ? "100+" : mins.toFixed(1)} 分鐘` : "還沒有機器";
+    const bar = pw.querySelector(".fp-bar i"); bar.style.width = Math.max(0, Math.min(100, mins === Infinity ? 100 : mins / 20 * 100)) + "%";
+    pw.classList.toggle("low", !g.off && mins < 3); pw.classList.toggle("off", g.off);
+    pw.querySelector("[data-rescue]").hidden = !(g.power < 5 && g.money < 20);
+  }
   const say = (t) => { msg = t; msgAt = performance.now(); };
   const cellAt = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -187,6 +212,11 @@ export function mountFactory(root, { env, back }) {
     } else if (hover && tool === "erase") {
       const px = hover[0] * CELL, py = hover[1] * CELL; ctx.strokeStyle = "#ef5350"; ctx.lineWidth = 2; ctx.strokeRect(px + 2, py + 2, CELL - 4, CELL - 4);
     }
+    if (g.off) {
+      ctx.fillStyle = "rgba(10,14,22,.62)"; ctx.fillRect(0, 0, W * CELL, H * CELL);
+      ctx.fillStyle = "#ffd54f"; ctx.font = "bold 34px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("⚡ 停電了", W * CELL / 2, H * CELL / 2 - 16);
+      ctx.fillStyle = "#fff"; ctx.font = "18px sans-serif"; ctx.fillText("儲值電費後，工廠會從原地繼續", W * CELL / 2, H * CELL / 2 + 22);
+    }
     if (sel) { ctx.strokeStyle = "#ffd54f"; ctx.lineWidth = 3; rrect(sel[0] * CELL + 1, sel[1] * CELL + 1, CELL - 2, CELL - 2, 8); ctx.stroke(); }
   }
 
@@ -204,6 +234,7 @@ export function mountFactory(root, { env, back }) {
     const st = c.k === "belt" || c.k === "splitter" || c.k === "shipper" ? null : machineState(c);
     const inv = Object.entries(c.inv).filter(([, n]) => n > 0).map(([k, n]) => `${ITEMS[k].name} ×${n}`).join("、") || "空的";
     let html = `<div class="fi-h"><b>${KINDS[c.k].name}</b>${c.k !== "shipper" ? `<span>出口朝${DIRN[c.dir]}</span><button data-d>轉方向</button>` : ""}</div>`;
+    html += `<div class="fi-p">耗電：每分鐘 ${POWER_USE[c.k]} 度</div>`;
     if (st) html += `<div class="fi-s s-${st.s}"><i></i>${st.text}</div>`;
     if (c.k === "miner") html += `<div>挖的是${c.ore === "copper" ? "銅礦" : "鐵礦"}，每 1.5 秒 1 個</div>`;
     if (c.k === "smelter") html += `<div>機器裡：${inv}</div>`;
@@ -222,7 +253,7 @@ export function mountFactory(root, { env, back }) {
     if (!priceDone) { priceDone = true; $(".fprice").innerHTML = Object.values(ITEMS).map((it) => `<span><i style="background:${it.color}"></i>${it.name} $${it.value}</span>`).join(""); }
     const t = performance.now() - msgAt < 2500 ? msg : "";
     const el = $(".fstat"); el.textContent = t || `每分鐘出貨 $${perMinute(g)}　累計出貨 $${g.shipped}`; el.classList.toggle("warn", !!t);
-    renderInfo();
+    renderInfo(); renderPower();
   }
 
   // ---- 主迴圈：固定 10 tick/秒

@@ -4,6 +4,10 @@ export const W = 20, H = 12;
 export const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
 export const BELT_STEP = 3;                 // 傳送帶每 3 個 tick 前進一格
 export const START_MONEY = 150;
+// 電費：每台機器每分鐘耗電（度）。電用完整座工廠就停工，要儲值（現在用遊戲幣買，之後可改成代幣）。
+export const POWER_USE = { belt: 0.1, splitter: 0.5, miner: 1.5, smelter: 2.5, assembler: 3.5, shipper: 0.5 };
+export const POWER_PRICE = 1;               // 1 度 = $1
+export const START_POWER = 100;
 
 export const KINDS = {
   belt:      { name: "傳送帶", cost: 1 },
@@ -42,7 +46,7 @@ export function makeOre() {
 }
 
 const newCell = (k, dir, ore) => ({ k, dir, item: null, out: [], inv: {}, prog: 0, ago: 99, rr: 0, r: 0, ore: ore || null, cur: null, stall: 0 });
-export function newGame() { return { cells: new Array(W * H).fill(null), money: START_MONEY, tick: 0, shipped: 0, log: [] }; }
+export function newGame() { return { cells: new Array(W * H).fill(null), money: START_MONEY, power: START_POWER, off: false, tick: 0, shipped: 0, log: [] }; }
 const at = (g, x, y) => (x < 0 || y < 0 || x >= W || y >= H ? null : g.cells[y * W + x]);
 const invN = (c) => Object.values(c.inv).reduce((s, n) => s + n, 0);
 
@@ -99,8 +103,19 @@ export function machineState(c) {
   return { s: "idle", text: "" };
 }
 
-// 前進一個 tick
+// 全廠每分鐘耗電（度）
+export function powerRate(g) { let r = 0; for (const c of g.cells) if (c) r += POWER_USE[c.k]; return r; }
+export function buyPower(g, units) {
+  const cost = Math.round(units * POWER_PRICE);
+  if (!(units > 0)) return "數量不對";
+  if (g.money < cost) return "錢不夠";
+  g.money -= cost; g.power += units; return "";
+}
+// 前進一個 tick（沒電就整座工廠停工，tick 也不走）
 export function step(g) {
+  const rate = powerRate(g);
+  if (g.power <= 0 && rate > 0) { g.off = true; return; }
+  g.off = false; g.power = Math.max(0, g.power - rate / 600);
   g.tick++;
   // 1) 機器：處理、產出、把成品推給面向的那一格
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -172,12 +187,12 @@ function give(g, t, item) {
 export function perMinute(g) { const from = g.tick - 600; return g.log.filter(([t]) => t > from).reduce((s, [, v]) => s + v, 0); }
 
 export function serialize(g) {
-  return { v: 2, m: g.money, s: g.shipped, c: g.cells.map((c, i) => (c ? [i, c.k, c.dir, c.r || 0, c.ore || ""] : null)).filter(Boolean) };
+  return { v: 3, m: g.money, p: Math.round(g.power * 100) / 100, s: g.shipped, c: g.cells.map((c, i) => (c ? [i, c.k, c.dir, c.r || 0, c.ore || ""] : null)).filter(Boolean) };
 }
 export function load(o) {
   const g = newGame();
   if (o && Array.isArray(o.c)) {
-    g.money = Number(o.m) || 0; g.shipped = Number(o.s) || 0;
+    g.money = Number(o.m) || 0; g.shipped = Number(o.s) || 0; g.power = typeof o.p === "number" ? o.p : 150;   // 舊存檔送 150 度
     for (const [i, k, dir, r, ore] of o.c) if (KINDS[k] && i >= 0 && i < W * H) { const c = newCell(k, dir & 3, ore || null); c.r = (r | 0) % RECIPES.length; g.cells[i] = c; }
   }
   return g;
