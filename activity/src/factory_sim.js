@@ -7,31 +7,54 @@ export const START_MONEY = 150;
 
 export const KINDS = {
   belt:      { name: "傳送帶", cost: 1 },
-  miner:     { name: "採礦機", cost: 25, every: 15 },               // 只能放在礦點上，每 1.5 秒出 1 礦
-  smelter:   { name: "熔爐", cost: 45, need: "ore", make: "plate", time: 20, cap: 4 },
-  assembler: { name: "組裝機", cost: 90, need: "plate", n: 2, make: "gear", time: 30, cap: 6 },   // 2 鐵板 → 1 齒輪
+  splitter:  { name: "分流器", cost: 15 },                              // 把收到的東西輪流丟給前、左、右三個方向（收不下的那邊會跳過）
+  miner:     { name: "採礦機", cost: 25, every: 15 },                    // 只能放在礦點上，每 1.5 秒出 1 礦
+  smelter:   { name: "熔爐", cost: 45, cap: 4, time: 20 },               // 鐵礦→鐵板、銅礦→銅板（同一時間只處理一種）
+  assembler: { name: "組裝機", cost: 90 },                               // 照配方組裝，點「配方」工具切換
   shipper:   { name: "出貨口", cost: 10 },
 };
-export const VALUE = { ore: 2, plate: 6, gear: 20 };
+export const SMELT = { iron_ore: "iron_plate", copper_ore: "copper_plate" };
+// 配方：in 是需要的材料（每次消耗），out 是產出數量
+export const RECIPES = [
+  { id: "gear",    name: "齒輪",   in: { iron_plate: 2 },                  make: "gear",    n: 1, time: 30 },
+  { id: "wire",    name: "電線",   in: { copper_plate: 1 },                make: "wire",    n: 2, time: 20 },
+  { id: "circuit", name: "電路板", in: { iron_plate: 1, wire: 3 },         make: "circuit", n: 1, time: 40 },
+  { id: "motor",   name: "馬達",   in: { gear: 2, circuit: 1, copper_plate: 2 }, make: "motor", n: 1, time: 60 },
+];
+export const ITEMS = {
+  iron_ore:     { name: "鐵礦",   value: 2,  color: "#a1887f" },
+  copper_ore:   { name: "銅礦",   value: 2,  color: "#d98b5f" },
+  iron_plate:   { name: "鐵板",   value: 6,  color: "#cfd8dc" },
+  copper_plate: { name: "銅板",   value: 6,  color: "#f0a36b" },
+  gear:         { name: "齒輪",   value: 20, color: "#ffb74d" },
+  wire:         { name: "電線",   value: 4,  color: "#ff8a65" },
+  circuit:      { name: "電路板", value: 60, color: "#66bb6a" },
+  motor:        { name: "馬達",   value: 200, color: "#4fc3f7" },
+};
+export const VALUE = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [k, v.value]));
 
-// 礦點：固定地圖
+// 礦點：index → "iron" / "copper"
 export function makeOre() {
-  const ore = new Set();
-  const patch = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) ore.add(y * W + x); };
-  patch(1, 2, 4, 3); patch(2, 8, 3, 3); patch(14, 1, 3, 3);
+  const ore = new Map();
+  const patch = (x0, y0, w, h, t) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) ore.set(y * W + x, t); };
+  patch(1, 2, 4, 3, "iron"); patch(2, 8, 3, 3, "iron"); patch(14, 1, 3, 3, "copper"); patch(15, 8, 4, 3, "copper");
   return ore;
 }
 
+const newCell = (k, dir, ore) => ({ k, dir, item: null, out: [], inv: {}, prog: 0, ago: 99, rr: 0, r: 0, ore: ore || null, cur: null });
 export function newGame() { return { cells: new Array(W * H).fill(null), money: START_MONEY, tick: 0, shipped: 0, log: [] }; }
 const at = (g, x, y) => (x < 0 || y < 0 || x >= W || y >= H ? null : g.cells[y * W + x]);
+const invN = (c) => Object.values(c.inv).reduce((s, n) => s + n, 0);
 
-// c 能不能收下 item（from：來源方向，用來擋「迎面接」）
+// c 能不能再收下 item（srcDir：來源前進的方向，用來擋「迎面接」；pend：這個 tick 已經預訂的數量）
 function accepts(c, item, srcDir, pend) {
   if (!c) return false;
+  pend = pend || 0;
   if (c.k === "belt") return c.dir !== (srcDir + 2) % 4 && !c.item;
   if (c.k === "shipper") return true;
-  const K = KINDS[c.k];
-  if (c.k === "smelter" || c.k === "assembler") return item === K.need && c.inn + (pend || 0) < K.cap;
+  if (c.k === "splitter") return !c.item && !pend;
+  if (c.k === "smelter") return !!SMELT[item] && (!c.cur || c.cur === item) && invN(c) + pend < KINDS.smelter.cap;
+  if (c.k === "assembler") { const need = RECIPES[c.r].in[item]; return !!need && (c.inv[item] || 0) + pend < need * 2; }
   return false;
 }
 
@@ -44,12 +67,17 @@ export function place(g, ore, x, y, k, dir) {
   const cost = KINDS[k].cost;
   if (g.money < cost) return "錢不夠";
   g.money -= cost;
-  g.cells[i] = { k, dir, item: null, out: null, inn: 0, prog: 0, ago: 99 };
+  g.cells[i] = newCell(k, dir, k === "miner" ? ore.get(i) : null);
   return "";
 }
 export function remove(g, x, y) {
   const i = y * W + x, c = g.cells[i]; if (!c) return;
   g.money += Math.floor(KINDS[c.k].cost / 2); g.cells[i] = null;
+}
+// 組裝機換下一個配方（機器裡的材料清掉）
+export function cycleRecipe(g, x, y) {
+  const c = at(g, x, y); if (!c || c.k !== "assembler") return false;
+  c.r = (c.r + 1) % RECIPES.length; c.inv = {}; c.out = []; c.prog = 0; return true;
 }
 
 // 前進一個 tick
@@ -58,13 +86,36 @@ export function step(g) {
   // 1) 機器：處理、產出、把成品推給面向的那一格
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = g.cells[y * W + x]; if (!c || c.k === "belt" || c.k === "shipper") continue;
-    const K = KINDS[c.k];
-    if (c.k === "miner") { c.prog++; if (!c.out && c.prog >= K.every) { c.out = "ore"; c.prog = 0; } }
-    else if (c.prog > 0) { if (--c.prog === 0) c.out = K.make; }
-    else if (!c.out && c.inn >= (K.n || 1)) { c.inn -= K.n || 1; c.prog = K.time; }
-    if (c.out) {
+    if (c.k === "splitter") {
+      if (c.item) {
+        for (let n = 0; n < 3; n++) {
+          const d = (c.dir + [0, 1, 3][(c.rr + n) % 3]) & 3;      // 前、右、左 輪流
+          const t = at(g, x + DX[d], y + DY[d]);
+          if (accepts(t, c.item, d)) { give(g, t, c.item); c.item = null; c.rr = (c.rr + n + 1) % 3; break; }
+        }
+      }
+      continue;
+    }
+    if (c.k === "miner") {
+      c.prog++;
+      if (c.out.length < 1 && c.prog >= KINDS.miner.every) { c.out.push(c.ore === "copper" ? "copper_ore" : "iron_ore"); c.prog = 0; }
+    } else if (c.k === "smelter") {
+      if (c.prog > 0) { if (--c.prog === 0) { c.out.push(SMELT[c.cur]); if (invN(c) === 0) c.cur = null; } }
+      else if (c.out.length < 2) {
+        const it = Object.keys(c.inv).find((k) => c.inv[k] > 0);
+        if (it) { c.inv[it]--; c.cur = it; c.prog = KINDS.smelter.time; }
+      }
+    } else if (c.k === "assembler") {
+      const R = RECIPES[c.r];
+      if (c.prog > 0) { if (--c.prog === 0) for (let n = 0; n < R.n; n++) c.out.push(R.make); }
+      else if (c.out.length < 4 && Object.entries(R.in).every(([k, n]) => (c.inv[k] || 0) >= n)) {
+        for (const [k, n] of Object.entries(R.in)) c.inv[k] -= n;
+        c.prog = R.time;
+      }
+    }
+    if (c.out.length) {
       const t = at(g, x + DX[c.dir], y + DY[c.dir]);
-      if (accepts(t, c.out, c.dir)) { give(g, t, c.out, c.dir); c.out = null; }
+      if (accepts(t, c.out[0], c.dir)) { give(g, t, c.out.shift()); }
     }
   }
   // 2) 傳送帶：每 BELT_STEP 個 tick 前進一次
@@ -88,26 +139,27 @@ export function step(g) {
   const moves = belts.filter(([c]) => state.get(c));
   const items = moves.map(([c]) => c.item);
   for (const [c] of moves) c.item = null;
-  moves.forEach(([c, x, y], i) => give(g, at(g, x + DX[c.dir], y + DY[c.dir]), items[i], c.dir));
+  moves.forEach(([c, x, y], i) => give(g, at(g, x + DX[c.dir], y + DY[c.dir]), items[i]));
 }
 
-function give(g, t, item, dir) {
+function give(g, t, item) {
   if (t.k === "belt") { t.item = item; t.ago = 0; }
+  else if (t.k === "splitter") { t.item = item; }
   else if (t.k === "shipper") { const v = VALUE[item] || 0; g.money += v; g.shipped += v; g.log.push([g.tick, v]); if (g.log.length > 400) g.log.shift(); }
-  else t.inn++;
+  else t.inv[item] = (t.inv[item] || 0) + 1;
 }
 
 // 最近 60 秒（600 tick）的出貨金額
 export function perMinute(g) { const from = g.tick - 600; return g.log.filter(([t]) => t > from).reduce((s, [, v]) => s + v, 0); }
 
 export function serialize(g) {
-  return { m: g.money, s: g.shipped, c: g.cells.map((c, i) => (c ? [i, c.k, c.dir] : null)).filter(Boolean) };
+  return { v: 2, m: g.money, s: g.shipped, c: g.cells.map((c, i) => (c ? [i, c.k, c.dir, c.r || 0, c.ore || ""] : null)).filter(Boolean) };
 }
 export function load(o) {
   const g = newGame();
   if (o && Array.isArray(o.c)) {
     g.money = Number(o.m) || 0; g.shipped = Number(o.s) || 0;
-    for (const [i, k, dir] of o.c) if (KINDS[k] && i >= 0 && i < W * H) g.cells[i] = { k, dir: dir & 3, item: null, out: null, inn: 0, prog: 0, ago: 99 };
+    for (const [i, k, dir, r, ore] of o.c) if (KINDS[k] && i >= 0 && i < W * H) { const c = newCell(k, dir & 3, ore || null); c.r = (r | 0) % RECIPES.length; g.cells[i] = c; }
   }
   return g;
 }
