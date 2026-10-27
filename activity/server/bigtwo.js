@@ -61,7 +61,7 @@ function setTurn(t, i) {
 }
 
 // ---------------------------------------------------------------- 出牌、過
-function checkPlay(h, i, cards) {
+function checkPlay(t, h, i, cards) {
   if (!Array.isArray(cards) || !cards.length || cards.length > 13) return null;
   const mine = new Set(h.hands[i]);
   if (new Set(cards).size !== cards.length || !cards.every((c) => Number.isInteger(c) && mine.has(c))) return null;
@@ -72,7 +72,7 @@ function checkPlay(h, i, cards) {
 }
 function doPlay(t, i, cards) {
   const h = t.h; if (!h || h.turn !== i) return false;
-  const combo = checkPlay(h, i, cards); if (!combo) return false;
+  const combo = checkPlay(t, h, i, cards); if (!combo) return false;
   const set = new Set(cards);
   h.hands[i] = h.hands[i].filter((c) => !set.has(c));
   h.last = { seat: i, cards: sortHand(cards.slice()), combo, name: TYPE_NAMES[combo.type] };
