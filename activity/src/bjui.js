@@ -35,6 +35,8 @@ export function newBjState() { return { p: 0, d: 0, hole: true, reset: true }; }
 export function bjHtml(m, st) {
   if (st.reset) { st.p = 0; st.d = 0; st.hole = true; st.reset = false; }
   const first = st.p === 0;
+  const newP = m.player.length - st.p, pdelay = newP > 0 ? (first ? 1.25 : 0.8) : 0;
+  const pt = (txt, d) => (d > 0 ? `<em class="dvl" style="animation-delay:${d}s">${txt}</em>` : txt);
   const pl = m.player.map((c, i) => cardHtml(c, i >= st.p ? "deal" : "", first ? (i === 0 ? 0 : 0.4) : 0)).join("");
   let dl = "", extra = 0;
   if (!m.done) dl = cardHtml(m.dealerUp, st.d === 0 ? "deal" : "", 0.2) + cardHtml(null, st.d === 0 ? "deal" : "", 0.6);
@@ -52,8 +54,8 @@ export function bjHtml(m, st) {
   return {
     rdelay,
     html: `<div class="bjtab"><div class="bjshoe"></div>
-      <div class="bjrow"><small>莊家${m.done ? `（<em class="dvl" style="animation-delay:${rdelay}s">${m.dv} 點</em>）` : ""}</small><div class="hand" style="--ov:${ov(dealerN)}px">${dl}</div></div>
+      <div class="bjrow"><small>莊家${m.done ? `（${pt(m.dv + " 點", rdelay)}）` : ""}</small><div class="hand" style="--ov:${ov(dealerN)}px">${dl}</div></div>
       <div class="bjmid"><span>BLACKJACK　2.5 倍</span>${chipHtml(m.bet)}</div>
-      <div class="bjrow"><small>你（${m.pv} 點）</small><div class="hand" style="--ov:${ov(m.player.length)}px">${pl}</div></div></div>`,
+      <div class="bjrow"><small>你（${pt(m.pv + " 點", pdelay)}）</small><div class="hand" style="--ov:${ov(m.player.length)}px">${pl}</div></div></div>`,
   };
 }
