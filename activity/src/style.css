@@ -1176,3 +1176,8 @@ body.tv-fs{overflow:hidden}
 /* 人頭牌的圖不要蓋住角標 */
 :is(.casino,.poker) .mid:has(.court){left:25%;right:25%;top:12%;bottom:12%}
 :is(.casino,.poker) .court img{inset:1px;width:calc(100% - 2px);height:calc(100% - 2px)}
+/* 小張的牌（攤牌列、別人的底牌）：只留大點數＋大花色，才看得清楚 */
+.poker .pkw.sm{--s:.66}
+.poker .pkw.sm .mid,.poker .pkw.sm .ix.br{display:none}
+.poker .pkw.sm .ix.tl{top:50%;left:50%;transform:translate(-50%,-50%);gap:2px}
+.poker .pkw.sm .ix b{font-size:36px}.poker .pkw.sm .ix span{font-size:34px;margin-top:2px}
