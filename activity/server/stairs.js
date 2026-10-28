@@ -65,7 +65,7 @@ function land(p, pl) {
 function collidePlayers(sim) {
   const al = sim.ps.filter((q) => q.alive);
   for (const q of al) q.cr = false;
-  for (let it = 0; it < 2; it++) {
+  for (let it = 0; it < 5; it++) {
     for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) {
       const a = al[i], b = al[j];
       const px = Math.min(a.x, b.x) + DKW - Math.max(a.x, b.x), py = Math.min(a.y, b.y) + DKH - Math.max(a.y, b.y);
