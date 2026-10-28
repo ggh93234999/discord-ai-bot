@@ -53,9 +53,9 @@ function land(p, pl) {
   p.lastId = pl.id;
   p.y = pl.y - DKH;
   if (pl.type === "nails") { if (fresh) { p.hp -= 5; p.hurt = 40; p.ev |= EV_HURT; } }
-  else if (fresh && p.hp < MAXHP) { p.hp++; p.ev |= EV_HEAL; }
+  else if (fresh && pl.type !== "tramp" && p.hp < MAXHP) { p.hp++; p.ev |= EV_HEAL; }
   if (fresh) p.ev |= EV_LAND;
-  if (pl.type === "tramp") { p.vy = -6.6; p.on = null; pl.bounce = 8; p.ev |= EV_SPRING; return; }
+  if (pl.type === "tramp") { p.vy = -10.6; p.on = null; pl.bounce = 8; p.ev |= EV_SPRING; return; }
   p.vy = 0; p.on = pl;
   if (pl.type === "fake" && pl.t === 0) { pl.t = 1; p.ev |= EV_FLIP; }
 }
@@ -100,7 +100,7 @@ function stepDown(sim, input) {
       if (p.vy >= 0) {
         let hit = null;
         for (const pl of sim.plats) {
-          if (pl.flip || pl.id === p.pass) continue;
+          if (pl.flip || pl.t > 0 || pl.id === p.pass) continue;
           if (p.x + DKW > pl.x + 4 && p.x < pl.x + pl.w - 4 && bottom >= pl.y && prevBottom <= pl.y + sp + 2 && (!hit || pl.y < hit.y)) hit = pl;
         }
         if (hit) land(p, hit);
