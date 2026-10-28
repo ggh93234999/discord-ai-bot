@@ -35,6 +35,7 @@ import channels
 import economy
 import extras
 import imagegen
+import sfxgen
 import memberstatus
 import webimg
 import divination
@@ -128,6 +129,7 @@ TOOL_GUIDE = (
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
     "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
     "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫，其他都能畫。畫圖時任何膚色、種族、國籍、外貌、性別、文化的人物都可以畫，不要自己加限制、不要拒絕、不要說教；使用者要畫就直接呼叫 draw_image。"
+    "使用者要你做音效（「做一個…的音效」「生一段…的聲音」）就呼叫 make_sound：prompt 一定要用英文（先翻譯）、seconds 是長度；做好程式會自動貼出音檔，你只回一句簡短的話。這個只能做音效、環境音、短樂句，不能做人聲說話或唱歌。"
     "使用者傳了圖片（或回覆一則有圖的訊息，包含你畫的圖）並要你修改它（「改成白天」「把…換成…」「幫我修圖」），呼叫 edit_image，prompt 照使用者的語言寫就好（中文可以直接傳）；只是要你看圖、描述圖就不要呼叫。"
     "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
@@ -627,6 +629,10 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             if not imagegen.channel_ok(msg.channel):
                 return imagegen.NSFW_ONLY_REPLY
             return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
+        if name == "make_sound":
+            if msg is None:
+                return "這裡不能做音效。"
+            return await sfxgen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
         if name == "edit_image":
             if msg is None:
                 return "這裡不能改圖。"
@@ -678,6 +684,8 @@ def tool_status(name: str, args_json: str) -> str:
         return music.tool_status(args)
     if name in ("draw_image", "edit_image"):
         return imagegen.tool_status(args)
+    if name == "make_sound":
+        return sfxgen.tool_status(args)
     if name == "web_image":
         return f"🔎 上網找圖：{args.get('query') or args.get('url') or ''}"[:80]
     if name == "music_status":
@@ -839,7 +847,7 @@ def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
     return out
 
 
-ACTION_TOOLS = {"draw_image", "edit_image", "web_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
+ACTION_TOOLS = {"draw_image", "edit_image", "make_sound", "web_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
 CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
 CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
 FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
@@ -921,7 +929,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
@@ -1388,6 +1396,38 @@ async def ctx_edit(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.send_modal(EditModal(message))
 
 
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+async def _sfx_to_english(text: str) -> str:
+    """音效模型只懂英文：描述有中文就先請語言模型翻成一句英文的音效描述。翻失敗就原樣回傳（讓呼叫的人處理）。"""
+    if not _CJK_RE.search(text):
+        return text
+    try:
+        reply = await call_model([
+            {"role": "system", "content": "You translate sound-effect requests into a short, concrete English description for a text-to-sound-effect model "
+                                          "(describe the sound itself and the environment, e.g. 'footsteps on gravel, slow, night, crickets'). Output only the English description, no quotes, no explanation."},
+            {"role": "user", "content": text}], use_tools=False, max_tokens=80)
+        out = clean_text(reply.get("content")).strip().strip('"“”')
+        return out if out and not _CJK_RE.search(out) else text
+    except Exception as e:
+        log.warning("音效描述翻譯失敗：%r", e)
+        return text
+
+
+@client.tree.command(name="音效", description="做一段音效（約 10 秒～數分鐘，做好會貼在頻道）：環境音、物品聲、短樂句；不是語音也不是歌")
+@app_commands.describe(內容="想要什麼聲音（中英文都可以），例如：雨夜裡的腳步聲", 秒數="長度 1～47 秒，預設 5", 避免="選填：不要出現的東西（英文），例如 music, speech")
+async def cmd_sfx(interaction: discord.Interaction, 內容: str, 秒數: app_commands.Range[int, 1, 47] = 5, 避免: str = ""):
+    if not sfxgen.enabled():
+        await interaction.response.send_message("音效功能目前沒開。", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True)
+    prompt = await _sfx_to_english(內容)
+    res = await sfxgen.submit(client.http_session, {"prompt": prompt, "seconds": 秒數, "avoid": 避免}, interaction.user.id,
+                              imagegen.say_for_interaction(interaction), 內容)
+    await interaction.followup.send(res + (f"\n（英文描述：{prompt}）" if prompt != 內容 and "排進" in res else ""))
+
+
 @client.tree.command(name="help", description="看機器人會做什麼、有哪些指令")
 async def cmd_help(interaction: discord.Interaction):
     e = discord.Embed(title=f"🤖 {client.user.display_name} 使用說明", color=0x5865F2)
@@ -1401,7 +1441,7 @@ async def cmd_help(interaction: discord.Interaction):
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
               "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
               "・排八字命盤、畫星盤（說「@我 幫我排八字和星盤，1990-05-15 14:30 台北出生，男」）\n"
-              "・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`，或在圖片上按右鍵／長按 → Apps →「改這張圖」）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
+              "・做音效（說「@我 做一段雨夜裡的腳步聲音效」，或用 `/音效`；環境音、物品聲、短樂句，不是語音也不是歌，會和畫圖一起排隊）\n・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`，或在圖片上按右鍵／長按 → Apps →「改這張圖」）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
               "・放歌時會有一個自動更新的播放面板（進度條、接下來的歌、播完了沒），語音頻道狀態也會顯示歌名",
