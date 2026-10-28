@@ -422,7 +422,7 @@ function mountStairs(root, { env, back }) {
     if (playing) scroll += st.snap.speed * dt * 60;
     shaft();
     if (st && st.snap && st.state !== "lobby") {
-      const k = 1 - Math.pow(.0005, dt);
+      const k = 1 - Math.exp(-dt * 45);            // 追上伺服器位置的速度要快（以前太慢，左右移動像有加速度）
       const seen = new Set();
       for (const [id, x, y, w, type, t, fl, bo] of st.snap.pl) {
         seen.add("p" + id);
@@ -432,7 +432,14 @@ function mountStairs(root, { env, back }) {
       for (const key of [...disp.keys()]) if (key[0] === "p" && !seen.has(key)) disp.delete(key);
       for (const p of st.snap.ps) {
         let d = disp.get("k" + p.s);
-        if (!d) d = { x: p.x, y: p.y }; else { d.x += (p.x - d.x) * k; d.y += (p.y - d.y) * k; if (Math.abs(p.x - d.x) > 160) d.x = p.x; }
+        if (!d) d = { x: p.x, y: p.y };
+        else if (p.s === st.you && p.a && playing) {
+          // 自己的小人：按鍵當下就在本機往左右走（不等伺服器回傳），伺服器的位置只用來修正（被擋住、被推開時）
+          const dir = (R ? 1 : 0) - (L ? 1 : 0);
+          d.y += (p.y - d.y) * k;
+          if (dir) { d.x = Math.max(WALL, Math.min(DW - WALL - KW, d.x + dir * 4.6 * 60 * dt)); if (Math.abs(p.x - d.x) > 45) d.x += (p.x - d.x) * (1 - Math.exp(-dt * 14)); }
+          else d.x += (p.x - d.x) * (1 - Math.exp(-dt * 20));
+        } else { d.x += (p.x - d.x) * k; d.y += (p.y - d.y) * k; if (Math.abs(p.x - d.x) > 160) d.x = p.x; }
         disp.set("k" + p.s, d);
         if (p.a) kid(p.s, d.x, d.y, p.f, p.g, p.w, p.h, p.s === st.you, now);
       }

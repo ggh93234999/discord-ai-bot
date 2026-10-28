@@ -91,7 +91,7 @@ export function tickMulti() {
         r.record = Math.max(r.record, r.sim.floor || 0);
         r.result = { winner: r.sim.winner, rank: ST.ranking(r.sim) };
         broadcast(r);
-      } else if (r.n % 2 === 0) broadcast(r);
+      } else broadcast(r);
     }
     if (r.clients.size === 0 && r.emptySince && Date.now() - r.emptySince > 10 * 60 * 1000) rooms.delete(key);
   }
