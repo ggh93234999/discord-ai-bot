@@ -81,6 +81,31 @@ export const sfx = {
   cheer: run((c) => { const s = noise(c, 1.4), fl = c.createBiquadFilter(), g = c.createGain(), t = c.currentTime; fl.type = "bandpass"; fl.frequency.setValueAtTime(900, t); fl.frequency.linearRampToValueAtTime(1500, t + 0.6); fl.Q.value = 0.7; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.18, t + 0.35); g.gain.linearRampToValueAtTime(0.0001, t + 1.4); s.connect(fl); fl.connect(g); g.connect(c.destination); s.start(t); s.stop(t + 1.4); }),
 };
 
+// ---- 真實音效檔（用音效生成模型做的，在 sfx-audio/）：載入成功就用檔案，否則退回上面的合成音
+const URLS = {};
+for (const [p, u] of Object.entries(import.meta.glob("./sfx-audio/*.mp3", { eager: true, query: "?url", import: "default" }))) URLS[p.split("/").pop().slice(0, -4)] = u;
+const SAMPLE = { deal: ["deal", 0.9], flip: ["flip", 0.8], chip: ["chip", 0.7], dice: ["dice", 0.8], coin: ["coin", 0.8], win: ["win", 0.8], bigwin: ["bigwin", 0.9], lose: ["lose", 0.7], gateOpen: ["gate", 0.8], bell: ["bell", 0.7], cheer: ["cheer", 0.6], hoof: ["gallop", 0.5] };
+const bufs = {}; let loading = false;
+function loadSamples() {
+  if (loading) return; const c = ctx(); if (!c) return; loading = true;
+  for (const k of Object.keys(URLS)) {
+    fetch(URLS[k]).then((r) => r.arrayBuffer()).then((ab) => c.decodeAudioData(ab)).then((b) => { bufs[k] = b; }).catch(() => {});
+  }
+}
+let galUntil = 0;
+for (const [name, [file, g]] of Object.entries(SAMPLE)) {
+  const synth = sfx[name];
+  sfx[name] = () => {
+    if (muted || vol <= 0) return;
+    const c = ctx(), b = bufs[file];
+    if (!c) return;
+    if (!b) { loadSamples(); return synth(); }
+    if (name === "hoof") { const now = performance.now(); if (now < galUntil) return; galUntil = now + b.duration * 1000 - 150; }   // 馬蹄整段只播一次，不重疊
+    try { const src = c.createBufferSource(), gn = c.createGain(); src.buffer = b; gn.gain.value = g; src.connect(gn); gn.connect(c.destination); src.start(); } catch { synth(); }
+  };
+}
+document.addEventListener("pointerdown", loadSamples, { once: true, capture: true });
+
 // 點按鈕時的回饋音（賭場畫面裡）：依按鈕文字決定發牌／骰子／硬幣／籌碼
 document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest(".casino button, .casino .chip");
