@@ -1240,3 +1240,11 @@ body.tv-fs{overflow:hidden}
 .mj .mctl{min-height:72px;justify-content:flex-start}
 .mj .mseat.r1,.mj .mseat.r3{min-height:290px}
 .mj .mseat.r2,.mj .mseat.r0{min-height:138px}
+/* 老虎機符號圖、阿瓦隆角色肖像 */
+.slots .sym img{width:78%;height:78%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));pointer-events:none;user-select:none}
+.av .avpor{display:block;width:150px;height:150px;object-fit:cover;object-position:center 20%;border-radius:14px;margin:0 auto 8px;border:2px solid rgba(255,213,79,.8);box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.av .avrole.evil .avpor{border-color:#e53935}
+.av .avrow{align-items:center}.av .avrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.av .avmini{width:34px;height:34px;object-fit:cover;object-position:center 20%;border-radius:8px;flex:none}
+.av .avab{display:flex;gap:8px;align-items:center}
+.av .avab .avmini{width:44px;height:44px}

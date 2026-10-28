@@ -7,6 +7,7 @@ import { attachRules } from "./rules.js";
 import { createWatch } from "./watch.js";
 import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
+import { symUrl } from "./slotart.js";
 
 const KINDS = [
   { id: 1, name: "3 格", rows: 1, cols: 3, syms: ["🍒", "🍋", "💎"], hint: "三個一樣拿 2～3.2 倍，兩個一樣退錢" },
@@ -184,7 +185,7 @@ export function mountSlots(root, { env, back }) {
     $(".hint").textContent = kind.hint;
   }
   const rnd = (syms) => syms[Math.floor(Math.random() * syms.length)];
-  function sym(s) { const d = document.createElement("div"); d.className = "sym"; d.textContent = s; return d; }
+  function sym(s) { const d = document.createElement("div"); d.className = "sym"; const u = symUrl(s); if (u) { const im = document.createElement("img"); im.src = u; im.alt = s; im.draggable = false; d.appendChild(im); } else d.textContent = s; return d; }
 
   function build() {
     const w = Math.min(root.clientWidth - 40, 420);

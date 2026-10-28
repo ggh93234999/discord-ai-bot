@@ -1,6 +1,7 @@
 // 阿瓦隆（5～10 人，沒有計時）：身分、投票、任務、刺殺都在伺服器（server/avalon.js），這裡只畫畫面和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
+import { roleArt } from "./avart.js";
 
 const GOOD_N = { 5: 3, 6: 4, 7: 4, 8: 5, 9: 6, 10: 6 };
 // 依人數和勾選的角色算出每種角色的數量（和伺服器 assignRoles 同一套規則）
@@ -83,7 +84,7 @@ export function mountAvalon(opts = {}) {
       const total = Math.max(c.n, st.players.length), cp = composition(total, c);
       const comp = `<div class="avcomp"><b>${total} 人局</b>：<span class="g">好人 ${cp.goodN} 人（${cp.good}）</span><span class="e">壞人 ${cp.evilN} 人（${cp.evil}）</span></div>`;
       const names = (str) => str.split("、").map((x) => x.replace(/ ×\d+$/, ""));
-      const row = (r, cls) => `<div class="avab ${cls}"><b>${r}</b>${ABIL[r] || ""}</div>`;
+      const row = (r, cls) => `<div class="avab ${cls}">${roleArt(r) ? `<img class="avmini" src="${roleArt(r)}" alt="">` : ""}<div><b>${r}</b> ${ABIL[r] || ""}</div></div>`;
       const ab = `<div class="avabil">${names(cp.good).map((r) => row(r, "g")).join("")}${names(cp.evil).map((r) => row(r, "e")).join("")}${[["mordred", "莫德雷德"], ["oberon", "奧伯倫"]].filter(([k, r]) => c[k] && !cp.evil.includes(r)).map(([, r]) => `<div class="avab off"><b>${r}</b>此人數壞人名額不足，這局不會出現。</div>`).join("")}</div>`;
       body.innerHTML = `<div class="avlobby"><div class="avplist">${list}</div>${comp}${ab}${!me && !spectate ? `<button class="mb sit">入座</button>` : ""}${cfg}<small>沒有計時：每個公開的畫面（投票結果、任務結果）都要有人按「下一步」才會繼續。身分只有自己看得到。</small>${me && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : `等開局（${st.players.length} 人入座）`;
@@ -123,7 +124,7 @@ export function mountAvalon(opts = {}) {
       if (!st.me || spectate) return "";
       const m = st.me;
       const known = m.names.length ? `<div>${esc(m.text)} <b>${m.names.map(esc).join("、")}</b></div>` : `<div>${esc(m.text)}</div>`;
-      return `<div class="avrole${m.evil ? " evil" : ""}"><button class="mb ghost avshow">${showRole ? "🙈 藏起來" : "👁 看我的身分"}</button>${showRole ? `<div class="avrc"><h3>${esc(m.roleName)}（${m.evil ? "壞人" : "好人"}）</h3>${known}</div>` : ""}</div>`;
+      return `<div class="avrole${m.evil ? " evil" : ""}"><button class="mb ghost avshow">${showRole ? "🙈 藏起來" : "👁 看我的身分"}</button>${showRole ? `<div class="avrc">${roleArt(m.roleName) ? `<img class="avpor" src="${roleArt(m.roleName)}" alt="">` : ""}<h3>${esc(m.roleName)}（${m.evil ? "壞人" : "好人"}）</h3>${known}</div>` : ""}</div>`;
     }
     function panel() {
       const me = st.you, lead = st.leader === me, ph = st.phase, k = st.sizes[st.round];
@@ -153,7 +154,7 @@ export function mountAvalon(opts = {}) {
     }
     function endHTML() {
       const e = st.end;
-      const rows = e.roles.map((r) => `<div class="avrow ${r.evil ? "evil" : "good"}${r.i === e.target ? " hit" : ""}"><b>${esc(r.name)}</b><span>${esc(r.role)}${r.i === e.target ? "（被刺殺）" : ""}</span></div>`).join("");
+      const rows = e.roles.map((r) => `<div class="avrow ${r.evil ? "evil" : "good"}${r.i === e.target ? " hit" : ""}">${roleArt(r.role) ? `<img class="avmini" src="${roleArt(r.role)}" alt="">` : ""}<b>${esc(r.name)}</b><span>${esc(r.role)}${r.i === e.target ? "（被刺殺）" : ""}</span></div>`).join("");
       return `<div class="mresult avend ${e.winner === "good" ? "ok" : "bad"}"><h3>${e.winner === "good" ? "好人獲勝！" : "壞人獲勝！"}</h3><div>${esc(e.why)}</div><div class="avroles">${rows}</div>${tokHTML(e.tok, true)}${seated() ? `<div class="btbtns"><button class="mb avagain">再來一場</button><button class="mb ghost avlobby">回大廳</button></div>` : ""}</div>`;
     }
     const tokHTML = (k, full) => !k ? "" : `<small class="avtok">🤖 AI 用量：${k.calls} 次思考　輸入 ${k.in.toLocaleString()}　輸出 ${k.out.toLocaleString()}　共 ${(k.in + k.out).toLocaleString()} tokens${k.fail ? `　（失敗 ${k.fail} 次改用規則）` : ""}${full && k.by && k.by.length ? "<br>" + k.by.map((b) => `${esc(b.name)} ${b.calls} 次 ${(b.in + b.out).toLocaleString()}`).join("　") : ""}</small>`;
