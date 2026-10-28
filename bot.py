@@ -129,7 +129,7 @@ TOOL_GUIDE = (
     "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
     "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
     "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫，其他都能畫。畫圖時任何膚色、種族、國籍、外貌、性別、文化的人物都可以畫，不要自己加限制、不要拒絕、不要說教；使用者要畫就直接呼叫 draw_image。"
-    "使用者要你做音效（「做一個…的音效」「生一段…的聲音」）就呼叫 make_sound：prompt 一定要用英文（先翻譯）、seconds 是長度；做好程式會自動貼出音檔，你只回一句簡短的話。這個只能做音效、環境音、短樂句，不能做人聲說話或唱歌。"
+    "使用者要你做音效（「做一個…的音效」「生一段…的聲音」）就呼叫 make_sound：prompt 一定要用英文（先翻譯）、seconds 是長度（只能在年齡限制 NSFW 頻道使用，其他頻道程式會擋下並回覆說明，你照轉述即可）；做好程式會自動貼出音檔，你只回一句簡短的話。這個只能做音效、環境音、短樂句，不能做人聲說話或唱歌。"
     "使用者傳了圖片（或回覆一則有圖的訊息，包含你畫的圖）並要你修改它（「改成白天」「把…換成…」「幫我修圖」），呼叫 edit_image，prompt 照使用者的語言寫就好（中文可以直接傳）；只是要你看圖、描述圖就不要呼叫。"
     "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
 )
@@ -632,6 +632,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
         if name == "make_sound":
             if msg is None:
                 return "這裡不能做音效。"
+            if not imagegen.channel_ok(msg.channel):
+                return NSFW_SFX_REPLY
             return await sfxgen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
         if name == "edit_image":
             if msg is None:
@@ -1396,6 +1398,7 @@ async def ctx_edit(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.send_modal(EditModal(message))
 
 
+NSFW_SFX_REPLY = "🔞 做音效和畫圖一樣，只能在「年齡限制（NSFW）」頻道使用，請到 NSFW 頻道再試。"
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
 
@@ -1418,6 +1421,9 @@ async def _sfx_to_english(text: str) -> str:
 @client.tree.command(name="音效", description="做一段音效（約 10 秒～數分鐘，做好會貼在頻道）：環境音、物品聲、短樂句；不是語音也不是歌")
 @app_commands.describe(內容="想要什麼聲音（中英文都可以），例如：雨夜裡的腳步聲", 秒數="長度 1～47 秒，預設 5", 避免="選填：不要出現的東西（英文），例如 music, speech")
 async def cmd_sfx(interaction: discord.Interaction, 內容: str, 秒數: app_commands.Range[int, 1, 47] = 5, 避免: str = ""):
+    if not imagegen.channel_ok(interaction.channel):
+        await interaction.response.send_message(NSFW_SFX_REPLY, ephemeral=True)
+        return
     if not sfxgen.enabled():
         await interaction.response.send_message("音效功能目前沒開。", ephemeral=True)
         return
@@ -1441,7 +1447,7 @@ async def cmd_help(interaction: discord.Interaction):
         value="・聊天，會看最近的對話接話\n・看圖片（傳圖給我或貼圖後 @我）\n"
               "・占卜：塔羅牌、擲筊、抽籤詩、易經卜卦（直接說「@我 幫我抽塔羅問工作」）\n"
               "・排八字命盤、畫星盤（說「@我 幫我排八字和星盤，1990-05-15 14:30 台北出生，男」）\n"
-              "・做音效（說「@我 做一段雨夜裡的腳步聲音效」，或用 `/音效`；環境音、物品聲、短樂句，不是語音也不是歌，會和畫圖一起排隊）\n・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`，或在圖片上按右鍵／長按 → Apps →「改這張圖」）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
+              "・做音效（說「@我 做一段雨夜裡的腳步聲音效」，或用 `/音效`；只能在 NSFW 頻道，和畫圖一樣；環境音、物品聲、短樂句，不是語音也不是歌，會和畫圖一起排隊）\n・畫圖（說「@我 畫一隻戴帽子的柴犬」，或用 `/畫圖`；要高畫質請明說，會比較久）\n・改圖（傳圖片並說「@我 把背景改成白天」，或回覆一張圖說要怎麼改，也可用 `/改圖`，或在圖片上按右鍵／長按 → Apps →「改這張圖」）\n・查天氣、上網搜尋、讀你貼的網頁\n・總結頻道的討論\n"
               "・在語音頻道放 YouTube 音樂（用指令，或直接說「@我 放周杰倫的晴天」）\n"
               "・開頻道、改名／搬分類、封存／刪除頻道、臨時語音房、語音頻道狀態（要有「管理頻道」權限的人才能叫我做）\n"
               "・放歌時會有一個自動更新的播放面板（進度條、接下來的歌、播完了沒），語音頻道狀態也會顯示歌名",
