@@ -16,7 +16,7 @@ const EV_LAND = 1, EV_HEAL = 2, EV_HURT = 4, EV_SPRING = 8, EV_FLIP = 16, EV_DIE
 // ・越往下捲得越快（每 5 階加速一次）。掉出畫面下緣或生命歸零就出局。
 // 尺寸照原版畫面比例（場地接近正方形；平台約場寬 1/4；小人約半層樓高）
 export const DW = 636, DH = 540, WALL = 26, ROW = 73, DPW = 146, CEIL = 26;
-const DKW = 28, DKH = 38;
+const DKW = 38, DKH = 38;          // 玩家是 38×38 的正方形實體（小人圖 28 寬置中）
 const EARLY = [["normal", 72], ["left", 9], ["right", 9], ["tramp", 10]];
 // 難度（原版也有 やさしい／ふつう／むずかしい：改變床的出現方式與捲動速度）
 const DIFF = {

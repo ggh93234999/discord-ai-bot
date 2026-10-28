@@ -4,7 +4,7 @@
 import { wsUrl } from "./gomoku.js";
 
 // 伺服器的尺寸（要跟 server/stairs.js 一致）
-const DW = 636, DH = 540, WALL = 26, KW = 28, KH = 38, MAXHP = 12;
+const DW = 636, DH = 540, WALL = 26, KW = 38, KH = 38, MAXHP = 12;
 const COLORS = ["#ffd21f", "#38c75a", "#ff4d4d", "#3d8bff"];     // 照原版：1P 黃衣服、2P 綠衣服
 const NAMES = ["黃", "綠", "紅", "藍"];
 const DIFFS = [["easy", "簡單"], ["normal", "普通"], ["hard", "困難"]];
@@ -332,7 +332,7 @@ function mountStairs(root, { env, back }) {
     if (hurt && Math.floor(now / 70) % 2) return;
     const spr = !grounded ? SPR.fall : (walking && Math.floor(now / 110) % 2 ? SPR.walk : SPR.stand);
     const pal = { w: "#ffffff", c: "#c9c9d2", h: "#6b3a1a", k: "#ffd2a0", e: "#1b1b1b", b: COLORS[seat], p: "#f2f2f2", s: "#7a4a22" };
-    const X = Math.round(x), Y = Math.round(y);
+    const X = Math.round(x) + 5, Y = Math.round(y);
     // 黑色外框（像素圖常見的描邊，讓小人在深藍背景上看得清楚）
     ctx.fillStyle = "rgba(0,0,0,.75)";
     for (let r = 0; r < 19; r++) for (let c = 0; c < 14; c++) {
