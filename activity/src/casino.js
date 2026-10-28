@@ -10,6 +10,7 @@ import { horseCards } from "./horsecards.js";
 import { createForge } from "./forgeui.js";
 import { prodUrl, dealerUrl } from "./stoneart.js";
 import { bjHtml, newBjState } from "./bjui.js";
+import { sfx } from "./sfx.js";
 import { horseSheet, FW as HFW, FH as HFH, FRAMES as HFR } from "./horseart.js";
 
 const BETS = [10, 50, 100, 500];
@@ -18,6 +19,9 @@ const ERR = {
   no_guild: "找不到伺服器，請聯絡管理員", bad_amount: "賭注不合法", closed: "這一場已經截止下注了", already: "這一場你已經下過注了",
   sold: "這顆石頭剛被別人買走了，挑別的吧", limit: "這顆已經探太多次了", error: "發生錯誤，再試一次", 
 };
+const STAND = new URL("./horse-art/stand.jpg", import.meta.url).href;
+let standImg = null;
+const getStand = () => { if (!standImg) { standImg = new Image(); standImg.src = STAND; } return standImg.complete && standImg.naturalWidth ? standImg : null; };
 const TITLES = { coin: "擲硬幣", dice: "骰子", bj: "21 點", horse: "賽馬", stone: "賭石", slots: "老虎機", forge: "鍛造" };
 const HINTS = {
   coin: "猜正反面，猜中拿回 2 倍（賺 1 倍），猜錯輸光",
@@ -181,6 +185,7 @@ export function mountCasino(game, opts = {}) {
     const btn = (label, cls, fn) => { const b = document.createElement("button"); b.className = "spin " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); return b; };
     function resultLine(m) {
       const net = m.back - m.bet;
+      gameEl.dataset.lastbet = m.bet;
       return m.back > m.bet ? `🎉 +${money(net)}（拿回 ${money(m.back)}）` : m.back === m.bet ? `🤝 退回 ${money(m.bet)}` : `😢 -${money(m.bet)}`;
     }
 
@@ -474,7 +479,7 @@ export function mountCasino(game, opts = {}) {
     let rph = [];
     function sizeRace() {
       if (!rcv) return;
-      rW = rcv.parentElement.clientWidth || 340; rH = 332;
+      rW = rcv.parentElement.clientWidth || 340; rH = 372;
       const d = window.devicePixelRatio || 1;
       rcv.style.width = rW + "px"; rcv.style.height = rH + "px"; rcv.width = Math.round(rW * d); rcv.height = Math.round(rH * d);
       rctx = rcv.getContext("2d"); rctx.setTransform(d, 0, 0, d, 0, 0);
@@ -569,17 +574,31 @@ export function mountCasino(game, opts = {}) {
       c.restore();
       return feet;
     }
+    let rsfx = { id: "" };
     function drawRace(t, dt) {
       const c = rctx; if (!c || !rseed.length) return;
-      const n = hs.names.length, top = 36, laneH = (rH - top - 8) / n, x0 = 96, x1 = rW - 74, len = x1 - x0, sq = laneH / 4;
-      const tmax = Math.max(...hs.times), mine = myBet(), running = t >= 0 && t < tmax + 1600;
-      c.clearRect(0, 0, rW, rH);
-      c.fillStyle = "#17241a"; c.fillRect(0, 0, rW, top);
-      for (let k = 0; k < rW / 11; k++) {          // 看台上的觀眾
-        c.fillStyle = SILK[k % 6]; c.globalAlpha = 0.8;
-        c.beginPath(); c.arc(6 + k * 11, top - 9 - (running ? Math.abs(Math.sin(t / 160 + k)) * 3 : 0), 3.5, 0, 7); c.fill();
+      const n = hs.names.length, top = 100, laneH = (rH - top - 8) / n, x0 = 96, x1 = rW - 74, len = x1 - x0, sq = laneH / 4;
+      const tmax = Math.max(...hs.times), twin = Math.min(...hs.times), mine = myBet(), running = t >= 0 && t < tmax + 1600;
+      if (rsfx.id !== hs.id) rsfx = { id: hs.id, gate: 0, open: 0, bell: 0, hoof: 0 };
+      if (dt > 0) {
+        if (t < 1200) { if (!rsfx.gate) { rsfx.gate = 1; sfx.gateClose(); } if (t >= 0 && !rsfx.open) { rsfx.open = 1; sfx.gateOpen(); } }
+        if (t > 0 && t < tmax && t - rsfx.hoof > 230) { rsfx.hoof = t; sfx.hoof(); }
+        if (t >= twin && !rsfx.bell && t - twin < 3000) { rsfx.bell = 1; sfx.bell(); setTimeout(sfx.cheer, 150); }
       }
-      c.globalAlpha = 1;
+      c.clearRect(0, 0, rW, rH);
+      const st = getStand();
+      if (st) { const sc = rW / st.naturalWidth, sh = Math.min(st.naturalHeight, top / sc); c.drawImage(st, 0, st.naturalHeight - sh, st.naturalWidth, sh, 0, top - sh * sc, rW, sh * sc); }
+      else { c.fillStyle = "#17241a"; c.fillRect(0, 0, rW, top); }
+      if (running && t < twin + 2500) {                                         // 看台上相機閃光
+        for (let k = 0; k < 7; k++) {
+          const sd = Math.floor(t / 110) * 7 + k, rx = (Math.sin(sd * 12.9898) * 43758.5453) % 1, ry = (Math.sin(sd * 78.233) * 43758.5453) % 1;
+          if (sd % 3) continue;
+          const fx = (rx + 1) % 1 * rW, fy = top * 0.3 + (ry + 1) % 1 * top * 0.55;
+          c.fillStyle = "rgba(255,255,255,.85)"; c.fillRect(fx - 1, fy - 3, 2, 6); c.fillRect(fx - 3, fy - 1, 6, 2);
+        }
+      }
+      c.fillStyle = "#f1f1f1"; c.fillRect(0, top - 4, rW, 4);                    // 欄杆
+      c.fillStyle = "#b3b7be"; for (let px = 10; px < rW; px += 44) c.fillRect(px, top - 4, 3, 7);
       for (let i = 0; i < n; i++) {
         const y = top + i * laneH;
         c.fillStyle = i % 2 ? "#2f6b33" : "#37793b"; c.fillRect(0, y, rW, laneH);
@@ -593,6 +612,7 @@ export function mountCasino(game, opts = {}) {
       c.setLineDash([]);
       c.strokeStyle = "#fff"; c.lineWidth = 2; c.beginPath(); c.moveTo(x0 - 2, top); c.lineTo(x0 - 2, top + n * laneH); c.stroke();   // 起跑線
       for (let r = 0; r < n * 4; r++) for (let k = 0; k < 2; k++) { c.fillStyle = (r + k) % 2 ? "#111" : "#fff"; c.fillRect(x1 + k * sq, top + r * sq, sq, sq); }   // 終點方格旗
+      if (t < twin) { c.strokeStyle = "rgba(255,255,255,.95)"; c.lineWidth = 3; c.beginPath(); c.moveTo(x1 + sq, top); c.lineTo(x1 + sq, top + n * laneH); c.stroke(); }   // 終點的彩帶，冠軍衝線時扯斷
       const ps = hs.names.map((_, i) => prog(i, t));
       let lead = 0; ps.forEach((p, i) => { if (p > ps[lead]) lead = i; });
       if (hs.order && t >= Math.min(...hs.times)) lead = hs.order[0];        // 已經有馬衝線，領先的就是冠軍
@@ -620,9 +640,21 @@ export function mountCasino(game, opts = {}) {
         c.font = "10px sans-serif"; c.fillStyle = "rgba(255,255,255,.55)"; c.fillText(info.style || "", 24, yc + 8);
         if (i === lead && t > 0 && t < tmax && p > 0.04) { c.font = "15px " + EMO; c.textAlign = "center"; c.fillText("👑", x + S * 0.1, yc - S * 0.62); }
       }
-      if (t < 0) { c.fillStyle = "rgba(0,0,0,.45)"; c.fillRect(0, top, rW, n * laneH); c.fillStyle = "#fff"; c.font = "bold 28px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("預備…", rW / 2, top + n * laneH / 2); }
-      else if (t < tmax) {                                                         // 轉播字幕
+      if (t < 1100) {                                                              // 起跑閘門：開跑瞬間前門往上彈開，接著淡出
+        const gx = x0 + laneH * 0.62, open = Math.max(0, Math.min(1, t / 420));
+        c.save(); c.globalAlpha = t > 700 ? Math.max(0, 1 - (t - 700) / 400) : 1;
+        for (let i = 0; i < n; i++) {
+          const y0 = top + i * laneH + 3, hgt = (laneH - 6) * (1 - open);
+          c.fillStyle = "#4a4f58"; c.fillRect(gx - laneH * 1.5, y0 - 2, laneH * 1.5 + 8, 3);
+          c.fillStyle = "#9aa1ad"; for (let b = 0; b < 3; b++) c.fillRect(gx + b * 4, y0, 2, hgt);
+          c.fillStyle = "#c9ced8"; c.fillRect(gx - 1, y0 + hgt * 0.3, 11, 2); c.fillRect(gx - 1, y0 + hgt * 0.7, 11, 2);
+        }
+        c.restore();
+      }
+      if (t < 0) { c.fillStyle = "#fff"; c.font = "bold 16px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.shadowColor = "#000"; c.shadowBlur = 5; c.fillText("預備…", rW / 2, top + 16); c.shadowBlur = 0; }
+      if (t >= 0 && t < tmax) {                                                    // 轉播字幕
         const left = Math.round((1 - ps[lead]) * 100);
+        c.fillStyle = "rgba(0,0,0,.55)"; c.fillRect(0, 0, rW, 24);
         c.fillStyle = "#fff"; c.font = "bold 13px sans-serif"; c.textAlign = "left"; c.textBaseline = "middle";
         c.fillText(`🎙 領先：${lead + 1}號 ${hs.names[lead]}　${left > 85 ? "起跑！" : left > 15 ? `距終點 ${left}%` : "衝刺！"}`, 8, 12);
       }
@@ -630,6 +662,7 @@ export function mountCasino(game, opts = {}) {
       if (t >= tw && rconf !== hs.id && t - tw < 2500) {
         rconf = hs.id; const wi = hs.order ? hs.order[0] : lead, yc = top + wi * laneH + laneH / 2;
         for (let k = 0; k < 70; k++) rparts.push({ x: x1, y: yc, vx: -120 + Math.random() * 240, vy: -140 - Math.random() * 160, life: 1.6, max: 1.6, r: 3, col: SILK[k % 6] });
+        for (let k = 0; k < 14; k++) rparts.push({ x: x1 + sq, y: top + Math.random() * n * laneH, vx: -60 + Math.random() * 120, vy: -40 - Math.random() * 80, life: 1.2, max: 1.2, r: 3, col: "#fff" });
       }
       for (const q of rparts) {
         q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; if (!q.dust) q.vy += 380 * dt;
@@ -637,6 +670,19 @@ export function mountCasino(game, opts = {}) {
         c.beginPath(); if (q.dust) c.arc(q.x, q.y, q.r, 0, 7); else c.rect(q.x, q.y, 5, 3); c.fill();
       }
       c.globalAlpha = 1; rparts = rparts.filter((q) => q.life > 0);
+      const srt = [...hs.times].sort((p, q) => p - q), gap = srt[1] - srt[0];
+      if (srt.length > 1 && gap < 260 && t >= twin && t < twin + 1300) {            // 差距很小：攝影判定
+        c.fillStyle = `rgba(255,255,255,${Math.max(0, 0.55 - (t - twin) / 300)})`; c.fillRect(0, top, rW, n * laneH);
+        c.fillStyle = "#fff"; c.font = "bold 15px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.shadowColor = "#000"; c.shadowBlur = 5; c.fillText("📸 攝影判定！", rW / 2, top + 16); c.shadowBlur = 0;
+      }
+      if (t >= twin + 250 && t < twin + 2700) {                                    // 冠軍橫幅
+        const k = Math.min(1, (t - twin - 250) / 350), e = 1 - Math.pow(1 - k, 3), wi = hs.order ? hs.order[0] : lead;
+        const w = Math.min(rW - 20, 310), bx = (rW - w) / 2 - (1 - e) * rW, by = top + n * laneH / 2 - 26;
+        const g = c.createLinearGradient(bx, 0, bx + w, 0); g.addColorStop(0, "rgba(255,200,60,0)"); g.addColorStop(0.15, "rgba(255,200,60,.94)"); g.addColorStop(0.85, "rgba(255,150,30,.94)"); g.addColorStop(1, "rgba(255,150,30,0)");
+        c.fillStyle = g; c.fillRect(bx, by, w, 52);
+        c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#3a2200"; c.font = "bold 20px sans-serif"; c.fillText(`🏆 ${wi + 1} 號 ${hs.names[wi]}`, bx + w / 2, by + 20);
+        c.font = "12px sans-serif"; c.fillText("第一個衝過終點線！", bx + w / 2, by + 41);
+      }
       if (hs.phase === "result" || t >= tmax) {                                    // 結束後在賽道上顯示冠軍
         c.fillStyle = "rgba(0,0,0,.5)"; c.fillRect(0, 0, rW, 24); c.fillStyle = "#ffd54a"; c.font = "bold 14px sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
         c.fillText(`🏆 ${hs.names[hs.win]} 奪冠`, rW / 2, 12);

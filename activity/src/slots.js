@@ -8,6 +8,7 @@ import { createWatch } from "./watch.js";
 import { createBetLog } from "./betlog.js";
 import { addBetInput } from "./betinput.js";
 import { symUrl } from "./slotart.js";
+import { celebrate } from "./fx.js";
 
 const KINDS = [
   { id: 1, name: "3 格", rows: 1, cols: 3, syms: ["🍒", "🍋", "💎"], hint: "三個一樣拿 2～3.2 倍，兩個一樣退錢" },
@@ -246,6 +247,7 @@ export function mountSlots(root, { env, back }) {
     if (m.real) realBal = m.balance; else practiceBal = m.balance;
     showBalance();
     const net = m.back - m.bet;
+    try { const b = reelsEl.getBoundingClientRect(); celebrate({ net, bet: m.bet, at: { x: b.left + b.width / 2, y: b.top + b.height / 2 }, host: reelsEl, quiet: true }); } catch {}
     const sign = net > 0 ? `+${net.toLocaleString()}` : net < 0 ? `${net.toLocaleString()}` : "打平";
     if (m.wins.length || m.mult > 0) {
       markWins(m.wins);

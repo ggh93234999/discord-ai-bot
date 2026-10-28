@@ -1,4 +1,6 @@
 import { DiscordSDK } from "@discord/embedded-app-sdk";
+import "./sfx.js";
+import "./fx.js";
 import "./style.css";
 import { mountGomoku, wsUrl } from "./gomoku.js";
 import { mountConnect4 } from "./connect4.js";

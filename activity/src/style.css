@@ -213,7 +213,7 @@ canvas { max-width:100%; border-radius:6px; touch-action:manipulation; cursor:po
 .slots .status{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;align-content:center}
 .casino .cstage{justify-content:flex-start}
 .casino .hhead{height:28px;line-height:28px}
-.casino .hmain{width:100%;min-height:332px}
+.casino .hmain{width:100%;min-height:372px}
 .casino .hbets{min-height:84px}
 .casino .hb{align-items:center}
 .casino .hb .hn{flex:0 0 38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -297,7 +297,7 @@ html,body{overflow-y:auto}
 .volrow input{width:90px;vertical-align:middle}
 .pinball .pvol{font-size:12px;color:#cfd8dc}.pinball .pvol input{width:80px;vertical-align:middle}.pinball .pad button.plunge{background:#b26a00;width:96px}
 .casino .hrow .hd{grid-column:1/-1;font-size:11px;line-height:1.5;opacity:.85;font-weight:400}.casino .hrow .hd b{color:#ffd54a}
-.casino .rcv{display:block;width:100%;height:332px;border-radius:8px;background:#2f6b33}
+.casino .rcv{display:block;width:100%;height:372px;border-radius:8px;background:#2f6b33}
 
 /* 賭注模式（真代幣）：整個背景換成暗紅，一眼看出現在用的是真的錢 */
 .game.slots.realmode{background:linear-gradient(180deg,#3a0e16 0%,#1d0a0f 100%)}
@@ -1248,3 +1248,31 @@ body.tv-fs{overflow:hidden}
 .av .avmini{width:34px;height:34px;object-fit:cover;object-position:center 20%;border-radius:8px;flex:none}
 .av .avab{display:flex;gap:8px;align-items:center}
 .av .avab .avmini{width:44px;height:44px}
+
+/* ===== 全域音量鈕、贏輸演出 ===== */
+#gvol{position:fixed;right:8px;bottom:8px;z-index:9000;display:flex;flex-direction:row-reverse;align-items:center;gap:6px}
+.gv-btn{width:34px;height:34px;border-radius:50%;border:1px solid #ffffff2a;background:#14161cd9;color:#fff;font-size:16px;line-height:1;padding:0;cursor:pointer;opacity:.62;backdrop-filter:blur(4px)}
+.gv-btn:hover,#gvol:focus-within .gv-btn{opacity:1}
+#gvol.off .gv-btn{opacity:.4}
+.gv-pop{display:flex;align-items:center;gap:8px;background:#14161cf2;border:1px solid #ffffff2a;border-radius:18px;padding:6px 10px}
+.gv-pop[hidden]{display:none}
+.gv-range{width:110px;accent-color:#e0a526;height:18px}
+.gv-mute{font-size:12px;padding:4px 8px;border-radius:10px;border:1px solid #ffffff33;background:#262932;color:#ddd;cursor:pointer}
+.fxlayer{position:fixed;inset:0;z-index:9500;pointer-events:none}
+.fxlose{position:fixed;inset:0;z-index:9400;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,#7a0d0d99 100%);animation:fxlose .9s ease-out forwards}
+@keyframes fxlose{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+.fx-shake{animation:fxshake .5s ease-in-out}
+@keyframes fxshake{0%,100%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(5px)}45%{transform:translateX(-4px)}60%{transform:translateX(3px)}80%{transform:translateX(-1px)}}
+.bigwin{position:fixed;inset:0;z-index:9600;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#000000a8,#000000d9);animation:bwin .35s ease-out;cursor:pointer;overflow:hidden}
+.bigwin.out{animation:bwout .35s ease-in forwards}
+@keyframes bwin{from{opacity:0}to{opacity:1}}
+@keyframes bwout{to{opacity:0}}
+.bw-rays{position:absolute;width:160vmax;height:160vmax;left:50%;top:50%;margin:-80vmax 0 0 -80vmax;background:repeating-conic-gradient(from 0deg,#ffd54a33 0 8deg,transparent 8deg 22deg);animation:bwspin 14s linear infinite;mask-image:radial-gradient(circle,#000 0,transparent 55%);-webkit-mask-image:radial-gradient(circle,#000 0,transparent 55%)}
+@keyframes bwspin{to{transform:rotate(360deg)}}
+.bw-box{position:relative;text-align:center;animation:bwpop .6s cubic-bezier(.2,1.6,.4,1)}
+@keyframes bwpop{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+.bw-t{font-size:min(16vw,76px);font-weight:900;letter-spacing:2px;background:linear-gradient(#fff6c2,#ffc83d 55%,#d9881a);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 #7a4a08) drop-shadow(0 0 18px #ffb300aa)}
+.bigwin.mega .bw-t{background:linear-gradient(#fff,#ff9bf0 50%,#a24bff);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 3px 0 #3a0a6a) drop-shadow(0 0 22px #d36bff)}
+.bw-n{font-size:min(11vw,48px);font-weight:800;color:#fff;text-shadow:0 2px 0 #7a4a08,0 0 14px #ffd54a;margin-top:6px;font-variant-numeric:tabular-nums}
+.bw-s{font-size:12px;color:#ffffff88;margin-top:14px}
+@media (prefers-reduced-motion:reduce){.bw-rays{animation:none}.fx-shake{animation:none}}
