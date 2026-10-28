@@ -21,3 +21,6 @@ body[data-game="rv"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14
 body[data-game="slots"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14,.82)),url("./game-bg/slots.jpg") center/cover fixed no-repeat}
 body[data-game="spectate"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14,.82)),url("./game-bg/spectate.jpg") center/cover fixed no-repeat}
 body[data-game="xq"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14,.82)),url("./game-bg/xq.jpg") center/cover fixed no-repeat}
+body[data-game="farm"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14,.84)),url("./game-bg/farm.jpg") center/cover fixed no-repeat}
+body[data-game="forge"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14,.84)),url("./game-bg/forge.jpg") center/cover fixed no-repeat}
+body[data-game="factory"]{background:linear-gradient(rgba(10,10,14,.72),rgba(10,10,14,.84)),url("./game-bg/factory.jpg") center/cover fixed no-repeat}

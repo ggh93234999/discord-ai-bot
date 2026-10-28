@@ -34,6 +34,7 @@ export function mountPinball(root, { env, back }) {
   // ---- 音效（簡單的合成音，音量記在瀏覽器）
   let ac = null, vol = 0.5;
   try { const v = localStorage.getItem(VK); if (v != null) vol = Math.max(0, Math.min(1, Number(v))); } catch {}
+  vol = 1;                                    // 音量改由右下角的全域音量鈕控制
   const pv = $(".pv"); pv.value = Math.round(vol * 100);
   pv.addEventListener("input", () => { vol = Number(pv.value) / 100; try { localStorage.setItem(VK, String(vol)); } catch {} });
   const beep = (f, d = 0.08, type = "square", g = 0.15) => {
@@ -180,7 +181,7 @@ export function mountPinball(root, { env, back }) {
   function resize() {
     const wrap = $(".cwrap");
     const s = Math.min((wrap.clientWidth || W) / W, (wrap.clientHeight || H) / H);
-    scale = Math.max(0.4, s);
+    scale = Math.max(0.25, s);
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = Math.round(W * scale) + "px"; canvas.style.height = Math.round(H * scale) + "px";
     canvas.width = Math.round(W * scale * dpr); canvas.height = Math.round(H * scale * dpr);

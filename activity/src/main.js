@@ -137,6 +137,7 @@ function start(id) {
   presence(id); document.body.dataset.game = id;
   app.innerHTML = "";
   cleanup = g.mount(app, { env, back: () => { if (cleanup) cleanup(); cleanup = null; showMenu(); } }) || null;
+  window.scrollTo(0, 0); document.body.scrollTop = 0; document.documentElement.scrollTop = 0;     // 從滑到一半的選單點進來，遊戲畫面要從頂端開始（否則標題列會被捲掉）
 }
 
 // 網址帶 ?g=遊戲代號 就直接開那個遊戲（例如「一起看影片」的「在瀏覽器開啟」）
