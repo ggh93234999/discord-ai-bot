@@ -60,6 +60,29 @@ function land(p, pl) {
   if (pl.type === "fake" && pl.t === 0) { pl.t = 1; p.ev |= EV_FLIP; }
 }
 
+
+// 玩家都是實體方塊，不能互相穿過：左右相撞互相擋住（各退一半，被牆擋住的那個由另一個讓），從上方落下就站在對方頭上。
+function collidePlayers(sim) {
+  const al = sim.ps.filter((q) => q.alive);
+  for (const q of al) q.cr = false;
+  for (let it = 0; it < 2; it++) {
+    for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) {
+      const a = al[i], b = al[j];
+      const px = Math.min(a.x, b.x) + DKW - Math.max(a.x, b.x), py = Math.min(a.y, b.y) + DKH - Math.max(a.y, b.y);
+      if (px <= 0 || py <= 0) continue;
+      if (py < px) {
+        const up = a.y < b.y ? a : b, lo = up === a ? b : a;
+        up.y = lo.y - DKH; up.vy = Math.min(up.vy, lo.vy < 0 ? lo.vy : 0); up.cr = true;
+      } else {
+        const l = a.x < b.x ? a : b, r = l === a ? b : a, lim = (v) => Math.max(WALL, Math.min(DW - WALL - DKW, v));
+        l.x = lim(l.x - px / 2); r.x = lim(r.x + px / 2);
+        const rest = l.x + DKW - r.x;
+        if (rest > 0) { if (r.x < DW - WALL - DKW) r.x = lim(r.x + rest); if (l.x + DKW > r.x) l.x = lim(r.x - DKW); }
+      }
+    }
+  }
+}
+
 function stepDown(sim, input) {
   sim.t++;
   let sp = 0;
@@ -114,6 +137,7 @@ function stepDown(sim, input) {
     }
     if (p.hp <= 0 || p.y > DH + 4) kill(sim, p);
   }
+  collidePlayers(sim);
   checkEnd(sim);
 }
 
@@ -221,7 +245,7 @@ export function snapshot(sim) {
     return {
       mode: "down", diff: sim.diff, speed: r1(sim.ready > 0 ? 0 : sim.speed), floor: sim.floor, ready: sim.ready,
       ps: sim.ps.map((p) => ({ s: p.seat, x: r1(p.x), y: r1(p.y), hp: p.hp, a: p.alive ? 1 : 0, sc: p.alive ? sim.floor : p.score,
-                                f: p.face, h: p.hurt > 0 ? 1 : 0, g: p.on ? 1 : 0, w: p.walk ? 1 : 0, ev: p.ev || 0 })),
+                                f: p.face, h: p.hurt > 0 ? 1 : 0, g: p.on || p.cr ? 1 : 0, w: p.walk ? 1 : 0, ev: p.ev || 0 })),
       pl: sim.plats.map((p) => [p.id, Math.round(p.x), r1(p.y), p.w, p.type, p.t, p.flip ? 1 : 0, p.bounce]),
     };
   }
