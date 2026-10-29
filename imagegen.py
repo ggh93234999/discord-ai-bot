@@ -306,13 +306,13 @@ EDIT_TOOL = {
             "要改的圖由程式自動從這則訊息（或被回覆的訊息）的附件取得，你不用處理圖片。畫好要等約 20 秒，你呼叫後只要簡短回一句「在改了」就好。"
             "如果要改的是剛才用 web_image 上網找到的圖（不是使用者傳的附件），use_found 設 true。"
             "prompt 寫「改什麼」，中英文都可以：使用者用中文講就直接用中文（不用翻譯），英文通常更穩定；可加上 \"Keep everything else the same.\"（其他部分維持不變）。" 
-            "圖中的小字、招牌文字改起來容易亂碼，不要承諾能精準改字。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫。"
+            "圖中要加字或改字（招牌、標語、海報字）時，快速模式容易亂碼，這種情況請用 edit_quality=clean（Qwen-Image-Edit，文字處理比較好，和畫圖的 clean 是同一系列）；即使用 clean 也不要保證每個字都完全正確。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫。"
         ),
         "parameters": {
             "type": "object",
             "properties": {"prompt": {"type": "string", "description": "修改指令（中英文皆可）"},
                            "use_found": {"type": "boolean", "description": "true＝改剛才用 web_image 找到的圖，而不是這則訊息的附件"},
-                           "edit_quality": {"type": "string", "enum": ["fast", "clean"], "description": "fast（預設，約 20 秒，FLUX.2 klein）；clean＝品質較好但較慢（約 100 秒，Qwen-Image-Edit 2511），使用者要求高品質／細緻／精修時才用"}},
+                           "edit_quality": {"type": "string", "enum": ["fast", "clean"], "description": "fast（預設，約 20 秒，FLUX.2 klein）；clean＝文字與構圖處理較好、品質較好但較慢（約 70～100 秒，Qwen-Image-Edit 2511，對應畫圖的 clean）。圖要加字或改字（招牌、標語、海報字、對話框文字）、或使用者要求高品質／細緻／精修時用 clean"}},
             "required": ["prompt"],
         },
     },
@@ -386,9 +386,9 @@ async def submit_edit(session, prompt: str, images: list, user_id: int, say, sou
         return why + "（這張沒有改）"
     clean = quality == "clean"
     model = (os.getenv("IMAGE_MODEL_EDIT_CLEAN", "edit-qwen-4").strip() or "edit-qwen-4") if clean else (os.getenv("IMAGE_MODEL_EDIT", "draw-klein").strip() or "draw-klein")
-    label = "改圖・品質較好" if clean else "改圖"
+    label = "改圖・文字與構圖較乾淨" if clean else "改圖"
     ref = f"{len(images)} 張參考圖" if len(images) > 1 else ""
-    note = "、".join(x for x in (ref, "品質較好，比較慢" if clean else "") if x)
+    note = "、".join(x for x in (ref, "文字與構圖較乾淨，比較慢" if clean else "") if x)
     return _enqueue(session, user_id, lambda: edit(session, model, prompt, images), label,
                     f"排進改圖了（{note}）" if note else "排進改圖了", 100 if clean else 25, say)
 

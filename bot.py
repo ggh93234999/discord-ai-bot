@@ -1344,10 +1344,10 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
     await interaction.followup.send(note + res)
 
 
-@client.tree.command(name="改圖", description="改一張圖（快速約 20 秒、品質較好約 100 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
+@client.tree.command(name="改圖", description="改一張圖（快速約 20 秒、文字與構圖較乾淨約 100 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
 @app_commands.describe(內容="要怎麼改（中英文都可以），例如：把背景改成白天", 圖片="要修改的圖（可不附）", 訊息="要改哪則訊息裡的圖：貼那則訊息的連結（可不填）",
-                       參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖", 畫質="快速（預設，約 20 秒）／品質較好（Qwen，約 100 秒，較慢）")
-@app_commands.choices(畫質=[app_commands.Choice(name="快速（約20秒）", value="fast"), app_commands.Choice(name="品質較好（約100秒，較慢）", value="clean")])
+                       參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖", 畫質="快速（預設，約 20 秒）／文字與構圖較乾淨（Qwen-Image-Edit，要加字改字選這個，約 70～100 秒）")
+@app_commands.choices(畫質=[app_commands.Choice(name="快速（約20秒）", value="fast"), app_commands.Choice(name="文字與構圖較乾淨（約100秒，較慢）", value="clean")])
 async def cmd_edit(interaction: discord.Interaction, 內容: str, 圖片: discord.Attachment | None = None, 訊息: str | None = None,
                    參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None, 畫質: str = "fast"):
     if not imagegen.channel_ok(interaction.channel):
