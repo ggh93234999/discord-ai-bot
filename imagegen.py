@@ -116,7 +116,11 @@ def check_prompt(*texts: str) -> str | None:
 # ---------------------------------------------------------------- 排隊與限額
 _lock = asyncio.Lock()                      # 對方一次只畫一張，這邊也一張一張送
 _waiting = 0                                # 目前在排隊（含正在畫）的張數
-_busy_users: set[int] = set()
+_busy_users: dict[int, int] = {}          # 每個人目前排著（含正在畫）的張數
+
+
+def _user_max() -> int:
+    return max(1, int(os.getenv("IMAGE_USER_MAX", "3") or 3))
 _tasks: set[asyncio.Task] = set()
 
 
@@ -254,13 +258,13 @@ async def expand_prompt(session: aiohttp.ClientSession, idea: str, quality: str 
 def _enqueue(session, user_id: int, make, label: str, ready: str, eta: int, say, extra: str = "") -> str:
     """共用排隊：make() 回傳要執行的 coroutine（呼叫模型），畫好後 say 貼出。"""
     global _waiting
-    if user_id in _busy_users:
-        return "你上一張還在處理，等它好了再要下一張。"
+    if _busy_users.get(user_id, 0) >= _user_max():
+        return f"你已經排了 {_user_max()} 張還在處理，等有一張好了再要下一張。"
     if _waiting >= _max_queue():
         return "畫圖排隊的人太多了（目前滿了），晚點再試。"
     ahead = _waiting
     _waiting += 1
-    _busy_users.add(user_id)
+    _busy_users[user_id] = _busy_users.get(user_id, 0) + 1
     task = asyncio.create_task(_job(user_id, make, label, say, extra))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
@@ -418,7 +422,11 @@ async def _job(user_id, make, label, say, extra=""):
             pass
     finally:
         _waiting = max(0, _waiting - 1)
-        _busy_users.discard(user_id)
+        left = _busy_users.get(user_id, 1) - 1
+        if left > 0:
+            _busy_users[user_id] = left
+        else:
+            _busy_users.pop(user_id, None)
         if path:
             try:
                 os.unlink(path)
