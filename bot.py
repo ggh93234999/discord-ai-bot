@@ -628,7 +628,7 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
                 return "這裡不能畫圖。"
             if not imagegen.channel_ok(msg.channel):
                 return imagegen.NSFW_ONLY_REPLY
-            return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
+            return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "", "clean" if args.get("edit_quality") == "clean" else "fast")
         if name == "make_sound":
             if msg is None:
                 return "這裡不能做音效。"
@@ -643,7 +643,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             images = webimg.recall(msg.channel.id) if args.get("use_found") else await imagegen.collect_images(msg)
             if args.get("use_found") and not images:
                 return "最近沒有上網找到的圖（超過 30 分鐘會清掉），請先用 web_image 找圖，或把圖片傳上來。"
-            return await imagegen.submit_edit(client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
+            return await imagegen.submit_edit(client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "",
+                                            "clean" if args.get("edit_quality") == "clean" else "fast")
         if name == "web_image":
             if msg is None:
                 return "這裡不能抓圖。"
@@ -1343,11 +1344,12 @@ async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: 
     await interaction.followup.send(note + res)
 
 
-@client.tree.command(name="改圖", description="改一張圖（約 20 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
+@client.tree.command(name="改圖", description="改一張圖（快速約 20 秒、品質較好約 100 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
 @app_commands.describe(內容="要怎麼改（中英文都可以），例如：把背景改成白天", 圖片="要修改的圖（可不附）", 訊息="要改哪則訊息裡的圖：貼那則訊息的連結（可不填）",
-                       參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖")
+                       參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖", 畫質="快速（預設，約 20 秒）／品質較好（Qwen，約 100 秒，較慢）")
+@app_commands.choices(畫質=[app_commands.Choice(name="快速（約20秒）", value="fast"), app_commands.Choice(name="品質較好（約100秒，較慢）", value="clean")])
 async def cmd_edit(interaction: discord.Interaction, 內容: str, 圖片: discord.Attachment | None = None, 訊息: str | None = None,
-                   參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None):
+                   參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None, 畫質: str = "fast"):
     if not imagegen.channel_ok(interaction.channel):
         await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
         return
@@ -1365,7 +1367,7 @@ async def cmd_edit(interaction: discord.Interaction, 內容: str, 圖片: discor
     else:
         images, note = await imagegen.find_images(client, interaction.channel, 訊息)
     res = await imagegen.submit_edit(client.http_session, 內容, images, interaction.user.id,
-                                     imagegen.say_for_interaction(interaction), 內容)
+                                     imagegen.say_for_interaction(interaction), 內容, 畫質)
     await interaction.followup.send((res + ("\n-# " + note if note and images else "")) if images else note or res)
 
 

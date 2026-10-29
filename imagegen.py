@@ -219,7 +219,7 @@ def say_for_interaction(interaction: discord.Interaction):
 
 def tool_status(args: dict) -> str:
     if "quality" not in args and "shape" not in args:
-        return "🎨 排進改圖佇列（約 20 秒）"
+        return "🎨 排進改圖佇列（約 100 秒）" if args.get("edit_quality") == "clean" else "🎨 排進改圖佇列（約 20 秒）"
     q = args.get("quality") if args.get("quality") in QUALITY else "fast"
     sc = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
     return f"🎨 排進畫圖佇列（約 {QUALITY['fast' if sc != 'normal' else q][2] + SCALE_EXTRA_ETA[sc]} 秒）"
@@ -311,7 +311,8 @@ EDIT_TOOL = {
         "parameters": {
             "type": "object",
             "properties": {"prompt": {"type": "string", "description": "修改指令（中英文皆可）"},
-                           "use_found": {"type": "boolean", "description": "true＝改剛才用 web_image 找到的圖，而不是這則訊息的附件"}},
+                           "use_found": {"type": "boolean", "description": "true＝改剛才用 web_image 找到的圖，而不是這則訊息的附件"},
+                           "edit_quality": {"type": "string", "enum": ["fast", "clean"], "description": "fast（預設，約 20 秒，FLUX.2 klein）；clean＝品質較好但較慢（約 100 秒，Qwen-Image-Edit 2511），使用者要求高品質／細緻／精修時才用"}},
             "required": ["prompt"],
         },
     },
@@ -371,7 +372,7 @@ async def find_images(client: discord.Client, channel, ref: str | None = None, s
     return [], f"最近 {scan} 則訊息裡找不到圖片，請附上圖片，或用 `訊息` 欄位貼那則訊息的連結。"
 
 
-async def submit_edit(session, prompt: str, images: list, user_id: int, say, source_text: str = "") -> str:
+async def submit_edit(session, prompt: str, images: list, user_id: int, say, source_text: str = "", quality: str = "fast") -> str:
     if not enabled():
         return "畫圖功能目前沒開。"
     prompt = (prompt or "").strip()[:1200]
@@ -383,9 +384,13 @@ async def submit_edit(session, prompt: str, images: list, user_id: int, say, sou
     if why:
         log.info("改圖被擋：%s｜%s", why, prompt[:80])
         return why + "（這張沒有改）"
-    model = os.getenv("IMAGE_MODEL_EDIT", "draw-klein").strip() or "draw-klein"
-    return _enqueue(session, user_id, lambda: edit(session, model, prompt, images), "改圖",
-                    f"排進改圖了（{len(images)} 張參考圖）" if len(images) > 1 else "排進改圖了", 25, say)
+    clean = quality == "clean"
+    model = (os.getenv("IMAGE_MODEL_EDIT_CLEAN", "edit-qwen-4").strip() or "edit-qwen-4") if clean else (os.getenv("IMAGE_MODEL_EDIT", "draw-klein").strip() or "draw-klein")
+    label = "改圖・品質較好" if clean else "改圖"
+    ref = f"{len(images)} 張參考圖" if len(images) > 1 else ""
+    note = "、".join(x for x in (ref, "品質較好，比較慢" if clean else "") if x)
+    return _enqueue(session, user_id, lambda: edit(session, model, prompt, images), label,
+                    f"排進改圖了（{note}）" if note else "排進改圖了", 100 if clean else 25, say)
 
 
 async def _job(user_id, make, label, say, extra=""):
