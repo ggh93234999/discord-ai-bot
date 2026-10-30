@@ -20,7 +20,9 @@ const LENV = (() => {
 })();
 const ENV = { ...ROOT_ENV, ...LENV };
 
-const KEY = ENV.ODDSPAPI_KEY || "";
+const KEYS = [ENV.ODDSPAPI_KEY, ENV.ODDSPAPI_KEY2].filter(Boolean);            // 第二組是備用：第一組讀不到（額度用完／被拒絕）就自動換第二組
+const KEY = KEYS[0] || "";
+const hide = (m) => KEYS.reduce((a, k) => a.split(k).join("***"), String(m));
 const BASE = "https://api.oddspapi.io/v4";
 const TOURNAMENT = Number(ENV.LOLBET_TOURNAMENT) || 2549;           // 2549 = World Championship
 const BOOK = ENV.LOLBET_BOOKMAKER || "pinnacle";
@@ -34,18 +36,27 @@ const VOID_AFTER = 3 * 24 * 3600 * 1000;                             // 開賽�
 const MAX_PER_FIXTURE = 5;                                           // 每人每場最多下注總額 = 單注上限 × 5
 const SFILE = fileURLToPath(new URL("./state.json", import.meta.url));
 
-export const lolEnabled = () => !!KEY;
+export const lolEnabled = () => KEYS.length > 0;
 
 async function fetchJson(path, params, prio) {
   if (!st.api) st.api = { used: 0 };
   if (st.api.used >= BUDGET || (!prio && st.api.used >= BUDGET - RESERVE)) throw new Error("quota");
   st.api.used++; save();                                      // 先記帳再呼叫（失敗也算一次，寧可高估）
-  const q = new URLSearchParams({ ...params, apiKey: KEY });
   const ac = new AbortController(), to = setTimeout(() => ac.abort(), 20000);
   try {
-    const r = await fetch(`${BASE}/${path}?${q}`, { signal: ac.signal });
-    if (!r.ok) throw new Error(`OddsPapi ${path} http ${r.status}`);
-    return await r.json();
+    let ki = Math.min(Number(st.api.key) || 0, KEYS.length - 1);
+    for (let tries = 0; ; tries++) {
+      const q = new URLSearchParams({ ...params, apiKey: KEYS[ki] });
+      const r = await fetch(`${BASE}/${path}?${q}`, { signal: ac.signal });
+      if (r.ok) return await r.json();
+      const body = r.status === 200 ? "" : await r.text().catch(() => "");
+      const bad = [401, 402, 403].includes(r.status) || ([429, 500].includes(r.status) && /quota|limit|exceed|authentic|api ?key|plan/i.test(body) && !/per second|too fast/i.test(body));
+      if (bad && tries < KEYS.length - 1) {                                            // 這組金鑰讀不到（額度用完／驗證失敗）：換下一組再試
+        ki = (ki + 1) % KEYS.length; st.api.key = ki; save();
+        console.log(`世界賽運彩：金鑰被拒絕（http ${r.status}），改用第 ${ki + 1} 組`); continue;
+      }
+      throw new Error(`OddsPapi ${path} http ${r.status}`);
+    }
   } finally { clearTimeout(to); }
 }
 export const _deps = { settle: botSettle, pay: botPay, fetchJson };
@@ -118,7 +129,7 @@ async function loadFixtures(now, prio) {
         for (const f of Array.isArray(rows) ? rows : []) if (f.tournamentId === TOURNAMENT) far.set(f.fixtureId, mapFix(f, fixtures.get(f.fixtureId)));
       }
       farMap = far; farAt = now;
-    } catch (e) { console.log("世界賽運彩：遠期賽程抓取失敗", String(e && e.message || e).replace(KEY, "***").slice(0, 80)); }
+    } catch (e) { console.log("世界賽運彩：遠期賽程抓取失敗", String(e && e.message || e).replace(KEY, "***").replace(KEYS[1] || "\0", "***").slice(0, 80)); }
   }
   for (const [id, f] of farMap) if (!next.has(id)) next.set(id, fixtures.get(id) || f);
   for (const [id, f] of fixtures) if (!next.has(id) && st.bets.some((b) => b.fixtureId === id && (b.status === "open" || b.status === "unpaid"))) next.set(id, f);   // 還有人下注的場次要留著好結算
@@ -150,7 +161,7 @@ export async function lolPoll() {
     for (const f of fixtures.values()) if (!seen.has(f.id)) f.suspended = true;
     updatedAt = now; lastErr = "";
     pushAll();
-  } catch (e) { lastErr = String(e && e.message || e).replace(KEY, "***").slice(0, 120); console.log("世界賽運彩同步失敗：", lastErr); }
+  } catch (e) { lastErr = String(e && e.message || e).replace(KEY, "***").replace(KEYS[1] || "\0", "***").slice(0, 120); console.log("世界賽運彩同步失敗：", lastErr); }
   finally { polling = false; }
 }
 
