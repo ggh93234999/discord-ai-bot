@@ -270,10 +270,10 @@ function mountStairs(root, { env, back }) {
       if (fl) { ctx.save(); ctx.globalAlpha = .45; ctx.fillStyle = "#8c7a56"; ctx.fillRect(x, y + 10, w, 3); ctx.restore(); return; }   // 翻下去之後只剩薄薄一條側邊，不要再畫出翻上來的板子
       const a = Math.min(1, t / 18);
       if (a <= 0) { texRect(PAT.sand, x, y, w, h, -x % 64, 0); bevel(x, y, w, h, "#f4ead2", "#8c7a56"); return; }
-      const front = Math.max(3, h * Math.cos(a * Math.PI / 2)), top = 30 * Math.sin(a * Math.PI / 2);
-      ctx.save(); ctx.globalAlpha = fl ? .55 : 1;
-      if (top > 1) { texRect(PAT.sand, x, y - top + 6, w, top, -x % 64, 0); ctx.fillStyle = "rgba(60,40,10,.35)"; ctx.fillRect(x, y - top + 6, w, top); bevel(x, y - top + 6, w, top, "#e8dcc0", "#6d5d3c"); }
-      texRect(PAT.sand, x, y + 6, w, front, -x % 64, 0); bevel(x, y + 6, w, front, "#f4ead2", "#8c7a56");
+      // 往下翻：板子以下緣為軸往下倒，高度越縮越薄，翻完只剩一條線；不會再有一塊板子翻到上面來
+      const front = Math.max(3, h * Math.cos(a * Math.PI / 2));
+      ctx.save(); ctx.globalAlpha = 1 - a * .4;
+      texRect(PAT.sand, x, y + 6 + (h - front), w, front, -x % 64, 0); bevel(x, y + 6 + (h - front), w, front, "#f4ead2", "#8c7a56");
       ctx.restore();
     } else if (type === "nails") {
       metalBar(x, y + 10, w, 14);
