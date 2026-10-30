@@ -1,4 +1,4 @@
-// 接七（排七，練習點數）：發牌、判定、計分、電腦都在伺服器（server/sevens.js），這裡只畫畫面和送操作。
+// 排七（練習點數）：發牌、判定、計分、電腦都在伺服器（server/sevens.js），這裡只畫畫面和送操作。
 import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 import { backUrl } from "./bjui.js";
@@ -21,7 +21,7 @@ export function mountSevens(opts = {}) {
   return function (root, { env, back }) {
     root.innerHTML = `
       <div class="game slots mj br bt sv">
-        <header><button class="back">← 選單</button><h2>接七</h2><span class="watch"></span></header>
+        <header><button class="back">← 選單</button><h2>排七</h2><span class="watch"></span></header>
         <div class="status">連線中…</div>
         <div class="brbody"></div>
         <div class="brlog"></div>
@@ -73,7 +73,7 @@ export function mountSevens(opts = {}) {
           <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，最多 4 人，空位可以加電腦。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k === 0 ? " top" : ""}"><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
-      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。持有 ♦7 的人先出 ♦7，之後接同花色相鄰的牌或開新的 7；沒牌可出就要自己選一張手牌蓋下去。蓋的牌點數加總越少越好（A=1 … K=13），大家兩兩比較差距，乘以每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。持有 ♦7 的人先出 ♦7，之後接同花色相鄰的牌或開新的 7（A 或 K 出現後那一排封口）；沒牌可出就要自己選一張手牌蓋下去。蓋的牌點數加總越少越好（A=1 … K=13），大家兩兩比較差距，乘以每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : st.phase === "end" ? "按開始再來一場" : "等玩家入座";
       body.querySelectorAll("[data-sit]").forEach((b) => b.addEventListener("click", () => send({ t: "svsit", seat: Number(b.dataset.sit) })));
       body.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "svaddbot", seat: Number(b.dataset.bot) })));
@@ -106,7 +106,8 @@ export function mountSevens(opts = {}) {
           const on = b && n >= b.lo && n <= b.hi, cid = s * 13 + ((n === 1 ? 14 : n) - 2);
           cells.push(`<i class="svc s${s}${on ? " on" : ""}${n === 7 ? " seven" : ""}${last && last.card === cid ? " new" : ""}">${on ? `<b>${rn(n)}</b>` : `<em>${rn(n)}</em>`}</i>`);
         }
-        return `<div class="svrow"><span class="svs s${s}">${SUITS[s]}</span>${cells.join("")}</div>`;
+        const closed = b && (b.lo === 1 || b.hi === 13);
+        return `<div class="svrow${closed ? " closed" : ""}"><span class="svs s${s}">${closed ? "🔒" : SUITS[s]}</span>${cells.join("")}</div>`;
       }).join("")}</div>`;
     }
     function resultHTML(r) {
@@ -118,8 +119,8 @@ export function mountSevens(opts = {}) {
     function renderTable() {
       const you = st.you, me = you >= 0 ? st.seats[you] : null, play = st.phase === "play";
       const order = [2, 1, 3, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
-      const mid = `<div class="brmid"><div class="brinfo"><div class="brct">${play ? (st.first ? "第一張要出 ♦7" : st.last ? (st.last.cover ? `${nm(st.last.seat)} 蓋了一張牌` : `${nm(st.last.seat)} 出了 ${SUITS[suitOf(st.last.card)]}${rn(nat(st.last.card))}`) : "") : ""}</div><div class="brtimer"></div></div>${play || st.board ? boardHTML(st.board, play ? st.last : null) : ""}${!play && st.result ? resultHTML(st.result) : ""}</div>`;
-      let below = `<div class="btspacer"></div>`;
+      const mid = `<div class="brmid"><div class="brinfo"><div class="brct">${play ? (st.first ? "第一張要出 ♦7" : st.last ? (st.last.cover ? `${nm(st.last.seat)} 蓋了一張牌` : `${nm(st.last.seat)} 出了 ${SUITS[suitOf(st.last.card)]}${rn(nat(st.last.card))}`) : "") : ""}</div><div class="brtimer"></div></div>${play || st.board ? boardHTML(st.board, play ? st.last : null) : ""}</div>`;
+      let below = !play && st.result ? resultHTML(st.result) : `<div class="btspacer"></div>`;      // 結算放在牌桌下面（牌桌中間放不下）
       if (play && me) {
         const myTurn = st.turn === you, can = new Set(st.playable || []);
         const cover = myTurn && st.mustCover;
@@ -143,7 +144,7 @@ export function mountSevens(opts = {}) {
       const n = Date.now() - st.at;
       if (st.phase === "result") { statusEl.textContent = `第 ${st.handNo} 手結束　下一手 ${Math.max(0, Math.ceil((st.nextAt - n) / 1000))} 秒`; return; }
       const left = st.deadline ? Math.max(0, Math.ceil((st.deadline - n) / 1000)) : 0;
-      statusEl.textContent = `接七　第 ${st.handNo} / ${st.cfg.len} 手　${myTurn ? "輪到你" : `輪到 ${st.seats[st.turn]?.name || ""}`}`;
+      statusEl.textContent = `排七　第 ${st.handNo} / ${st.cfg.len} 手　${myTurn ? "輪到你" : `輪到 ${st.seats[st.turn]?.name || ""}`}`;
       const tEl = body.querySelector(".brtimer");
       if (tEl) { tEl.textContent = myTurn && left ? `⏱ ${left}` : ""; tEl.classList.toggle("urgent", myTurn && left <= 5); }
     }

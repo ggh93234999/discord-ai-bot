@@ -1,7 +1,8 @@
-// 接七（排七／接龍，練習點數）：4 人各 13 張，先出完的人贏。
+// 排七（練習點數）：4 人各 13 張，沒牌可出要蓋牌，蓋牌點數少的贏。
 // 牌的編號和大老二、橋牌一樣：花色 = floor(c/13)（♣0 ♦1 ♥2 ♠3），rank = c%13+2（2..14），這裡把 A 當 1 ，所以數字順序是 A 2 3 … 10 J Q K。
 // 規則：持有 ♦7 的人先出 ♦7；之後每一輪，輪到你就要出一張能接上的牌：任何一個花色的 7（還沒開的花色），
 // 或是桌上那個花色目前最小的前一張、最大的後一張。有牌能出就一定要出；沒有能出的牌，就要自己選一張手牌「蓋牌」（面朝下放到自己前面）。
+// 任何一個花色的 A 或 K 打出去之後，那個花色就封口，不能再接了（剩下的牌只能蓋掉）。
 // 手牌都處理完（出完或蓋掉）的人跳過；全部人手牌都沒了，這手結束。每人蓋牌的點數加總（A=1、J=11、Q=12、K=13）越少越好，
 // 兩兩比較蓋牌點數的差再乘以每點點數。伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
@@ -43,6 +44,7 @@ function legal(h, c) {
   if (h.first) return c === DIAMOND7;                       // 第一張一定是 ♦7
   const s = suitOf(c), n = nat(c), b = h.board[s];
   if (!b) return n === 7;
+  if (b.lo === 1 || b.hi === 13) return false;               // 這個花色的 A 或 K 已經出現，整排封口
   return n === b.lo - 1 || n === b.hi + 1;
 }
 const legalCards = (h, i) => h.hands[i].filter((c) => legal(h, c));
@@ -132,7 +134,12 @@ function botMove(t, i) {
     let run = 0;
     if (dir !== 0) for (let k = n + dir; k >= 1 && k <= 13 && hand.some((x) => suitOf(x) === s && nat(x) === k); k += dir) run++;
     const mine = hand.filter((x) => suitOf(x) === s).length;
-    return run * 3 + (n === 7 ? 4 : 0) + (mine >= 4 ? 1 : 0) - Math.abs(n - 7) * 0.25 + Math.random() * 1.2;
+    let sc = run * 3 + (n === 7 ? 4 : 0) + (mine >= 4 ? 1 : 0) - Math.abs(n - 7) * 0.25 + Math.random() * 1.2;
+    if (n === 1 || n === 13) {                                // 打出 A 或 K 會讓這排封口：我這個花色剩下的牌就只能蓋掉
+      const left = hand.filter((x) => suitOf(x) === s && x !== c);
+      sc += left.length ? -2 - left.reduce((a, x) => a + nat(x), 0) * 0.35 : 3;
+    }
+    return sc;
   };
   return cs.map((c) => [c, score(c)]).sort((a, b) => b[1] - a[1])[0][0];
 }
@@ -183,7 +190,7 @@ function tick() {
       if (t.phase !== "play") continue;
       const h = t.h, s = t.seats[h.turn];
       if ((isAuto(s) && n >= h.botAt) || n >= h.deadline) { if (botAct(t, h.turn)) push(t); }
-    } catch (e) { console.log("接七錯誤", e && e.stack); }
+    } catch (e) { console.log("排七錯誤", e && e.stack); }
   }
 }
 setInterval(tick, 200).unref();

@@ -1386,3 +1386,7 @@ body.tv-fs{overflow:hidden}
 .sv .svmine{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;align-items:center;font-size:12px;color:#ddd;margin:4px 0}
 .sv .mhint.svwarn{color:#ffcc80;font-weight:700}
 .sv .brhand.cover .bc.can{filter:none;box-shadow:0 0 0 2px #ff9800}
+.sv .brres{max-width:520px;margin:10px auto 0;box-sizing:border-box;text-align:left}
+.sv .brres h3{text-align:center}
+.sv .brres .mdelta{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin:6px 0}
+.sv .brres .btleft div{display:flex;flex-wrap:wrap;gap:2px}
