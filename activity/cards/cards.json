@@ -1,0 +1,402 @@
+[
+ {
+  "id": 1,
+  "name": "應龍",
+  "rarity": "SSR",
+  "type": "神獸",
+  "desc": "上古翼龍,能蓄水興雨,曾助黃帝戰蚩尤。",
+  "prompt": "a winged Chinese dragon Yinglong soaring through storm clouds, lightning and rain, powerful coiling body"
+ },
+ {
+  "id": 2,
+  "name": "鳳凰",
+  "rarity": "SSR",
+  "type": "神獸",
+  "desc": "百鳥之王,浴火而生,所過之處萬物回春。",
+  "prompt": "a magnificent phoenix with long flowing tail feathers rising from flames and mist"
+ },
+ {
+  "id": 3,
+  "name": "麒麟",
+  "rarity": "SSR",
+  "type": "神獸",
+  "desc": "仁獸現世,天下太平。",
+  "prompt": "a majestic qilin with scaled body and flowing mane standing on clouds beneath the moon"
+ },
+ {
+  "id": 4,
+  "name": "嫦娥",
+  "rarity": "SSR",
+  "type": "人物",
+  "desc": "偷服仙藥,飛升月宮,一世清冷。",
+  "prompt": "Chang'e the moon goddess in flowing robes floating up toward a huge full moon, osmanthus branch"
+ },
+ {
+  "id": 5,
+  "name": "崑崙仙山",
+  "rarity": "SSR",
+  "type": "山水",
+  "desc": "萬山之祖,諸神所居,凡人不得見。",
+  "prompt": "towering sacred Kunlun mountain peaks piercing sea of clouds, waterfalls, tiny pavilion on a cliff"
+ },
+ {
+  "id": 6,
+  "name": "九尾狐",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "千年修行,九尾既成,能迷人心魄。",
+  "prompt": "a graceful nine-tailed fox sitting under a blossoming tree at night, tails fanned out"
+ },
+ {
+  "id": 7,
+  "name": "白澤",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "通曉萬物,識盡天下妖怪之名。",
+  "prompt": "the wise beast Baize, a lion-like creature with horns and extra eyes along its body, standing calmly"
+ },
+ {
+  "id": 8,
+  "name": "玄武",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "北方守護,龜蛇合體,沉穩不可撼動。",
+  "prompt": "the Black Tortoise Xuanwu, giant turtle entwined with a serpent, rising from dark water"
+ },
+ {
+  "id": 9,
+  "name": "白虎",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "西方守護,殺伐之氣,百獸皆避。",
+  "prompt": "a fierce white tiger leaping in a bamboo forest, bold strokes, dynamic"
+ },
+ {
+  "id": 10,
+  "name": "劍仙",
+  "rarity": "SR",
+  "type": "人物",
+  "desc": "一劍光寒,千里取人頭顱於談笑間。",
+  "prompt": "a lone sword immortal in billowing robes standing on a mountain peak, sword in hand, wind-swept"
+ },
+ {
+  "id": 11,
+  "name": "紅衣俠女",
+  "rarity": "SR",
+  "type": "人物",
+  "desc": "一襲紅衣,劍出無悔,江湖路遠。",
+  "prompt": "a female swordswoman in a flowing red robe mid-motion among falling plum petals"
+ },
+ {
+  "id": 12,
+  "name": "軒轅劍",
+  "rarity": "SR",
+  "type": "器物",
+  "desc": "黃帝所佩,斬妖除魔,神器之首。",
+  "prompt": "the ancient legendary sword Xuanyuan standing upright, glowing faintly, with clouds and ancient bronze patterns"
+ },
+ {
+  "id": 13,
+  "name": "蓬萊雲海",
+  "rarity": "SR",
+  "type": "山水",
+  "desc": "海上仙山,雲霧深處,有人長生。",
+  "prompt": "legendary Penglai island floating in a sea of mist, pine trees, distant pavilions, sunrise"
+ },
+ {
+  "id": 14,
+  "name": "飛流瀑布",
+  "rarity": "SR",
+  "type": "山水",
+  "desc": "飛流直下三千尺,疑是銀河落九天。",
+  "prompt": "a huge waterfall plunging from a cliff into mist, ancient pines clinging to rocks, tiny scholar watching"
+ },
+ {
+  "id": 15,
+  "name": "深山古道",
+  "rarity": "SR",
+  "type": "山水",
+  "desc": "人跡罕至,唯有雲與松為伴。",
+  "prompt": "a winding mountain path with a lone traveler and donkey, layered misty peaks"
+ },
+ {
+  "id": 16,
+  "name": "饕餮",
+  "rarity": "R",
+  "type": "神獸",
+  "desc": "貪食之獸,吞盡一切,連自己也吞下。",
+  "prompt": "the fearsome taotie beast with big eyes, horns and gaping mouth, bronze-vessel pattern style"
+ },
+ {
+  "id": 17,
+  "name": "貔貅",
+  "rarity": "R",
+  "type": "神獸",
+  "desc": "吞金納財,只進不出。",
+  "prompt": "a pixiu winged lion beast sitting with coins at its feet"
+ },
+ {
+  "id": 18,
+  "name": "畢方",
+  "rarity": "R",
+  "type": "神獸",
+  "desc": "一足之鳥,所到之處必有火災。",
+  "prompt": "the one-legged crane-like fire bird Bifang with a beak, trailing small flames"
+ },
+ {
+  "id": 19,
+  "name": "青鸞",
+  "rarity": "R",
+  "type": "神獸",
+  "desc": "鳳凰之屬,鳴聲清越,傳遞仙訊。",
+  "prompt": "a graceful blue-green luan bird singing on a pine branch"
+ },
+ {
+  "id": 20,
+  "name": "刀客",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "一刀在手,萬里獨行。",
+  "prompt": "a rugged wandering blade master with broad saber, straw hat, standing in snow"
+ },
+ {
+  "id": 21,
+  "name": "琴師",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "高山流水,知音難覓。",
+  "prompt": "a scholar playing a guqin zither under a pine tree beside a stream"
+ },
+ {
+  "id": 22,
+  "name": "道士",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "煉丹問道,不問人間事。",
+  "prompt": "a Taoist priest with a whisk and gourd walking among mountain mist"
+ },
+ {
+  "id": 23,
+  "name": "僧人",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "一缽一杖,行遍山川。",
+  "prompt": "a monk in robes with a walking staff crossing a stone bridge in rain"
+ },
+ {
+  "id": 24,
+  "name": "漁翁",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "孤舟蓑笠翁,獨釣寒江雪。",
+  "prompt": "an old fisherman in a straw cloak and hat fishing from a small boat on a still river"
+ },
+ {
+  "id": 25,
+  "name": "古琴",
+  "rarity": "R",
+  "type": "器物",
+  "desc": "七弦清響,可通天地。",
+  "prompt": "an ancient guqin zither lying on a stone table with incense smoke curling"
+ },
+ {
+  "id": 26,
+  "name": "銅鏡",
+  "rarity": "R",
+  "type": "器物",
+  "desc": "鏡中照見的,不只是容顏。",
+  "prompt": "an ancient bronze mirror with ornate back, reflecting a faint moon"
+ },
+ {
+  "id": 27,
+  "name": "竹林",
+  "rarity": "R",
+  "type": "山水",
+  "desc": "竹影搖風,清氣滿林。",
+  "prompt": "a tall dense bamboo forest in mist with a tiny pavilion"
+ },
+ {
+  "id": 28,
+  "name": "寒江獨釣",
+  "rarity": "R",
+  "type": "山水",
+  "desc": "千山鳥飛絕,萬徑人蹤滅。",
+  "prompt": "a tiny boat alone on a vast empty river, snow-covered banks, huge white space"
+ },
+ {
+  "id": 29,
+  "name": "古寺晨鐘",
+  "rarity": "R",
+  "type": "山水",
+  "desc": "一聲鐘響,山中日月長。",
+  "prompt": "a mountain temple with pagoda in morning mist and a hanging bronze bell"
+ },
+ {
+  "id": 30,
+  "name": "仙鶴",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "長壽之鳥,姿態悠然。",
+  "prompt": "a red-crowned crane standing on one leg beside pine and rock"
+ },
+ {
+  "id": 31,
+  "name": "錦鯉",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "魚躍龍門的第一步。",
+  "prompt": "two koi fish swirling in ink water with lotus leaf"
+ },
+ {
+  "id": 32,
+  "name": "白鹿",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "仙山靈獸,遇之者吉。",
+  "prompt": "a white deer standing in a misty forest clearing"
+ },
+ {
+  "id": 33,
+  "name": "玄貓",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "夜裡的眼睛,什麼都看見了。",
+  "prompt": "a black cat curled on a roof tile under the moon"
+ },
+ {
+  "id": 34,
+  "name": "寒鴉",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "枯藤老樹昏鴉。",
+  "prompt": "a crow perched on a bare winter branch"
+ },
+ {
+  "id": 35,
+  "name": "蟾蜍",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "月中蟾蜍,吐錢招財。",
+  "prompt": "a three-legged toad sitting on a coin beside a lotus leaf"
+ },
+ {
+  "id": 36,
+  "name": "書童",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "跟著先生走遍天涯。",
+  "prompt": "a young scholar's boy servant carrying a stack of books and a lantern"
+ },
+ {
+  "id": 37,
+  "name": "樵夫",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "砍柴聽松,日子也夠了。",
+  "prompt": "a woodcutter carrying bundled firewood on a mountain trail"
+ },
+ {
+  "id": 38,
+  "name": "牧童",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "牧童遙指杏花村。",
+  "prompt": "a young boy riding a water buffalo while playing a flute"
+ },
+ {
+  "id": 39,
+  "name": "採蓮女",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "荷花深處,有人唱歌。",
+  "prompt": "a girl in a small boat gathering lotus in a pond"
+ },
+ {
+  "id": 40,
+  "name": "說書人",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "一塊驚堂木,說盡天下事。",
+  "prompt": "a storyteller at a teahouse table with a folding fan and gavel block"
+ },
+ {
+  "id": 41,
+  "name": "油紙傘",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "雨巷深處,等一個人。",
+  "prompt": "an oil-paper umbrella leaning on a wall in the rain"
+ },
+ {
+  "id": 42,
+  "name": "毛筆",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "一筆一畫,皆是功夫。",
+  "prompt": "a calligraphy brush resting on an ink stone with a drop of ink"
+ },
+ {
+  "id": 43,
+  "name": "酒葫蘆",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "一壺濁酒,盡歡而已。",
+  "prompt": "a wine gourd with a cord and a cup"
+ },
+ {
+  "id": 44,
+  "name": "燈籠",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "夜路長,有光就不怕。",
+  "prompt": "a paper lantern hanging from a bamboo pole in the night"
+ },
+ {
+  "id": 45,
+  "name": "竹笛",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "一曲短笛,山谷回聲。",
+  "prompt": "a bamboo flute resting on a rock with a falling leaf"
+ },
+ {
+  "id": 46,
+  "name": "茶壺",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "一壺清茶,半日浮生。",
+  "prompt": "a small clay teapot with steam rising, a cup beside it"
+ },
+ {
+  "id": 47,
+  "name": "梅花",
+  "rarity": "N",
+  "type": "山水",
+  "desc": "凌寒獨自開。",
+  "prompt": "a plum blossom branch bending over snow, bold ink trunk"
+ },
+ {
+  "id": 48,
+  "name": "荷塘",
+  "rarity": "N",
+  "type": "山水",
+  "desc": "出淤泥而不染。",
+  "prompt": "a pond with lotus leaves and flowers in ink and wash"
+ },
+ {
+  "id": 49,
+  "name": "紙鳶",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "春風一起,線在誰手。",
+  "prompt": "a paper kite in the shape of a swallow flying in a breezy sky above willows"
+ },
+ {
+  "id": 50,
+  "name": "遠山松雲",
+  "rarity": "N",
+  "type": "山水",
+  "desc": "遠山如黛,松下聽雲。",
+  "prompt": "distant layered mountains with a lone pine in the foreground and drifting cloud"
+ }
+]
