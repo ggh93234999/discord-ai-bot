@@ -1,0 +1,902 @@
+[
+ {
+  "id": 101,
+  "name": "獨角獸",
+  "rarity": "SSR",
+  "type": "幻獸",
+  "prompt": "a majestic white unicorn rearing in a misty enchanted forest, long spiral horn glowing, flowing mane",
+  "desc": "純潔之獸,獨角能淨化一切毒與污穢。",
+  "set": "west"
+ },
+ {
+  "id": 102,
+  "name": "不死鳥",
+  "rarity": "SSR",
+  "type": "幻獸",
+  "prompt": "a phoenix rising from flames with wide spread wings and long trailing tail feathers",
+  "desc": "燃盡自己,再從灰燼中重生。",
+  "set": "west"
+ },
+ {
+  "id": 103,
+  "name": "巨龍",
+  "rarity": "SSR",
+  "type": "幻獸",
+  "prompt": "a colossal Western dragon with bat wings coiled on a mountain of treasure, breathing fire, castle ruins below",
+  "desc": "盤踞寶山的火龍,勇者與貪婪者的終點。",
+  "set": "west"
+ },
+ {
+  "id": 104,
+  "name": "克拉肯",
+  "rarity": "SSR",
+  "type": "幻獸",
+  "prompt": "the giant kraken sea monster dragging a sailing ship down with huge tentacles in a stormy sea",
+  "desc": "深海巨怪,觸手一揮,船隻沉沒。",
+  "set": "west"
+ },
+ {
+  "id": 105,
+  "name": "亞瑟王",
+  "rarity": "SSR",
+  "type": "人物",
+  "prompt": "King Arthur raising the sword Excalibur in a misty lake, the Lady of the Lake's hand beneath the water",
+  "desc": "拔出石中劍的王,圓桌騎士之首。",
+  "set": "west"
+ },
+ {
+  "id": 106,
+  "name": "雅典娜",
+  "rarity": "SSR",
+  "type": "人物",
+  "prompt": "the goddess Athena in helmet and robe holding a spear and shield with an owl on her shoulder, Greek temple behind",
+  "desc": "智慧與戰爭女神,守護城邦與英雄。",
+  "set": "west"
+ },
+ {
+  "id": 107,
+  "name": "奧丁",
+  "rarity": "SSR",
+  "type": "人物",
+  "prompt": "Odin the one-eyed Norse god with long beard, wide hat and spear Gungnir, two ravens on his shoulders, storm clouds",
+  "desc": "眾神之父,以一隻眼換取智慧。",
+  "set": "west"
+ },
+ {
+  "id": 108,
+  "name": "聖杯",
+  "rarity": "SSR",
+  "type": "器物",
+  "prompt": "the Holy Grail chalice radiating light on an altar among ancient stone arches",
+  "desc": "傳說中的聖杯,尋得者得永生。",
+  "set": "west"
+ },
+ {
+  "id": 109,
+  "name": "亞特蘭提斯",
+  "rarity": "SSR",
+  "type": "風景",
+  "prompt": "the sunken city of Atlantis with columns and domes glowing under deep ocean waves, fish swimming through ruins",
+  "desc": "沉入海底的古老文明,只留下傳說。",
+  "set": "west"
+ },
+ {
+  "id": 110,
+  "name": "奧林帕斯山",
+  "rarity": "SSR",
+  "type": "風景",
+  "prompt": "Mount Olympus peak above the clouds with a grand Greek temple of the gods, golden light",
+  "desc": "眾神居住的山巔,雲端之上。",
+  "set": "west"
+ },
+ {
+  "id": 111,
+  "name": "獅鷲",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a griffin with eagle head and wings and a lion body perched on a cliff",
+  "desc": "鷹首獅身,守護寶藏與王權。",
+  "set": "west"
+ },
+ {
+  "id": 112,
+  "name": "九頭蛇",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "the nine-headed Hydra rising from a swamp, heads hissing",
+  "desc": "砍掉一個頭,又長出兩個。",
+  "set": "west"
+ },
+ {
+  "id": 113,
+  "name": "人馬",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a centaur archer with a bow galloping through a forest",
+  "desc": "半人半馬的智者與戰士。",
+  "set": "west"
+ },
+ {
+  "id": 114,
+  "name": "美人魚",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a mermaid sitting on a sea rock combing her hair in moonlight, waves",
+  "desc": "歌聲迷人,引航海者入海。",
+  "set": "west"
+ },
+ {
+  "id": 115,
+  "name": "狼人",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a werewolf howling at a full moon on a hilltop, torn clothes",
+  "desc": "月圓之夜,野獸甦醒。",
+  "set": "west"
+ },
+ {
+  "id": 116,
+  "name": "斯芬克斯",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "the Sphinx with a woman's face and lion body lying before pyramids at dusk",
+  "desc": "以謎語為關,答錯者死。",
+  "set": "west"
+ },
+ {
+  "id": 117,
+  "name": "女巫",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a witch in a pointed hat stirring a cauldron with a black cat, swirling smoke",
+  "desc": "深夜熬藥的魔法使者。",
+  "set": "west"
+ },
+ {
+  "id": 118,
+  "name": "騎士",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a knight in full plate armor holding a sword and kite shield, standing in a field with a banner",
+  "desc": "誓言與榮譽,披甲而行。",
+  "set": "west"
+ },
+ {
+  "id": 119,
+  "name": "維京戰士",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a Viking warrior with a horned-free helmet, round shield and axe on a longship prow, stormy fjord",
+  "desc": "駕長船出海的北方戰士。",
+  "set": "west"
+ },
+ {
+  "id": 120,
+  "name": "吸血鬼",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a pale vampire count in a long cloak standing before a gothic castle under a full moon, bats",
+  "desc": "永生者,畏懼日光與銀。",
+  "set": "west"
+ },
+ {
+  "id": 121,
+  "name": "梅林",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "the wizard Merlin with a long beard and staff conjuring a magic spark in a stone tower",
+  "desc": "王的導師,通曉預言與魔法。",
+  "set": "west"
+ },
+ {
+  "id": 122,
+  "name": "美杜莎",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "Medusa with hair of snakes and a stern gaze, stone statues around her",
+  "desc": "一眼石化,英雄需以盾鏡擊敗。",
+  "set": "west"
+ },
+ {
+  "id": 123,
+  "name": "海盜船長",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a pirate captain with a tricorn hat, cutlass and parrot on the deck of a ship in the wind",
+  "desc": "七海之上,無人能管的船長。",
+  "set": "west"
+ },
+ {
+  "id": 124,
+  "name": "雷神之錘",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "the hammer Mjolnir glowing with lightning on a rock, storm clouds",
+  "desc": "只有配得上的人,才舉得起來。",
+  "set": "west"
+ },
+ {
+  "id": 125,
+  "name": "潘朵拉的盒子",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "Pandora's box slightly open with dark smoke escaping and a tiny glowing light inside",
+  "desc": "打開之後,災厄散落人間,只剩希望。",
+  "set": "west"
+ },
+ {
+  "id": 126,
+  "name": "特洛伊木馬",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "the giant wooden Trojan horse before the walls of Troy at dusk",
+  "desc": "一份禮物,攻破堅城。",
+  "set": "west"
+ },
+ {
+  "id": 127,
+  "name": "水晶球",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "a fortune-teller's crystal ball on a table with a candle and tarot cards",
+  "desc": "看見的,也許是未來。",
+  "set": "west"
+ },
+ {
+  "id": 128,
+  "name": "古堡",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "a gothic castle with towers on a cliff in swirling mist and crows",
+  "desc": "霧中孤堡,藏著幾百年的故事。",
+  "set": "west"
+ },
+ {
+  "id": 129,
+  "name": "巨石陣",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "Stonehenge standing stones on a grassy plain at sunrise",
+  "desc": "人類最早的星象之謎。",
+  "set": "west"
+ },
+ {
+  "id": 130,
+  "name": "哥德大教堂",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "a towering gothic cathedral with flying buttresses and spires rising into clouds",
+  "desc": "向天空伸展的石頭祈禱。",
+  "set": "west"
+ },
+ {
+  "id": 131,
+  "name": "牛頭怪",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a Minotaur with a bull head and muscular body in a stone labyrinth",
+  "desc": "迷宮深處的怪物。",
+  "set": "west"
+ },
+ {
+  "id": 132,
+  "name": "地精",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a mischievous goblin with pointy ears crouching with a coin bag",
+  "desc": "貪財又愛惡作劇的小東西。",
+  "set": "west"
+ },
+ {
+  "id": 133,
+  "name": "巨魔",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a huge troll with a club under a stone bridge in a forest",
+  "desc": "橋下收過路費的巨人。",
+  "set": "west"
+ },
+ {
+  "id": 134,
+  "name": "精靈",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a graceful elf with a long bow and pointed ears standing in an ancient forest",
+  "desc": "長壽的林中種族,箭術無雙。",
+  "set": "west"
+ },
+ {
+  "id": 135,
+  "name": "幽靈",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a ghost in a tattered white sheet floating in a ruined hall with a candle",
+  "desc": "徘徊在舊宅裡的未了心願。",
+  "set": "west"
+ },
+ {
+  "id": 136,
+  "name": "獨眼巨人",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a Cyclops with a single eye holding a boulder at a cave mouth",
+  "desc": "只有一隻眼睛,卻很難騙。",
+  "set": "west"
+ },
+ {
+  "id": 137,
+  "name": "天馬",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "Pegasus the winged white horse flying over clouds",
+  "desc": "由海神之子化成,載英雄上天。",
+  "set": "west"
+ },
+ {
+  "id": 138,
+  "name": "石像鬼",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a stone gargoyle perched on a cathedral rooftop with wings folded, rain",
+  "desc": "夜裡守著教堂,白天化為石頭。",
+  "set": "west"
+ },
+ {
+  "id": 139,
+  "name": "巨狼",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a giant gray wolf with glowing eyes in a snowy pine forest",
+  "desc": "北歐傳說裡吞日的狼。",
+  "set": "west"
+ },
+ {
+  "id": 140,
+  "name": "吟遊詩人",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a bard with a lute singing under a tree in a village square",
+  "desc": "四處流浪,歌裡藏著各地故事。",
+  "set": "west"
+ },
+ {
+  "id": 141,
+  "name": "弓箭手",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a forest archer in a hood drawing a longbow in the woods",
+  "desc": "百步穿楊的森林俠客。",
+  "set": "west"
+ },
+ {
+  "id": 142,
+  "name": "修士",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a monk in a hooded robe copying a manuscript with a quill by candlelight in a scriptorium",
+  "desc": "抄寫與祈禱,守著知識。",
+  "set": "west"
+ },
+ {
+  "id": 143,
+  "name": "鍊金術士",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "an alchemist with flasks and a furnace in a cluttered workshop",
+  "desc": "想把鉛變成金,也想找長生。",
+  "set": "west"
+ },
+ {
+  "id": 144,
+  "name": "火槍手",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a musketeer with a feathered hat and rapier saluting in a street",
+  "desc": "一人為眾,眾人為一。",
+  "set": "west"
+ },
+ {
+  "id": 145,
+  "name": "皇后",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a queen in a long gown with a crown standing in a grand hall with tall windows",
+  "desc": "統治的人,也有孤獨。",
+  "set": "west"
+ },
+ {
+  "id": 146,
+  "name": "小丑",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a court jester with a bell cap and mask juggling in a hall",
+  "desc": "唯一敢對國王說實話的人。",
+  "set": "west"
+ },
+ {
+  "id": 147,
+  "name": "鐵匠",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a blacksmith hammering a glowing sword on an anvil, sparks flying",
+  "desc": "打造武器與命運。",
+  "set": "west"
+ },
+ {
+  "id": 148,
+  "name": "魔法書",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "an ancient thick spellbook open on a table with glowing runes and a candle",
+  "desc": "寫滿禁忌咒語的厚書。",
+  "set": "west"
+ },
+ {
+  "id": 149,
+  "name": "魔杖",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a wizard's wand with sparkling light trails on a dark table",
+  "desc": "小小一根木枝,能做大事。",
+  "set": "west"
+ },
+ {
+  "id": 150,
+  "name": "騎士盾牌",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a battered kite shield with a lion crest leaning against a stone wall",
+  "desc": "每道刮痕都是一場戰役。",
+  "set": "west"
+ },
+ {
+  "id": 151,
+  "name": "羽毛筆",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a quill pen in an inkwell next to a parchment scroll and a candle",
+  "desc": "筆尖落處,歷史成文。",
+  "set": "west"
+ },
+ {
+  "id": 152,
+  "name": "沙漏",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "an hourglass with falling sand on a wooden table, dim light",
+  "desc": "時間從不等人。",
+  "set": "west"
+ },
+ {
+  "id": 153,
+  "name": "騎士頭盔",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a knight's helm with a plume on a stone ledge, mist behind",
+  "desc": "空蕩的頭盔,守著誓言。",
+  "set": "west"
+ },
+ {
+  "id": 154,
+  "name": "燈塔",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a lighthouse on a rocky coast in a storm with a beam of light cutting through rain",
+  "desc": "為迷航的船指路。",
+  "set": "west"
+ },
+ {
+  "id": 155,
+  "name": "風車",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "an old windmill on a grassy hill under big clouds",
+  "desc": "風來了,日子就轉起來。",
+  "set": "west"
+ },
+ {
+  "id": 156,
+  "name": "橡樹森林",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "an ancient oak forest with twisted trunks and mist and a faint path",
+  "desc": "傳說裡精靈與女巫的家。",
+  "set": "west"
+ },
+ {
+  "id": 157,
+  "name": "峽灣",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a Nordic fjord with steep cliffs, still water and a tiny boat",
+  "desc": "冰河切出來的深藍水道。",
+  "set": "west"
+ },
+ {
+  "id": 158,
+  "name": "羅馬競技場",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "the Roman Colosseum ruins at sunset with crows",
+  "desc": "曾經萬人歡呼,如今只剩風聲。",
+  "set": "west"
+ },
+ {
+  "id": 159,
+  "name": "石橋小鎮",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a medieval stone bridge over a river with a small half-timbered town in mist",
+  "desc": "河上有橋,橋邊有炊煙。",
+  "set": "west"
+ },
+ {
+  "id": 160,
+  "name": "渡鴉",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a raven perched on a bare branch",
+  "desc": "烏黑的使者,傳遞凶兆與消息。",
+  "set": "west"
+ },
+ {
+  "id": 161,
+  "name": "貓頭鷹",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "an owl on a branch at night with a full moon",
+  "desc": "智慧的象徵,夜裡看得最清。",
+  "set": "west"
+ },
+ {
+  "id": 162,
+  "name": "黑貓",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a black cat sitting on a fence with a crescent moon",
+  "desc": "女巫的夥伴。",
+  "set": "west"
+ },
+ {
+  "id": 163,
+  "name": "紅狐",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a red fox trotting through snow",
+  "desc": "狡猾又機靈。",
+  "set": "west"
+ },
+ {
+  "id": 164,
+  "name": "雄鹿",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a stag with large antlers standing in a misty forest",
+  "desc": "森林的王。",
+  "set": "west"
+ },
+ {
+  "id": 165,
+  "name": "天鵝",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a white swan gliding on a calm lake with reeds",
+  "desc": "優雅,也傳說會在臨終時歌唱。",
+  "set": "west"
+ },
+ {
+  "id": 166,
+  "name": "白馬",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a white horse standing in a meadow under a big sky",
+  "desc": "騎士最忠誠的夥伴。",
+  "set": "west"
+ },
+ {
+  "id": 167,
+  "name": "棕熊",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a brown bear standing by a river catching a fish",
+  "desc": "森林裡的大力士。",
+  "set": "west"
+ },
+ {
+  "id": 168,
+  "name": "野豬",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a wild boar in an autumn forest",
+  "desc": "兇猛的森林獵物。",
+  "set": "west"
+ },
+ {
+  "id": 169,
+  "name": "蝙蝠",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a bat hanging upside down from a branch at dusk",
+  "desc": "夜裡的飛行者。",
+  "set": "west"
+ },
+ {
+  "id": 170,
+  "name": "毒蛇",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a coiled snake on a stone",
+  "desc": "一口咬下,不留餘地。",
+  "set": "west"
+ },
+ {
+  "id": 171,
+  "name": "獵鷹",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a falcon perched on a gloved hand",
+  "desc": "貴族打獵的夥伴。",
+  "set": "west"
+ },
+ {
+  "id": 172,
+  "name": "刺蝟",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a hedgehog in autumn leaves",
+  "desc": "一身刺,心卻軟。",
+  "set": "west"
+ },
+ {
+  "id": 173,
+  "name": "兔子",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a rabbit sitting in tall grass",
+  "desc": "跳進洞裡,就是另一個世界。",
+  "set": "west"
+ },
+ {
+  "id": 174,
+  "name": "牧羊人",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a shepherd with a crook and a few sheep on a hill",
+  "desc": "守著羊群看天色。",
+  "set": "west"
+ },
+ {
+  "id": 175,
+  "name": "麵包師",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a baker pulling bread from a wood oven in a small shop",
+  "desc": "天沒亮就開始忙。",
+  "set": "west"
+ },
+ {
+  "id": 176,
+  "name": "水手",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a sailor in a striped shirt pulling a rope on a ship deck",
+  "desc": "一生都在浪上。",
+  "set": "west"
+ },
+ {
+  "id": 177,
+  "name": "修女",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a nun in a habit walking in a cloister with a lantern",
+  "desc": "安靜的祈禱者。",
+  "set": "west"
+ },
+ {
+  "id": 178,
+  "name": "獵人",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a hunter with a hat and rifle and a dog in the forest",
+  "desc": "與山林為伍。",
+  "set": "west"
+ },
+ {
+  "id": 179,
+  "name": "農婦",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a farm woman carrying a basket of wheat in a field",
+  "desc": "一年忙到頭的收成。",
+  "set": "west"
+ },
+ {
+  "id": 180,
+  "name": "小提琴手",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a violinist playing in a street under a lamp",
+  "desc": "拉出一整座城市的夜。",
+  "set": "west"
+ },
+ {
+  "id": 181,
+  "name": "磨坊主",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a miller carrying a sack of flour near a windmill",
+  "desc": "風吹來的麵粉。",
+  "set": "west"
+ },
+ {
+  "id": 182,
+  "name": "老學者",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "an old scholar with spectacles reading a huge book by candlelight",
+  "desc": "一輩子讀不完的書。",
+  "set": "west"
+ },
+ {
+  "id": 183,
+  "name": "小公主",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a young princess in a simple dress looking out a tower window",
+  "desc": "塔上的小小期待。",
+  "set": "west"
+ },
+ {
+  "id": 184,
+  "name": "燈夫",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a lamplighter with a pole lighting a street lamp at dusk",
+  "desc": "把夜晚一盞盞點亮。",
+  "set": "west"
+ },
+ {
+  "id": 185,
+  "name": "蠟燭",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a single burning candle in a brass holder",
+  "desc": "一點微光,足夠看路。",
+  "set": "west"
+ },
+ {
+  "id": 186,
+  "name": "古董鑰匙",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an ornate antique key on a table",
+  "desc": "開得了什麼門,誰也不知道。",
+  "set": "west"
+ },
+ {
+  "id": 187,
+  "name": "懷錶",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an open pocket watch on a chain",
+  "desc": "滴答的是時間,也是回憶。",
+  "set": "west"
+ },
+ {
+  "id": 188,
+  "name": "橡木酒桶",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a wooden wine barrel in a cellar",
+  "desc": "醞釀一年又一年。",
+  "set": "west"
+ },
+ {
+  "id": 189,
+  "name": "馬燈",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an old lantern with a glowing flame hanging on a hook",
+  "desc": "夜路上的一點暖光。",
+  "set": "west"
+ },
+ {
+  "id": 190,
+  "name": "長弓",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a longbow and a few arrows leaning on a wall",
+  "desc": "拉滿的是力氣,也是耐心。",
+  "set": "west"
+ },
+ {
+  "id": 191,
+  "name": "航海羅盤",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a brass compass on an old sea map",
+  "desc": "不管風往哪吹,針只指向北。",
+  "set": "west"
+ },
+ {
+  "id": 192,
+  "name": "地球儀",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an antique globe on a wooden stand",
+  "desc": "世界,在手裡轉了一圈。",
+  "set": "west"
+ },
+ {
+  "id": 193,
+  "name": "玫瑰",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a single rose with thorns lying on a table",
+  "desc": "美麗的,也是帶刺的。",
+  "set": "west"
+ },
+ {
+  "id": 194,
+  "name": "麥田",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a golden wheat field with wind and a lone tree",
+  "desc": "風吹過,像海浪。",
+  "set": "west"
+ },
+ {
+  "id": 195,
+  "name": "薰衣草田",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a lavender field with rows to the horizon",
+  "desc": "紫色的香氣一直鋪到天邊。",
+  "set": "west"
+ },
+ {
+  "id": 196,
+  "name": "秋日森林",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "an autumn forest with falling leaves and a quiet path",
+  "desc": "落葉鋪成路。",
+  "set": "west"
+ },
+ {
+  "id": 197,
+  "name": "雪山小屋",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a small wooden cabin in snow-covered mountains with a chimney smoke",
+  "desc": "風雪裡的一盞燈。",
+  "set": "west"
+ },
+ {
+  "id": 198,
+  "name": "石拱橋",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "an old stone arch bridge over a stream with moss",
+  "desc": "走過了很多人的橋。",
+  "set": "west"
+ },
+ {
+  "id": 199,
+  "name": "海邊懸崖",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a sea cliff with waves crashing and seagulls",
+  "desc": "浪打在崖上,從不停歇。",
+  "set": "west"
+ },
+ {
+  "id": 200,
+  "name": "墓園月夜",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "an old cemetery with crooked crosses under a moon, mist",
+  "desc": "安靜,卻不孤單。",
+  "set": "west"
+ }
+]

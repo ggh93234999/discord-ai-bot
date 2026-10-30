@@ -107,7 +107,7 @@ const GAMES = [
   { id: "forge", cat: "life", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
   { id: "factory", cat: "life", wide: true, cls: "factorycard", icon: "🏭", name: "自動化工廠", players: "1 人", desc: "挖礦、熔鍊、組裝，用傳送帶把產品送去出貨口換錢（原型）", mount: mountFactory },
   { id: "forgeboard", cat: "life", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
-  { id: "gachacards", cat: "life", wide: true, icon: "🎴", name: "水墨卡冊", players: "不限", desc: "100 張水墨風卡牌：神獸、人物、器物、山水，目前先展示，之後會加入抽卡", mount: mountGachaCards },
+  { id: "gachacards", cat: "life", wide: true, icon: "🎴", name: "水墨卡冊", players: "不限", desc: "200 張水墨風卡牌：東方 100 張（神獸、人物、器物、山水）加西方 100 張（幻獸、人物、器物、風景），目前先展示，之後會加入抽卡", mount: mountGachaCards },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },

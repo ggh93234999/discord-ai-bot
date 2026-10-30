@@ -8,23 +8,29 @@ const RNAME = { SSR: "傳說", SR: "稀世", R: "珍品", N: "凡品" };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 export function mountGachaCards(root, { back }) {
-  let filter = "all", type = "all";
-  const counts = Object.fromEntries(RAR.map((r) => [r, CARDS.filter((c) => c.rarity === r).length]));
+  let filter = "all", type = "all", set = "all";
+  const inSet = (c) => set === "all" || c.set === set;
+  const counts = () => Object.fromEntries(RAR.map((r) => [r, CARDS.filter((c) => inSet(c) && c.rarity === r).length]));
   root.innerHTML = `
     <div class="game gcards">
       <header><button class="back">← 選單</button><h2>🎴 水墨卡冊</h2><span></span></header>
-      <div class="gc-hint">共 ${CARDS.length} 張　${RAR.map((r) => `<b class="gc-r ${r}">${r}</b> ${counts[r]}`).join("　")}</div>
+      <div class="gc-hint"></div>
+      <div class="gc-tabs gc-set"></div>
       <div class="gc-tabs gc-rar"></div>
       <div class="gc-tabs gc-typ"></div>
       <div class="gc-grid"></div>
     </div>`;
-  const rarEl = root.querySelector(".gc-rar"), typEl = root.querySelector(".gc-typ"), grid = root.querySelector(".gc-grid");
-  const types = [...new Set(CARDS.map((c) => c.type))];
+  const hintEl = root.querySelector(".gc-hint"), setEl = root.querySelector(".gc-set"), rarEl = root.querySelector(".gc-rar"), typEl = root.querySelector(".gc-typ"), grid = root.querySelector(".gc-grid");
   const tabs = (el, list, cur, key) => { el.innerHTML = list.map(([v, t]) => `<button class="tab${cur === v ? " on" : ""}" data-${key}="${v}">${t}</button>`).join(""); };
   function draw() {
+    const types = [...new Set(CARDS.filter(inSet).map((c) => c.type))];
+    if (type !== "all" && !types.includes(type)) type = "all";
+    const n = counts(), total = CARDS.filter(inSet).length;
+    hintEl.innerHTML = `共 ${total} 張　${RAR.map((r) => `<b class="gc-r ${r}">${r}</b> ${n[r]}`).join("　")}`;
+    tabs(setEl, [["all", "全部"], ["east", "東方"], ["west", "西方"]], set, "s");
     tabs(rarEl, [["all", "全部"], ...RAR.map((r) => [r, r])], filter, "r");
     tabs(typEl, [["all", "全部類別"], ...types.map((t) => [t, t])], type, "t");
-    const list = CARDS.filter((c) => (filter === "all" || c.rarity === filter) && (type === "all" || c.type === type))
+    const list = CARDS.filter((c) => inSet(c) && (filter === "all" || c.rarity === filter) && (type === "all" || c.type === type))
       .sort((a, b) => RAR.indexOf(a.rarity) - RAR.indexOf(b.rarity) || a.id - b.id);
     grid.innerHTML = list.length ? list.map((c) => `
       <button class="gc-card ${c.rarity}" data-id="${c.id}">
@@ -48,8 +54,8 @@ export function mountGachaCards(root, { back }) {
     return idx;
   }
   root.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-r],[data-t]");
-    if (t && t.closest(".gc-tabs")) { if (t.dataset.r !== undefined) filter = t.dataset.r; if (t.dataset.t !== undefined) type = t.dataset.t; draw(); return; }
+    const t = e.target.closest("[data-r],[data-t],[data-s]");
+    if (t && t.closest(".gc-tabs")) { if (t.dataset.r !== undefined) filter = t.dataset.r; if (t.dataset.t !== undefined) type = t.dataset.t; if (t.dataset.s !== undefined) set = t.dataset.s; draw(); return; }
     const c = e.target.closest(".gc-card"); if (c) detail(Number(c.dataset.id));
   });
   root.querySelector(".back").addEventListener("click", () => back());
