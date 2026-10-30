@@ -70,11 +70,19 @@ function collidePlayers(sim) {
       const a = al[i], b = al[j];
       const px = Math.min(a.x, b.x) + DKW - Math.max(a.x, b.x), py = Math.min(a.y, b.y) + DKH - Math.max(a.y, b.y);
       if (px <= 0 || py <= 0) continue;
-      {   // 人不能疊在別人頭上：不論上下左右，重疊就沿水平方向推開（從頭上落下的會滑到旁邊）
+      if (py < px) {
+        const up = a.y < b.y ? a : b, lo = up === a ? b : a;
+        up.y = lo.y - DKH; up.vy = Math.min(up.vy, lo.vy < 0 ? lo.vy : 0); up.cr = true;
+      } else {   // 左右相撞：像推箱子，往對方走的人把對方整個推著走；推不動（對方頂到牆）換自己被擋住
         const l = a.x < b.x ? a : b, r = l === a ? b : a, lim = (v) => Math.max(WALL, Math.min(DW - WALL - DKW, v));
-        l.x = lim(l.x - px / 2); r.x = lim(r.x + px / 2);
-        const rest = l.x + DKW - r.x;
-        if (rest > 0) { if (r.x < DW - WALL - DKW) r.x = lim(r.x + rest); if (l.x + DKW > r.x) l.x = lim(r.x - DKW); }
+        const lp = l.dir > 0, rp = r.dir < 0;          // l 往右推、r 往左推
+        if (lp && !rp) { r.x = lim(r.x + px); l.x = lim(r.x - DKW); }
+        else if (rp && !lp) { l.x = lim(l.x - px); r.x = lim(l.x + DKW); }
+        else {
+          l.x = lim(l.x - px / 2); r.x = lim(r.x + px / 2);
+          const rest = l.x + DKW - r.x;
+          if (rest > 0) { if (r.x < DW - WALL - DKW) r.x = lim(r.x + rest); if (l.x + DKW > r.x) l.x = lim(r.x - DKW); }
+        }
       }
     }
   }
@@ -104,6 +112,7 @@ function stepDown(sim, input) {
     const inp = input[p.seat] || {};
     const dir = (inp.r ? 1 : 0) - (inp.l ? 1 : 0);
     if (dir) p.face = dir;
+    p.dir = dir;
     p.walk = dir !== 0;
     if (p.hurt > 0) p.hurt--;
     let vx = dir * 4.6;
