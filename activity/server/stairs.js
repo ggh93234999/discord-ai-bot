@@ -129,7 +129,7 @@ function stepDown(sim, input) {
       if (p.vy >= 0) {
         let hit = null;
         for (const pl of sim.plats) {
-          if (pl.flip || pl.t > 0 || pl.id === p.pass) continue;
+          if (pl.flip || pl.id === p.pass) continue;
           if (p.x + DKW > pl.x + 4 && p.x < pl.x + pl.w - 4 && bottom >= pl.y && prevBottom <= pl.y + sp + 2 && (!hit || pl.y < hit.y)) hit = pl;
         }
         if (hit) land(p, hit);
