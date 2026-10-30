@@ -5,7 +5,7 @@
 // 可疊加（開桌可關）：被 +2 的人可以再出 +2（或 +4）轉給下家，累計張數；被 +4 的人可以再出 +4；不想疊或不能疊的人把累計的牌全部抽起來並被跳過。
 // 可質疑 +4（開桌可關）：+4 本來只能在手上沒有「目前顏色」的牌時出；被 +4 的人可以質疑：出牌的人真的有該色牌 → 他抽 4 張、你照常出牌；沒有 → 你抽 6 張並被跳過。
 // 喊 UNO：剩最後一張時要按「UNO!」（剩 2 張要出牌前也可以先按）；沒喊的話，在下一位玩家動作之前被別人「抓」到，罰抽 2 張。
-// 起始牌若是功能牌也會生效（跳過／迴轉／+2／變色）。沒有牌可出就按「抽牌」，一次抽一張，抽到能出的牌為止（沒得出要自己繼續按）：那張可以馬上出（也可以不出）；牌堆抽光了才換下家。
+// 起始牌若是功能牌也會生效（跳過／迴轉／+2／變色）。沒有牌可出就按「抽牌」，一次抽一張，抽到能出的牌為止（沒得出要自己繼續按），抽到就一定要出，沒有「過」；牌堆抽光了才換下家。
 // 計分：贏的人收其他人手上剩的牌點（數字牌＝面值、功能牌 20、變色牌 50）× 每點點數，輸的人各付自己的。
 // 伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
@@ -190,7 +190,7 @@ function doDraw(t, i) {                                                    // �
   h.last = { seat: i, card: -1, draw: 1 };
   if (!got.length) { t.log = `${t.seats[i].name} 牌堆抽光了，過`; setTurn(t, nextSeat(h, i)); return true; }
   h.deadline = now() + TURN_MS; h.botAt = now() + BOT_MS[0];
-  if (canPlayOn(h, got[0])) { h.drawn = got[0]; t.log = `${t.seats[i].name} 抽到能出的牌`; }      // 可以馬上出，或按「過」
+  if (canPlayOn(h, got[0])) { h.drawn = got[0]; t.log = `${t.seats[i].name} 抽到能出的牌，要出牌`; }      // 沒有「過」：一定要出牌才換人
   else t.log = `${t.seats[i].name} 抽了一張，還是不能出，繼續抽`;
   return true;
 }
@@ -266,7 +266,7 @@ function view(t, ws) {
   v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0 });
   if (h && t.phase === "play") {
     Object.assign(v, { turn: h.turn, top: h.top, color: h.color, dir: h.dir, deck: h.deck.length, last: h.last, deadline: h.deadline, pend: h.pend ? { kind: h.pend.kind, total: h.pend.total, from: h.pend.from, victim: h.pend.victim, canChal: h.pend.canChal } : null, unoSeat: h.uno && h.uno.called ? h.uno.seat : -1, drawn: h.drawn != null && h.turn === you ? h.drawn : null });
-    if (you >= 0) { v.hand = h.hands[you]; v.playable = h.turn === you ? playable(h, you) : []; v.canDraw = h.turn === you && h.drawn == null && !h.pend; v.canAccept = !!h.pend && h.turn === you; v.canPass = h.turn === you && h.drawn != null; }
+    if (you >= 0) { v.hand = h.hands[you]; v.playable = h.turn === you ? playable(h, you) : []; v.canDraw = h.turn === you && h.drawn == null && !h.pend; v.canAccept = !!h.pend && h.turn === you; v.canPass = false; }
   }
   if (t.phase === "result") { v.result = t.result; v.nextAt = t.nextAt; if (t.h) { v.top = t.h.top; v.color = t.h.color; } }
   return v;
@@ -375,7 +375,7 @@ export function handleUno(ws, m) {
   } else if (m.t === "unact") {
     if (mine < 0 || t.phase !== "play") return true;
     const a = String(m.a || "");
-    const ok = a === "play" ? doPlay(t, mine, Number(m.card), m.color) : a === "draw" ? doDraw(t, mine) : a === "pass" ? doPass(t, mine) : a === "accept" ? doAccept(t, mine) : a === "challenge" ? doChallenge(t, mine) : false;
+    const ok = a === "play" ? doPlay(t, mine, Number(m.card), m.color) : a === "draw" ? doDraw(t, mine) : a === "accept" ? doAccept(t, mine) : a === "challenge" ? doChallenge(t, mine) : false;
     if (ok) push(t); else out(ws, { t: "unerr", error: "illegal" });
   }
   return true;

@@ -128,7 +128,7 @@ export function mountUno(opts = {}) {
         const hand = `<div class="brhand bthand unhand${myTurn ? " act" : ""}">${(st.hand || []).map((c) => card(c, `big${myTurn && can.has(c) ? " can" : ""}`, `data-c="${c}"`)).join("")}</div>`;
         const pd = st.pend;
         const tip = pd ? (myTurn ? `${nm(pd.from)} 出了 ${pd.kind === "f" ? "+4" : "+2"}，累計要抽 ${pd.total} 張：${can.size ? "可以疊一張" : "你沒有可疊的牌"}${pd.canChal ? "、質疑，" : "，"}或全部抽起來` : `${nm(pd.victim)} 要決定：累計 ${pd.total} 張（疊／質疑／抽）`)
-          : myTurn ? (st.drawn != null ? "抽到的牌可以出，不想出就按「過」" : can.size ? "輪到你：點一張亮著的牌，或按「抽牌」" : "你沒有牌可以出，按「抽牌」") : `等 ${nm(st.turn)} 出牌…`;
+          : myTurn ? (st.drawn != null ? "抽到能出的牌了，點亮著的牌出牌（沒有「過」，一定要出）" : can.size ? "輪到你：點一張亮著的牌，或按「抽牌」" : "你沒有牌可以出，按「抽牌」") : `等 ${nm(st.turn)} 出牌…`;
         const callBtn = (st.hand.length === 2 && myTurn && !pd) || (st.hand.length === 1 && st.unoSeat !== you) ? `<button class="mb uncall">UNO！</button>` : "";
         const btns = myTurn || callBtn ? `<div class="btbtns">${st.canAccept ? `<button class="mb unacc">抽 ${pd.total} 張</button>` : ""}${st.canAccept && pd.canChal ? `<button class="mb ghost unchal">質疑 +4</button>` : ""}${callBtn}${st.canDraw ? `<button class="mb undraw">抽牌</button>` : ""}${st.canPass ? `<button class="mb ghost unpass">過</button>` : ""}</div>` : "";
         const pick = pickWild >= 0 ? `<div class="unpick"><b>選新的顏色</b><div>${[0, 1, 2, 3].map((k) => `<button class="uncolor c${COLOR[k]} big" data-col="${k}">${CNAME[k]}</button>`).join("")}</div><button class="mb ghost unpx">取消</button></div>` : "";
