@@ -29,7 +29,7 @@
   "rarity": "SSR",
   "type": "人物",
   "desc": "偷服仙藥,飛升月宮,一世清冷。",
-  "prompt": "Chang'e the moon goddess in flowing robes floating up toward a huge full moon, osmanthus branch"
+  "prompt": "Chang'e, an exquisitely beautiful young Chinese woman of Tang dynasty elegance, delicate oval face with refined features, rosy cheeks and wistful gaze looking back down at the earth, glossy black hair in an elaborate high cloud bun with jade hairpins and tassels, wearing layered flowing silk hanfu in pale rose and sky blue with long trailing sleeves and floating ribbon scarves, graceful dancing pose as she floats upward, a small jade rabbit in her arms, a huge full moon behind her, osmanthus branch, not a Buddhist figure, no halo, no lotus, no white nun robe, glamorous and romantic"
  },
  {
   "id": 5,
@@ -53,7 +53,7 @@
   "rarity": "SR",
   "type": "神獸",
   "desc": "通曉萬物,識盡天下妖怪之名。",
-  "prompt": "the wise beast Baize, a lion-like creature with horns and extra eyes along its body, standing calmly"
+  "prompt": "Baize, the mythical Chinese beast from the Yellow Emperor legend: the body of a large lion-like beast with a full flowing mane, a long white beard like a wise elder, two curved horns on the head, a human-like intelligent face, additional eyes along its chest and flanks (nine eyes in total), strong clawed legs, standing on a misty mountain at Mount Dongheng, ancient and wise, majestic"
  },
  {
   "id": 8,
@@ -125,7 +125,7 @@
   "rarity": "R",
   "type": "神獸",
   "desc": "貪食之獸,吞盡一切,連自己也吞下。",
-  "prompt": "the fearsome taotie beast with big eyes, horns and gaping mouth, bronze-vessel pattern style"
+  "prompt": "Taotie, the ancient Chinese gluttonous monster: a gigantic head with no lower body, huge bulging round eyes, curved ram-like horns, an enormous gaping mouth full of sharp fangs, swirling spiral patterns on its face like Shang dynasty bronze ware, devouring everything around it, ominous black mist and bones, fearsome and savage"
  },
  {
   "id": 17,
@@ -398,5 +398,405 @@
   "type": "山水",
   "desc": "遠山如黛,松下聽雲。",
   "prompt": "distant layered mountains with a lone pine in the foreground and drifting cloud"
+ },
+ {
+  "id": 51,
+  "name": "燭龍",
+  "rarity": "SSR",
+  "type": "神獸",
+  "desc": "睜眼為晝,閉眼為夜,吹氣成冬,呼氣成夏。",
+  "prompt": "Zhulong the torch dragon, a colossal red serpentine dragon with a human face, whose open eye brings daylight, coiling around a dark mountain, flames and cosmic mist"
+ },
+ {
+  "id": 52,
+  "name": "鯤鵬",
+  "rarity": "SSR",
+  "type": "神獸",
+  "desc": "北冥有魚,化而為鳥,怒而飛,其翼若垂天之雲。",
+  "prompt": "Kunpeng, a gigantic fish transforming into a gigantic roc bird rising from the northern sea, wings covering the sky, huge waves"
+ },
+ {
+  "id": 53,
+  "name": "西王母",
+  "rarity": "SSR",
+  "type": "人物",
+  "desc": "崑崙之主,掌不死之藥,蟠桃三千年一熟。",
+  "prompt": "Xiwangmu the Queen Mother of the West, in elaborate immortal robes with a phoenix crown, holding a peach, sitting on clouds with cranes"
+ },
+ {
+  "id": 54,
+  "name": "盤古",
+  "rarity": "SSR",
+  "type": "人物",
+  "desc": "開天闢地,身化山川日月。",
+  "prompt": "Pangu the primordial giant splitting chaos with a great axe, egg-shaped chaos cracking, light and darkness separating, mountains forming"
+ },
+ {
+  "id": 55,
+  "name": "瑤池仙境",
+  "rarity": "SSR",
+  "type": "山水",
+  "desc": "仙人宴飲之處,一滴水也有靈氣。",
+  "prompt": "the Jade Pool paradise, a luminous lake surrounded by floating peaks, pavilions, peach trees and cranes, auspicious clouds"
+ },
+ {
+  "id": 56,
+  "name": "青龍",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "東方守護,春之神,行雲布雨。",
+  "prompt": "the Azure Dragon of the East, a green-tinged dragon coiling through clouds above the sea"
+ },
+ {
+  "id": 57,
+  "name": "朱雀",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "南方守護,夏之神,烈焰是它的羽毛。",
+  "prompt": "the Vermilion Bird of the South, a crimson fire bird with long tail feathers spread wide"
+ },
+ {
+  "id": 58,
+  "name": "窮奇",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "生有雙翼,專吃好人,是最兇的惡獸。",
+  "prompt": "the fearsome qiongqi, a winged tiger-like beast with spiky fur and fangs, prowling in storm"
+ },
+ {
+  "id": 59,
+  "name": "精衛",
+  "rarity": "SR",
+  "type": "神獸",
+  "desc": "銜西山木石,以填東海,不死不休。",
+  "prompt": "Jingwei, a small bird with a pebble in its beak flying over stormy sea toward waves"
+ },
+ {
+  "id": 60,
+  "name": "後羿",
+  "rarity": "SR",
+  "type": "人物",
+  "desc": "射落九日,救蒼生於焦土。",
+  "prompt": "Hou Yi the divine archer drawing a huge bow aiming at suns in the sky, wind-swept robes, on a mountain peak"
+ },
+ {
+  "id": 61,
+  "name": "夸父",
+  "rarity": "SR",
+  "type": "人物",
+  "desc": "與日逐走,渴死前化為桃林。",
+  "prompt": "Kuafu the giant chasing the sun across a vast desert horizon, staff in hand, tiny sun in the sky"
+ },
+ {
+  "id": 62,
+  "name": "鍾馗",
+  "rarity": "SR",
+  "type": "人物",
+  "desc": "捉鬼天師,一身正氣,百鬼避讓。",
+  "prompt": "Zhong Kui the demon-slayer with fierce bearded face, official hat, sword raised, ghosts fleeing around him"
+ },
+ {
+  "id": 63,
+  "name": "照妖鏡",
+  "rarity": "SR",
+  "type": "器物",
+  "desc": "鏡裡的影子,比人還誠實。",
+  "prompt": "a magical ancient demon-revealing mirror glowing faintly, reflecting a monstrous shadow, ornate frame"
+ },
+ {
+  "id": 64,
+  "name": "青銅鼎",
+  "rarity": "SR",
+  "type": "器物",
+  "desc": "國之重器,問鼎者天下人共逐之。",
+  "prompt": "an ancient bronze ding tripod cauldron with taotie patterns and rising incense smoke, mist"
+ },
+ {
+  "id": 65,
+  "name": "赤壁江山",
+  "rarity": "SR",
+  "type": "山水",
+  "desc": "大江東去,浪淘盡千古風流人物。",
+  "prompt": "the Red Cliff river scene, steep cliffs over a wide river, a single sailboat under a pale moon"
+ },
+ {
+  "id": 66,
+  "name": "夔",
+  "rarity": "R",
+  "type": "神獸",
+  "desc": "一足之獸,出入水必有風雨,聲如雷。",
+  "prompt": "the one-legged thunder beast Kui, an ox-like creature with no horns drumming thunder, mist and rain"
+ },
+ {
+  "id": 67,
+  "name": "狻猊",
+  "rarity": "R",
+  "type": "神獸",
+  "desc": "龍之九子,喜靜好坐,常伴香爐。",
+  "prompt": "a suanni lion-dragon beast sitting calmly with curled mane, incense smoke from its mouth"
+ },
+ {
+  "id": 68,
+  "name": "書生",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "十年寒窗,只為一榜功名。",
+  "prompt": "a young scholar with a bookcase on his back crossing a wooden bridge in light rain, carrying an umbrella"
+ },
+ {
+  "id": 69,
+  "name": "繡女",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "針線之間,繡出的是心事。",
+  "prompt": "a lady embroidering on a balcony beside blooming peonies, delicate brush strokes"
+ },
+ {
+  "id": 70,
+  "name": "武僧",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "禪武合一,一棍震山河。",
+  "prompt": "a Shaolin monk in a martial stance with a staff on a stone courtyard, motion blur"
+ },
+ {
+  "id": 71,
+  "name": "醫者",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "懸壺濟世,救人不問貴賤。",
+  "prompt": "a village physician with a medicine box examining herbs, a stream and mountain behind"
+ },
+ {
+  "id": 72,
+  "name": "棋士",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "一局終了,山中已千年。",
+  "prompt": "two elders playing go beneath a pine tree on a mountain top, tea on a stone table"
+ },
+ {
+  "id": 73,
+  "name": "酒仙",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "舉杯邀明月,對影成三人。",
+  "prompt": "a drunken poet leaning on a rock with a wine jar, laughing, moon above"
+ },
+ {
+  "id": 74,
+  "name": "詩人",
+  "rarity": "R",
+  "type": "人物",
+  "desc": "筆落驚風雨,詩成泣鬼神。",
+  "prompt": "a poet in robes writing a poem on a cliff beside a waterfall, brush in hand"
+ },
+ {
+  "id": 75,
+  "name": "玉璽",
+  "rarity": "R",
+  "type": "器物",
+  "desc": "受命於天,既壽永昌。",
+  "prompt": "an imperial jade seal with a dragon handle on a silk cushion"
+ },
+ {
+  "id": 76,
+  "name": "羅盤",
+  "rarity": "R",
+  "type": "器物",
+  "desc": "指南針只指方向,不指前途。",
+  "prompt": "an ancient Chinese feng shui luopan compass with concentric rings on a table"
+ },
+ {
+  "id": 77,
+  "name": "竹簡",
+  "rarity": "R",
+  "type": "器物",
+  "desc": "字字句句,都是先人留下的話。",
+  "prompt": "bamboo slips bound with string, unrolled partly, a brush and ink stone beside them"
+ },
+ {
+  "id": 78,
+  "name": "雪嶺",
+  "rarity": "R",
+  "type": "山水",
+  "desc": "千山雪壓,一點炊煙。",
+  "prompt": "snow-covered mountain ridge with bare pines and a tiny hut, large blank sky"
+ },
+ {
+  "id": 79,
+  "name": "桃花源",
+  "rarity": "R",
+  "type": "山水",
+  "desc": "忽逢桃花林,夾岸數百步,中無雜樹。",
+  "prompt": "a hidden valley of blooming peach trees beside a stream with a small cave entrance and thatched houses"
+ },
+ {
+  "id": 80,
+  "name": "煙雨江南",
+  "rarity": "R",
+  "type": "山水",
+  "desc": "小橋流水,煙雨朦朧。",
+  "prompt": "a misty Jiangnan water town with stone bridges, willows, boats and white-walled houses in light rain"
+ },
+ {
+  "id": 81,
+  "name": "白鷺",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "一行白鷺上青天。",
+  "prompt": "a white egret standing in shallow water with reeds"
+ },
+ {
+  "id": 82,
+  "name": "山雀",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "枝頭輕巧,不問世事。",
+  "prompt": "a small tit bird on a bamboo branch"
+ },
+ {
+  "id": 83,
+  "name": "小狐",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "還沒學會修煉,先學會好奇。",
+  "prompt": "a young fox cub sitting in tall grass looking up at the moon"
+ },
+ {
+  "id": 84,
+  "name": "野鴨",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "鴛鴦戲水,不羨仙。",
+  "prompt": "a pair of mandarin ducks floating on a pond among lotus"
+ },
+ {
+  "id": 85,
+  "name": "蝴蝶",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "莊周夢蝶,蝶夢莊周。",
+  "prompt": "a butterfly resting on a peony flower"
+ },
+ {
+  "id": 86,
+  "name": "青蛙",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "雨一下,蛙聲連成一片。",
+  "prompt": "a green frog on a lotus leaf in rain"
+ },
+ {
+  "id": 87,
+  "name": "燕子",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "舊時王謝堂前燕,飛入尋常百姓家。",
+  "prompt": "a swallow flying beneath willow branches in spring rain"
+ },
+ {
+  "id": 88,
+  "name": "松鼠",
+  "rarity": "N",
+  "type": "神獸",
+  "desc": "把冬天的糧食藏好了嗎?",
+  "prompt": "a squirrel on a pine branch holding a pine cone"
+ },
+ {
+  "id": 89,
+  "name": "洗衣婦",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "溪邊的日子,簡單而長。",
+  "prompt": "a woman washing clothes by a stream with a wooden paddle, willows"
+ },
+ {
+  "id": 90,
+  "name": "轎夫",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "一肩挑起別人的路。",
+  "prompt": "two sedan chair bearers carrying a palanquin on a mountain path"
+ },
+ {
+  "id": 91,
+  "name": "更夫",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "天乾物燥,小心火燭。",
+  "prompt": "a night watchman with a lantern and a bamboo clapper walking an empty alley"
+ },
+ {
+  "id": 92,
+  "name": "貨郎",
+  "rarity": "N",
+  "type": "人物",
+  "desc": "搖鼓一響,孩子們全跑出來。",
+  "prompt": "a traveling peddler with a pole carrying hanging goods and a rattle drum"
+ },
+ {
+  "id": 93,
+  "name": "硯台",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "墨香來自日復一日的研磨。",
+  "prompt": "an inkstone with ink pool and a brush"
+ },
+ {
+  "id": 94,
+  "name": "折扇",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "一扇在手,風雅自來。",
+  "prompt": "a folding fan half open with a painted bamboo scene"
+ },
+ {
+  "id": 95,
+  "name": "算盤",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "撥一撥,帳就清了。",
+  "prompt": "an abacus on a wooden counter"
+ },
+ {
+  "id": 96,
+  "name": "花瓶",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "一枝獨秀,不需多。",
+  "prompt": "a celadon vase with a single plum branch"
+ },
+ {
+  "id": 97,
+  "name": "竹籃",
+  "rarity": "N",
+  "type": "器物",
+  "desc": "進山採藥,日落而歸。",
+  "prompt": "a woven bamboo basket with herbs and a sickle"
+ },
+ {
+  "id": 98,
+  "name": "蘭花",
+  "rarity": "N",
+  "type": "山水",
+  "desc": "空谷幽蘭,不為無人而不香。",
+  "prompt": "an orchid with long curving leaves and delicate flowers, a few bold strokes"
+ },
+ {
+  "id": 99,
+  "name": "竹石",
+  "rarity": "N",
+  "type": "山水",
+  "desc": "咬定青山不放鬆。",
+  "prompt": "bamboo growing beside a gnarled rock, few strokes, lots of white"
+ },
+ {
+  "id": 100,
+  "name": "秋楓",
+  "rarity": "N",
+  "type": "山水",
+  "desc": "霜葉紅於二月花。",
+  "prompt": "a maple tree with falling leaves beside a stream"
  }
 ]
