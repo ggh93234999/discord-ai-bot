@@ -32,6 +32,7 @@ export function mountGachaCards(root, { back }) {
     tabs(typEl, [["all", "全部類別"], ...types.map((t) => [t, t])], type, "t");
     const list = CARDS.filter((c) => inSet(c) && (filter === "all" || c.rarity === filter) && (type === "all" || c.type === type))
       .sort((a, b) => RAR.indexOf(a.rarity) - RAR.indexOf(b.rarity) || a.id - b.id);
+    curList = list;
     grid.innerHTML = list.length ? list.map((c) => `
       <button class="gc-card ${c.rarity}" data-id="${c.id}">
         <img src="${ART[c.id]}" alt="${esc(c.name)}" loading="lazy" draggable="false">
@@ -39,19 +40,32 @@ export function mountGachaCards(root, { back }) {
         <span class="gc-name">${esc(c.name)}</span>
       </button>`).join("") : `<div class="mempty">沒有符合的卡</div>`;
   }
-  function detail(id) {
-    const c = CARDS.find((x) => x.id === id); if (!c) return;
-    const idx = CARDS.indexOf(c);
+  let curList = [];
+  function detail(id) {                                         // 點開一張卡：可以用 ◀ ▶（或鍵盤左右鍵、左右滑動）切到目前篩選清單裡的上一張／下一張
+    let pos = curList.findIndex((x) => x.id === id); if (pos < 0) return;
     const el = document.createElement("div");
     el.className = "gc-modal";
-    el.innerHTML = `<div class="gc-big ${c.rarity}"><img src="${ART[c.id]}" alt="${esc(c.name)}" draggable="false">
-      <div class="gc-info"><div class="gc-ttl"><b>${esc(c.name)}</b><span class="gc-badge ${c.rarity}">${c.rarity}・${RNAME[c.rarity]}</span></div>
-      <div class="gc-meta">${esc(c.type)}　No.${String(c.id).padStart(2, "0")}</div><p>${esc(c.desc)}</p></div>
-      <button class="gc-x" aria-label="關閉">✕</button></div>`;
-    root.append(el);
-    const close = () => el.remove();
-    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest(".gc-x")) close(); });
-    return idx;
+    const close = () => { el.remove(); document.removeEventListener("keydown", onKey); };
+    const show = () => {
+      const c = curList[pos];
+      el.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${curList.length < 2 ? " hidden" : ""}>◀</button>
+        <div class="gc-big ${c.rarity}"><img src="${ART[c.id]}" alt="${esc(c.name)}" draggable="false">
+        <div class="gc-info"><div class="gc-ttl"><b>${esc(c.name)}</b><span class="gc-badge ${c.rarity}">${c.rarity}・${RNAME[c.rarity]}</span></div>
+        <div class="gc-meta">${esc(c.type)}　No.${String(c.id).padStart(2, "0")}　${pos + 1} / ${curList.length}</div><p>${esc(c.desc)}</p></div>
+        <button class="gc-x" aria-label="關閉">✕</button></div>
+        <button class="gc-nav gc-next" aria-label="下一張"${curList.length < 2 ? " hidden" : ""}>▶</button>`;
+    };
+    const go = (d) => { pos = (pos + d + curList.length) % curList.length; show(); };
+    const onKey = (e) => { if (e.key === "ArrowRight") go(1); else if (e.key === "ArrowLeft") go(-1); else if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    show(); root.append(el);
+    let x0 = null;
+    el.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    el.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); });
+    el.addEventListener("click", (e) => {
+      if (e.target.closest(".gc-prev")) go(-1); else if (e.target.closest(".gc-next")) go(1);
+      else if (e.target === el || e.target.closest(".gc-x")) close();
+    });
   }
   root.addEventListener("click", (e) => {
     const t = e.target.closest("[data-r],[data-t],[data-s]");
