@@ -5,6 +5,7 @@ import { mountMahjong } from "./mahjong.js";
 import { mountBridge } from "./bridge.js";
 import { mountBigtwo } from "./bigtwo.js";
 import { mountSevens } from "./sevens.js";
+import { mountUno } from "./uno.js";
 import { mountAvalon } from "./avalon.js";
 import { mountCasino } from "./casino.js";
 import { mountGomoku } from "./gomoku.js";
@@ -12,7 +13,7 @@ import { mountConnect4 } from "./connect4.js";
 import { mountReversi } from "./reversi.js";
 import { mountBoard } from "./chessui.js";
 
-const GAMES = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], stone: ["💎", "賭石"], poker: ["♠️", "德州撲克"], mjtw: ["🀄", "台灣麻將"], mjjp: ["🀅", "日本麻將"], bridge: ["🂡", "橋牌"], bigtwo: ["🂮", "大老二"], sevens: ["🂧", "排七"], avalon: ["🗡️", "阿瓦隆"], gomoku: ["⚫", "五子棋"], c4: ["🔴", "四連棋"], rv: ["⚪", "黑白棋"], chess: ["♞", "西洋棋"], xq: ["帥", "象棋"] };
+const GAMES = { slots: ["🎰", "老虎機"], coin: ["🪙", "擲硬幣"], dice: ["🎲", "骰子"], bj: ["🃏", "21 點"], horse: ["🏇", "賽馬"], stone: ["💎", "賭石"], poker: ["♠️", "德州撲克"], mjtw: ["🀄", "台灣麻將"], mjjp: ["🀅", "日本麻將"], bridge: ["🂡", "橋牌"], bigtwo: ["🂮", "大老二"], sevens: ["🂧", "排七"], uno: ["🃏", "UNO"], avalon: ["🗡️", "阿瓦隆"], gomoku: ["⚫", "五子棋"], c4: ["🔴", "四連棋"], rv: ["⚪", "黑白棋"], chess: ["♞", "西洋棋"], xq: ["帥", "象棋"] };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const PHASE = { bet: "下注中", run: "比賽中", result: "公布結果" };
 
@@ -52,7 +53,7 @@ export function mountSpectateLobby(root, { env, back }) {
       root.classList.add("watchonly"); return;
     }
     root.classList.remove("watchonly");
-    inner = (r.game === "poker" ? mountPoker({ spectate: { room: r.id } }) : r.game === "bridge" ? mountBridge({ spectate: { room: r.id } }) : r.game === "bigtwo" ? mountBigtwo({ spectate: { room: r.id } }) : r.game === "sevens" ? mountSevens({ spectate: { room: r.id } }) : r.game === "avalon" ? mountAvalon({ spectate: { room: r.id } }) : r.game.startsWith("mj") ? mountMahjong(r.game.slice(2), { spectate: { room: r.id } }) : mountCasino(r.game, { spectate: { room: r.id } }))(root, { env, back: () => { if (inner) inner(); inner = null; connect(); showLobby(); } });
+    inner = (r.game === "poker" ? mountPoker({ spectate: { room: r.id } }) : r.game === "bridge" ? mountBridge({ spectate: { room: r.id } }) : r.game === "bigtwo" ? mountBigtwo({ spectate: { room: r.id } }) : r.game === "sevens" ? mountSevens({ spectate: { room: r.id } }) : r.game === "uno" ? mountUno({ spectate: { room: r.id } }) : r.game === "avalon" ? mountAvalon({ spectate: { room: r.id } }) : r.game.startsWith("mj") ? mountMahjong(r.game.slice(2), { spectate: { room: r.id } }) : mountCasino(r.game, { spectate: { room: r.id } }))(root, { env, back: () => { if (inner) inner(); inner = null; connect(); showLobby(); } });
   }
 
   function connect() {

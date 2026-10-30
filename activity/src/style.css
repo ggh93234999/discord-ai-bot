@@ -1390,3 +1390,40 @@ body.tv-fs{overflow:hidden}
 .sv .brres h3{text-align:center}
 .sv .brres .mdelta{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin:6px 0}
 .sv .brres .btleft div{display:flex;flex-wrap:wrap;gap:2px}
+
+/* ---- UNO（牌面全用 CSS 畫） */
+.un .uc{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:44px;height:64px;border-radius:7px;border:3px solid #fff;box-sizing:border-box;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.6);overflow:hidden;font-family:"Arial Black",Impact,sans-serif;user-select:none;-webkit-user-select:none}
+.un .uc::before{content:"";position:absolute;left:-20%;width:140%;height:64%;background:#fff;border-radius:50%;transform:rotate(-38deg)}
+.un .uc b{position:relative;z-index:1;font-size:25px;font-weight:900;font-style:normal;line-height:1;text-shadow:none}
+.un .uc b.ul{text-decoration:underline}
+.un .uc i,.un .uc u{position:absolute;z-index:1;font-style:normal;text-decoration:none;font-size:10px;line-height:1;font-weight:900}
+.un .uc i{left:3px;top:2px}.un .uc u{right:3px;bottom:2px;transform:rotate(180deg)}
+.un .uc.cr{background:#d32f2f}.un .uc.cr b{color:#d32f2f}
+.un .uc.cy{background:#f4b400}.un .uc.cy b{color:#c98f00}
+.un .uc.cg{background:#2e9d4f}.un .uc.cg b{color:#2e9d4f}
+.un .uc.cb{background:#1e6bd6}.un .uc.cb b{color:#1e6bd6}
+.un .uc.ck{background:#15151a}.un .uc.ck::before{background:conic-gradient(#d32f2f 0 25%,#1e6bd6 0 50%,#2e9d4f 0 75%,#f4b400 0)}.un .uc.ck b{color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+.un .uc.back{background:#15151a}.un .uc.back::before{background:#d32f2f}.un .uc.back em{position:relative;z-index:1;font-style:normal;font-size:12px;color:#ffd54f;transform:rotate(-38deg);letter-spacing:-.5px}
+.un .uc.xs{width:18px;height:26px;border-width:1.5px;border-radius:3px}.un .uc.xs b{font-size:10px}.un .uc.xs i,.un .uc.xs u{display:none}.un .uc.back.xs em{font-size:5px}
+.un .uc.big{width:52px;height:76px}.un .uc.big b{font-size:30px}.un .uc.big i,.un .uc.big u{font-size:12px}
+.un .uc.big.top{width:70px;height:102px}.un .uc.big.top b{font-size:40px}.un .uc.big.top i,.un .uc.big.top u{font-size:15px}
+.un .unhand{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;padding:0 6px}
+.un .unhand.act .uc:not(.can){filter:brightness(.5)}
+.un .unhand .uc.can{cursor:pointer;box-shadow:0 0 0 2px #ffd54f,0 2px 6px rgba(0,0,0,.6);transform:translateY(-6px);transition:transform .1s}
+.un .unhand .uc.can:hover{transform:translateY(-12px)}
+.un .unpiles{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:6px}
+.un .undeck{display:flex;flex-direction:column;align-items:center;gap:2px}.un .undeck small{font-size:11px;color:#cfe}
+.un .undeck .uc{width:52px;height:76px}
+.un .unside{display:flex;flex-direction:column;align-items:center;gap:6px}
+.un .uncolor{display:inline-block;width:26px;height:26px;border-radius:50%;border:3px solid #fff;box-sizing:border-box;color:#fff;font-weight:700}
+.un .uncolor.cr{background:#d32f2f}.un .uncolor.cy{background:#f4b400}.un .uncolor.cg{background:#2e9d4f}.un .uncolor.cb{background:#1e6bd6}
+.un .uncolor.big{width:60px;height:60px;font-size:16px;cursor:pointer}
+.un .undir{font-size:24px;color:#ffd54f;line-height:1}
+.un .unpick{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;padding:16px 18px;border-radius:14px;background:rgba(15,15,20,.96);border:2px solid #ffd54f;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.un .unpick div{display:flex;gap:10px}
+.un .unobadge{margin-left:6px;padding:0 6px;border-radius:8px;background:#d32f2f;color:#fff;font-size:11px;font-weight:800}
+.un .brres{max-width:520px;margin:10px auto 0;box-sizing:border-box;text-align:left}
+.un .brres h3{text-align:center}
+.un .brres .mdelta{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin:6px 0}
+.un .brres .btleft div{display:flex;flex-wrap:wrap;gap:2px}
+@media (max-width:520px){.un .uc.big{width:44px;height:64px}.un .uc.big b{font-size:25px}.un .uc.big.top{width:62px;height:90px}.un .unhand{gap:3px}}

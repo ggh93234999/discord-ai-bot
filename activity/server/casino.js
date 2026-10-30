@@ -7,6 +7,7 @@ import { listMjTables } from "./mahjong.js";
 import { listBridgeTables } from "./bridge.js";
 import { listBigTwoTables } from "./bigtwo.js";
 import { listSevensTables } from "./sevens.js";
+import { listUnoTables } from "./uno.js";
 import { listAvalonTables } from "./avalon.js";
 import { TIERS, MAX_PIECES, genStone, descLines, valueOf, pieceInfo, cutFee, newStoneState, canCut, applyCut, openSection, rubAt, lightAt, rubFee, lightFee, MAX_RUB, MAX_LIGHT, MARKET_MAX, RESTOCK_MS } from "./stone.js";
 import fs from "node:fs";
@@ -325,7 +326,7 @@ setInterval(() => { for (const room of rooms.values()) if (room.game === "horse"
 
 // 旁觀大廳：有人（非旁觀者）在玩的房間
 export function listRooms() {
-  const out = [...listPokerTables(), ...listMjTables(), ...listBridgeTables(), ...listBigTwoTables(), ...listSevensTables(), ...listAvalonTables()];
+  const out = [...listPokerTables(), ...listMjTables(), ...listBridgeTables(), ...listBigTwoTables(), ...listSevensTables(), ...listUnoTables(), ...listAvalonTables()];
   for (const room of rooms.values()) {
     if (room.game === "forge") continue;                        // 鍛造不是賭博，不列在旁觀大廳
     const players = whoList(room);
