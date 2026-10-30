@@ -1,14 +1,15 @@
 // 接七（排七／接龍，練習點數）：4 人各 13 張，先出完的人贏。
 // 牌的編號和大老二、橋牌一樣：花色 = floor(c/13)（♣0 ♦1 ♥2 ♠3），rank = c%13+2（2..14），這裡把 A 當 1 ，所以數字順序是 A 2 3 … 10 J Q K。
 // 規則：持有 ♦7 的人先出 ♦7；之後每一輪，輪到你就要出一張能接上的牌：任何一個花色的 7（還沒開的花色），
-// 或是桌上那個花色目前最小的前一張、最大的後一張。沒有能出的牌就自動「過」。最先出完手牌的人贏，
-// 其他人照手上剩的張數 × 每張點數付給他。伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
+// 或是桌上那個花色目前最小的前一張、最大的後一張。有牌能出就一定要出；沒有能出的牌，就要自己選一張手牌「蓋牌」（面朝下放到自己前面）。
+// 手牌都處理完（出完或蓋掉）的人跳過；全部人手牌都沒了，這手結束。每人蓋牌的點數加總（A=1、J=11、Q=12、K=13）越少越好，
+// 兩兩比較蓋牌點數的差再乘以每點點數。伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
 
 const START_POINTS = 10000;
-const DEFAULT_CFG = { len: 3, base: 20 };
+const DEFAULT_CFG = { len: 3, base: 5 };
 const LENS = [1, 3, 5, 10];
-const STAKES = [5, 10, 20, 50, 100];
+const STAKES = [1, 2, 5, 10, 20];
 const TURN_MS = 30000, RESULT_MS = 10000, BOT_MS = [600, 1300], AUTOPASS_MS = 1100;
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "豆豆", "阿嬤", "牌神", "胖虎"];
 const DIAMOND7 = 13 + 5;                                   // ♦7：suit 1，rank 7 → 13 + (7-2)
@@ -63,45 +64,53 @@ function startHand(t) {
   const g = t.g; g.handNo++;
   const hands = deal();
   const first = hands.findIndex((h) => h.includes(DIAMOND7));
-  t.h = { hands, board: [null, null, null, null], first: true, turn: first, order: [], deadline: 0, botAt: 0, passed: [false, false, false, false] };
+  t.h = { hands, board: [null, null, null, null], first: true, turn: first, deadline: 0, botAt: 0, covers: [[], [], [], []], coveredNow: -1 };
   t.result = null; t.phase = "play";
   t.log = `第 ${g.handNo} 手，由 ${t.seats[first].name} 先出 ♦7`;
   setTurn(t, first);
 }
 function setTurn(t, i) {
   const h = t.h; h.turn = i; h.deadline = now() + TURN_MS;
-  const none = !legalCards(h, i).length;
-  h.botAt = now() + (none ? AUTOPASS_MS : BOT_MS[0] + randomInt(BOT_MS[1] - BOT_MS[0]));
+  h.botAt = now() + BOT_MS[0] + randomInt(BOT_MS[1] - BOT_MS[0]);
 }
 
 // ---------------------------------------------------------------- 出牌、過
+function nextTurn(t, i) {                                   // 下一個還有手牌的人；全部都沒牌了就結算
+  const h = t.h;
+  for (let k = 1; k <= 4; k++) { const j = (i + k) % 4; if (h.hands[j].length) { setTurn(t, j); return; } }
+  settle(t);
+}
 function doPlay(t, i, c) {
   const h = t.h; if (!h || h.turn !== i || !Number.isInteger(c) || !h.hands[i].includes(c) || !legal(h, c)) return false;
   h.hands[i] = h.hands[i].filter((x) => x !== c);
   const s = suitOf(c), n = nat(c);
   h.board[s] = h.board[s] ? { lo: Math.min(h.board[s].lo, n), hi: Math.max(h.board[s].hi, n) } : { lo: n, hi: n };
-  h.first = false; h.last = { seat: i, card: c }; h.passed = [false, false, false, false];
+  h.first = false; h.last = { seat: i, card: c, cover: false };
   t.log = `${t.seats[i].name} 出 ${cardName(c)}`;
-  if (!h.hands[i].length) { settle(t, i); return true; }
-  setTurn(t, (i + 1) % 4);
+  nextTurn(t, i);
   return true;
 }
-function doPass(t, i) {
-  const h = t.h; if (!h || h.turn !== i || legalCards(h, i).length) return false;
-  h.passed[i] = true; t.log = `${t.seats[i].name} 沒有牌可出，過`;
-  setTurn(t, (i + 1) % 4);
+// 沒有牌能出的時候，自己選一張手牌蓋下去（有牌能出就不能蓋）
+function doCover(t, i, c) {
+  const h = t.h; if (!h || h.turn !== i || h.first || legalCards(h, i).length || !Number.isInteger(c) || !h.hands[i].includes(c)) return false;
+  h.hands[i] = h.hands[i].filter((x) => x !== c); h.covers[i].push(c);
+  h.last = { seat: i, card: -1, cover: true };
+  t.log = `${t.seats[i].name} 沒有牌可出，蓋了一張牌（共 ${h.covers[i].length} 張）`;
+  nextTurn(t, i);
   return true;
 }
 
 // ---------------------------------------------------------------- 結算
-function settle(t, w) {
+function settle(t) {
   const h = t.h, base = t.cfg.base;
-  const deltas = [0, 0, 0, 0];
-  for (let i = 0; i < 4; i++) { if (i === w) continue; deltas[i] = -h.hands[i].length * base; deltas[w] -= deltas[i]; }
+  const pen = h.covers.map((cs) => cs.reduce((x, c) => x + nat(c), 0));               // 蓋牌點數（A=1 … K=13）
+  const total = pen.reduce((x, y) => x + y, 0);
+  const deltas = pen.map((p) => base * (total - 4 * p));                               // 兩兩比較差距，總和一定是 0
   deltas.forEach((d, i) => { t.seats[i].points += d; });
+  const best = Math.min(...pen), winner = pen.indexOf(best);
   const gameOver = t.g.handNo >= t.cfg.len;
-  t.result = { handNo: t.g.handNo, winner: w, deltas, left: h.hands.map((x) => x.length), hands: h.hands.map((x) => x.slice()), gameOver };
-  t.log = `${t.seats[w].name} 先出完，贏了第 ${t.g.handNo} 手`;
+  t.result = { handNo: t.g.handNo, winner, deltas, pen, covers: h.covers.map((x) => sortHand(x)), gameOver };
+  t.log = `第 ${t.g.handNo} 手結束：${t.seats[winner].name} 蓋牌點數最少（${best}）`;
   t.phase = "result"; t.nextAt = now() + RESULT_MS;
 }
 function finishGame(t) {
@@ -113,23 +122,27 @@ function finishGame(t) {
 
 // ---------------------------------------------------------------- 電腦
 // 想法：能把自己同花色的一整串接下去的牌優先出；盡量留住「別人要等的」牌，也就是 7 的兩側（6、8）不急著開，7 本身先出去。
+// 想法：能出的牌，優先接自己手上連得起來的一串，7 先出去；沒牌可出要蓋牌時，蓋點數最小、而且最不會卡死別人的牌（優先蓋靠近 A 的牌）。
 function botMove(t, i) {
   const h = t.h, hand = h.hands[i], cs = legalCards(h, i);
   if (!cs.length) return null;
   const score = (c) => {
     const s = suitOf(c), n = nat(c), b = h.board[s];
     const dir = !b ? 0 : n < 7 ? -1 : 1;
-    let run = 0;                                              // 這張出去後，我手上同花色能接著出的連續張數
+    let run = 0;
     if (dir !== 0) for (let k = n + dir; k >= 1 && k <= 13 && hand.some((x) => suitOf(x) === s && nat(x) === k); k += dir) run++;
     const mine = hand.filter((x) => suitOf(x) === s).length;
-    const far = Math.abs(n - 7);                              // 越靠近兩端越不容易被別人堵，越晚出越好；先出靠近 7 的
-    return run * 3 + (n === 7 ? 4 : 0) + (mine >= 4 ? 1 : 0) - far * 0.25 + Math.random() * 1.2;
+    return run * 3 + (n === 7 ? 4 : 0) + (mine >= 4 ? 1 : 0) - Math.abs(n - 7) * 0.25 + Math.random() * 1.2;
   };
   return cs.map((c) => [c, score(c)]).sort((a, b) => b[1] - a[1])[0][0];
 }
+function botCover(t, i) {
+  const hand = t.h.hands[i];
+  return hand.map((c) => [c, nat(c) + Math.random() * 0.5]).sort((a, b) => a[1] - b[1])[0][0];     // 蓋最小的（點數越小扣越少）
+}
 function botAct(t, i) {
   const mv = botMove(t, i);
-  return mv == null ? doPass(t, i) : doPlay(t, i, mv);
+  return mv == null ? doCover(t, i, botCover(t, i)) : doPlay(t, i, mv);
 }
 
 // ---------------------------------------------------------------- 畫面資料
@@ -138,10 +151,10 @@ function view(t, ws) {
   const h = t.h;
   const v = { t: "svstate", phase: t.phase, started: t.started, cfg: t.cfg, lens: LENS, stakes: STAKES, you, log: t.log, now: now(),
     watchers: [...t.members].filter((w) => w.svspec).length, final: t.final, handNo: t.g ? t.g.handNo : 0 };
-  v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0 });
+  v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0, covers: h ? h.covers[i].length : 0 });
   if (h && t.phase === "play") {
-    Object.assign(v, { turn: h.turn, board: h.board, first: h.first, last: h.last || null, passed: h.passed, deadline: h.deadline });
-    if (you >= 0) { v.hand = h.hands[you]; v.playable = h.turn === you ? legalCards(h, you) : []; }
+    Object.assign(v, { turn: h.turn, board: h.board, first: h.first, last: h.last || null, deadline: h.deadline });
+    if (you >= 0) { v.hand = h.hands[you]; v.myCovers = sortHand(h.covers[you]); v.playable = h.turn === you ? legalCards(h, you) : []; v.mustCover = h.turn === you && !h.first && !v.playable.length; }
   }
   if (t.phase === "result") { v.result = t.result; v.nextAt = t.nextAt; v.board = t.h ? t.h.board : null; }
   return v;
@@ -169,8 +182,7 @@ function tick() {
       if (t.phase === "result") { if (n >= t.nextAt) { if (t.result.gameOver) finishGame(t); else startHand(t); push(t); } continue; }
       if (t.phase !== "play") continue;
       const h = t.h, s = t.seats[h.turn];
-      const none = !legalCards(h, h.turn).length;
-      if ((isAuto(s) && n >= h.botAt) || (none && n >= h.botAt) || n >= h.deadline) { if (botAct(t, h.turn)) push(t); }
+      if ((isAuto(s) && n >= h.botAt) || n >= h.deadline) { if (botAct(t, h.turn)) push(t); }
     } catch (e) { console.log("接七錯誤", e && e.stack); }
   }
 }
@@ -236,7 +248,8 @@ export function handleSevens(ws, m) {
     startGame(t); t.log = `${nameOf(ws)} 按下開始｜` + t.log; push(t);
   } else if (m.t === "svact") {
     if (mine < 0 || t.phase !== "play") return true;
-    const ok = String(m.a || "") === "play" ? doPlay(t, mine, Number(m.card)) : false;
+    const a = String(m.a || "");
+    const ok = a === "play" ? doPlay(t, mine, Number(m.card)) : a === "cover" ? doCover(t, mine, Number(m.card)) : false;
     if (ok) push(t); else out(ws, { t: "sverr", error: "illegal" });
   }
   return true;

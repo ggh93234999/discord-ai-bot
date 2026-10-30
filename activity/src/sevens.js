@@ -69,11 +69,11 @@ export function mountSevens(opts = {}) {
       const c = st.cfg;
       if (seated && !spectate) {
         cfg = `<div class="mjcfg"><label>長度 <select class="cf-len">${st.lens.map((v) => `<option value="${v}"${c.len === v ? " selected" : ""}>${v} 手</option>`).join("")}</select></label>
-          <label>每張牌 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label></div>
+          <label>每點 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label></div>
           <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，最多 4 人，空位可以加電腦。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k === 0 ? " top" : ""}"><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
-      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。持有 ♦7 的人先出 ♦7，之後接同花色相鄰的牌或開新的 7；沒牌可出自動過。最先出完的人贏，其他人照手上剩的張數 × 每張點數付給他。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。持有 ♦7 的人先出 ♦7，之後接同花色相鄰的牌或開新的 7；沒牌可出就要自己選一張手牌蓋下去。蓋的牌點數加總越少越好（A=1 … K=13），大家兩兩比較差距，乘以每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : st.phase === "end" ? "按開始再來一場" : "等玩家入座";
       body.querySelectorAll("[data-sit]").forEach((b) => b.addEventListener("click", () => send({ t: "svsit", seat: Number(b.dataset.sit) })));
       body.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "svaddbot", seat: Number(b.dataset.bot) })));
@@ -90,11 +90,11 @@ export function mountSevens(opts = {}) {
     function seatBox(i) {
       const s = st.seats[i]; if (!s) return "";
       const r = rel(i), turn = st.phase === "play" && st.turn === i;
-      const passed = st.phase === "play" && (st.passed || [])[i];
+      const cv = st.phase === "play" && s.covers ? `<span class="svcov" title="蓋牌">蓋 ${s.covers}</span>` : "";
       const backs = r === 0 && st.you >= 0 ? "" : `<span class="brcnt"><span class="bc back xs"></span>${s.count}</span>`;
       return `<div class="brseat r${r}${turn ? " turn" : ""}${st.you === i ? " me" : ""}">
         <div class="brname"><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}</div>
-        <div class="brsub">${backs}<em>${s.points.toLocaleString()}</em></div>${passed ? `<span class="brbub"><span class="bpass">過</span></span>` : ""}
+        <div class="brsub">${backs}<em>${s.points.toLocaleString()}</em>${cv}</div>
       </div>`;
     }
     // 桌上四排：每個花色一排 A…K，打出的牌亮起來，還沒出的是淡淡的格子；7 那一欄加底色
@@ -111,25 +111,27 @@ export function mountSevens(opts = {}) {
     }
     function resultHTML(r) {
       const deltas = r.deltas.map((d, i) => `<span class="${d > 0 ? "up" : d < 0 ? "down" : ""}">${nm(i)} ${d > 0 ? "+" : ""}${d.toLocaleString()}</span>`).join("");
-      const left = r.hands.map((h, i) => (i === r.winner ? "" : `<div class="btleft"><span>${nm(i)}（剩 ${h.length} 張）</span><div>${h.map((c) => card(c, "xs")).join("")}</div></div>`)).join("");
-      return `<div class="mresult brres"><h3>第 ${r.handNo} 手　${nm(r.winner)} 贏了！</h3><div class="mdelta">${deltas}</div>${left}${r.gameOver ? "<div class='mrl'>這場打完了，馬上公布名次</div>" : ""}</div>`;
+      const cov = r.covers.map((h, i) => `<div class="btleft"><span>${nm(i)}${i === r.winner ? " 🏆" : ""}：蓋了 ${h.length} 張，共 ${r.pen[i]} 點</span><div>${h.length ? h.map((c) => card(c, "xs")).join("") : "（一張都沒蓋）"}</div></div>`).join("");
+      return `<div class="mresult brres"><h3>第 ${r.handNo} 手　${nm(r.winner)} 蓋牌最少！</h3><div class="mdelta">${deltas}</div>${cov}${r.gameOver ? "<div class='mrl'>這場打完了，馬上公布名次</div>" : ""}</div>`;
     }
 
     function renderTable() {
       const you = st.you, me = you >= 0 ? st.seats[you] : null, play = st.phase === "play";
       const order = [2, 1, 3, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
-      const mid = `<div class="brmid"><div class="brinfo"><div class="brct">${play ? (st.first ? "第一張要出 ♦7" : st.last ? `${nm(st.last.seat)} 出了 ${SUITS[suitOf(st.last.card)]}${rn(nat(st.last.card))}` : "") : ""}</div><div class="brtimer"></div></div>${play || st.board ? boardHTML(st.board, play ? st.last : null) : ""}${!play && st.result ? resultHTML(st.result) : ""}</div>`;
+      const mid = `<div class="brmid"><div class="brinfo"><div class="brct">${play ? (st.first ? "第一張要出 ♦7" : st.last ? (st.last.cover ? `${nm(st.last.seat)} 蓋了一張牌` : `${nm(st.last.seat)} 出了 ${SUITS[suitOf(st.last.card)]}${rn(nat(st.last.card))}`) : "") : ""}</div><div class="brtimer"></div></div>${play || st.board ? boardHTML(st.board, play ? st.last : null) : ""}${!play && st.result ? resultHTML(st.result) : ""}</div>`;
       let below = `<div class="btspacer"></div>`;
       if (play && me) {
         const myTurn = st.turn === you, can = new Set(st.playable || []);
-        const hand = `<div class="brhand bthand${myTurn ? " act" : ""}">${(st.hand || []).map((c) => card(c, `big${myTurn && can.has(c) ? " can" : ""}`, `data-c="${c}"`)).join("")}</div>`;
-        const tip = myTurn ? (can.size ? (st.first ? "你先出：點 ♦7" : "輪到你：點一張亮著的牌打出去") : "你沒有牌可以出，自動過…") : `等 ${nm(st.turn)} 出牌…`;
-        below = `<div class="mhint">${tip}</div>${hand}`;
+        const cover = myTurn && st.mustCover;
+        const hand = `<div class="brhand bthand${myTurn ? " act" : ""}${cover ? " cover" : ""}">${(st.hand || []).map((c) => card(c, `big${myTurn && (cover || can.has(c)) ? " can" : ""}`, `data-c="${c}"`)).join("")}</div>`;
+        const tip = myTurn ? (cover ? "你沒有牌可以出：選一張手牌蓋下去（蓋的點數越少越好，A=1、K=13）" : st.first ? "你先出：點 ♦7" : "輪到你：點一張亮著的牌打出去") : `等 ${nm(st.turn)} 出牌…`;
+        const mine = (st.myCovers || []).length ? `<div class="svmine">我蓋的牌：${st.myCovers.map((c) => card(c, "xs")).join("")}</div>` : "";
+        below = `<div class="mhint${cover ? " svwarn" : ""}">${tip}</div>${hand}${mine}`;
       } else if (play) {
         below = `<div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div>`;
       }
       body.innerHTML = `<div class="brtable">${order.map(seatBox).join("")}${mid}</div>${below}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
-      body.querySelectorAll(".brhand .bc.can").forEach((el) => el.addEventListener("click", () => send({ t: "svact", a: "play", card: Number(el.dataset.c) })));
+      body.querySelectorAll(".brhand .bc.can").forEach((el) => el.addEventListener("click", () => send({ t: "svact", a: st.mustCover ? "cover" : "play", card: Number(el.dataset.c) })));
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "svsit", seat: Number(el.dataset.sit) })));
       const sb = body.querySelector(".stand"); sb && sb.addEventListener("click", () => send({ t: "svstand" }));
     }
