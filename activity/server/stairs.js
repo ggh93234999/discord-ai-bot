@@ -100,7 +100,7 @@ function stepDown(sim, input) {
   }
   for (const pl of sim.plats) {
     pl.y -= sp;
-    if (pl.type === "fake" && pl.t > 0 && !pl.flip) { pl.t++; if (pl.t > 18) pl.flip = true; }
+    if (pl.type === "fake" && pl.t > 0) { pl.t++; if (pl.t > 42) { pl.t = 0; pl.flip = false; } else if (pl.t > 18) pl.flip = true; }   // 1~18 踩上去還撐得住；19~42 翻下去再翻回來（不能踩）；42 之後恢復原樣可以再踩
     if (pl.bounce > 0) pl.bounce--;
   }
   sim.plats = sim.plats.filter((p) => p.y > -24);

@@ -267,8 +267,7 @@ function mountStairs(root, { env, back }) {
       bevel(x, y, w, h, "#d6edff", "#3a73c0");
     } else if (type === "fake") {
       // 米色翻轉板：踩到後繞水平軸翻過去（露出上面那一面），翻完只剩薄薄的側邊
-      if (fl) { ctx.save(); ctx.globalAlpha = .45; ctx.fillStyle = "#8c7a56"; ctx.fillRect(x, y + 10, w, 3); ctx.restore(); return; }   // 翻下去之後只剩薄薄一條側邊，不要再畫出翻上來的板子
-      const a = Math.min(1, t / 18);
+      const a = t <= 18 ? t / 18 : t <= 30 ? 1 : Math.max(0, (42 - t) / 12);   // 往下翻（0→1）、停一下、再翻回來（1→0）
       if (a <= 0) { texRect(PAT.sand, x, y, w, h, -x % 64, 0); bevel(x, y, w, h, "#f4ead2", "#8c7a56"); return; }
       // 往下翻：板子以下緣為軸往下倒，高度越縮越薄，翻完只剩一條線；不會再有一塊板子翻到上面來
       const front = Math.max(3, h * Math.cos(a * Math.PI / 2));
