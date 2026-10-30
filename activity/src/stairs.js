@@ -267,12 +267,16 @@ function mountStairs(root, { env, back }) {
       bevel(x, y, w, h, "#d6edff", "#3a73c0");
     } else if (type === "fake") {
       // 米色翻轉板：踩到後繞水平軸翻過去（露出上面那一面），翻完只剩薄薄的側邊
-      const a = t <= 18 ? t / 18 : t <= 30 ? 1 : Math.max(0, (42 - t) / 12);   // 往下翻（0→1）、停一下、再翻回來（1→0）
-      if (a <= 0) { texRect(PAT.sand, x, y, w, h, -x % 64, 0); bevel(x, y, w, h, "#f4ead2", "#8c7a56"); return; }
-      // 往下翻：板子以下緣為軸往下倒，高度越縮越薄，翻完只剩一條線；不會再有一塊板子翻到上面來
-      const front = Math.max(3, h * Math.cos(a * Math.PI / 2));
-      ctx.save(); ctx.globalAlpha = 1 - a * .4;
-      texRect(PAT.sand, x, y + 6 + (h - front), w, front, -x % 64, 0); bevel(x, y + 6 + (h - front), w, front, "#f4ead2", "#8c7a56");
+      // t：0 沒被踩；1~18 被踩後微微抖動（還站得住）；19~42 繞著板子中線翻一整圈（翻到背面再翻回正面），之後恢復原樣
+      if (t <= 0) { texRect(PAT.sand, x, y, w, h, -x % 64, 0); bevel(x, y, w, h, "#f4ead2", "#8c7a56"); return; }
+      if (t <= 18) { const dx = Math.sin(t * 1.9) * (1 + t / 9); texRect(PAT.sand, x + dx, y, w, h, -x % 64, 0); bevel(x + dx, y, w, h, "#f4ead2", "#8c7a56"); return; }
+      const th = Math.min(1, (t - 18) / 24) * Math.PI * 2, c = Math.cos(th), back = c < 0;
+      const fh = Math.max(2, h * Math.abs(c)), top = y + h / 2 - fh / 2;
+      ctx.save();
+      texRect(PAT.sand, x, top, w, fh, -x % 64, 0);
+      if (back) { ctx.fillStyle = "rgba(70,45,10,.38)"; ctx.fillRect(x, top, w, fh); }       // 翻到背面：深一點
+      bevel(x, top, w, fh, back ? "#cdbd96" : "#f4ead2", back ? "#5a4a2c" : "#8c7a56");
+      if (Math.abs(c) < .35) { ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fillRect(x, y + h / 2 + fh / 2, w, 3); }   // 立起來時底下一點陰影
       ctx.restore();
     } else if (type === "nails") {
       metalBar(x, y + 10, w, 14);
