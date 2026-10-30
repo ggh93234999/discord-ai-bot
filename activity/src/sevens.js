@@ -73,7 +73,7 @@ export function mountSevens(opts = {}) {
           <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，最多 4 人，空位可以加電腦。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k === 0 ? " top" : ""}"><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
-      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。持有 ♦7 的人先出 ♦7，之後接同花色相鄰的牌或開新的 7（A 或 K 出現後那一排封口）；沒牌可出就要自己選一張手牌蓋下去。蓋的牌點數加總越少越好（A=1 … K=13），大家兩兩比較差距，乘以每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。持有 ♠7 的人先出 ♠7，之後接同花色相鄰的牌或開新的 7（A 或 K 出現後那一排封口）；沒牌可出就要自己選一張手牌蓋下去。蓋的牌點數加總越少越好（A=1 … K=13），大家兩兩比較差距，乘以每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : st.phase === "end" ? "按開始再來一場" : "等玩家入座";
       body.querySelectorAll("[data-sit]").forEach((b) => b.addEventListener("click", () => send({ t: "svsit", seat: Number(b.dataset.sit) })));
       body.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "svaddbot", seat: Number(b.dataset.bot) })));
@@ -119,13 +119,13 @@ export function mountSevens(opts = {}) {
     function renderTable() {
       const you = st.you, me = you >= 0 ? st.seats[you] : null, play = st.phase === "play";
       const order = [2, 1, 3, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
-      const mid = `<div class="brmid"><div class="brinfo"><div class="brct">${play ? (st.first ? "第一張要出 ♦7" : st.last ? (st.last.cover ? `${nm(st.last.seat)} 蓋了一張牌` : `${nm(st.last.seat)} 出了 ${SUITS[suitOf(st.last.card)]}${rn(nat(st.last.card))}`) : "") : ""}</div><div class="brtimer"></div></div>${play || st.board ? boardHTML(st.board, play ? st.last : null) : ""}</div>`;
+      const mid = `<div class="brmid"><div class="brinfo"><div class="brct">${play ? (st.first ? "第一張要出 ♠7" : st.last ? (st.last.cover ? `${nm(st.last.seat)} 蓋了一張牌` : `${nm(st.last.seat)} 出了 ${SUITS[suitOf(st.last.card)]}${rn(nat(st.last.card))}`) : "") : ""}</div><div class="brtimer"></div></div>${play || st.board ? boardHTML(st.board, play ? st.last : null) : ""}</div>`;
       let below = !play && st.result ? resultHTML(st.result) : `<div class="btspacer"></div>`;      // 結算放在牌桌下面（牌桌中間放不下）
       if (play && me) {
         const myTurn = st.turn === you, can = new Set(st.playable || []);
         const cover = myTurn && st.mustCover;
         const hand = `<div class="brhand bthand${myTurn ? " act" : ""}${cover ? " cover" : ""}">${(st.hand || []).map((c) => card(c, `big${myTurn && (cover || can.has(c)) ? " can" : ""}`, `data-c="${c}"`)).join("")}</div>`;
-        const tip = myTurn ? (cover ? "你沒有牌可以出：選一張手牌蓋下去（蓋的點數越少越好，A=1、K=13）" : st.first ? "你先出：點 ♦7" : "輪到你：點一張亮著的牌打出去") : `等 ${nm(st.turn)} 出牌…`;
+        const tip = myTurn ? (cover ? "你沒有牌可以出：選一張手牌蓋下去（蓋的點數越少越好，A=1、K=13）" : st.first ? "你先出：點 ♠7" : "輪到你：點一張亮著的牌打出去") : `等 ${nm(st.turn)} 出牌…`;
         const mine = (st.myCovers || []).length ? `<div class="svmine">我蓋的牌：${st.myCovers.map((c) => card(c, "xs")).join("")}</div>` : "";
         below = `<div class="mhint${cover ? " svwarn" : ""}">${tip}</div>${hand}${mine}`;
       } else if (play) {

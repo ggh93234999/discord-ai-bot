@@ -1,6 +1,6 @@
 // 排七（練習點數）：4 人各 13 張，沒牌可出要蓋牌，蓋牌點數少的贏。
 // 牌的編號和大老二、橋牌一樣：花色 = floor(c/13)（♣0 ♦1 ♥2 ♠3），rank = c%13+2（2..14），這裡把 A 當 1 ，所以數字順序是 A 2 3 … 10 J Q K。
-// 規則：持有 ♦7 的人先出 ♦7；之後每一輪，輪到你就要出一張能接上的牌：任何一個花色的 7（還沒開的花色），
+// 規則：持有 ♠7 的人先出 ♠7；之後每一輪，輪到你就要出一張能接上的牌：任何一個花色的 7（還沒開的花色），
 // 或是桌上那個花色目前最小的前一張、最大的後一張。有牌能出就一定要出；沒有能出的牌，就要自己選一張手牌「蓋牌」（面朝下放到自己前面）。
 // 任何一個花色的 A 或 K 打出去之後，那個花色就封口，不能再接了（剩下的牌只能蓋掉）。
 // 手牌都處理完（出完或蓋掉）的人跳過；全部人手牌都沒了，這手結束。每人蓋牌的點數加總（A=1、J=11、Q=12、K=13）越少越好，
@@ -13,7 +13,7 @@ const LENS = [1, 3, 5, 10];
 const STAKES = [1, 2, 5, 10, 20];
 const TURN_MS = 30000, RESULT_MS = 10000, BOT_MS = [600, 1300], AUTOPASS_MS = 1100;
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "豆豆", "阿嬤", "牌神", "胖虎"];
-const DIAMOND7 = 13 + 5;                                   // ♦7：suit 1，rank 7 → 13 + (7-2)
+const SPADE7 = 3 * 13 + 5;                                   // ♠7：suit 3，rank 7 → 39 + (7-2)
 
 const suitOf = (c) => Math.floor(c / 13);
 const nat = (c) => { const r = (c % 13) + 2; return r === 14 ? 1 : r; };     // A=1 … K=13
@@ -41,7 +41,7 @@ const cardName = (c) => ["♣", "♦", "♥", "♠"][suitOf(c)] + ({ 1: "A", 11:
 
 // ---------------------------------------------------------------- 規則
 function legal(h, c) {
-  if (h.first) return c === DIAMOND7;                       // 第一張一定是 ♦7
+  if (h.first) return c === SPADE7;                       // 第一張一定是 ♠7
   const s = suitOf(c), n = nat(c), b = h.board[s];
   if (!b) return n === 7;
   if (b.lo === 1 || b.hi === 13) return false;               // 這個花色的 A 或 K 已經出現，整排封口
@@ -65,10 +65,10 @@ function startGame(t) {
 function startHand(t) {
   const g = t.g; g.handNo++;
   const hands = deal();
-  const first = hands.findIndex((h) => h.includes(DIAMOND7));
+  const first = hands.findIndex((h) => h.includes(SPADE7));
   t.h = { hands, board: [null, null, null, null], first: true, turn: first, deadline: 0, botAt: 0, covers: [[], [], [], []], coveredNow: -1 };
   t.result = null; t.phase = "play";
-  t.log = `第 ${g.handNo} 手，由 ${t.seats[first].name} 先出 ♦7`;
+  t.log = `第 ${g.handNo} 手，由 ${t.seats[first].name} 先出 ♠7`;
   setTurn(t, first);
 }
 function setTurn(t, i) {
