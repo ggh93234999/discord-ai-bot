@@ -88,7 +88,7 @@ function plan() {
   const left = Math.max(0, BUDGET - RESERVE - used);
   const daysLeft = Math.max(1, Math.ceil((END - now) / 864e5)), effDays = Math.max(1, Math.ceil(daysLeft * 0.7));   // 休賽日不用花
   const perDay = left / effDays;
-  return { left, perDay, oddsMs: clamp(864e5 / Math.max(0.1, perDay * 0.4), 90 * 60e3, 8 * 3600e3), checkMs: clamp(864e5 / Math.max(0.1, perDay * 0.45), 75 * 60e3, 6 * 3600e3), dead: left <= 0 };
+  return { left, perDay, oddsMs: 6 * 3600e3, checkMs: clamp(864e5 / Math.max(0.1, perDay * 0.45), 75 * 60e3, 6 * 3600e3), dead: left <= 0 };
 }
 const POLL_MS_NOW = () => plan().oddsMs;
 // ---- 省 API 用量：OddsPapi 有額度限制，所以只在「有人開著頁面」時才抓賠率（預設每 10 分鐘一次），
