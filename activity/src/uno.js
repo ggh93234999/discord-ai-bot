@@ -43,7 +43,7 @@ export function mountUno(opts = {}) {
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
         if (m.t === "unstate") { st = m; st.at = Date.now() - m.now; if (st.phase !== "play") pickWild = -1; render(); }
-        else if (m.t === "unerr") { statusEl.textContent = m.error === "full" ? "座位滿了" : m.error === "need2" ? "至少要 2 人才能開始（可以加電腦）" : "這張現在不能出"; }
+        else if (m.t === "unerr") { statusEl.textContent = m.error === "full" ? "座位滿了" : m.error === "need2" ? "至少要 2 人才能開始（可以加電腦）" : m.error === "called" ? "他有喊 UNO，抓錯了" : m.error === "none" ? "現在抓不到" : "這張現在不能出"; }
       };
       ws.onclose = () => { if (closed) return; statusEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };
       ws.onerror = () => {};
@@ -70,11 +70,13 @@ export function mountUno(opts = {}) {
       const c = st.cfg;
       if (seated && !spectate) {
         cfg = `<div class="mjcfg"><label>長度 <select class="cf-len">${st.lens.map((v) => `<option value="${v}"${c.len === v ? " selected" : ""}>${v} 手</option>`).join("")}</select></label>
-          <label>每點 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label></div>
+          <label>每點 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label>
+          <label><input type="checkbox" class="cf-stack"${c.stack ? " checked" : ""}> 可疊加 +2／+4</label>
+          <label><input type="checkbox" class="cf-chal"${c.challenge ? " checked" : ""}> +4 可質疑</label></div>
           <button class="mb start"${nSeat < 2 ? " disabled" : ""}>▶ 開始（${nSeat} 人）</button>${nSeat < 2 ? `<div class="mempty">至少要 2 人，可以按「＋電腦」補人。</div>` : ""}`;
       } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，2～8 人，可以加電腦。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k === 0 ? " top" : ""}"><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
-      body.innerHTML = `${fin}<div class="brlobby"><div class="unseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。每人 7 張，2～8 人，先出完的人贏；贏的人收其他人手上剩的牌點（數字＝面值、功能牌 20、變色牌 50）× 每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      body.innerHTML = `${fin}<div class="brlobby"><div class="unseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。每人 7 張，2～8 人，先出完的人贏（標準 UNO 規則，詳見右上角說明）；贏的人收其他人手上剩的牌點（數字＝面值、功能牌 20、變色牌 50）× 每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : st.phase === "end" ? "按開始再來一場" : "等玩家入座";
       body.querySelectorAll("[data-sit]").forEach((b) => b.addEventListener("click", () => send({ t: "unsit", seat: Number(b.dataset.sit) })));
       body.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "unaddbot", seat: Number(b.dataset.bot) })));
@@ -82,7 +84,9 @@ export function mountUno(opts = {}) {
       const q = (s) => body.querySelector(s);
       q(".start") && q(".start").addEventListener("click", () => send({ t: "unstart" }));
       q(".stand") && q(".stand").addEventListener("click", () => send({ t: "unstand" }));
-      const sendCfg = () => send({ t: "uncfg", len: Number(q(".cf-len").value), base: Number(q(".cf-base").value) });
+      const sendCfg = () => send({ t: "uncfg", len: Number(q(".cf-len").value), base: Number(q(".cf-base").value), stack: q(".cf-stack").checked, challenge: q(".cf-chal").checked });
+      q(".cf-stack") && q(".cf-stack").addEventListener("change", sendCfg);
+      q(".cf-chal") && q(".cf-chal").addEventListener("change", sendCfg);
       q(".cf-len") && q(".cf-len").addEventListener("change", sendCfg);
       q(".cf-base") && q(".cf-base").addEventListener("change", sendCfg);
     }
@@ -92,10 +96,11 @@ export function mountUno(opts = {}) {
       const s = st.seats[i]; if (!s) return "";
       const turn = st.phase === "play" && st.turn === i;
       const backs = i === st.you ? "" : `<span class="brcnt"><span class="uc back xs"></span>${s.count}</span>`;
-      const uno = st.phase === "play" && s.count === 1 ? `<span class="unobadge">UNO!</span>` : "";
+      const uno = st.phase === "play" && s.count === 1 && st.unoSeat === i ? `<span class="unobadge">UNO!</span>` : "";
+      const catchBtn = st.phase === "play" && st.you >= 0 && !spectate && i !== st.you && s.count === 1 && st.unoSeat !== i ? `<button class="mb ghost uncatch" data-catch="${i}">抓！沒喊 UNO</button>` : "";
       return `<div class="unseat${turn ? " turn" : ""}${st.you === i ? " me" : ""}">
         <div class="brname"><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}</div>
-        <div class="brsub">${backs}<em>${s.points.toLocaleString()}</em>${uno}</div>
+        <div class="brsub">${backs}<em>${s.points.toLocaleString()}</em>${uno}</div>${catchBtn}
       </div>`;
     }
     function midHTML() {
@@ -121,8 +126,11 @@ export function mountUno(opts = {}) {
       if (play && me) {
         const myTurn = st.turn === you, can = new Set(st.playable || []);
         const hand = `<div class="brhand bthand unhand${myTurn ? " act" : ""}">${(st.hand || []).map((c) => card(c, `big${myTurn && can.has(c) ? " can" : ""}`, `data-c="${c}"`)).join("")}</div>`;
-        const tip = myTurn ? (st.drawn != null ? "抽到的牌可以出，不想出就按「過」" : can.size ? "輪到你：點一張亮著的牌，或按「抽牌」" : "你沒有牌可以出，按「抽牌」") : `等 ${nm(st.turn)} 出牌…`;
-        const btns = myTurn ? `<div class="btbtns">${st.canDraw ? `<button class="mb undraw">抽牌</button>` : ""}${st.canPass ? `<button class="mb ghost unpass">過</button>` : ""}</div>` : "";
+        const pd = st.pend;
+        const tip = pd ? (myTurn ? `${nm(pd.from)} 出了 ${pd.kind === "f" ? "+4" : "+2"}，累計要抽 ${pd.total} 張：${can.size ? "可以疊一張" : "你沒有可疊的牌"}${pd.canChal ? "、質疑，" : "，"}或全部抽起來` : `${nm(pd.victim)} 要決定：累計 ${pd.total} 張（疊／質疑／抽）`)
+          : myTurn ? (st.drawn != null ? "抽到的牌可以出，不想出就按「過」" : can.size ? "輪到你：點一張亮著的牌，或按「抽牌」" : "你沒有牌可以出，按「抽牌」") : `等 ${nm(st.turn)} 出牌…`;
+        const callBtn = (st.hand.length === 2 && myTurn && !pd) || (st.hand.length === 1 && st.unoSeat !== you) ? `<button class="mb uncall">UNO！</button>` : "";
+        const btns = myTurn || callBtn ? `<div class="btbtns">${st.canAccept ? `<button class="mb unacc">抽 ${pd.total} 張</button>` : ""}${st.canAccept && pd.canChal ? `<button class="mb ghost unchal">質疑 +4</button>` : ""}${callBtn}${st.canDraw ? `<button class="mb undraw">抽牌</button>` : ""}${st.canPass ? `<button class="mb ghost unpass">過</button>` : ""}</div>` : "";
         const pick = pickWild >= 0 ? `<div class="unpick"><b>選新的顏色</b><div>${[0, 1, 2, 3].map((k) => `<button class="uncolor c${COLOR[k]} big" data-col="${k}">${CNAME[k]}</button>`).join("")}</div><button class="mb ghost unpx">取消</button></div>` : "";
         below = `<div class="mhint">${tip}</div>${hand}${btns}${pick}`;
       } else if (play) {
@@ -136,6 +144,10 @@ export function mountUno(opts = {}) {
       }));
       body.querySelectorAll("[data-col]").forEach((el) => el.addEventListener("click", () => { const c = pickWild; pickWild = -1; send({ t: "unact", a: "play", card: c, color: Number(el.dataset.col) }); }));
       const px = body.querySelector(".unpx"); px && px.addEventListener("click", () => { pickWild = -1; renderTable(); });
+      const ac = body.querySelector(".unacc"); ac && ac.addEventListener("click", () => send({ t: "unact", a: "accept" }));
+      const ch = body.querySelector(".unchal"); ch && ch.addEventListener("click", () => send({ t: "unact", a: "challenge" }));
+      const uc = body.querySelector(".uncall"); uc && uc.addEventListener("click", () => send({ t: "uncall" }));
+      body.querySelectorAll("[data-catch]").forEach((el) => el.addEventListener("click", () => send({ t: "uncatch", seat: Number(el.dataset.catch) })));
       const dr = body.querySelector(".undraw"); dr && dr.addEventListener("click", () => send({ t: "unact", a: "draw" }));
       const ps = body.querySelector(".unpass"); ps && ps.addEventListener("click", () => send({ t: "unact", a: "pass" }));
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "unsit", seat: Number(el.dataset.sit) })));

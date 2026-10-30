@@ -1,14 +1,17 @@
 // UNO（練習點數）：2～8 人（真人或電腦都可以），按開始時有幾個人入座就幾個人玩。標準 108 張牌，每人 7 張，先出完手牌的人贏這一手。
 // 牌的編號：0..99 是四色數字／功能牌（紅黃綠藍各 25 張：一張 0、1～9 各兩張、跳過 / 迴轉 / +2 各兩張），100..103 是變色牌，104..107 是變色 +4。
-// 規則：出的牌要跟桌上最上面那張同色、同數字或同符號，變色牌隨時可出（出的時候要選新顏色）。
-// 跳過：下家被跳過；迴轉：反方向（兩個人時等於跳過）；+2：下家抽 2 張並被跳過；+4：下家抽 4 張並被跳過（不能疊加、沒有質疑）。
-// 沒有牌可出（或不想出）就抽一張：抽到能出的牌可以馬上出，否則換下家。剩最後一張時自動喊 UNO。
+// 規則（標準 UNO）：出的牌要跟桌上最上面那張同色、同數字或同符號，變色牌隨時可出（出的時候要選新顏色）。
+// 跳過：下家被跳過；迴轉：反方向（兩個人時等於跳過）；+2：下家抽 2 張並被跳過；變色 +4：選顏色，下家抽 4 張並被跳過。
+// 可疊加（開桌可關）：被 +2 的人可以再出 +2（或 +4）轉給下家，累計張數；被 +4 的人可以再出 +4；不想疊或不能疊的人把累計的牌全部抽起來並被跳過。
+// 可質疑 +4（開桌可關）：+4 本來只能在手上沒有「目前顏色」的牌時出；被 +4 的人可以質疑：出牌的人真的有該色牌 → 他抽 4 張、你照常出牌；沒有 → 你抽 6 張並被跳過。
+// 喊 UNO：剩最後一張時要按「UNO!」（剩 2 張要出牌前也可以先按）；沒喊的話，在下一位玩家動作之前被別人「抓」到，罰抽 2 張。
+// 起始牌若是功能牌也會生效（跳過／迴轉／+2／變色）。沒有牌可出就抽一張：抽到能出的牌可以馬上出，否則換下家。
 // 計分：贏的人收其他人手上剩的牌點（數字牌＝面值、功能牌 20、變色牌 50）× 每點點數，輸的人各付自己的。
 // 伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
 
 const START_POINTS = 10000;
-const DEFAULT_CFG = { len: 3, base: 1 };
+const DEFAULT_CFG = { len: 3, base: 1, stack: true, challenge: true };
 const LENS = [1, 3, 5, 10];
 const STAKES = [1, 2, 5, 10];
 const TURN_MS = 30000, RESULT_MS = 10000, BOT_MS = [900, 1700];
@@ -56,7 +59,8 @@ const canPlayOn = (h, c) => {
   if (k !== "n" && k === kindOf(top) && colorOf(top) !== 4) return true;          // 同符號（跳過、迴轉、+2）
   return false;
 };
-const playable = (h, i) => h.hands[i].filter((c) => canPlayOn(h, c) && (h.drawn == null || c === h.drawn));
+const stackable = (hand, kind) => hand.filter((c) => kindOf(c) === "f" || (kindOf(c) === "d" && kind === "d"));
+const playable = (h, i) => (h.pend ? stackable(h.hands[i], h.pend.kind) : h.hands[i].filter((c) => canPlayOn(h, c) && (h.drawn == null || c === h.drawn)));
 const nextSeat = (h, i, steps = 1) => { let j = i; for (let k = 0; k < steps; k++) j = (j + h.dir + h.n) % h.n; return j; };
 
 // ---------------------------------------------------------------- 開局、發牌
@@ -88,43 +92,102 @@ function startHand(t) {
   for (let k = 0; k < 7; k++) for (let i = 0; i < n; i++) hands[i].push(deck.pop());
   let top = deck.pop();
   const rest = [];
-  while (kindOf(top) !== "n") { rest.push(top); top = deck.pop(); }          // 起始牌一定是數字牌
+  while (kindOf(top) === "f") { rest.push(top); top = deck.pop(); }          // 起始牌不能是 +4（放回去重翻）
   deck.push(...rest); shuffle(deck);
-  const start = (g.starter + g.handNo - 1) % n;
-  t.h = { n, deck, discard: [top], hands: hands.map(sortHand), top, color: colorOf(top), dir: 1, turn: start, drawn: null, deadline: 0, botAt: 0, last: null };
-  t.result = null; t.phase = "play";
+  let start = (g.starter + g.handNo - 1) % n;
+  const h = { n, deck, discard: [top], hands: hands.map(sortHand), top, color: colorOf(top), dir: 1, turn: start, drawn: null, deadline: 0, botAt: 0, last: null, pend: null, uno: null, preCall: -1 };
+  t.h = h; t.result = null; t.phase = "play";
   t.log = `第 ${g.handNo} 手，由 ${t.seats[start].name} 先出`;
+  const k0 = kindOf(top);                                                    // 起始牌是功能牌：照規則生效
+  if (k0 === "s") { t.log += `（起始牌跳過，直接換 ${t.seats[nextSeat(h, start)].name}）`; start = nextSeat(h, start); }
+  else if (k0 === "r") { h.dir = -1; t.log += "（起始牌迴轉，逆時針出牌）"; }
+  else if (k0 === "d") { drawCards(h, start, 2); t.log += `（起始牌 +2，${t.seats[start].name} 抽 2 張並跳過）`; start = nextSeat(h, start); }
+  else if (k0 === "w") { h.color = randomInt(4); t.log += `（起始牌變色，顏色定為${COLORS[h.color]}色）`; }
   setTurn(t, start);
 }
 function setTurn(t, i) {
-  const h = t.h; h.turn = i; h.drawn = null; h.deadline = now() + TURN_MS;
+  const h = t.h; h.turn = i; h.drawn = null; h.preCall = -1; h.deadline = now() + TURN_MS;
   h.botAt = now() + BOT_MS[0] + randomInt(BOT_MS[1] - BOT_MS[0]);
 }
 
 // ---------------------------------------------------------------- 出牌、抽牌、過
+function setUno(t, i) {                                                    // 剩最後一張：有沒有喊 UNO
+  const h = t.h, st = t.seats[i];
+  const called = h.preCall === i || (isAuto(st) ? (st.bot ? Math.random() < 0.85 : true) : false);
+  h.uno = { seat: i, called, catchAt: now() + 600 + randomInt(900) };
+}
 function doPlay(t, i, c, color) {
-  const h = t.h; if (!h || h.turn !== i || !Number.isInteger(c) || !h.hands[i].includes(c) || !canPlayOn(h, c)) return false;
-  if (h.drawn != null && c !== h.drawn) return false;
-  const k = kindOf(c);
+  const h = t.h; if (!h || h.turn !== i || !Number.isInteger(c) || !h.hands[i].includes(c)) return false;
+  const k = kindOf(c), wasPend = h.pend;
+  if (wasPend) { if (!stackable([c], wasPend.kind).length) return false; }
+  else { if (!canPlayOn(h, c)) return false; if (h.drawn != null && c !== h.drawn) return false; }
   let col = colorOf(c);
   if (k === "w" || k === "f") { col = Number(color); if (!Number.isInteger(col) || col < 0 || col > 3) return false; }
+  const hadColor = h.hands[i].some((x) => x !== c && colorOf(x) === h.color);       // +4 合法性：手上有沒有「目前顏色」的牌
+  h.uno = null;
   h.hands[i] = h.hands[i].filter((x) => x !== c);
-  h.discard.push(c); h.top = c; h.color = col;
+  h.discard.push(c); h.top = c; h.color = col; h.pend = null;
   h.last = { seat: i, card: c, color: col, draw: 0 };
-  let msg = `${t.seats[i].name} 出 ${cardName(c)}${k === "w" || k === "f" ? `（改成${COLORS[col]}色）` : ""}`;
-  if (h.hands[i].length === 1) msg += "　UNO！";
-  if (!h.hands[i].length) { t.log = msg; settle(t, i); return true; }
+  let msg = `${t.seats[i].name} ${wasPend ? "疊上 " : "出 "}${cardName(c)}${k === "w" || k === "f" ? `（改成${COLORS[col]}色）` : ""}`;
+  const left = h.hands[i].length;
+  if (left === 1) { msg += "　剩最後一張！"; setUno(t, i); }
   let nxt = nextSeat(h, i);
-  if (k === "r") { h.dir = -h.dir; nxt = h.n === 2 ? i : nextSeat(h, i); if (h.n === 2) msg += "（迴轉＝再出一次）"; else msg += "（轉向）"; }
+  if (k === "d" || k === "f") {
+    const amt = k === "d" ? 2 : 4, total = (wasPend ? wasPend.total : 0) + amt, chain = wasPend ? wasPend.chain + 1 : 1, v = nxt;
+    if (!left) { drawCards(h, v, total); h.last.draw = total; t.log = msg + `（${t.seats[v].name} 抽 ${total} 張）`; settle(t, i); return true; }
+    const canChal = k === "f" && chain === 1 && t.cfg.challenge;
+    if (canChal || (t.cfg.stack && stackable(h.hands[v], k).length)) {
+      h.pend = { kind: k, total, chain, from: i, victim: v, illegal: k === "f" && chain === 1 && hadColor, canChal };
+      msg += `（累計 ${total} 張，等 ${t.seats[v].name} 決定）`;
+      t.log = msg; setTurn(t, v); return true;
+    }
+    drawCards(h, v, total); h.last.draw = total; nxt = nextSeat(h, v);
+    msg += `（${t.seats[v].name} 抽 ${total} 張並被跳過）`;
+  } else if (!left) { t.log = msg; settle(t, i); return true; }
+  else if (k === "r") { h.dir = -h.dir; nxt = h.n === 2 ? i : nextSeat(h, i); if (h.n === 2) msg += "（迴轉＝再出一次）"; else msg += "（轉向）"; }
   else if (k === "s") { const sk = nxt; nxt = nextSeat(h, nxt); msg += `（${t.seats[sk].name} 被跳過）`; }
-  else if (k === "d") { const v = nxt; drawCards(h, v, 2); h.last.draw = 2; nxt = nextSeat(h, nxt); msg += `（${t.seats[v].name} 抽 2 張並被跳過）`; }
-  else if (k === "f") { const v = nxt; drawCards(h, v, 4); h.last.draw = 4; nxt = nextSeat(h, nxt); msg += `（${t.seats[v].name} 抽 4 張並被跳過）`; }
   t.log = msg;
   setTurn(t, nxt);
   return true;
 }
+function doAccept(t, i) {                                                  // 不疊、不質疑：把累計的牌全部抽起來
+  const h = t.h; if (!h || !h.pend || h.turn !== i) return false;
+  const p = h.pend; h.uno = null; h.pend = null;
+  drawCards(h, i, p.total); h.last = { seat: i, card: -1, draw: p.total };
+  t.log = `${t.seats[i].name} 抽 ${p.total} 張並被跳過`;
+  setTurn(t, nextSeat(h, i)); return true;
+}
+function doChallenge(t, i) {
+  const h = t.h; if (!h || !h.pend || h.turn !== i || !h.pend.canChal) return false;
+  const p = h.pend; h.uno = null; h.pend = null;
+  const from = t.seats[p.from].name, me = t.seats[i].name;
+  if (p.illegal) {                                                         // 質疑成功：出 +4 的人其實有該色牌
+    drawCards(h, p.from, p.total); h.last = { seat: p.from, card: -1, draw: p.total };
+    t.log = `${me} 質疑成功！${from} 手上有同色牌，罰抽 ${p.total} 張，${me} 照常出牌`;
+    setTurn(t, i);
+  } else {                                                                 // 質疑失敗：多抽 2 張
+    const n = p.total + 2; drawCards(h, i, n); h.last = { seat: i, card: -1, draw: n };
+    t.log = `${me} 質疑失敗，${from} 沒有同色牌。${me} 抽 ${n} 張並被跳過`;
+    setTurn(t, nextSeat(h, i));
+  }
+  return true;
+}
+function doCall(t, i) {                                                    // 喊 UNO
+  const h = t.h; if (!h) return false;
+  if (h.uno && h.uno.seat === i) { if (!h.uno.called) { h.uno.called = true; t.log = `${t.seats[i].name} 喊 UNO！`; } return true; }
+  if (h.turn === i && h.hands[i].length === 2 && !h.pend) { h.preCall = i; return true; }
+  return false;
+}
+function doCatch(t, by, seat) {                                            // 抓沒喊 UNO 的人
+  const h = t.h; if (!h || !h.uno || h.uno.seat !== seat || seat === by) return "none";
+  if (h.uno.called) return "called";
+  drawCards(h, seat, 2); h.last = { seat, card: -1, draw: 2 };
+  t.log = `${t.seats[by].name} 抓到 ${t.seats[seat].name} 沒喊 UNO，罰抽 2 張`;
+  h.uno = null; return "ok";
+}
 function doDraw(t, i) {
-  const h = t.h; if (!h || h.turn !== i || h.drawn != null) return false;
+  const h = t.h; if (!h || h.turn !== i || h.drawn != null || h.pend) return false;
+  h.uno = null;
   const got = drawCards(h, i, 1);
   if (!got.length) { t.log = `${t.seats[i].name} 沒牌可抽，過`; setTurn(t, nextSeat(h, i)); return true; }
   const c = got[0];
@@ -137,6 +200,7 @@ function doDraw(t, i) {
 }
 function doPass(t, i) {
   const h = t.h; if (!h || h.turn !== i || h.drawn == null) return false;
+  h.uno = null;
   t.log = `${t.seats[i].name} 抽到的牌不出，過`;
   setTurn(t, nextSeat(h, i));
   return true;
@@ -163,8 +227,19 @@ function finishGame(t) {
 }
 
 // ---------------------------------------------------------------- 電腦
+function pickColor(hand, c) { const cc = [0, 0, 0, 0]; for (const x of hand) if (x !== c && colorOf(x) < 4) cc[colorOf(x)]++; return Math.max(...cc) === 0 ? randomInt(4) : cc.indexOf(Math.max(...cc)); }
+function botPend(t, i) {
+  const h = t.h, p = h.pend;
+  if (p.canChal && Math.random() < (h.hands[i].length >= 6 ? 0.15 : 0.3)) return doChallenge(t, i);
+  const ps = playable(h, i);
+  if (ps.length && Math.random() < 0.85) { const c = ps.find((x) => kindOf(x) === p.kind) ?? ps[0]; return doPlay(t, i, c, kindOf(c) === "f" ? pickColor(h.hands[i], c) : undefined); }
+  return doAccept(t, i);
+}
 function botAct(t, i) {
-  const h = t.h, hand = h.hands[i], ps = playable(h, i);
+  const h = t.h, hand = h.hands[i];
+  if (h.pend) return botPend(t, i);
+  let ps = playable(h, i);
+  if (t.cfg.challenge && hand.some((x) => colorOf(x) === h.color) && Math.random() > 0.1) ps = ps.filter((c) => kindOf(c) !== "f");   // 有同色牌就不亂出 +4（偶爾唬人）
   if (!ps.length) return h.drawn != null ? doPass(t, i) : doDraw(t, i);
   const minOpp = Math.min(...h.hands.map((x, k) => (k === i ? 99 : x.length)));
   const cnt = [0, 0, 0, 0]; for (const c of hand) if (colorOf(c) < 4) cnt[colorOf(c)]++;
@@ -181,7 +256,7 @@ function botAct(t, i) {
   const c = ps.map((x) => [x, score(x)]).sort((a, b) => b[1] - a[1])[0][0];
   const k = kindOf(c);
   let color;
-  if (k === "w" || k === "f") { const rest = hand.filter((x) => x !== c); const cc = [0, 0, 0, 0]; for (const x of rest) if (colorOf(x) < 4) cc[colorOf(x)]++; color = Math.max(...cc) === 0 ? randomInt(4) : cc.indexOf(Math.max(...cc)); }
+  if (k === "w" || k === "f") color = pickColor(hand, c);
   void bestColor;
   return doPlay(t, i, c, color);
 }
@@ -194,8 +269,8 @@ function view(t, ws) {
     watchers: [...t.members].filter((w) => w.unspec).length, final: t.final, handNo: t.g ? t.g.handNo : 0 };
   v.seats = t.seats.map((s, i) => s && { i, name: s.name, bot: s.bot, away: !s.bot && !s.ws, points: s.points, count: h ? h.hands[i].length : 0 });
   if (h && t.phase === "play") {
-    Object.assign(v, { turn: h.turn, top: h.top, color: h.color, dir: h.dir, deck: h.deck.length, last: h.last, deadline: h.deadline, drawn: h.drawn != null && h.turn === you ? h.drawn : null });
-    if (you >= 0) { v.hand = h.hands[you]; v.playable = h.turn === you ? playable(h, you) : []; v.canDraw = h.turn === you && h.drawn == null; v.canPass = h.turn === you && h.drawn != null; }
+    Object.assign(v, { turn: h.turn, top: h.top, color: h.color, dir: h.dir, deck: h.deck.length, last: h.last, deadline: h.deadline, pend: h.pend ? { kind: h.pend.kind, total: h.pend.total, from: h.pend.from, victim: h.pend.victim, canChal: h.pend.canChal } : null, unoSeat: h.uno && h.uno.called ? h.uno.seat : -1, drawn: h.drawn != null && h.turn === you ? h.drawn : null });
+    if (you >= 0) { v.hand = h.hands[you]; v.playable = h.turn === you ? playable(h, you) : []; v.canDraw = h.turn === you && h.drawn == null && !h.pend; v.canAccept = !!h.pend && h.turn === you; v.canPass = h.turn === you && h.drawn != null; }
   }
   if (t.phase === "result") { v.result = t.result; v.nextAt = t.nextAt; if (t.h) { v.top = t.h.top; v.color = t.h.color; } }
   return v;
@@ -223,6 +298,11 @@ function tick() {
       if (t.phase === "result") { if (n >= t.nextAt) { if (t.result.gameOver) finishGame(t); else startHand(t); push(t); } continue; }
       if (t.phase !== "play") continue;
       const h = t.h, s = t.seats[h.turn];
+      if (h.uno && !h.uno.called && n >= h.uno.catchAt) {                   // 電腦抓沒喊 UNO 的人
+        const bots = t.seats.map((x, k) => (x && x.bot && k !== h.uno.seat ? k : -1)).filter((k) => k >= 0);
+        if (bots.length && Math.random() < 0.7) { doCatch(t, bots[randomInt(bots.length)], h.uno.seat); push(t); continue; }
+        h.uno.catchAt = Infinity;
+      }
       if ((isAuto(s) && n >= h.botAt) || n >= h.deadline) { if (botAct(t, h.turn)) push(t); }
     } catch (e) { console.log("UNO 錯誤", e && e.stack); }
   }
@@ -283,15 +363,23 @@ export function handleUno(ws, m) {
     if (mine < 0 || t.started) return true;
     if (LENS.includes(Number(m.len))) t.cfg.len = Number(m.len);
     if (STAKES.includes(Number(m.base))) t.cfg.base = Number(m.base);
+    if (typeof m.stack === "boolean") t.cfg.stack = m.stack;
+    if (typeof m.challenge === "boolean") t.cfg.challenge = m.challenge;
     t.log = `${nameOf(ws)} 調整設定`; push(t);
   } else if (m.t === "unstart") {
     if (mine < 0 || t.started) return true;
     if (t.seats.filter(Boolean).length < 2) return out(ws, { t: "unerr", error: "need2" }), true;
     startGame(t); t.log = `${nameOf(ws)} 按下開始｜` + t.log; push(t);
+  } else if (m.t === "uncall") {
+    if (t.phase === "play" && doCall(t, mine)) push(t);
+  } else if (m.t === "uncatch") {
+    if (t.phase !== "play") return true;
+    const r = doCatch(t, mine, Number(m.seat));
+    if (r === "ok") push(t); else out(ws, { t: "unerr", error: r === "called" ? "called" : "none" });
   } else if (m.t === "unact") {
     if (mine < 0 || t.phase !== "play") return true;
     const a = String(m.a || "");
-    const ok = a === "play" ? doPlay(t, mine, Number(m.card), m.color) : a === "draw" ? doDraw(t, mine) : a === "pass" ? doPass(t, mine) : false;
+    const ok = a === "play" ? doPlay(t, mine, Number(m.card), m.color) : a === "draw" ? doDraw(t, mine) : a === "pass" ? doPass(t, mine) : a === "accept" ? doAccept(t, mine) : a === "challenge" ? doChallenge(t, mine) : false;
     if (ok) push(t); else out(ws, { t: "unerr", error: "illegal" });
   }
   return true;

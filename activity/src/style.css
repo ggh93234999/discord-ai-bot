@@ -1442,3 +1442,8 @@ body.tv-fs{overflow:hidden}
 .un .unme{display:flex;justify-content:center}
 .un .unme .unseat{min-width:140px}
 .un .untable .brmid{position:static;transform:none;width:auto;margin:0}
+.un .uncatch{margin-top:3px;padding:2px 8px;font-size:11px}
+.un .unobadge{background:#e53935;color:#fff;border-radius:6px;padding:0 6px;font-weight:700}
+.un .uncall{background:#e53935;color:#fff;font-weight:700}
+.un .unchal{border-color:#ffb300;color:#ffb300}
+.un .unls label,.un .mjcfg label{white-space:nowrap}
