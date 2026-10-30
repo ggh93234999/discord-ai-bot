@@ -43,13 +43,11 @@ export function mountUno(opts = {}) {
       ws.onmessage = (e) => {
         const m = JSON.parse(e.data);
         if (m.t === "unstate") { st = m; st.at = Date.now() - m.now; if (st.phase !== "play") pickWild = -1; render(); }
-        else if (m.t === "unerr") { statusEl.textContent = m.error === "full" ? "座位滿了" : "這張現在不能出"; }
+        else if (m.t === "unerr") { statusEl.textContent = m.error === "full" ? "座位滿了" : m.error === "need2" ? "至少要 2 人才能開始（可以加電腦）" : "這張現在不能出"; }
       };
       ws.onclose = () => { if (closed) return; statusEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };
       ws.onerror = () => {};
     }
-    const base = () => (st.you >= 0 ? st.you : 0);
-    const rel = (i) => (i - base() + 4) % 4;                 // 0 自己（下）、1 下家（左）、2 對面（上）、3 上家（右）
     const nm = (i) => esc(st.seats[i]?.name || "");
 
     function render() {
@@ -62,20 +60,21 @@ export function mountUno(opts = {}) {
     // ---------------- 開打前
     function renderLobby() {
       const seated = st.you >= 0;
-      const seats = [2, 1, 3, 0].map((i) => {
+      const seats = Array.from({ length: 8 }, (_, i) => {
         const s = st.seats[i];
-        if (!s) return `<div class="brls p${i} empty">${spectate ? "空位" : !seated ? `<button class="mb" data-sit="${i}">入座</button>` : `<button class="mb ghost" data-bot="${i}">＋電腦</button>`}</div>`;
-        return `<div class="brls p${i}${i === st.you ? " me" : ""}"><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}${seated && s.bot ? `<button class="mdel" data-del="${i}">✕</button>` : ""}</div>`;
+        if (!s) return `<div class="unls empty">${spectate ? "空位" : !seated ? `<button class="mb" data-sit="${i}">入座</button>` : `<button class="mb ghost" data-bot="${i}">＋電腦</button>`}</div>`;
+        return `<div class="unls${i === st.you ? " me" : ""}"><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}${seated && s.bot ? `<button class="mdel" data-del="${i}">✕</button>` : ""}</div>`;
       }).join("");
+      const nSeat = st.seats.filter(Boolean).length;
       let cfg = "";
       const c = st.cfg;
       if (seated && !spectate) {
         cfg = `<div class="mjcfg"><label>長度 <select class="cf-len">${st.lens.map((v) => `<option value="${v}"${c.len === v ? " selected" : ""}>${v} 手</option>`).join("")}</select></label>
           <label>每點 <select class="cf-base">${st.stakes.map((v) => `<option value="${v}"${c.base === v ? " selected" : ""}>${v} 點</option>`).join("")}</select></label></div>
-          <button class="mb start">▶ 開始${st.seats.some((s) => !s) ? "（空位由電腦補）" : ""}</button>`;
-      } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，最多 4 人，空位可以加電腦。</div>`;
+          <button class="mb start"${nSeat < 2 ? " disabled" : ""}>▶ 開始（${nSeat} 人）</button>${nSeat < 2 ? `<div class="mempty">至少要 2 人，可以按「＋電腦」補人。</div>` : ""}`;
+      } else if (!spectate) cfg = `<div class="mempty">點「入座」坐下，2～8 人，可以加電腦。</div>`;
       const fin = st.final ? `<div class="mjfinal"><h3>牌局結束</h3>${st.final.map((r, k) => `<div class="fr${k === 0 ? " top" : ""}"><b>${esc(r.name)}</b><em>${r.points.toLocaleString()}</em></div>`).join("")}</div>` : "";
-      body.innerHTML = `${fin}<div class="brlobby"><div class="brseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。每人 7 張，先出完的人贏；贏的人收其他人手上剩的牌點（數字＝面值、功能牌 20、變色牌 50）× 每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
+      body.innerHTML = `${fin}<div class="brlobby"><div class="unseats">${seats}</div>${cfg}<small>每人 10,000 點，練習用，不會動到代幣。每人 7 張，2～8 人，先出完的人贏；贏的人收其他人手上剩的牌點（數字＝面值、功能牌 20、變色牌 50）× 每點點數。</small>${seated && !spectate ? `<button class="mb ghost stand">離座</button>` : ""}</div>`;
       statusEl.textContent = spectate ? "👀 旁觀中，等開局" : st.phase === "end" ? "按開始再來一場" : "等玩家入座";
       body.querySelectorAll("[data-sit]").forEach((b) => b.addEventListener("click", () => send({ t: "unsit", seat: Number(b.dataset.sit) })));
       body.querySelectorAll("[data-bot]").forEach((b) => b.addEventListener("click", () => send({ t: "unaddbot", seat: Number(b.dataset.bot) })));
@@ -91,10 +90,10 @@ export function mountUno(opts = {}) {
     // ---------------- 牌桌
     function seatBox(i) {
       const s = st.seats[i]; if (!s) return "";
-      const r = rel(i), turn = st.phase === "play" && st.turn === i;
-      const backs = r === 0 && st.you >= 0 ? "" : `<span class="brcnt"><span class="uc back xs"></span>${s.count}</span>`;
+      const turn = st.phase === "play" && st.turn === i;
+      const backs = i === st.you ? "" : `<span class="brcnt"><span class="uc back xs"></span>${s.count}</span>`;
       const uno = st.phase === "play" && s.count === 1 ? `<span class="unobadge">UNO!</span>` : "";
-      return `<div class="brseat r${r}${turn ? " turn" : ""}${st.you === i ? " me" : ""}">
+      return `<div class="unseat${turn ? " turn" : ""}${st.you === i ? " me" : ""}">
         <div class="brname"><b>${esc(s.name)}</b>${s.away ? "（離線）" : ""}</div>
         <div class="brsub">${backs}<em>${s.points.toLocaleString()}</em>${uno}</div>
       </div>`;
@@ -116,7 +115,8 @@ export function mountUno(opts = {}) {
 
     function renderTable() {
       const you = st.you, me = you >= 0 ? st.seats[you] : null, play = st.phase === "play";
-      const order = [2, 1, 3, 0].map((r) => [0, 1, 2, 3].find((i) => rel(i) === r));
+      const n = st.seats.length, from = you >= 0 ? you : 0;
+      const opps = Array.from({ length: n - (you >= 0 ? 1 : 0) }, (_, k) => (from + (you >= 0 ? k + 1 : k)) % n);     // 從我的下家開始，照出牌順序排
       let below = !play && st.result ? resultHTML(st.result) : `<div class="btspacer"></div>`;
       if (play && me) {
         const myTurn = st.turn === you, can = new Set(st.playable || []);
@@ -128,7 +128,7 @@ export function mountUno(opts = {}) {
       } else if (play) {
         below = `<div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div>`;
       }
-      body.innerHTML = `<div class="brtable">${order.map(seatBox).join("")}${midHTML()}</div>${below}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
+      body.innerHTML = `<div class="untable"><div class="unopps">${opps.map(seatBox).join("")}</div>${midHTML()}${you >= 0 ? `<div class="unme">${seatBox(you)}</div>` : ""}</div>${below}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
       body.querySelectorAll(".unhand .uc.can").forEach((el) => el.addEventListener("click", () => {
         const c = Number(el.dataset.c);
         if (colorOf(c) === 4) { pickWild = c; renderTable(); return; }

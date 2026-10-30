@@ -1,4 +1,4 @@
-// UNO（練習點數）：2～4 人，空位由電腦補。標準 108 張牌，每人 7 張，先出完手牌的人贏這一手。
+// UNO（練習點數）：2～8 人（真人或電腦都可以），按開始時有幾個人入座就幾個人玩。標準 108 張牌，每人 7 張，先出完手牌的人贏這一手。
 // 牌的編號：0..99 是四色數字／功能牌（紅黃綠藍各 25 張：一張 0、1～9 各兩張、跳過 / 迴轉 / +2 各兩張），100..103 是變色牌，104..107 是變色 +4。
 // 規則：出的牌要跟桌上最上面那張同色、同數字或同符號，變色牌隨時可出（出的時候要選新顏色）。
 // 跳過：下家被跳過；迴轉：反方向（兩個人時等於跳過）；+2：下家抽 2 張並被跳過；+4：下家抽 4 張並被跳過（不能疊加、沒有質疑）。
@@ -12,6 +12,7 @@ const DEFAULT_CFG = { len: 3, base: 1 };
 const LENS = [1, 3, 5, 10];
 const STAKES = [1, 2, 5, 10];
 const TURN_MS = 30000, RESULT_MS = 10000, BOT_MS = [900, 1700];
+const MAXP = 8;
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "豆豆", "阿嬤", "牌神", "胖虎"];
 
 // ---- 牌
@@ -32,7 +33,7 @@ const tables = new Map();
 const now = () => Date.now();
 
 function newTable(id) {
-  return { id, members: new Set(), seats: [null, null, null, null], started: false, phase: "wait", cfg: { ...DEFAULT_CFG }, g: null, h: null, log: "等玩家入座…", result: null, final: null, nextAt: 0, botHist: new Set() };
+  return { id, members: new Set(), seats: Array(MAXP).fill(null), started: false, phase: "wait", cfg: { ...DEFAULT_CFG }, g: null, h: null, log: "等玩家入座…", result: null, final: null, nextAt: 0, botHist: new Set() };
 }
 function getTable(id) { if (!tables.has(id)) tables.set(id, newTable(id)); return tables.get(id); }
 function pickBotName(t) {
@@ -73,25 +74,24 @@ function drawCards(h, i, n) {
   return got;
 }
 function startGame(t) {
-  for (let i = 0; i < 4; i++) if (!t.seats[i]) t.seats[i] = mkSeat({ bot: true, name: pickBotName(t) });
-  t.seats = t.seats.slice(0, 4);
+  t.seats = t.seats.filter(Boolean);                                  // 只留有人坐的座位（真人或電腦），座位編號重新排成 0..n-1
   for (const s of t.seats) s.points = START_POINTS;
-  t.g = { handNo: 0, starter: randomInt(4) };
+  t.g = { handNo: 0, starter: randomInt(t.seats.length) };
   t.started = true; t.final = null;
   startHand(t);
 }
 function startHand(t) {
   const g = t.g; g.handNo++;
-  const n = 4;
+  const n = t.seats.length;
   const deck = mkDeck();
-  const hands = [[], [], [], []];
+  const hands = Array.from({ length: n }, () => []);
   for (let k = 0; k < 7; k++) for (let i = 0; i < n; i++) hands[i].push(deck.pop());
   let top = deck.pop();
   const rest = [];
   while (kindOf(top) !== "n") { rest.push(top); top = deck.pop(); }          // 起始牌一定是數字牌
   deck.push(...rest); shuffle(deck);
   const start = (g.starter + g.handNo - 1) % n;
-  t.h = { n, deck, discard: [top], hands: hands.map(sortHand), top, color: colorOf(top), dir: 1, turn: start, drawn: null, deadline: 0, botAt: 0, last: null, said: [false, false, false, false] };
+  t.h = { n, deck, discard: [top], hands: hands.map(sortHand), top, color: colorOf(top), dir: 1, turn: start, drawn: null, deadline: 0, botAt: 0, last: null };
   t.result = null; t.phase = "play";
   t.log = `第 ${g.handNo} 手，由 ${t.seats[start].name} 先出`;
   setTurn(t, start);
@@ -146,8 +146,8 @@ function doPass(t, i) {
 function settle(t, w) {
   const h = t.h, base = t.cfg.base;
   const pts = h.hands.map((cs) => cs.reduce((a, c) => a + pointOf(c), 0));
-  const deltas = [0, 0, 0, 0];
-  for (let i = 0; i < 4; i++) if (i !== w) { deltas[i] = -pts[i] * base; deltas[w] += pts[i] * base; }
+  const deltas = h.hands.map(() => 0);
+  for (let i = 0; i < h.n; i++) if (i !== w) { deltas[i] = -pts[i] * base; deltas[w] += pts[i] * base; }
   deltas.forEach((d, i) => { t.seats[i].points += d; });
   const gameOver = t.g.handNo >= t.cfg.len;
   t.result = { handNo: t.g.handNo, winner: w, deltas, pts, hands: h.hands.map((x) => x.slice()), gameOver };
@@ -158,14 +158,15 @@ function finishGame(t) {
   t.final = t.seats.map((s) => ({ name: s.name, points: s.points })).sort((a, b) => b.points - a.points);
   t.phase = "end"; t.started = false; t.h = null; t.result = null;
   t.log = "牌局結束";
-  for (let i = 0; i < 4; i++) if (t.seats[i] && !t.seats[i].bot && !t.seats[i].ws) t.seats[i] = null;
+  t.seats = t.seats.filter((s) => s.bot || s.ws);                       // 離線的真人移出座位
+  while (t.seats.length < MAXP) t.seats.push(null);
 }
 
 // ---------------------------------------------------------------- 電腦
 function botAct(t, i) {
   const h = t.h, hand = h.hands[i], ps = playable(h, i);
   if (!ps.length) return h.drawn != null ? doPass(t, i) : doDraw(t, i);
-  const minOpp = Math.min(...[0, 1, 2, 3].filter((k) => k !== i).map((k) => h.hands[k].length));
+  const minOpp = Math.min(...h.hands.map((x, k) => (k === i ? 99 : x.length)));
   const cnt = [0, 0, 0, 0]; for (const c of hand) if (colorOf(c) < 4) cnt[colorOf(c)]++;
   const bestColor = () => cnt.indexOf(Math.max(...cnt));
   const score = (c) => {
@@ -217,7 +218,7 @@ function tick() {
     if (!t.members.size) { if (n - (t.emptyAt || (t.emptyAt = n)) > 120000) tables.delete(key); continue; }
     t.emptyAt = 0;
     const humans = t.seats.filter((s) => s && !s.bot && s.ws);
-    if (!humans.length && t.phase !== "wait" && t.phase !== "end") { t.seats = [null, null, null, null]; t.phase = "wait"; t.started = false; t.h = null; t.g = null; t.result = null; t.log = "等玩家入座…"; push(t); continue; }
+    if (!humans.length && t.phase !== "wait" && t.phase !== "end") { t.seats = Array(MAXP).fill(null); t.phase = "wait"; t.started = false; t.h = null; t.g = null; t.result = null; t.log = "等玩家入座…"; push(t); continue; }
     try {
       if (t.phase === "result") { if (n >= t.nextAt) { if (t.result.gameOver) finishGame(t); else startHand(t); push(t); } continue; }
       if (t.phase !== "play") continue;
@@ -253,7 +254,7 @@ export function handleUno(ws, m) {
   if (m.t === "unsit") {
     if (mine >= 0) return true;
     let i = Number(m.seat);
-    if (!Number.isInteger(i) || i < 0 || i > 3) i = t.seats.findIndex((s) => !s);
+    if (!Number.isInteger(i) || i < 0 || i >= MAXP) i = t.seats.findIndex((s) => !s);
     if (i >= 0 && t.seats[i] && !(t.seats[i].bot && t.started)) i = t.seats.findIndex((x) => !x);
     if (i < 0) return out(ws, { t: "unerr", error: "full" }), true;
     if (t.seats[i] && t.seats[i].bot) { const old = t.seats[i]; t.seats[i] = mkSeat({ ws, pid: ws.unpid, name: nameOf(ws), points: old.points }); t.log = `${nameOf(ws)} 接手 ${old.name} 的位置`; }
@@ -268,7 +269,7 @@ export function handleUno(ws, m) {
   } else if (m.t === "unaddbot") {
     if (mine < 0 || t.started) return true;
     const k = Number(m.seat);
-    const i = Number.isInteger(k) && k >= 0 && k <= 3 && !t.seats[k] ? k : t.seats.findIndex((s) => !s);
+    const i = Number.isInteger(k) && k >= 0 && k < MAXP && !t.seats[k] ? k : t.seats.findIndex((s) => !s);
     if (i < 0) return true;
     t.seats[i] = mkSeat({ bot: true, name: pickBotName(t) }); push(t);
   } else if (m.t === "undelbot") {
@@ -285,6 +286,7 @@ export function handleUno(ws, m) {
     t.log = `${nameOf(ws)} 調整設定`; push(t);
   } else if (m.t === "unstart") {
     if (mine < 0 || t.started) return true;
+    if (t.seats.filter(Boolean).length < 2) return out(ws, { t: "unerr", error: "need2" }), true;
     startGame(t); t.log = `${nameOf(ws)} 按下開始｜` + t.log; push(t);
   } else if (m.t === "unact") {
     if (mine < 0 || t.phase !== "play") return true;
@@ -296,8 +298,9 @@ export function handleUno(ws, m) {
 }
 
 // 測試用：四個座位都由電腦打完一場，回傳步數和點數
-export function _simGame(len = 1) {
+export function _simGame(len = 1, n = 4) {
   const t = newTable("sim"); t.cfg.len = len;
+  for (let i = 0; i < n; i++) t.seats[i] = mkSeat({ bot: true, name: pickBotName(t) });
   startGame(t);
   let steps = 0;
   while (steps < 20000) {
