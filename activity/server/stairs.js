@@ -70,10 +70,7 @@ function collidePlayers(sim) {
       const a = al[i], b = al[j];
       const px = Math.min(a.x, b.x) + DKW - Math.max(a.x, b.x), py = Math.min(a.y, b.y) + DKH - Math.max(a.y, b.y);
       if (px <= 0 || py <= 0) continue;
-      if (py < px) {
-        const up = a.y < b.y ? a : b, lo = up === a ? b : a;
-        up.y = lo.y - DKH; up.vy = Math.min(up.vy, lo.vy < 0 ? lo.vy : 0); up.cr = true;
-      } else {
+      {   // 人不能疊在別人頭上：不論上下左右，重疊就沿水平方向推開（從頭上落下的會滑到旁邊）
         const l = a.x < b.x ? a : b, r = l === a ? b : a, lim = (v) => Math.max(WALL, Math.min(DW - WALL - DKW, v));
         l.x = lim(l.x - px / 2); r.x = lim(r.x + px / 2);
         const rest = l.x + DKW - r.x;
