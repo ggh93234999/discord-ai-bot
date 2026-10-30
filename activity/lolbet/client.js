@@ -100,7 +100,7 @@ export function mountLolBet(root, { env, back }) {
     const open = f.state === "open";
     const btn = (side, name, odds, w) => `<button class="lbteam${sel && sel.id === f.id && sel.side === side ? " on" : ""}${w ? " win" : ""}" data-f="${f.id}" data-s="${side}" ${open ? "" : "disabled"}>${logo(name)}<span>${esc(name)}</span>${seedTag(name)}${odds ? `<em>${odds}</em>` : ""}</button>`;
     const tag = { open: "可下注", live: "已截止／進行中", finished: "已結束", void: "取消", closed: "暫無盤口" }[f.state];
-    return `<div class="lbcard ${f.state}"><div class="lbtop"><span>${fmtTime(f.start)}</span><span class="lbtag">${tag}</span></div>
+    return `<div class="lbcard ${f.state}"><div class="lbtop"><span>${fmtTime(f.start)}${f.bo ? `<b class="lbbo">Bo${f.bo}</b>` : ""}</span><span class="lbtag">${tag}</span></div>
       <div class="lbrow">${btn("home", f.home, f.oh, winner === 0)}${score}${btn("away", f.away, f.oa, winner === 1)}</div>${mine}${others}</div>`;
   }
 

@@ -55,3 +55,5 @@
 .lolbet .lbrank span{width:20px;color:#7d869a}.lolbet .lbrank b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lolbet .lbrank em{font-style:normal;font-weight:700}.lolbet .lbrank em.up{color:#8fe3a5}.lolbet .lbrank em.down{color:#ef9a9a}
 .lolbet .lbrank small{color:#7d869a;font-size:11px}
+
+.lbbo{margin-left:8px;padding:1px 6px;border-radius:5px;background:rgba(255,255,255,.14);font-size:11px;font-weight:700;letter-spacing:.3px}

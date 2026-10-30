@@ -181,14 +181,18 @@ const sameTeam = (a, b) => { a = norm(a); b = norm(b); return !!a && !!b && (a =
 let lp = { at: 0, list: [] };
 function parseMatchlists(html) {
   const out = [];
-  for (const chunk of html.split('class="brkts-matchlist-match ').slice(1)) {
-    const teams = [...chunk.matchAll(/brkts-matchlist-opponent[^"]*"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1].replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, "&"));
-    const scores = [...chunk.matchAll(/brkts-matchlist-score[^"]*"[^>]*aria-label="[^"]*"><div class="brkts-matchlist-cell-content">\s*(\d*)\s*<\/div>/g)].map((m) => m[1]);
-    const ts = chunk.match(/data-timestamp="(\d+)"/);
-    if (teams.length < 2 || scores.length < 2 || scores[0] === "" || scores[1] === "") continue;     // 還沒打完（沒有比分）
-    const sa = Number(scores[0]), sb = Number(scores[1]);
-    if (sa === sb) continue;
-    out.push({ a: teams[0], b: teams[1], sa, sb, ts: ts ? Number(ts[1]) * 1000 : 0 });
+  for (const block of html.split("brkts-matchlist-title").slice(1)) {                    // 每個區塊標題長得像「Round 4 Low Matches (Bo3)」：賽制 Bo1/Bo3/Bo5 在這裡
+    const bm = block.slice(0, 600).match(/\(Bo(\d)\)/), bo = bm ? Number(bm[1]) : 0;
+    for (const chunk of block.split('class="brkts-matchlist-match ').slice(1)) {
+      const teams = [...chunk.matchAll(/brkts-matchlist-opponent[^"]*"[^>]*aria-label="([^"]+)"/g)].map((m) => m[1].replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, "&"));
+      const scores = [...chunk.matchAll(/brkts-matchlist-score[^"]*"[^>]*aria-label="[^"]*"><div class="brkts-matchlist-cell-content">\s*(\d*)\s*<\/div>/g)].map((m) => m[1]);
+      const ts = chunk.match(/data-timestamp="(\d+)"/);
+      if (teams.length < 2) continue;
+      const sa = Number(scores[0] || 0), sb = Number(scores[1] || 0);
+      // 打完才算：頁面要標出贏家，而且（賽制已知時）贏家要拿到過半場數。進行中的 1:0 不算結果。
+      const done = scores.length >= 2 && scores[0] !== "" && scores[1] !== "" && sa !== sb && chunk.includes("brkts-matchlist-slot-winner") && (!bo || Math.max(sa, sb) >= (bo + 1) / 2);
+      out.push({ a: teams[0], b: teams[1], sa, sb, ts: ts ? Number(ts[1]) * 1000 : 0, bo, done });
+    }
   }
   return out;
 }
@@ -207,15 +211,18 @@ async function lpFetch(now, force) {
   }
   if (list.length) lp.list = list;
 }
-function lpMatch(f) {
+function lpFind(f, needDone) {
   for (const r of lp.list) {
+    if (needDone && !r.done) continue;
     const fw = sameTeam(f.home, r.a) && sameTeam(f.away, r.b), bw = sameTeam(f.home, r.b) && sameTeam(f.away, r.a);
     if (!fw && !bw) continue;
     if (r.ts && Math.abs(r.ts - f.start) > 8 * 3600e3) continue;
-    return fw ? [r.sa, r.sb] : [r.sb, r.sa];
+    return { r, sc: fw ? [r.sa, r.sb] : [r.sb, r.sa] };
   }
   return null;
 }
+const lpMatch = (f) => { const x = lpFind(f, true); return x ? x.sc : null; };
+function lpBoAll() { for (const f of fixtures.values()) { const x = lpFind(f, false); if (x && x.r.bo) f.bo = x.r.bo; } }
 function lpApply(f) {                                           // 用 Liquipedia 的結果把這場標成已結束並記下比分
   const sc = lpMatch(f); if (!sc) return false;
   f.score = sc; f.statusId = 2; f.statusName = "Finished";
@@ -232,6 +239,8 @@ async function settleAll() {
     const started = [...fixtures.values()].filter((f) => !isFinished(f) && !isVoid(f) && now - f.start > 25 * 60e3 && now - f.start < 12 * 3600e3);
     const hasBet = (f) => st.bets.some((b) => b.fixtureId === f.id && b.status === "open");
     if (LP_ON && started.length && (watchers.size > 0 || started.some(hasBet))) { await lpFetch(now); for (const f of started) lpApply(f); }
+    else if (LP_ON && watchers.size > 0) await lpFetch(now);       // 有人在看：也順便更新每場的賽制（Bo1/Bo3）
+    if (LP_ON) lpBoAll();
     if (LP_ON && st.backfill) { await lpFetch(now, true); for (const f of fixtures.values()) if (isFinished(f) && !f.score && !st.results[f.id]) lpApply(f); }
     // OddsPapi 的狀態檢查只當備援：Liquipedia 在 3 小時內都沒給出結果的場次才用（例如淘汰賽頁面抓不到）
     const running = (f) => f && !isFinished(f) && !isVoid(f) && now - f.start > (LP_ON ? 3 * 3600e3 : FIRST_CHECK) && now - f.start < 12 * 3600e3;
@@ -282,7 +291,7 @@ function fview(f, uid) {
   else if (f.start - LOCK_MS <= now) state = "live";
   else if (hasLine && !f.suspended && f.hasOdds) state = "open";
   const mine = uid ? st.bets.filter((b) => b.uid === uid && b.fixtureId === f.id).map((b) => ({ id: b.id, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) : [];
-  return { id: f.id, home: f.home, away: f.away, start: f.start, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine,
+  return { id: f.id, home: f.home, away: f.away, start: f.start, bo: f.bo || null, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine,
     all: st.bets.filter((b) => b.fixtureId === f.id && b.uid !== uid).map((b) => ({ name: b.name, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) };   // 別人下的注（公開）
 }
 function viewFor(ws) {
