@@ -60,7 +60,7 @@ const canPlayOn = (h, c) => {
   return false;
 };
 const stackable = (hand, kind) => hand.filter((c) => kindOf(c) === "f" || (kindOf(c) === "d" && kind === "d"));
-const playable = (h, i) => (h.pend ? stackable(h.hands[i], h.pend.kind) : h.hands[i].filter((c) => canPlayOn(h, c) && (h.drawn == null || c === h.drawn)));
+const playable = (h, i) => (h.pend ? (h.pend.canStack ? stackable(h.hands[i], h.pend.kind) : []) : h.hands[i].filter((c) => canPlayOn(h, c) && (h.drawn == null || c === h.drawn)));
 const nextSeat = (h, i, steps = 1) => { let j = i; for (let k = 0; k < steps; k++) j = (j + h.dir + h.n) % h.n; return j; };
 
 // ---------------------------------------------------------------- 開局、發牌
@@ -119,7 +119,7 @@ function setUno(t, i) {                                                    // �
 function doPlay(t, i, c, color) {
   const h = t.h; if (!h || h.turn !== i || !Number.isInteger(c) || !h.hands[i].includes(c)) return false;
   const k = kindOf(c), wasPend = h.pend;
-  if (wasPend) { if (!stackable([c], wasPend.kind).length) return false; }
+  if (wasPend) { if (!wasPend.canStack || !stackable([c], wasPend.kind).length) return false; }
   else { if (!canPlayOn(h, c)) return false; if (h.drawn != null && c !== h.drawn) return false; }
   let col = colorOf(c);
   if (k === "w" || k === "f") { col = Number(color); if (!Number.isInteger(col) || col < 0 || col > 3) return false; }
@@ -135,14 +135,12 @@ function doPlay(t, i, c, color) {
   if (k === "d" || k === "f") {
     const amt = k === "d" ? 2 : 4, total = (wasPend ? wasPend.total : 0) + amt, chain = wasPend ? wasPend.chain + 1 : 1, v = nxt;
     if (!left) { drawCards(h, v, total); h.last.draw = total; t.log = msg + `（${t.seats[v].name} 抽 ${total} 張）`; settle(t, i); return true; }
-    const canChal = k === "f" && chain === 1 && t.cfg.challenge;
-    if (canChal || (t.cfg.stack && stackable(h.hands[v], k).length)) {
-      h.pend = { kind: k, total, chain, from: i, victim: v, illegal: k === "f" && chain === 1 && hadColor, canChal };
-      msg += `（累計 ${total} 張，等 ${t.seats[v].name} 決定）`;
-      t.log = msg; setTurn(t, v); return true;
-    }
-    drawCards(h, v, total); h.last.draw = total; nxt = nextSeat(h, v);
-    msg += `（${t.seats[v].name} 抽 ${total} 張並被跳過）`;
+    const canChal = k === "f" && chain === 1 && t.cfg.challenge; void nxt;
+    // 不管能不能疊、能不能質疑，被打到的人都要自己按「抽牌」（沒得疊時只有這個選項）
+    h.pend = { kind: k, total, chain, from: i, victim: v, illegal: k === "f" && chain === 1 && hadColor, canChal };
+    h.pend.canStack = !!t.cfg.stack;
+    msg += `（累計 ${total} 張，等 ${t.seats[v].name} 決定）`;
+    t.log = msg; setTurn(t, v); return true;
   } else if (!left) { t.log = msg; settle(t, i); return true; }
   else if (k === "r") { h.dir = -h.dir; nxt = h.n === 2 ? i : nextSeat(h, i); if (h.n === 2) msg += "（迴轉＝再出一次）"; else msg += "（轉向）"; }
   else if (k === "s") { const sk = nxt; nxt = nextSeat(h, nxt); msg += `（${t.seats[sk].name} 被跳過）`; }
