@@ -5,7 +5,7 @@
 // 可疊加（開桌可關）：被 +2 的人可以再出 +2（或 +4）轉給下家，累計張數；被 +4 的人可以再出 +4；不想疊或不能疊的人把累計的牌全部抽起來並被跳過。
 // 可質疑 +4（開桌可關）：+4 本來只能在手上沒有「目前顏色」的牌時出；被 +4 的人可以質疑：出牌的人真的有該色牌 → 他抽 4 張、你照常出牌；沒有 → 你抽 6 張並被跳過。
 // 喊 UNO：剩最後一張時要按「UNO!」（剩 2 張要出牌前也可以先按）；沒喊的話，在下一位玩家動作之前被別人「抓」到，罰抽 2 張。
-// 起始牌若是功能牌也會生效（跳過／迴轉／+2／變色）。沒有牌可出就抽一張：抽到能出的牌可以馬上出，否則換下家。
+// 起始牌若是功能牌也會生效（跳過／迴轉／+2／變色）。沒有牌可出就一直抽，抽到能出的牌為止：那張可以馬上出（也可以不出）；牌抽光了還是沒得出就換下家。
 // 計分：贏的人收其他人手上剩的牌點（數字牌＝面值、功能牌 20、變色牌 50）× 每點點數，輸的人各付自己的。
 // 伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
@@ -183,17 +183,20 @@ function doCatch(t, by, seat) {                                            // �
   t.log = `${t.seats[by].name} 抓到 ${t.seats[seat].name} 沒喊 UNO，罰抽 2 張`;
   h.uno = null; return "ok";
 }
-function doDraw(t, i) {
+function doDraw(t, i) {                                                    // 一直抽到抽出能出的牌為止
   const h = t.h; if (!h || h.turn !== i || h.drawn != null || h.pend) return false;
   h.uno = null;
-  const got = drawCards(h, i, 1);
-  if (!got.length) { t.log = `${t.seats[i].name} 沒牌可抽，過`; setTurn(t, nextSeat(h, i)); return true; }
-  const c = got[0];
-  if (canPlayOn(h, c)) {                                      // 抽到能出的牌：可以馬上出，或按「過」
-    h.drawn = c; t.log = `${t.seats[i].name} 抽了一張牌`;
-    h.deadline = now() + TURN_MS; h.botAt = now() + BOT_MS[0];
-  } else { t.log = `${t.seats[i].name} 抽了一張牌，沒得出，換下家`; setTurn(t, nextSeat(h, i)); }
-  h.last = { seat: i, card: -1, draw: 1 };
+  let n = 0, c = null;
+  for (;;) {
+    const got = drawCards(h, i, 1);
+    if (!got.length) break;
+    n++;
+    if (canPlayOn(h, got[0])) { c = got[0]; break; }
+  }
+  h.last = { seat: i, card: -1, draw: n };
+  if (c == null) { t.log = `${t.seats[i].name} 抽了 ${n} 張還是沒牌可出，換下家`; setTurn(t, nextSeat(h, i)); return true; }
+  h.drawn = c; t.log = `${t.seats[i].name} 抽了 ${n} 張，抽到能出的牌`;       // 可以馬上出，或按「過」
+  h.deadline = now() + TURN_MS; h.botAt = now() + BOT_MS[0];
   return true;
 }
 function doPass(t, i) {
@@ -396,3 +399,15 @@ export function _simGame(len = 1, n = 4) {
   }
   return { steps, result: t.result, points: t.seats.map((s) => s.points) };
 }
+
+// 測試用：指定手牌，回傳疊 +4 的過程
+export function _scenario() {
+  const t = newTable("scn"); for (let i = 0; i < 3; i++) t.seats[i] = mkSeat({ bot: true, name: "b" + i });
+  startGame(t); const h = t.h;
+  h.hands = [[104, 5, 6], [105, 7, 8], [9, 10, 11]]; h.top = 1; h.color = 0; h.dir = 1; setTurn(t, 0);
+  const o = [];
+  o.push(doPlay(t, 0, 104, 2)); o.push(JSON.stringify(h.pend)); o.push(JSON.stringify(playable(h, 1)));
+  o.push(doPlay(t, 1, 105, 3)); o.push(JSON.stringify(h.pend)); o.push(h.turn);
+  return o;
+}
+export function _deal(n) { const t = newTable("d"); for (let i = 0; i < n; i++) t.seats[i] = mkSeat({ bot: true, name: "b" + i }); startGame(t); return { hands: t.h.hands.map((x) => x.map((c) => kindOf(c)).join("")), deck: t.h.deck.length }; }
