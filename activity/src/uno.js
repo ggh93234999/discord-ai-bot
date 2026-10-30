@@ -3,9 +3,9 @@ import { wsUrl } from "./gomoku.js";
 import { attachRules } from "./rules.js";
 
 const COLOR = ["r", "y", "g", "b"], CNAME = ["紅", "黃", "綠", "藍"];
-const colorOf = (c) => (c < 100 ? Math.floor(c / 25) : 4);
-const kindOf = (c) => { if (c >= 104) return "f"; if (c >= 100) return "w"; const k = c % 25; return k <= 18 ? "n" : k <= 20 ? "s" : k <= 22 ? "r" : "d"; };
-const numOf = (c) => { const k = c % 25; return k === 0 ? 0 : Math.ceil(k / 2); };
+const colorOf = (c) => ((c %= 108) < 100 ? Math.floor(c / 25) : 4);
+const kindOf = (c) => { c %= 108; if (c >= 104) return "f"; if (c >= 100) return "w"; const k = c % 25; return k <= 18 ? "n" : k <= 20 ? "s" : k <= 22 ? "r" : "d"; };
+const numOf = (c) => { const k = (c % 108) % 25; return k === 0 ? 0 : Math.ceil(k / 2); };
 const SYM = { s: "⊘", r: "⇄", d: "+2", w: "★", f: "+4" };
 const face = (c) => (kindOf(c) === "n" ? String(numOf(c)) : SYM[kindOf(c)]);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

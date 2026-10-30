@@ -1,4 +1,4 @@
-// UNO（練習點數）：2～8 人（真人或電腦都可以），按開始時有幾個人入座就幾個人玩。標準 108 張牌，每人 7 張，先出完手牌的人贏這一手。
+// UNO（練習點數）：2～8 人（真人或電腦都可以），按開始時有幾個人入座就幾個人玩。標準 108 張牌（5 人以上自動改用兩副 216 張），每人 7 張，先出完手牌的人贏這一手。
 // 牌的編號：0..99 是四色數字／功能牌（紅黃綠藍各 25 張：一張 0、1～9 各兩張、跳過 / 迴轉 / +2 各兩張），100..103 是變色牌，104..107 是變色 +4。
 // 規則（標準 UNO）：出的牌要跟桌上最上面那張同色、同數字或同符號，變色牌隨時可出（出的時候要選新顏色）。
 // 跳過：下家被跳過；迴轉：反方向（兩個人時等於跳過）；+2：下家抽 2 張並被跳過；變色 +4：選顏色，下家抽 4 張並被跳過。
@@ -19,12 +19,12 @@ const MAXP = 8;
 const BOT_NAMES = ["阿發", "小明", "老王", "花花", "阿牛", "小美", "豆豆", "阿嬤", "牌神", "胖虎"];
 
 // ---- 牌
-const colorOf = (c) => (c < 100 ? Math.floor(c / 25) : 4);                 // 0 紅 1 黃 2 綠 3 藍 4 變色牌
-const kindOf = (c) => {                                                    // "n" 數字 "s" 跳過 "r" 迴轉 "d" +2 "w" 變色 "f" 變色+4
+const colorOf = (c) => ((c %= 108) < 100 ? Math.floor(c / 25) : 4);                // 兩副牌時編號 108 以上是第二副，花色和功能跟 c%108 相同                 // 0 紅 1 黃 2 綠 3 藍 4 變色牌
+const kindOf = (c) => { c %= 108;                                                  // "n" 數字 "s" 跳過 "r" 迴轉 "d" +2 "w" 變色 "f" 變色+4
   if (c >= 104) return "f"; if (c >= 100) return "w";
   const k = c % 25; return k === 0 ? "n" : k <= 18 ? "n" : k <= 20 ? "s" : k <= 22 ? "r" : "d";
 };
-const numOf = (c) => { if (kindOf(c) !== "n") return -1; const k = c % 25; return k === 0 ? 0 : Math.ceil(k / 2); };
+const numOf = (c) => { if (kindOf(c) !== "n") return -1; const k = (c % 108) % 25; return k === 0 ? 0 : Math.ceil(k / 2); };
 const pointOf = (c) => { const k = kindOf(c); return k === "n" ? numOf(c) : k === "w" || k === "f" ? 50 : 20; };
 const COLORS = ["紅", "黃", "綠", "藍"];
 const cardName = (c) => { const k = kindOf(c); return k === "w" ? "變色牌" : k === "f" ? "變色+4" : COLORS[colorOf(c)] + ({ n: numOf(c), s: "跳過", r: "迴轉", d: "+2" }[k]); };
@@ -64,7 +64,7 @@ const playable = (h, i) => (h.pend ? stackable(h.hands[i], h.pend.kind) : h.hand
 const nextSeat = (h, i, steps = 1) => { let j = i; for (let k = 0; k < steps; k++) j = (j + h.dir + h.n) % h.n; return j; };
 
 // ---------------------------------------------------------------- 開局、發牌
-function mkDeck() { return shuffle(Array.from({ length: 108 }, (_, i) => i)); }
+function mkDeck(n) { return shuffle(Array.from({ length: n >= 5 ? 216 : 108 }, (_, i) => i)); }          // 5 人以上用兩副牌
 function drawCards(h, i, n) {
   const got = [];
   for (let k = 0; k < n; k++) {
@@ -87,7 +87,7 @@ function startGame(t) {
 function startHand(t) {
   const g = t.g; g.handNo++;
   const n = t.seats.length;
-  const deck = mkDeck();
+  const deck = mkDeck(n);
   const hands = Array.from({ length: n }, () => []);
   for (let k = 0; k < 7; k++) for (let i = 0; i < n; i++) hands[i].push(deck.pop());
   let top = deck.pop();
