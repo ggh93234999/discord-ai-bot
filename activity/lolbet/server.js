@@ -142,7 +142,9 @@ export async function lolPoll() {
   try {
     const now = Date.now();
     if (!fixtures.size || now - fixturesAt > FIX_TTL) await loadFixtures(now);
-    const soon = [...fixtures.values()].some((f) => !isFinished(f) && !isVoid(f) && f.start > now - 6 * 3600e3 && f.start - now < 30 * 3600e3);
+    const isSoon = () => [...fixtures.values()].some((f) => !isFinished(f) && !isVoid(f) && f.start > now - 6 * 3600e3 && f.start - now < 30 * 3600e3);
+    let soon = isSoon();
+    if (!soon && now - fixturesAt > 2 * 3600e3) { await loadFixtures(now); soon = isSoon(); }     // 名單上沒有即將開打的比賽：每 2 小時重抓名單（瑞士輪／淘汰賽的對戰是打完才排出來的）
     if (!soon) { updatedAt = now; lastErr = ""; pushAll(); return; }      // 30 小時內沒有比賽就不抓賠率
     const od = await _deps.fetchJson("odds-by-tournaments", { bookmaker: BOOK, tournamentIds: String(TOURNAMENT), oddsFormat: "decimal" });
     const list = Array.isArray(od) ? od : [];
