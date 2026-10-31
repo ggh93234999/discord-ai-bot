@@ -27,7 +27,7 @@ export function mountGachaCards(root, { back }) {
     if (type !== "all" && !types.includes(type)) type = "all";
     const n = counts(), total = CARDS.filter(inSet).length;
     hintEl.innerHTML = `共 ${total} 張　${RAR.map((r) => `<b class="gc-r ${r}">${r}</b> ${n[r]}`).join("　")}`;
-    tabs(setEl, [["all", "全部"], ["east", "東方"], ["west", "西方"], ["orig", "原創"]], set, "s");
+    tabs(setEl, [["all", "全部"], ["east", "東方"], ["west", "西方"], ["orig", "原創"], ["whim", "異想"]], set, "s");
     tabs(rarEl, [["all", "全部"], ...RAR.map((r) => [r, r])], filter, "r");
     tabs(typEl, [["all", "全部類別"], ...types.map((t) => [t, t])], type, "t");
     const list = CARDS.filter((c) => inSet(c) && (filter === "all" || c.rarity === filter) && (type === "all" || c.type === type))

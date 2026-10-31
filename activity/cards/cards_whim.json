@@ -1,0 +1,452 @@
+[
+ {
+  "id": 251,
+  "name": "酣睡山",
+  "rarity": "SSR",
+  "type": "風景",
+  "prompt": "a mountain that is actually a gigantic sleeping giant lying on his back, his belly covered with villages and forests, snoring clouds rising from his nose, tiny birds nesting in his beard",
+  "desc": "整座山其實是個睡著的巨人,打呼就是山風。",
+  "set": "whim"
+ },
+ {
+  "id": 252,
+  "name": "天上海",
+  "rarity": "SSR",
+  "type": "風景",
+  "prompt": "an entire ocean hanging upside down in the sky above a desert, fish and whales swimming overhead, ships sailing on the underside, rain of water drops falling onto sand dunes",
+  "desc": "海掛在天上,沙漠抬頭就能看魚。",
+  "set": "whim"
+ },
+ {
+  "id": 253,
+  "name": "吞雲象",
+  "rarity": "SSR",
+  "type": "幻獸",
+  "prompt": "a colossal elephant inhaling clouds with its trunk and breathing out rain, small gardens and a tiny pagoda growing on its back, mist all around",
+  "desc": "把雲吸進去,再用鼻子下成雨。",
+  "set": "whim"
+ },
+ {
+  "id": 254,
+  "name": "夢境館長",
+  "rarity": "SSR",
+  "type": "人物",
+  "prompt": "a tall elegant lady curator whose enormous hair is a bookshelf of glowing jars each holding a tiny dream, birds and moths flying among them, long robe trailing into a starry floor",
+  "desc": "她的頭髮是書架,每個罐子裡都住著一個夢。",
+  "set": "whim"
+ },
+ {
+  "id": 255,
+  "name": "萬門之鑰",
+  "rarity": "SSR",
+  "type": "器物",
+  "prompt": "a key as tall as a tower standing in a desert, each tooth of the key is a different tiny door leading to a different world, clouds and stairs around it",
+  "desc": "每一個齒,都開得了一個不同的世界。",
+  "set": "whim"
+ },
+ {
+  "id": 256,
+  "name": "茶壺龍",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a small dragon living inside a big teapot, its head sticking out of the spout breathing steam that forms clouds, teacups scattered around",
+  "desc": "在壺裡睡覺,一發脾氣就冒煙。",
+  "set": "whim"
+ },
+ {
+  "id": 257,
+  "name": "階梯蛇",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a huge snake whose coiled body forms a spiral staircase climbing into the clouds, tiny people climbing its scales",
+  "desc": "一圈一圈盤上去,爬到頂就是天。",
+  "set": "whim"
+ },
+ {
+  "id": 258,
+  "name": "雨傘章魚",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "an octopus whose eight tentacles each hold an open umbrella, walking down a rainy cobbled street at night",
+  "desc": "下雨天,牠每一隻手都有傘。",
+  "set": "whim"
+ },
+ {
+  "id": 259,
+  "name": "偷月賊",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a thief in a striped shirt climbing a tall ladder to steal the moon, putting it in a sack, the night sky dark and surprised below him",
+  "desc": "梯子再長一點點,月亮就是他的了。",
+  "set": "whim"
+ },
+ {
+  "id": 260,
+  "name": "影子裁縫",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a tailor sewing a person's long shadow with a huge needle and thread on a rooftop at dusk, scissors and shadow cloth hanging on a line",
+  "desc": "幫人把走丟的影子縫回腳下。",
+  "set": "whim"
+ },
+ {
+  "id": 261,
+  "name": "釣星客",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "an old fisherman sitting on a tall rooftop fishing for stars with a very long rod and a lantern, a basket full of tiny glowing stars",
+  "desc": "夜夜垂釣,魚簍裡裝的都是星星。",
+  "set": "whim"
+ },
+ {
+  "id": 262,
+  "name": "口袋海",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "a coat pocket opened to reveal a tiny ocean inside with waves, a small ship and a whale, a hand holding the pocket, spray in the air",
+  "desc": "隨身帶著一片海,想家時拿出來看。",
+  "set": "whim"
+ },
+ {
+  "id": 263,
+  "name": "心願羅盤",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "a brass compass whose needle points not north but to a glowing heart-shaped light, held in a hand over a misty valley",
+  "desc": "指的不是北方,是你最想去的地方。",
+  "set": "whim"
+ },
+ {
+  "id": 264,
+  "name": "長腿茶館",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "a wooden teahouse standing on four enormous long stilt-like chicken legs striding across a misty plain, lanterns swinging, steam from its chimney",
+  "desc": "茶館自己會走,客人跟著它到處喝茶。",
+  "set": "whim"
+ },
+ {
+  "id": 265,
+  "name": "雲端郵局",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "a post office on top of a cloud with fleets of paper airplanes and balloons delivering letters, a ladder down to the earth",
+  "desc": "信是用紙飛機和氣球送的。",
+  "set": "whim"
+ },
+ {
+  "id": 266,
+  "name": "泡泡鯊",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a shark swimming inside a huge soap bubble floating in the sky above rooftops, rainbow sheen on the bubble",
+  "desc": "困在泡泡裡,卻一點也不著急。",
+  "set": "whim"
+ },
+ {
+  "id": 267,
+  "name": "掃星馬",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a horse whose long tail is a broom, sweeping fallen stars into a pile at the foot of a hill at dawn",
+  "desc": "每天早上,把掉下來的星星掃成一堆。",
+  "set": "whim"
+ },
+ {
+  "id": 268,
+  "name": "郵筒犬",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a dog shaped like a red mailbox with a slot mouth and a flag tail, letters flying out as it bounds along a road",
+  "desc": "張開嘴,信就一封封掉出來。",
+  "set": "whim"
+ },
+ {
+  "id": 269,
+  "name": "樹屋龜",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a giant tortoise with a whole treehouse village on its shell, rope bridges and lanterns, walking slowly through a swamp",
+  "desc": "背上的村子,是牠走了一千年的路。",
+  "set": "whim"
+ },
+ {
+  "id": 270,
+  "name": "傘菇蝸牛",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a snail carrying a giant mushroom as its shell house with a tiny door and chimney, crossing a mossy log in rain",
+  "desc": "背著蘑菇屋出門,下雨最舒服。",
+  "set": "whim"
+ },
+ {
+  "id": 271,
+  "name": "氣球郵差",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a postman carried through the sky by a bunch of balloons delivering letters to rooftop mailboxes, a bag over his shoulder",
+  "desc": "風往哪吹,信就往哪送。",
+  "set": "whim"
+ },
+ {
+  "id": 272,
+  "name": "鬍子園丁",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "an old gardener whose long beard grows flowers and vines, watering them with a small can in a quiet garden",
+  "desc": "他的鬍子比花圃開得還好。",
+  "set": "whim"
+ },
+ {
+  "id": 273,
+  "name": "迷宮設計師",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a labyrinth designer lost inside his own enormous hedge maze, holding a rolled blueprint upside down, a bird above laughing",
+  "desc": "設計得太好,連自己也出不來。",
+  "set": "whim"
+ },
+ {
+  "id": 274,
+  "name": "雲端理髮師",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a barber standing on a ladder trimming a fluffy cloud with scissors and comb, cloud hair falling like snow below",
+  "desc": "幫天上的雲修剪,掉下來的是雪。",
+  "set": "whim"
+ },
+ {
+  "id": 275,
+  "name": "飛行靴",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a pair of leather boots with small feathered wings flying by themselves above rooftops, laces trailing",
+  "desc": "穿的人還沒決定去哪,靴子已經飛走了。",
+  "set": "whim"
+ },
+ {
+  "id": 276,
+  "name": "季節抽屜",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "an old wooden dresser whose four open drawers each show a different season landscape, spring blossoms, summer sea, autumn leaves, winter snow",
+  "desc": "拉開一格,就是一整個季節。",
+  "set": "whim"
+ },
+ {
+  "id": 277,
+  "name": "長頸水壺",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a kettle with a giraffe-long neck and spout reaching up to pour tea into a cup on a high shelf, steam curling",
+  "desc": "為了倒茶,把脖子伸得老長。",
+  "set": "whim"
+ },
+ {
+  "id": 278,
+  "name": "蒲公英森林",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a forest of giant dandelions as tall as trees, their seeds carrying tiny houses floating away in the wind, a small path below",
+  "desc": "一陣風吹過,整片森林就搬家了。",
+  "set": "whim"
+ },
+ {
+  "id": 279,
+  "name": "巨人棋盤",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a valley laid out like a giant chessboard with tiny houses and towers as pieces, a huge hand hovering overhead",
+  "desc": "每個村子,都是棋盤上一顆棋子。",
+  "set": "whim"
+ },
+ {
+  "id": 280,
+  "name": "昇雨村",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a village where rain falls upward from the ground into the sky, villagers holding umbrellas upside down, puddles rising",
+  "desc": "這裡的雨,從地上往天上下。",
+  "set": "whim"
+ },
+ {
+  "id": 281,
+  "name": "彈簧兔",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a rabbit with a coil spring for legs bouncing high above grass",
+  "desc": "一蹬就是三尺高。",
+  "set": "whim"
+ },
+ {
+  "id": 282,
+  "name": "鬍子鳥",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a small bird with a huge curly mustache perched on a branch looking serious",
+  "desc": "一副很有學問的樣子。",
+  "set": "whim"
+ },
+ {
+  "id": 283,
+  "name": "影子貓",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a cat sitting by itself while its shadow walks away in a different direction along a wall",
+  "desc": "影子,有時候自己出去逛逛。",
+  "set": "whim"
+ },
+ {
+  "id": 284,
+  "name": "琴弦蟲",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a caterpillar shaped like a violin crawling on a leaf, strings vibrating softly",
+  "desc": "爬過的地方,會留下淡淡的音。",
+  "set": "whim"
+ },
+ {
+  "id": 285,
+  "name": "氣球魚",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a fish shaped like a round balloon floating through the air with a tiny string trailing",
+  "desc": "吸飽了氣,就浮到天上。",
+  "set": "whim"
+ },
+ {
+  "id": 286,
+  "name": "打盹魔法師",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a sleepy wizard in a long hat dozing on a rock while sparks from his staff make tiny flowers around him",
+  "desc": "睡夢中施的魔法最有趣。",
+  "set": "whim"
+ },
+ {
+  "id": 287,
+  "name": "蝸牛郵差",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a postman riding a giant snail with a mailbag on its shell on a country road",
+  "desc": "慢慢送,但一定送到。",
+  "set": "whim"
+ },
+ {
+  "id": 288,
+  "name": "浴缸船長",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a tiny captain in a hat sailing a bathtub across a pond with a toy flag and a duck crew",
+  "desc": "在池塘上航行,勇敢得不得了。",
+  "set": "whim"
+ },
+ {
+  "id": 289,
+  "name": "泡泡畫家",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a painter blowing colorful bubbles that become paintings floating in the air, an easel on a hill",
+  "desc": "畫是吹出來的,一戳就破。",
+  "set": "whim"
+ },
+ {
+  "id": 290,
+  "name": "墨水瓶屋",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a small house built inside a giant ink bottle with a tiny door and window, a quill sticking out like a chimney",
+  "desc": "住在瓶子裡,連夢都是黑色的。",
+  "set": "whim"
+ },
+ {
+  "id": 291,
+  "name": "鉛筆階梯",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a giant pencil leaning on a wall with steps carved into it, a tiny person climbing up",
+  "desc": "一階一階,往紙的邊緣爬。",
+  "set": "whim"
+ },
+ {
+  "id": 292,
+  "name": "鑰匙孔窗",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a large keyhole in a wall showing a bright garden on the other side, a small door ajar",
+  "desc": "從鑰匙孔看出去,是另一個世界。",
+  "set": "whim"
+ },
+ {
+  "id": 293,
+  "name": "哭泣蠟燭",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a candle shedding long wax tears that become tiny puddles of flowers on a table",
+  "desc": "越亮,就越會哭。",
+  "set": "whim"
+ },
+ {
+  "id": 294,
+  "name": "浮空茶杯",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a teacup floating in the air with steam curling and a tiny saucer orbiting like a moon",
+  "desc": "喝茶的人,還沒到。",
+  "set": "whim"
+ },
+ {
+  "id": 295,
+  "name": "紐扣太陽",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a giant button hanging in the sky like the sun with thread holes, stitched on a pale cloth sky",
+  "desc": "天空是塊布,太陽是顆鈕扣。",
+  "set": "whim"
+ },
+ {
+  "id": 296,
+  "name": "傾斜村",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a village built on an extremely steep tilted hillside, houses leaning at angles with laundry lines hanging sideways",
+  "desc": "一半的屋子,都在斜著睡覺。",
+  "set": "whim"
+ },
+ {
+  "id": 297,
+  "name": "雲上稻田",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "terraced rice paddies floating on clouds with a tiny farmer and a water buffalo",
+  "desc": "雲收割了,就是白色的稻。",
+  "set": "whim"
+ },
+ {
+  "id": 298,
+  "name": "窗外海",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a single wall standing in a desert with a window in it showing a calm ocean on the other side",
+  "desc": "走過這面牆,就是海。",
+  "set": "whim"
+ },
+ {
+  "id": 299,
+  "name": "螺旋塔",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a tall tower twisting like a corkscrew into the sky with tiny windows and a flag at the top",
+  "desc": "轉著圈長出來的塔。",
+  "set": "whim"
+ },
+ {
+  "id": 300,
+  "name": "彩虹滑梯",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a rainbow serving as a giant slide down from a cloud to a pond with a tiny child sliding down",
+  "desc": "滑下去,就到了水邊。",
+  "set": "whim"
+ }
+]
