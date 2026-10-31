@@ -7,7 +7,7 @@
 - 那台沒有內容過濾，過濾在這裡做（check_prompt）。
 - 對方在打遊戲等暫停服務時連不上或回錯誤：直接回「畫圖服務目前暫停中」，不重試。
 設定（.env，都可省略）：IMAGE_GEN=on|off、IMAGE_BASE_URL、IMAGE_API_KEY（預設沿用 LLM_BASE_URL / LLM_API_KEY）、
-IMAGE_MODEL_FAST / IMAGE_MODEL_CLEAN、IMAGE_MAX_QUEUE（最多排幾張，預設 4）。
+IMAGE_MODEL_FAST / IMAGE_MODEL_CLEAN / IMAGE_MODEL_HIGH、IMAGE_MAX_QUEUE（最多排幾張，預設 4）。
 """
 import asyncio
 import base64
@@ -38,8 +38,9 @@ SCALE_EXTRA_ETA = {"normal": 0, "large": 20, "huge": 70}      # 比一般多等�
 QUALITY = {
     "fast": ("IMAGE_MODEL_FAST", "draw-klein", 30, 900),
     "clean": ("IMAGE_MODEL_CLEAN", "draw-qwen-fast", 100, 900),
+    "high": ("IMAGE_MODEL_HIGH", "draw-flux", 600, 1800),
 }
-QUALITY_NAMES = {"fast": "快速", "clean": "構圖與文字較乾淨"}
+QUALITY_NAMES = {"fast": "快速", "clean": "構圖與文字較乾淨", "high": "最高畫質"}
 DISCORD_LIMIT = 7_800_000          # 一般伺服器單檔 8MB 上限，留一點空間
 
 TOOL = {
@@ -50,16 +51,16 @@ TOOL = {
             "用畫圖模型畫一張圖（插畫、風景、物品、卡通角色、概念圖等）。使用者說「畫一張…」「幫我畫…」「生一張圖」時呼叫。"
             "畫一張要等 30 秒到幾分鐘，畫好後程式會自動貼出來，你呼叫後只要簡短回一句「在畫了」就好，不要說已經畫好、不要描述圖的內容。"
             "【只能在年齡限制（NSFW）頻道使用，在其他頻道呼叫會被程式擋下並回覆說明，你照轉述即可】【不能畫】涉及未成年人的性暗示或色情內容（一律拒絕，不要呼叫工具、也不要偷偷改成類似的東西）；其他都可以畫（任何膚色、種族、國籍、外貌、性別、文化的人物都可以，不要自己加限制或拒絕）。"
-            "prompt 寫畫面描述：主體、動作、場景、風格、光線、構圖；quality 為 fast 時 prompt 請用英文寫（先把使用者的意思翻成英文再描述得具體一點），"
+            "prompt 寫畫面描述：主體、動作、場景、風格、光線、構圖；quality 為 fast 或 high 時 prompt 請用英文寫（先把使用者的意思翻成英文再描述得具體一點），"
             "quality 為 clean 時可以直接用中文。"
             "quality：預設用 fast（約 30 秒）；畫面裡要有清楚的文字（招牌、標語、海報字）或複雜構圖用 clean（約 100 秒）；"
-            "沒有更高的畫質選項，使用者要求最高畫質時照樣用 fast 或 clean。"
+            "只有使用者明確說要「高畫質」「最高畫質」「畫質最好」才用 high（draw-flux，最細緻，約 10 分鐘，很久）。"
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "prompt": {"type": "string", "description": "要畫的畫面描述"},
-                "quality": {"type": "string", "enum": ["fast", "clean"], "description": "畫質／速度，預設 fast"},
+                "quality": {"type": "string", "enum": ["fast", "clean", "high"], "description": "畫質／速度，預設 fast"},
                 "scale": {"type": "string", "enum": ["normal", "large", "huge"], "description": "圖片大小，預設 normal。只有使用者特別提到要大張／高解析度／高清／2K／4K／壁紙級時才用：large（長邊約 1900 像素）或 huge（長邊 2048 像素，API 上限），會比較久，而且只支援 fast 畫質"},
                 "shape": {"type": "string", "enum": ["square", "landscape", "portrait"], "description": "square 正方形（預設）、landscape 橫式（風景、桌布）、portrait 直式（手機桌布、人物全身）"},
             },
@@ -226,6 +227,8 @@ def tool_status(args: dict) -> str:
         return "🎨 排進改圖佇列（約 100 秒）" if args.get("edit_quality") == "clean" else "🎨 排進改圖佇列（約 20 秒）"
     q = args.get("quality") if args.get("quality") in QUALITY else "fast"
     sc = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
+    if q == "high" and sc == "normal":
+        return "🎨 排進畫圖佇列（最高畫質，約 10 分鐘）"
     return f"🎨 排進畫圖佇列（約 {QUALITY['fast' if sc != 'normal' else q][2] + SCALE_EXTRA_ETA[sc]} 秒）"
 
 
