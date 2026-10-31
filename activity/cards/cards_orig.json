@@ -1,0 +1,452 @@
+[
+ {
+  "id": 201,
+  "name": "星鯨",
+  "rarity": "SSR",
+  "type": "幻獸",
+  "prompt": "a colossal whale swimming through the night sky among stars, its body drawn with constellation lines, tiny villages with lanterns on its back, clouds as waves",
+  "desc": "馱著整片夜空漫遊的巨鯨,背上住著守星人。",
+  "set": "orig"
+ },
+ {
+  "id": 202,
+  "name": "時間之樹",
+  "rarity": "SSR",
+  "type": "風景",
+  "prompt": "a gigantic ancient tree whose leaves are round clock faces, falling leaves drifting upward, roots in a still mirror lake, tiny figure at its foot",
+  "desc": "每片葉子是一個時辰,落葉的地方時間倒流。",
+  "set": "orig"
+ },
+ {
+  "id": 203,
+  "name": "月影女王",
+  "rarity": "SSR",
+  "type": "人物",
+  "prompt": "a queen in a long gown made of the phases of the moon standing on a mirror-like lake, crown of crescent horns, her reflection a different figure",
+  "desc": "她的長裙是月相,倒影裡站著另一個她。",
+  "set": "orig"
+ },
+ {
+  "id": 204,
+  "name": "天樞浮城",
+  "rarity": "SSR",
+  "type": "風景",
+  "prompt": "a floating city of pagodas, bridges and towers on a cloud island held by great chains and sails, airships docking, waterfalls falling off the edge into mist",
+  "desc": "飄在雲上的城,以鎖鏈與風帆維繫。",
+  "set": "orig"
+ },
+ {
+  "id": 205,
+  "name": "無名之書",
+  "rarity": "SSR",
+  "type": "器物",
+  "prompt": "a huge open book on a stone altar whose pages are living ink, ink creatures and rivers climbing out of the pages into the air",
+  "desc": "書頁是活的墨,翻開哪頁,就會有東西爬出來。",
+  "set": "orig"
+ },
+ {
+  "id": 206,
+  "name": "霧鹿",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a tall stag made of drifting mist with branching antlers that hold glowing paper lanterns, walking through a misty forest",
+  "desc": "鹿角掛著燈籠,霧起時才現身。",
+  "set": "orig"
+ },
+ {
+  "id": 207,
+  "name": "燈籠水母",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "a large jellyfish floating in the air like a lantern, glowing bell and long trailing tentacles, over a dark valley with fireflies",
+  "desc": "夜裡順風漂浮,所到之處亮起微光。",
+  "set": "orig"
+ },
+ {
+  "id": 208,
+  "name": "鐘樓鴞",
+  "rarity": "SR",
+  "type": "幻獸",
+  "prompt": "an owl with clockwork brass wings and gear-filled chest perched on an old clock tower at midnight",
+  "desc": "每敲一下鐘,牠的齒輪就轉一圈。",
+  "set": "orig"
+ },
+ {
+  "id": 209,
+  "name": "墨匠",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a painter in a wide sleeved robe with a giant brush painting a living tiger and waves into the air from his brush strokes",
+  "desc": "筆下所畫,皆會活過來。",
+  "set": "orig"
+ },
+ {
+  "id": 210,
+  "name": "風語者",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a figure in a robe made of many colorful kites, hair streaming, standing on a cliff listening to the wind, birds around",
+  "desc": "聽得懂風說的每一句話。",
+  "set": "orig"
+ },
+ {
+  "id": 211,
+  "name": "守夜機偶",
+  "rarity": "SR",
+  "type": "人物",
+  "prompt": "a tall clockwork automaton with a lantern for a head holding a staff, walking through a sleeping town at night",
+  "desc": "燈籠是頭,走遍小鎮,夜夜守望。",
+  "set": "orig"
+ },
+ {
+  "id": 212,
+  "name": "倒影鏡",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "an ornate standing mirror in a ruined hall showing a bright different world instead of the room, mist at its base",
+  "desc": "鏡裡的世界,和這裡不一樣。",
+  "set": "orig"
+ },
+ {
+  "id": 213,
+  "name": "紙船燈",
+  "rarity": "SR",
+  "type": "器物",
+  "prompt": "a paper boat holding a lit candle floating down a dark river carrying tiny wishes, lotus-like glow",
+  "desc": "載著願望,順水流向看不見的地方。",
+  "set": "orig"
+ },
+ {
+  "id": 214,
+  "name": "倒懸瀑布",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "a waterfall flowing upward from a pool into the sky, rocks and mist, tiny bridge and pavilion beside it",
+  "desc": "水從地上流向天,反過來看世界。",
+  "set": "orig"
+ },
+ {
+  "id": 215,
+  "name": "鯨骨橋",
+  "rarity": "SR",
+  "type": "風景",
+  "prompt": "a giant whale skeleton forming a bridge across a deep canyon with small lanterns hung along the ribs and travelers crossing",
+  "desc": "巨鯨的遺骨,成了兩岸之間的橋。",
+  "set": "orig"
+ },
+ {
+  "id": 216,
+  "name": "墨貓",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a cat whose body is made of flowing black ink, tail trailing ink droplets, sitting on a stack of old books",
+  "desc": "碰到的紙,都會留下爪印。",
+  "set": "orig"
+ },
+ {
+  "id": 217,
+  "name": "銅鱗魚",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a koi with bronze metallic scales swimming through the air among clouds and bamboo",
+  "desc": "在雲裡游,不在水裡游。",
+  "set": "orig"
+ },
+ {
+  "id": 218,
+  "name": "雲羊",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a sheep whose wool is a fluffy cloud grazing on a mountain top, a small rainbow above",
+  "desc": "下雨前,牠的毛會變灰。",
+  "set": "orig"
+ },
+ {
+  "id": 219,
+  "name": "蘑菇精",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a tiny mushroom spirit with a large cap hat holding a small lantern in a mossy forest",
+  "desc": "雨後長出來,天亮就不見。",
+  "set": "orig"
+ },
+ {
+  "id": 220,
+  "name": "燈蛾",
+  "rarity": "R",
+  "type": "幻獸",
+  "prompt": "a giant moth with softly glowing patterned wings resting on a branch in a dark forest",
+  "desc": "翅膀的花紋,每晚都不一樣。",
+  "set": "orig"
+ },
+ {
+  "id": 221,
+  "name": "提燈少女",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a young girl with a large paper lantern walking down a misty stone path in the night",
+  "desc": "她的燈,只照得到回家的路。",
+  "set": "orig"
+ },
+ {
+  "id": 222,
+  "name": "流浪鐘表匠",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a wandering clockmaker pulling a cart full of clocks and gears along a country road, a bird on his hat",
+  "desc": "修得好各式各樣的鐘,唯獨修不好時間。",
+  "set": "orig"
+ },
+ {
+  "id": 223,
+  "name": "星象師",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "an astronomer with a brass astrolabe and long telescope on a tower top under a starry sky with constellations drawn in the clouds",
+  "desc": "每顆星的脾氣,他都記得。",
+  "set": "orig"
+ },
+ {
+  "id": 224,
+  "name": "渡船人",
+  "rarity": "R",
+  "type": "人物",
+  "prompt": "a ferryman poling a small boat with a lantern at the bow through a misty river at dusk",
+  "desc": "擺渡的不只是人,也有心事。",
+  "set": "orig"
+ },
+ {
+  "id": 225,
+  "name": "星砂瓶",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a glass bottle filled with glowing star sand on a wooden table, tiny stars floating out of the cork",
+  "desc": "倒出來的,是一小撮夜空。",
+  "set": "orig"
+ },
+ {
+  "id": 226,
+  "name": "發條蝴蝶",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "a clockwork butterfly with brass gear wings and a winding key resting on a flower",
+  "desc": "上一次發條,能飛一整個下午。",
+  "set": "orig"
+ },
+ {
+  "id": 227,
+  "name": "傘中雨",
+  "rarity": "R",
+  "type": "器物",
+  "prompt": "an umbrella with a small rainstorm swirling inside it, droplets falling upward, held by a hand",
+  "desc": "收起來之前,記得先把雨倒掉。",
+  "set": "orig"
+ },
+ {
+  "id": 228,
+  "name": "雲海書店",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a small bookshop with a lantern on a cliff edge above a sea of clouds, stacks of books outside, a tiny cat on the steps",
+  "desc": "要翻過雲海,才找得到的書店。",
+  "set": "orig"
+ },
+ {
+  "id": 229,
+  "name": "螢火谷",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a deep valley filled with thousands of fireflies and a winding stream, mist and dark hills",
+  "desc": "夏夜,整座山谷會呼吸。",
+  "set": "orig"
+ },
+ {
+  "id": 230,
+  "name": "浮島群",
+  "rarity": "R",
+  "type": "風景",
+  "prompt": "a group of small floating islands with single trees and waterfalls connected by rope bridges in a pale sky",
+  "desc": "島與島之間,只靠繩橋相連。",
+  "set": "orig"
+ },
+ {
+  "id": 231,
+  "name": "銀魚",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a silver fish leaping from a calm pond with ripples",
+  "desc": "一躍,便是一道光。",
+  "set": "orig"
+ },
+ {
+  "id": 232,
+  "name": "小雲龍",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a tiny dragon made of cloud curling around a mountain peak",
+  "desc": "還沒長大,只會下毛毛雨。",
+  "set": "orig"
+ },
+ {
+  "id": 233,
+  "name": "苔蘚熊",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a bear covered in thick green moss sleeping among ferns",
+  "desc": "睡得太久,身上長了一座森林。",
+  "set": "orig"
+ },
+ {
+  "id": 234,
+  "name": "紙鶴",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a paper crane coming alive and flying over a quiet lake",
+  "desc": "折得夠用心,它就會飛。",
+  "set": "orig"
+ },
+ {
+  "id": 235,
+  "name": "蛙燈",
+  "rarity": "N",
+  "type": "幻獸",
+  "prompt": "a frog with a small glowing lamp on its head sitting on a lily pad",
+  "desc": "夜裡替迷路的螢火蟲帶路。",
+  "set": "orig"
+ },
+ {
+  "id": 236,
+  "name": "賣夢人",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a dream seller with a tall backpack of glowing jars walking through a night street",
+  "desc": "一罐一個夢,童叟無欺。",
+  "set": "orig"
+ },
+ {
+  "id": 237,
+  "name": "撐葉小孩",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a small child holding a huge leaf as an umbrella standing in the rain",
+  "desc": "一片葉子,就是一把傘。",
+  "set": "orig"
+ },
+ {
+  "id": 238,
+  "name": "老茶師",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "an old tea master with a long beard sitting beside a tiny stove and tea set under a pine",
+  "desc": "茶涼了,故事才開始。",
+  "set": "orig"
+ },
+ {
+  "id": 239,
+  "name": "風箏少年",
+  "rarity": "N",
+  "type": "人物",
+  "prompt": "a boy running on a hill flying a big colorful kite shaped like a fish",
+  "desc": "線的另一頭,是整片天空。",
+  "set": "orig"
+ },
+ {
+  "id": 240,
+  "name": "風鈴",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a wind chime of small bells and glass hanging from a roof in a breeze",
+  "desc": "風來了,它才說話。",
+  "set": "orig"
+ },
+ {
+  "id": 241,
+  "name": "空燈籠",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an empty paper lantern hanging on a bare branch at dusk",
+  "desc": "等著有人,把光放進去。",
+  "set": "orig"
+ },
+ {
+  "id": 242,
+  "name": "舊地圖",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an old folded map with faded ink lines and a compass on a table",
+  "desc": "上面的地方,有些已經不存在了。",
+  "set": "orig"
+ },
+ {
+  "id": 243,
+  "name": "墨錠",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "an ink stick and an inkstone with a brush on a wooden table",
+  "desc": "磨一磨,世界就黑得很好看。",
+  "set": "orig"
+ },
+ {
+  "id": 244,
+  "name": "紙風車",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a small paper pinwheel spinning in the wind in a grass field",
+  "desc": "小小的風,也能轉一個夏天。",
+  "set": "orig"
+ },
+ {
+  "id": 245,
+  "name": "骨笛",
+  "rarity": "N",
+  "type": "器物",
+  "prompt": "a bone flute lying on a mossy stone with a thin curl of mist",
+  "desc": "吹出來的,是很遠的聲音。",
+  "set": "orig"
+ },
+ {
+  "id": 246,
+  "name": "霧中石階",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a long stone staircase climbing into thick mist with a single lantern",
+  "desc": "往上走,看不見盡頭。",
+  "set": "orig"
+ },
+ {
+  "id": 247,
+  "name": "湖面月影",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a calm lake with the moon reflected and a tiny boat, reeds on the shore",
+  "desc": "月亮掉進了湖裡。",
+  "set": "orig"
+ },
+ {
+  "id": 248,
+  "name": "雨巷",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a narrow rainy alley with wet cobblestones and a glowing window and an umbrella",
+  "desc": "雨落在巷子裡,有點孤單。",
+  "set": "orig"
+ },
+ {
+  "id": 249,
+  "name": "雲間梯田",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "terraced fields on a mountain slope above the clouds with a small hut",
+  "desc": "種田的人,住在雲上。",
+  "set": "orig"
+ },
+ {
+  "id": 250,
+  "name": "孤島小舟",
+  "rarity": "N",
+  "type": "風景",
+  "prompt": "a tiny island with one tree and a small boat tied at the shore on a still sea at dawn",
+  "desc": "一棵樹,一艘船,一整片海。",
+  "set": "orig"
+ }
+]
