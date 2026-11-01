@@ -10,6 +10,7 @@ for (const [pth, url] of Object.entries(import.meta.glob("./gacha-art/*.jpg", { 
 const BYID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const MEDAL = ["壹", "貳", "參"];
+const RNAME = { SSR: "傳說", SR: "稀有", R: "珍品", N: "尋常" };
 
 export function mountCardBoard(root, { env, back }) {
   let ws = null, closed = false, retry = 0, timer = 0, real = true, data = { true: null, false: null };
@@ -34,11 +35,34 @@ export function mountCardBoard(root, { env, back }) {
     listEl.innerHTML = d.rows.map((r, i) => `
       <div class="gc-brow${i < 3 ? " top" + (i + 1) : ""}">
         <span class="gc-brank">${MEDAL[i] || i + 1}</span>
-        <span class="gc-bcards">${r.cards.map((c) => `<span class="gc-sh on ${c.rarity}"><img src="${ART[c.id]}" alt="${esc(BYID[c.id].name)}" loading="lazy" draggable="false"><span class="gc-badge ${c.rarity}">${c.rarity}</span><span class="gc-star">${"★".repeat(c.star)}</span></span>`).join("")}</span>
+        <span class="gc-bcards">${r.cards.map((c) => `<button class="gc-sh on ${c.rarity}" data-row="${i}" data-ci="${r.cards.indexOf(c)}"><img src="${ART[c.id]}" alt="${esc(BYID[c.id].name)}" loading="lazy" draggable="false"><span class="gc-badge ${c.rarity}">${c.rarity}</span><span class="gc-star">${"★".repeat(c.star)}</span></button>`).join("")}</span>
         <span class="gc-binfo"><b>${esc(r.name)}</b><small>${r.cards.map((c) => esc(BYID[c.id].name)).join("・")}</small><small>收藏 ${r.owned} / ${CARDS.length}</small></span>
         <span class="gc-bval"><small>展示分</small>${r.score}</span>
       </div>`).join("") + `<div class="gc-btotal">共 ${d.total} 人有展示櫃</div>`;
   }
+  // 點榜上的卡：放大看（◀ ▶ 切同一個人的其他兩張）
+  listEl.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-row]"); if (!b) return;
+    const row = data[real].rows[Number(b.dataset.row)]; if (!row) return;
+    let pos = Number(b.dataset.ci);
+    const z = document.createElement("div"); z.className = "gc-modal";
+    const show = () => {
+      const r = row.cards[pos], c = BYID[r.id];
+      z.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${row.cards.length < 2 ? " hidden" : ""}>◀</button>
+        <div class="gc-big ${r.rarity}"><img src="${ART[r.id]}" alt="${esc(c.name)}" draggable="false">
+        <div class="gc-info"><div class="gc-ttl"><b>${esc(c.name)}</b><span class="gc-badge ${r.rarity}">${r.rarity}・${RNAME[r.rarity]}</span></div>
+        <div class="gc-meta">${esc(c.type)}　No.${String(c.id).padStart(2, "0")}　${pos + 1} / ${row.cards.length}　<span class="gc-stars">${"★".repeat(r.star)}${"☆".repeat(5 - r.star)}</span></div><p>${esc(c.desc)}</p>
+        <div class="gc-meta">${esc(row.name)} 的展示櫃・展示分 ${row.score}</div></div>
+        <button class="gc-x" aria-label="關閉">✕</button></div>
+        <button class="gc-nav gc-next" aria-label="下一張"${row.cards.length < 2 ? " hidden" : ""}>▶</button>`;
+    };
+    const go = (d) => { pos = (pos + d + row.cards.length) % row.cards.length; show(); };
+    const close = () => { z.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (ev) => { if (ev.key === "Escape") close(); else if (ev.key === "ArrowRight") go(1); else if (ev.key === "ArrowLeft") go(-1); };
+    document.addEventListener("keydown", onKey);
+    z.addEventListener("click", (ev) => { if (ev.target.closest(".gc-prev")) go(-1); else if (ev.target.closest(".gc-next")) go(1); else if (ev.target === z || ev.target.closest(".gc-x")) close(); });
+    show(); root.append(z);
+  });
   function ask() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "gboard", real })); }
   function connect() {
     ws = new WebSocket(wsUrl(env.inDiscord));

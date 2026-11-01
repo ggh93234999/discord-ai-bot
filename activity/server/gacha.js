@@ -184,6 +184,13 @@ export async function handleGacha(ws, m) {
       const cid = Number(m.id), c = CARD.get(cid), star = u.cards[cid];
       if (!c || !star) { err("not_owned"); return; }
       if (star >= MAX_STAR) { err("max_star"); return; }
+      if (m.dup) {      // 拿 1 張重複的同一張卡來升星，不花墨點
+        if (!(u.dups[cid] > 0)) { err("no_dup"); return; }
+        if (--u.dups[cid] <= 0) delete u.dups[cid];
+        u.cards[cid] = star + 1; gachaSave(true);
+        out(ws, { t: "gc", a: "upgraded", id: cid, star: star + 1, cost: 0, dup: true });
+        await send(); return;
+      }
       const cost = starCost(c.rarity, star);
       if (u.ink < cost) { err("no_ink"); return; }
       u.ink -= cost; u.cards[cid] = star + 1; gachaSave(true);

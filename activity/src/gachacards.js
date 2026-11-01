@@ -71,7 +71,7 @@ export function mountGachaCards(root, { env, back }) {
       else if (m.a === "dclaimed") { sfx.claim(); statusEl.textContent = `領回 ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`; }
       else if (m.a === "dcalled") { sfx.recall(); statusEl.textContent = "已召回"; }
       else if (m.a === "salvaged") { sfx.salvage(); statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`; }
-      else if (m.a === "upgraded") { sfx.star(); statusEl.textContent = `升到 ${m.star} 星了（花 ${m.cost} 墨點）`; }
+      else if (m.a === "upgraded") { sfx.star(); statusEl.textContent = m.dup ? `用 1 張重複卡升到 ${m.star} 星了` : `升到 ${m.star} 星了（花 ${m.cost} 墨點）`; }
       else if (m.a === "swapped") { sfx.swap(); if (m.rewards && m.rewards.length) setTimeout(sfx.reward, 600); statusEl.textContent = `兌換成功（花 ${money(m.cost)} 墨點）` + (m.rewards && m.rewards.length ? "，" + m.rewards.map((r) => `${r.text}，抽卡券 +${r.tickets}`).join("；") : ""); }
       else if (m.a === "err") { sfx.err(); statusEl.textContent = ERR[m.error] || ERR.error; if (m.balance != null && st) { st.balance = m.balance; showBar(); } }
     };
@@ -248,14 +248,14 @@ export function mountGachaCards(root, { env, back }) {
     let pos = curList.findIndex((x) => x.id === id); if (pos < 0) return;
     const el = document.createElement("div");
     el.className = "gc-modal"; modalOpen = true;
-    const close = () => { el.remove(); modalOpen = false; refreshModal = null; document.removeEventListener("keydown", onKey); drawBook(); };
+    const close = () => { el.remove(); modalOpen = false; refreshModal = null; document.removeEventListener("keydown", onKey); draw(); };
     const show = () => {
       const c = curList[pos], star = st && st.cards[c.id] || 0;
       const dn = st && st.dups && st.dups[c.id] || 0, per = st ? st.dupInk[c.rarity] : 0;
       const salv = dn ? `<div class="gc-act gc-salv"><div class="gc-dnote">你有 ${dn} 張重複</div><button class="gc-salv1">分解 1 張<small>${I.ink} +${per}</small></button>${dn > 1 ? `<button class="gc-salvall">分解全部 ${dn} 張<small>${I.ink} +${per * dn}</small></button>` : ""}</div>` : "";
       let act = "";
       if (st) {
-        if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act"><button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>${I.ink} ${st.starBase[c.rarity] * star}</small></button></div>`;
+        if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act">${dn ? `<button class="gc-updup">用 1 張重複卡升到 ${star + 1} 星<small>剩 ${dn - 1} 張重複</small></button>` : ""}<button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>${I.ink} ${st.starBase[c.rarity] * star}</small></button></div>`;
         else act = `<div class="gc-act"><button class="gc-swap"${st.ink >= st.swap[c.rarity] ? "" : " disabled"}>用墨點兌換<small>${I.ink} ${money(st.swap[c.rarity])}</small></button></div>`;
       }
       el.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${curList.length < 2 ? " hidden" : ""}>◀</button>
@@ -275,6 +275,7 @@ export function mountGachaCards(root, { env, back }) {
     el.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); });
     el.addEventListener("click", (e) => {
       if (e.target.closest(".gc-prev")) go(-1); else if (e.target.closest(".gc-next")) go(1);
+      else if (e.target.closest(".gc-updup")) send({ a: "upgrade", id: curList[pos].id, dup: true });
       else if (e.target.closest(".gc-up")) send({ a: "upgrade", id: curList[pos].id });
       else if (e.target.closest(".gc-salv1")) send({ a: "salvage", id: curList[pos].id, n: 1 });
       else if (e.target.closest(".gc-salvall")) { const c = curList[pos]; confirmAsk(`把「${c.name}」的重複卡全部分解成墨點？`, () => send({ a: "salvage", id: c.id })); }
@@ -350,9 +351,9 @@ export function mountGachaCards(root, { env, back }) {
   let pickSlot = null;
   function drawShow() {
     const mine = st ? st.cards : {}, sh = st && st.show || [null, null, null];
-    const slot = (id, i) => id && mine[id] && BYID[id] ? `<button class="gc-sh on ${BYID[id].rarity}" data-sl="${i}"><img src="${ART[id]}" alt="" draggable="false"><span class="gc-badge ${BYID[id].rarity}">${BYID[id].rarity}</span><span class="gc-star">${"★".repeat(mine[id])}</span><span class="gc-name">${esc(BYID[id].name)}</span></button>` : `<button class="gc-sh" data-sl="${i}"><i>＋</i><span>選一張</span></button>`;
+    const slot = (id, i) => id && mine[id] && BYID[id] ? `<button class="gc-sh on ${BYID[id].rarity}" data-sl="${i}" data-view="${id}"><span class="gc-swp" data-sl="${i}">換</span><img src="${ART[id]}" alt="" draggable="false"><span class="gc-badge ${BYID[id].rarity}">${BYID[id].rarity}</span><span class="gc-star">${"★".repeat(mine[id])}</span><span class="gc-name">${esc(BYID[id].name)}</span></button>` : `<button class="gc-sh" data-sl="${i}"><i>＋</i><span>選一張</span></button>`;
     body.innerHTML = `
-      <div class="gc-hint">挑 3 張你最喜歡的卡擺在展示櫃，點格子更換，點已擺的卡可以拿下來。${real() ? "真代幣模式的展示櫃會上名卡榜。" : "練習模式每次進來展示櫃都會清空。"}</div>
+      <div class="gc-hint">挑 3 張你最喜歡的卡擺在展示櫃，點已擺的卡可以放大看（也能升星），點右上角「換」更換或拿下來。${real() ? "真代幣模式的展示櫃會上名卡榜。" : "練習模式每次進來展示櫃都會清空。"}</div>
       <div class="gc-shelf">${sh.map(slot).join("")}</div>
       ${pickSlot !== null ? `<div class="gc-pick"><div class="gc-hint">選一張放進第 ${pickSlot + 1} 格${sh[pickSlot] ? `　<button class="gc-unshow">拿下來</button>` : ""}　<button class="gc-pickx">取消</button></div><div class="gc-grid">${CARDS.filter((c) => mine[c.id]).sort((a, b) => RAR.indexOf(a.rarity) - RAR.indexOf(b.rarity) || a.id - b.id).map((c) => `<button class="gc-card ${c.rarity}" data-pk="${c.id}"><img src="${ART[c.id]}" alt="" loading="lazy" draggable="false"><span class="gc-badge ${c.rarity}">${c.rarity}</span><span class="gc-star">${"★".repeat(mine[c.id])}</span><span class="gc-name">${esc(c.name)}</span></button>`).join("") || `<div class="mempty">還沒有卡，先去抽幾張吧</div>`}</div></div>` : ""}
       <div class="gc-hint">展示的卡會依「展示分」（稀有度分 × 星數）排進選單裡的「名卡榜」，N 1・R 3・SR 12・SSR 40 分，升星分數更高。</div>`;
@@ -367,6 +368,8 @@ export function mountGachaCards(root, { env, back }) {
       if (pk) { sfx.place(); send({ a: "show", slot: pickSlot, id: Number(pk.dataset.pk) }); pickSlot = null; return; }
       if (e.target.closest(".gc-unshow")) { sfx.take(); send({ a: "show", slot: pickSlot, id: null }); pickSlot = null; return; }
       if (e.target.closest(".gc-pickx")) { pickSlot = null; drawShow(); return; }
+      const sw = e.target.closest(".gc-swp"), vw = e.target.closest("[data-view]");
+      if (vw && !sw) { curList = (st && st.show || []).filter((x) => x && st.cards[x]).map((x) => BYID[x]); detail(Number(vw.dataset.view)); return; }
       if (sl && sl.closest(".gc-shelf") && !sl.closest(".sm") && sl.dataset.sl !== undefined) { pickSlot = Number(sl.dataset.sl); drawShow(); return; }
     }
     const mt = e.target.closest(".gc-main [data-tab]");
