@@ -625,6 +625,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return botwallet.run_log(msg.guild.id if msg is not None and msg.guild else None, args)
         if name == "bot_pay":
             return botwallet.run_pay(msg, args)
+        if name == "bot_collect":
+            return botwallet.run_collect(msg, args)
         if name == "bot_wallet":
             return botwallet.run(msg.guild.id if msg is not None and msg.guild else None)
         if name == "activity_status":
@@ -731,6 +733,8 @@ def tool_status(name: str, args_json: str) -> str:
         return "🪙 數自己的代幣"
     if name == "bot_pay":
         return "💸 考慮要不要給錢"
+    if name == "bot_collect":
+        return "💰 收還款"
     if name == "transfer_log":
         return "📒 翻轉帳紀錄"
     if name == "activity_status":
@@ -967,6 +971,7 @@ def strip_meta(text: str) -> str:
 # 冷門工具只在使用者這句話提到相關字眼時才放進工具清單（工具說明每次都會算進 token，不常用的別一直帶著）
 ACT_RE = re.compile(r"activity|遊戲間|在玩|在打|玩什麼|玩啥|誰在(玩|打)|有人(在)?(玩|打)|開著", re.I)
 
+REPAY_RE = re.compile(r"還(你)?(錢|債|款|幣|代幣)|還清|還你|還款|我要還|來還", re.I)
 LOG_RE = re.compile(r"轉帳|轉账|紀錄|記錄|誰.{0,5}(轉|給|借|欠)|轉給|有人轉|收到.{0,4}(錢|幣)|欠.{0,4}(誰|多少|錢)|帳目|帳單|流水|欠債|欠款", re.I)
 PAY_RE = re.compile(r"給我.{0,4}(錢|幣|代幣)|(發|轉|匯|打|賞|送|借).{0,4}(我|給我).{0,6}(錢|幣|代幣)|(發|轉|匯|打|賞|送).{0,3}(錢|幣|代幣|紅包)|紅包|打賞|請我|獎勵|\\bpay\\b|轉帳|借我.{0,3}(錢|幣)|窮|沒錢", re.I)
 MONEY_RE = re.compile(r"你.{0,6}(代幣|代币|多少錢|多少钱|多少幣|身家|錢包|荷包|存款|餘額|口袋)|(代幣|代币|錢包|餘額).{0,6}你|莊家.{0,6}(賺|賠|多少|有)|bot.{0,6}(代幣|錢)", re.I)
@@ -993,7 +998,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     if msg is not None and msg.guild and is_admin(msg.author) and (PAY_RE.search(last_user_text(conversation)) or MONEY_RE.search(last_user_text(conversation))):
         sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點；有個像樣的理由就可以給小數目（幾千～三萬以內），沒理由或亂討就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
     messages = [{"role": "system", "content": sys_text}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL] if MONEY_RE.search(last_user_text(conversation)) else []) + ([botwallet.PAY_TOOL] if PAY_RE.search(last_user_text(conversation)) else []) + ([botwallet.LOG_TOOL] if LOG_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL] if MONEY_RE.search(last_user_text(conversation)) else []) + ([botwallet.PAY_TOOL] if PAY_RE.search(last_user_text(conversation)) else []) + ([botwallet.LOG_TOOL] if LOG_RE.search(last_user_text(conversation)) else []) + ([botwallet.REPAY_TOOL] if REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play

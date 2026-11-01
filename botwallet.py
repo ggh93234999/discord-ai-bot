@@ -114,6 +114,49 @@ def run_pay(msg, args: dict) -> str:
     return f"已從大笨bot 的帳戶轉 {economy.fmt(amount)} 給 {target.display_name}（對方現在有 {economy.fmt(new)}，你還剩 {economy.fmt(economy.house_balance(gid) or 0)}）。"
 
 
+# ---------------------------------------------------------------- 聊天還錢（等同 /還錢）
+REPAY_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "bot_collect",
+        "description": (
+            "對方在聊天裡說要還錢、還債、還款時呼叫（等同 /還錢）：從「現在跟你說話的這個人」自己的錢包扣款還給你。"
+            "只能扣說話的人自己的債，不能扣別人的。金額沒說清楚就不要填，代表盡量還（還清或把他手上的錢用光）。"
+            "他沒欠錢、或手上沒錢，工具會直接告訴你。成功後照工具結果回覆，不要自己編數字。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "amount": {"type": "integer", "description": "對方明確說要還多少；沒說就不要填"},
+            },
+        },
+    },
+}
+
+
+def run_collect(msg, args: dict) -> str:
+    if msg is None or not msg.guild:
+        return "只能在伺服器頻道裡還錢。"
+    gid, uid = msg.guild.id, msg.author.id
+    if not economy.debt_of(gid, uid):
+        return "這個人沒欠你錢，不用還。"
+    amt = None
+    if args.get("amount") not in (None, ""):
+        try:
+            amt = int(args.get("amount"))
+        except (TypeError, ValueError):
+            return "金額不對，沒有扣款。"
+        if amt < 1:
+            return "金額不對，沒有扣款。"
+    pay, left = economy.repay(gid, uid, amt)
+    if pay <= 0:
+        return f"他手上沒錢可以還（還欠 {economy.fmt(left)}），沒有扣款。"
+    now = economy.balance(gid, uid)
+    if not left:
+        return f"已從 {msg.author.display_name} 的錢包扣 {economy.fmt(pay)} 還款，債還清了（他現在有 {economy.fmt(now)}）。"
+    return f"已從 {msg.author.display_name} 的錢包扣 {economy.fmt(pay)} 還款，還欠 {economy.fmt(left)}（利息還在滾；他現在有 {economy.fmt(now)}）。"
+
+
 # ---------------------------------------------------------------- 查轉帳紀錄
 LOG_TOOL = {
     "type": "function",
