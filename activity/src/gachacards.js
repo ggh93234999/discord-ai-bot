@@ -295,10 +295,11 @@ export function mountGachaCards(root, { env, back }) {
     const now = srvNow(), busy = new Set(d.slots.flatMap((s) => (s ? s.ids : [])));
     const doneN = d.slots.filter((s) => s && s.end <= now).length;
     const mname = (id) => d.missions.find((x) => x.id === id);
+    const ZH = ["一", "二", "三", "四"];
     const slots = d.slots.map((s, i) => {
-      if (!s) return `<div class="gc-slot idle"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>空閒</span></div><button class="gc-go" data-i="${i}">派遣</button></div>`;
+      if (!s) return `<div class="gc-slot idle"><div class="gc-snum">第${ZH[i]}隊</div><div class="gc-idle"><b>待命</b><small>派卡片出去探險，回來領墨點</small></div><button class="gc-go" data-i="${i}">派遣</button></div>`;
       const ms = mname(s.m), left = s.end - now, total = s.end - s.at, ok = left <= 0;
-      return `<div class="gc-slot ${ok ? "done" : "run"}"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>${mi(ms.id)}${ms.name}</span></div>
+      return `<div class="gc-slot ${ok ? "done" : "run"}"><div class="gc-top"><div class="gc-snum">第${ZH[i]}隊</div>${mi(ms.id)}<div class="gc-tt"><b>${ms.name}</b><small>${ms.hours} 小時・${ms.types.join("／")}加成</small></div></div>
         <div class="gc-ths">${s.ids.map((id) => thumb(id)).join("")}</div>
         <div class="gc-prog" data-end="${s.end}" data-at="${s.at}"><i style="width:${ok ? 100 : Math.max(2, (1 - left / total) * 100)}%"></i><span>${ok ? "完成了" : "剩 " + fmtT(left)}</span></div>
         <div class="gc-sr">預計 ${I.ink} +${s.ink}${s.tick ? `　${I.tix} ${Math.round(s.tick * 100)}% +1` : ""}</div>
@@ -309,8 +310,9 @@ export function mountGachaCards(root, { env, back }) {
       const ms = mname(dispSel.m);
       const mine = Object.keys(st.cards).map(Number).filter((id) => !busy.has(id))
         .sort((a, b) => (ms.types.includes(BYID[b].type) - ms.types.includes(BYID[a].type)) || RAR.indexOf(BYID[a].rarity) - RAR.indexOf(BYID[b].rarity) || a - b);
-      picker = `<div class="gc-picker"><div class="gc-ph"><b>第 ${dispSel.slot + 1} 隊：選任務和卡片（最多 ${d.teamMax} 張）</b><button class="gc-auto">自動選最多</button></div>
+      picker = `<div class="gc-sheetbg"></div><div class="gc-picker"><div class="gc-ph"><b>第 ${dispSel.slot + 1} 隊：選任務和卡片（最多 ${d.teamMax} 張）</b><button class="gc-auto">自動選最多</button></div>
         <div class="gc-ms2">${d.missions.map((x) => `<button class="gc-mis${x.id === dispSel.m ? " on" : ""}" data-m="${x.id}">${mi(x.id)}<span>${x.name}</span><small>${x.hours} 小時${d.speed > 1 ? `（練習 ${fmtT(x.hours * 3600e3 / d.speed)}）` : ""}・${x.types.join("／")}加成${x.tick ? `・${I.tix}${Math.round(x.tick * 100)}%` : ""}</small></button>`).join("")}</div>
+        <div class="gc-team">${Array.from({ length: d.teamMax }, (_, k) => { const id = dispSel.ids[k]; return id ? `<button class="gc-tm on ${BYID[id].rarity}" data-rm="${id}" title="點一下移出隊伍"><img src="${ART[id]}" alt="" draggable="false"><span class="gc-star">${"★".repeat(st.cards[id])}</span></button>` : `<div class="gc-tm"><i>＋</i></div>`; }).join("")}</div>
         <div class="gc-pv">${dprev && dispSel.ids.length ? `預計 ${I.ink} <b>+${dprev.ink}</b>${dprev.tick ? `　${I.tix} ${Math.round(dprev.tick * 100)}% +1` : ""}　類別符合 ${dprev.match} 張${dprev.bond ? "　✓ 同卡組羈絆 +20%" : ""}` : "點下面的卡加入隊伍（類別符合任務的卡墨點 ×1.5，整隊同卡組再 ×1.2）"}</div>
         <div class="gc-pgrid">${mine.length ? mine.map((id) => { const sel = dispSel.ids.includes(id), hit = ms.types.includes(BYID[id].type);
           return `<button class="gc-pc ${BYID[id].rarity}${sel ? " sel" : ""}${hit ? " hit" : ""}" data-id="${id}" title="${esc(BYID[id].name)}"><img src="${ART[id]}" alt="" draggable="false"><span class="gc-badge ${BYID[id].rarity}">${BYID[id].rarity}</span><span class="gc-star">${"★".repeat(st.cards[id])}</span>${sel ? `<span class="gc-chk">✓</span>` : ""}</button>`; }).join("") : `<p class="mempty">沒有可派遣的卡</p>`}</div>
@@ -326,6 +328,8 @@ export function mountGachaCards(root, { env, back }) {
     const t = e.target;
     const go = t.closest(".gc-go"); if (go) { dispSel = { slot: Number(go.dataset.i), m: "forest", ids: [] }; dprev = null; drawDisp(); return true; }
     const mis = t.closest(".gc-mis"); if (mis && dispSel) { dispSel.m = mis.dataset.m; askPrev(); drawDisp(); return true; }
+    const rm = t.closest("[data-rm]"); if (rm && dispSel) { dispSel.ids = dispSel.ids.filter((x) => x !== Number(rm.dataset.rm)); askPrev(); drawDisp(); return true; }
+    if (t.closest(".gc-sheetbg") && dispSel) { dispSel = null; dprev = null; drawDisp(); return true; }
     const pc = t.closest(".gc-pc"); if (pc && dispSel) {
       const id = Number(pc.dataset.id), k = dispSel.ids.indexOf(id);
       if (k >= 0) dispSel.ids.splice(k, 1); else if (dispSel.ids.length < st.disp.teamMax) dispSel.ids.push(id); else { statusEl.textContent = `一隊最多 ${st.disp.teamMax} 張`; return true; }

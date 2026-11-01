@@ -165,8 +165,6 @@ html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots .gc-slots{display:grid;gap:12px}
 .game.gcards.slots .gc-slot{padding:10px 12px 12px;border:1.5px solid var(--ink);border-radius:1px;background:rgba(241,236,221,.75);box-shadow:3px 4px 0 rgba(22,20,15,.2)}
 .game.gcards.slots .gc-slot.done{border-color:var(--dai);box-shadow:3px 4px 0 rgba(64,96,90,.4)}
-.game.gcards.slots .gc-sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:15px}.game.gcards.slots .gc-sh b{letter-spacing:.2em}.game.gcards.slots .gc-sh span{display:inline-flex;align-items:center;gap:6px;color:var(--ink2)}
-.game.gcards.slots .gc-slot.idle{display:flex;align-items:center;justify-content:space-between;border-style:dashed;border-color:var(--ink3);background:transparent;box-shadow:none}.game.gcards.slots .gc-slot.idle .gc-sh{margin:0;gap:14px}
 .game.gcards.slots .gc-mi{width:26px;height:26px;border-radius:50%;object-fit:cover;mix-blend-mode:multiply;flex:none}
 .game.gcards.slots .gc-ths{display:flex;gap:8px;margin-bottom:9px}
 .game.gcards.slots .gc-th{display:block;width:54px;aspect-ratio:2/3;border:1px solid var(--ink);overflow:hidden;box-shadow:0 0 0 2px var(--paper2),0 0 0 3px var(--ink3)}.game.gcards.slots .gc-th img{width:100%;height:100%;object-fit:cover;display:block}
@@ -228,3 +226,23 @@ html body:has(.gcards){background:#d9d1bb}
 .gc-lb{position:absolute;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(18,16,12,.88)}
 .game.gcards.slots .gc-ph{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .game.gcards.slots .gc-auto{flex:none;padding:3px 10px;border:1.5px solid #b5342a;border-radius:2px;background:transparent;color:#b5342a;font-weight:700;font-size:13px;cursor:pointer}
+
+/* 派遣：隊伍卡（掛軸）與底部彈出的選卡面板 */
+.game.gcards.slots .gc-slot{position:relative;padding:12px 14px 14px 52px;background:rgba(241,236,221,.8) url("./gacha-ui/paper.jpg") center/cover;overflow:hidden}
+.game.gcards.slots .gc-snum{position:absolute;left:0;top:0;bottom:0;width:38px;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;letter-spacing:.35em;font-size:16px;font-weight:900;color:#f1ecdd;background:var(--ink)}
+.game.gcards.slots .gc-slot.done .gc-snum{background:var(--dai)}
+.game.gcards.slots .gc-slot.idle{display:flex;align-items:center;gap:12px;min-height:76px;border-style:dashed;border-color:var(--ink3);box-shadow:none;background:transparent}
+.game.gcards.slots .gc-slot.idle .gc-snum{background:var(--ink3)}
+.game.gcards.slots .gc-idle{flex:1;display:flex;flex-direction:column;gap:2px}.game.gcards.slots .gc-idle b{font-size:17px;letter-spacing:.3em;color:var(--ink2)}.game.gcards.slots .gc-idle small{font-size:12px;color:var(--ink2)}
+.game.gcards.slots .gc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.game.gcards.slots .gc-top .gc-mi{width:56px;height:56px;border:1px solid var(--ink3);box-shadow:0 0 0 3px rgba(241,236,221,.9),0 0 0 4px var(--ink3)}
+.game.gcards.slots .gc-tt{display:flex;flex-direction:column;gap:2px}.game.gcards.slots .gc-tt b{font-size:19px;letter-spacing:.2em}.game.gcards.slots .gc-tt small{font-size:12px;color:var(--ink2)}
+.game.gcards.slots .gc-sheetbg{position:fixed;inset:0;z-index:70;background:rgba(18,16,12,.55)}
+.game.gcards.slots .gc-picker{position:fixed;left:0;right:0;bottom:0;z-index:71;max-width:640px;margin:0 auto;max-height:90vh;overflow:auto;padding:14px 14px 16px;border:2px solid var(--ink);border-bottom:0;border-radius:2px 2px 0 0;background:#ece6d3 url("./gacha-ui/paper.jpg") center/cover;box-shadow:0 -6px 24px rgba(0,0,0,.4)}
+.game.gcards.slots .gc-pgrid{max-height:34vh}
+.game.gcards.slots .gc-team{display:flex;gap:10px;justify-content:center;margin:12px 0 4px}
+.game.gcards.slots .gc-tm{position:relative;width:62px;aspect-ratio:2/3;padding:0;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--ink3);border-radius:1px;background:rgba(22,20,15,.05);cursor:pointer}
+.game.gcards.slots .gc-tm i{font-style:normal;font-size:24px;color:var(--ink3)}
+.game.gcards.slots .gc-tm.on{border:1.5px solid var(--ink);box-shadow:0 0 0 2px var(--paper2),0 0 0 3px var(--ink3);overflow:hidden}
+.game.gcards.slots .gc-tm.on img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.game.gcards.slots .gc-tm .gc-star{position:absolute;left:0;right:0;bottom:1px;text-align:center;font-size:9px;color:#e0b94a;text-shadow:0 0 2px #000}
