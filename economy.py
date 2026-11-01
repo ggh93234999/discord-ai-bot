@@ -171,7 +171,7 @@ def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: 
         log.warning("發帳本頻道失敗：%r", ex)
 
 
-GAME_DIGEST_EVERY = 6 * 3600            # 賭博類每隔多久彙整一次發到帳本頻道
+GAME_DIGEST_EVERY = 10 * 60            # 賭博類每隔多久彙整一次發到帳本頻道
 GAME_DIGEST_FILE = Path(__file__).parent / "game_digest.json"
 
 
@@ -220,7 +220,7 @@ async def game_digest_loop(client) -> None:
             state, now, changed = _digest_state(), time.time(), False
             for guild in client.guilds:
                 last = float(state.get(str(guild.id), 0))
-                if last and now - last < GAME_DIGEST_EVERY:
+                if last and now - last < GAME_DIGEST_EVERY - 30:
                     continue
                 if not last:                                   # 第一次：從現有的遊戲紀錄開始算，並等滿一個週期再發
                     gt = [x["t"] for x in _ledger() if x["gid"] == guild.id and x["kind"] in GAME_KINDS]
