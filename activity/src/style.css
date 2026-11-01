@@ -1478,7 +1478,10 @@ body.tv-fs{overflow:hidden}
 .gc-setrow{display:grid;grid-template-columns:3em 1fr 4.5em 5.5em;align-items:center;gap:8px;font-size:13px;margin:5px 0}
 .gc-setrow em{font-style:normal;opacity:.8;font-size:12px}
 .gc-setbar{height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}.gc-setbar i{display:block;height:100%;background:#5fb7a8}
-.gc-card.lock img{filter:grayscale(1) brightness(.45)}
+.gc-card.lock img{filter:grayscale(1) brightness(.5) blur(7px);transform:scale(1.12)}
+.gc-card.lock{overflow:hidden}
+.gc-big img.gc-blur{filter:grayscale(1) brightness(.6) blur(10px)}
+.gc-big{background:#efe8d8;color:#1d1b19}.gc-big .gc-meta{color:#1d1b19}
 .gc-card.lock{border-color:#4a4640;box-shadow:none}
 .gc-lockt{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:11px;color:#cfc9bd}
 .gc-card .gc-badge{left:6px;top:6px;bottom:auto}

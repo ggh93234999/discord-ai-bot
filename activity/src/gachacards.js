@@ -18,7 +18,7 @@ const ERR = {
 const pidOf = () => { try { let p = localStorage.getItem("gcpid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("gcpid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
 
 export function mountGachaCards(root, { env, back }) {
-  let filter = "all", type = "all", set = "all", own = "all", tab = "pull";
+  let filter = "all", type = "all", set = "all", own = "have", tab = "pull";     // 圖鑑預設只顯示已擁有的，要看沒抽到的得按「未擁有」
   const inSet = (c) => set === "all" || c.set === set;
   root.innerHTML = `
     <div class="game slots gcards">
@@ -182,7 +182,7 @@ export function mountGachaCards(root, { env, back }) {
       <div class="gc-hint">已收集 <b>${nOwn}</b> / ${total} 張　${RAR.map((r) => `<b class="gc-r ${r}">${r}</b> ${CARDS.filter((c) => inSet(c) && c.rarity === r && mine[c.id]).length}/${counts[r]}`).join("　")}</div>
       <div class="gc-tabs gc-set"></div><div class="gc-tabs gc-own"></div><div class="gc-tabs gc-rar"></div><div class="gc-tabs gc-typ"></div><div class="gc-grid"></div>`;
     tabs(body.querySelector(".gc-set"), [["all", "全部"], ["east", "東方"], ["west", "西方"], ["orig", "原創"], ["whim", "異想"]], set, "s");
-    tabs(body.querySelector(".gc-own"), [["all", "全部"], ["have", "已擁有"], ["miss", "未擁有"]], own, "o");
+    tabs(body.querySelector(".gc-own"), [["have", "已擁有"], ["miss", "未擁有"], ["all", "全部"]], own, "o");
     tabs(body.querySelector(".gc-rar"), [["all", "全部"], ...RAR.map((r) => [r, r])], filter, "r");
     tabs(body.querySelector(".gc-typ"), [["all", "全部類別"], ...types.map((t) => [t, t])], type, "t");
     const list = CARDS.filter((c) => inSet(c) && (filter === "all" || c.rarity === filter) && (type === "all" || c.type === type) && (own === "all" || (own === "have") === !!mine[c.id]))
@@ -193,7 +193,7 @@ export function mountGachaCards(root, { env, back }) {
         <img src="${ART[c.id]}" alt="${esc(c.name)}" loading="lazy" draggable="false">
         <span class="gc-badge ${c.rarity}">${c.rarity}</span>${mine[c.id] ? `<span class="gc-star">${"★".repeat(mine[c.id])}</span>` : `<span class="gc-lockt">未擁有</span>`}
         <span class="gc-name">${esc(c.name)}</span>
-      </button>`).join("") : `<div class="mempty">沒有符合的卡</div>`;
+      </button>`).join("") : `<div class="mempty">${own === "have" && !nOwn ? "還沒有卡，到「抽卡」抽幾張吧" : own === "have" ? "這個條件下還沒有已擁有的卡" : "沒有符合的卡"}</div>`;
   }
   let modalOpen = false, refreshModal = null;
   function detail(id) {                                         // 點開一張卡：可以用 ◀ ▶（或鍵盤左右鍵、左右滑動）切到目前篩選清單裡的上一張／下一張
@@ -209,7 +209,7 @@ export function mountGachaCards(root, { env, back }) {
         else act = `<div class="gc-act"><button class="gc-swap"${st.ink >= st.swap[c.rarity] ? "" : " disabled"}>用墨點兌換<small>🖋️ ${money(st.swap[c.rarity])}</small></button></div>`;
       }
       el.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${curList.length < 2 ? " hidden" : ""}>◀</button>
-        <div class="gc-big ${c.rarity}"><img src="${ART[c.id]}" alt="${esc(c.name)}" draggable="false">
+        <div class="gc-big ${c.rarity}"><img class="${star ? "" : "gc-blur"}" src="${ART[c.id]}" alt="${esc(c.name)}" draggable="false">
         <div class="gc-info"><div class="gc-ttl"><b>${esc(c.name)}</b><span class="gc-badge ${c.rarity}">${c.rarity}・${RNAME[c.rarity]}</span></div>
         <div class="gc-meta">${esc(c.type)}　No.${String(c.id).padStart(2, "0")}　${pos + 1} / ${curList.length}　${star ? `<span class="gc-stars">${stars(star)}</span>` : "未擁有"}</div><p>${esc(c.desc)}</p>${act}</div>
         <button class="gc-x" aria-label="關閉">✕</button></div>
