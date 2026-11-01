@@ -878,14 +878,28 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
     @app_commands.describe(對象="轉給誰", 金額="轉多少")
     @app_commands.guild_only()
     async def cmd_pay(interaction: discord.Interaction, 對象: discord.Member, 金額: app_commands.Range[int, 1]):
-        if 對象.bot or 對象.id == interaction.user.id:
-            await interaction.response.send_message("不能轉給機器人或自己。", ephemeral=True)
+        to_bot = _client is not None and _client.user is not None and 對象.id == _client.user.id      # 大笨bot 自己可以收錢
+        if (對象.bot and not to_bot) or 對象.id == interaction.user.id:
+            await interaction.response.send_message("不能轉給其他機器人或自己。", ephemeral=True)
             return
         err = check_bet(interaction, 金額)
         if err:
             await interaction.response.send_message(err, ephemeral=True)
             return
         gid = interaction.guild_id
+        if to_bot:
+            who = interaction.user.display_name
+            if debt_of(gid, interaction.user.id):          # 欠著錢的人轉給大笨bot，視同還債
+                pay, left = repay(gid, interaction.user.id, 金額)
+                if pay <= 0:
+                    await interaction.response.send_message("你手上沒錢可以轉。", ephemeral=True)
+                    return
+                await interaction.response.send_message(f"💸 {who} 轉了 {fmt(pay)} 給大笨bot，抵債：" + ("債還清了！" if not left else f"還欠 {fmt(left)}。"))
+                return
+            add(gid, interaction.user.id, -金額, who)
+            house_add(gid, 金額)
+            await interaction.response.send_message(f"💸 {who} 轉了 {fmt(金額)} 給大笨bot（它現在有 {fmt(house_balance(gid) or 0)}）")
+            return
         if debt_of(gid, interaction.user.id):
             await interaction.response.send_message("你還欠著大笨bot 的錢，先還債才能轉帳。", ephemeral=True)
             return
