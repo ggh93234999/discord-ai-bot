@@ -39,9 +39,10 @@ export function mountGachaCards(root, { env, back }) {
   $(".back").addEventListener("click", back);
 
   // ---- 連線
+  let needEnter = true;      // 進入練習模式的第一個請求要帶 enter（伺服器據此清空練習收藏），斷線重連不算
   let ws = null, closed = false, retry = 0, wantReal = false, mode = "practice", session = env && env.session || null, st = null;
   const real = () => mode === "real";
-  const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "gc", real: real(), pid: pidOf(), ...o }));
+  const send = (o) => { if (o.a === "get" && needEnter && !real()) { o = { ...o, enter: true }; needEnter = false; } return ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "gc", real: real(), pid: pidOf(), ...o })); };
   function connect() {
     ws = new WebSocket(wsUrl(env && env.inDiscord));
     ws.onopen = () => { retry = 0; if (session) ws.send(JSON.stringify({ t: "bauth", token: session.token })); send({ a: "get" }); statusEl.textContent = "抽張卡吧"; };
@@ -71,14 +72,11 @@ export function mountGachaCards(root, { env, back }) {
   function drawPull() {
     if (!st) { body.innerHTML = `<p class="mempty">讀取中…</p>`; return; }
     const cur = real() ? "真代幣" : "練習幣";
-    const bar = (v, max, cls) => `<div class="gc-pity ${cls}"><i style="width:${Math.min(100, v / max * 100)}%"></i><span>${v} / ${max}</span></div>`;
     const ms = st.milestones.map(([n, t]) => `<span class="gc-ms${st.claimed.includes("m" + n) ? " done" : ""}">${n} 張 → 🎟️${t}</span>`).join("");
     const sets = Object.entries(st.sets).map(([s, x]) => `<div class="gc-setrow"><b>${x.name}</b><span class="gc-setbar"><i style="width:${x.have / x.n * 100}%"></i></span><span>${x.have} / ${x.n}</span><em>${st.claimed.includes("s" + s) ? "已領" : "集滿 🎟️" + st.setBonus[s]}</em></div>`).join("");
     body.innerHTML = `
       <div class="gc-pull">
         <div class="gc-big-ink"><b>${st.owned}</b> / ${st.total} 張　<small>累計抽了 ${st.pulls} 次</small></div>
-        <div class="gc-pt"><span>距離 SSR 保底</span>${bar(st.pity.ssr, st.pity.ssrMax, "ssr")}</div>
-        <div class="gc-pt"><span>距離 SR 以上保底</span>${bar(st.pity.sr, st.pity.srMax, "sr")}</div>
         <div class="gc-btns">
           <button class="gc-one">抽 1 次<small>${money(st.price)} ${cur}</small></button>
           <button class="gc-ten">十連抽<small>${money(st.tenPrice)} ${cur}（九折）</small></button>
@@ -87,9 +85,9 @@ export function mountGachaCards(root, { env, back }) {
         </div>
         <button class="gc-sign"${st.canSign ? "" : " disabled"}>${st.canSign ? "📅 每日簽到，領 1 張抽卡券" : "📅 今天簽到過了"}</button>
         <details class="gc-rules"><summary>機率與規則</summary>
-          <p>基礎機率：SSR ${st.rate.SSR / 10}%、SR ${st.rate.SR / 10}%、R ${st.rate.R / 10}%、N ${st.rate.N / 10}%（算上保底後實際 SSR 約 2.7%）。連續 ${st.pity.ssrMax} 抽沒出 SSR，第 ${st.pity.ssrMax} 抽一定是 SSR；連續 ${st.pity.srMax - 1} 抽都是 R 以下，第 ${st.pity.srMax} 抽一定是 SR 以上。</p>
+          <p>機率：SSR ${st.rate.SSR / 10}%、SR ${st.rate.SR / 10}%、R ${st.rate.R / 10}%、N ${st.rate.N / 10}%，每抽都是獨立機率，沒有保底。每天簽到送 1 抽。</p>
           <p>抽到重複的卡會轉成墨點：N ${st.dupInk.N}、R ${st.dupInk.R}、SR ${st.dupInk.SR}、SSR ${st.dupInk.SSR}。墨點可以在圖鑑裡替卡升星（最高 ${st.maxStar} 星），或直接兌換還沒有的卡（N ${st.swap.N}、R ${st.swap.R}、SR ${st.swap.SR}、SSR ${money(st.swap.SSR)}）。</p>
-          <p>練習模式和真代幣模式的收藏是分開的。獎勵只發抽卡券和墨點，不會直接發代幣。</p>
+          <p>練習模式和真代幣模式的收藏是分開的；<b>每次進入練習模式，收藏都會清空重來</b>（重新給 10 萬練習幣和 10 抽）。獎勵只發抽卡券和墨點，不會直接發代幣。</p>
         </details>
         <div class="gc-sub">🏆 圖鑑獎勵（收集到幾張不同的卡，一次性）</div><div class="gc-mss">${ms}</div>
         <div class="gc-sub">📚 卡組進度</div><div class="gc-sets">${sets}</div>
@@ -250,7 +248,7 @@ export function mountGachaCards(root, { env, back }) {
   }
   function setMode(m) {
     mode = m; modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m)); root.querySelector(".gcards").classList.toggle("realmode", m === "real");
-    st = null; draw(); showBar(); send({ a: "get" });
+    st = null; if (m === "practice") needEnter = true; draw(); showBar(); send({ a: "get" });
     statusEl.textContent = m === "real" ? `真代幣模式：${session ? session.name : ""}，抽卡會扣真代幣！` : "練習模式：收藏獨立，用練習幣";
   }
   modeBtns.forEach((b) => b.addEventListener("click", () => {

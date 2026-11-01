@@ -16,17 +16,16 @@ const SETS = { east: "東方", west: "西方", orig: "原創", whim: "異想" };
 const SETIDS = Object.fromEntries(Object.keys(SETS).map((s) => [s, CARDS.filter((c) => c.set === s).map((c) => c.id)]));
 
 // ---- 規則
-export const PRICE = 100, TEN_PRICE = 900;                         // 單抽、十連（十連打九折）
+export const PRICE = 10000, TEN_PRICE = 90000;                      // 單抽 1 萬、十連 9 萬（打九折）
 export const RATE = { SSR: 15, SR: 85, R: 300, N: 600 };           // 千分比：SSR 1.5%、SR 8.5%、R 30%、N 60%
-const SSR_PITY = 80;                                               // 連續 80 抽沒出 SSR，第 80 抽一定是 SSR
-const SR_PITY = 10;                                                // 連續 9 抽都是 R 以下，第 10 抽一定是 SR 以上
 const DUP_INK = { N: 5, R: 15, SR: 50, SSR: 150 };                 // 抽到重複的卡轉成幾點墨點
 const STAR_BASE = { N: 10, R: 25, SR: 80, SSR: 250 };             // 升星：從 k 星到 k+1 星要 base×k 墨點
 const MAX_STAR = 5;
 const SWAP = { N: 100, R: 300, SR: 1200, SSR: 4000 };              // 用墨點直接兌換還沒有的卡
 const MILESTONES = [[10, 1], [25, 2], [50, 3], [100, 5], [150, 8], [200, 10], [250, 12], [300, 20]];     // 收集到幾張不同的卡 → 一次性送幾張抽卡券
 const SETBONUS = { east: 20, west: 20, orig: 10, whim: 10 };       // 集滿一個卡組 → 抽卡券
-const DAILY_TICKETS = 1, PRACTICE_START = 1000;
+const DAILY_TICKETS = 1, START_TICKETS = 30;                       // 每日簽到送 1 抽；每個人第一次開局送 30 抽（真代幣模式）
+const PRACTICE_COIN = 100000, PRACTICE_TICKETS = 10;               // 練習模式：每次進入都清空收藏，重新給 10 萬練習幣和 10 抽
 const starCost = (r, star) => STAR_BASE[r] * star;
 
 // ---- 存檔
@@ -41,23 +40,15 @@ export function gachaSave(now = false) {
 }
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const today = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);     // 以台灣時間換日
-const userOf = (key) => (db.users[key] ||= { coin: PRACTICE_START, ink: 0, tickets: 1, cards: {}, pity: { ssr: 0, sr: 0 }, pulls: 0, daily: "", claimed: [], nm: "" });
+const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, pulls: 0, daily: "", claimed: [], nm: "" });
+const userOf = (key) => (db.users[key] ||= fresh(key.startsWith("r:")));
 const locks = new Set();
 
-// ---- 抽一張（含保底）
+// ---- 抽一張（沒有保底，每抽都是獨立機率）
 function rollOne(u) {
-  u.pulls++; u.pity.ssr++; u.pity.sr++;
-  let r;
-  if (u.pity.ssr >= SSR_PITY) r = "SSR";
-  else {
-    const srPlus = u.pity.sr >= SR_PITY;
-    const pool = srPlus ? { SSR: RATE.SSR, SR: RATE.SR } : RATE;
-    const tot = Object.values(pool).reduce((s, x) => s + x, 0);
-    let x = randomInt(tot);
-    r = Object.keys(pool).find((k) => (x -= pool[k]) < 0);
-  }
-  if (r === "SSR") u.pity.ssr = 0;
-  if (r === "SSR" || r === "SR") u.pity.sr = 0;
+  u.pulls++;
+  let x = randomInt(1000), r;
+  r = Object.keys(RATE).find((k) => (x -= RATE[k]) < 0);
   const ids = BYR[r];
   return CARD.get(ids[randomInt(ids.length)]);
 }
@@ -92,13 +83,14 @@ function viewOf(u, real, bal) {
   const owned = Object.keys(u.cards).length;
   return {
     t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, owned, total: CARDS.length,
-    pity: { ssr: u.pity.ssr, ssrMax: SSR_PITY, sr: u.pity.sr, srMax: SR_PITY }, pulls: u.pulls, canSign: u.daily !== today(),
+    pulls: u.pulls, canSign: u.daily !== today(),
     claimed: u.claimed, milestones: MILESTONES, setBonus: SETBONUS, price: PRICE, tenPrice: TEN_PRICE, rate: RATE,
     dupInk: DUP_INK, starBase: STAR_BASE, swap: SWAP, maxStar: MAX_STAR,
     sets: Object.fromEntries(Object.entries(SETIDS).map(([s, ids]) => [s, { name: SETS[s], have: ids.filter((i) => u.cards[i]).length, n: ids.length }])),
   };
 }
 
+const a0 = (m) => m.a;
 export async function handleGacha(ws, m) {
   const real = !!m.real;
   if (real && !REAL_ON) { out(ws, { t: "gc", a: "err", error: "real_off" }); return; }
@@ -107,6 +99,7 @@ export async function handleGacha(ws, m) {
   else id = ws.user ? ws.user.uid : "g" + (String(m.pid || "").replace(/[^\w-]/g, "").slice(0, 40) || ws.cid || "x");
   const key = (real ? "r:" : "p:") + id;
   const err = (error, extra = {}) => out(ws, { t: "gc", a: "err", error, ...extra });
+  if (a0(m) === "get" && m.enter && !real) { db.users[key] = fresh(false); gachaSave(true); }     // 每次進入練習模式：收藏清空重來
   const u = userOf(key);
   if (ws.user && u.nm !== ws.user.name) { u.nm = ws.user.name; gachaSave(); }
   const send = async () => out(ws, viewOf(u, real, real ? await realBalance(ws) : null));
@@ -165,9 +158,8 @@ export async function handleGacha(ws, m) {
       out(ws, { t: "gc", a: "swapped", id: cid, cost, rewards });
       await send(); return;
     }
-    if (a === "reset" && !real) { if (u.coin < PRICE) { u.coin = 500; gachaSave(true); } await send(); return; }
   } catch (e) { console.log("卡冊錯誤", e && e.message); err("error"); }
   finally { locks.delete(key); }
 }
 
-export const _test = { db: () => db, rollOne, userOf, checkRewards, RATE, SSR_PITY, SR_PITY };
+export const _test = { db: () => db, rollOne, userOf, checkRewards, RATE };
