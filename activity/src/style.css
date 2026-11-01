@@ -1562,3 +1562,9 @@ body.tv-fs{overflow:hidden}
 .gc-rgrid2.one .gc-cap{display:none}
 @media (max-width:520px){.gc-cap b{font-size:10.5px}.gc-cap small{font-size:9px;white-space:nowrap}.gc-sname{font-size:22px}}
 @media (prefers-reduced-motion:reduce){.gc-orb i,.gc-orb b,.gc-summon .gc-orb{animation:none}.gc-flip{transition:none}}
+.gc-dupn{position:absolute;right:6px;bottom:22px;padding:0 5px;border-radius:8px;background:#f3c64a;color:#2a2112;font-size:11px;font-weight:800}
+.gc-salvbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 14px 8px;font-size:13px}.gc-salvbar b{color:#f3c64a}
+.gc-salvbar button{padding:4px 12px;border-radius:999px;border:1px solid #f3c64a;background:transparent;color:#f3c64a;font-size:12px;cursor:pointer}
+.gc-salv{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.gc-salv .gc-dnote{width:100%;font-size:13px;opacity:.8}
+.gc-salv button{flex:1;padding:8px;border-radius:8px;border:1px solid #8a6d1f;background:#f3e6b8;color:#3b2d08;font-weight:700;font-size:14px;cursor:pointer}
+.gc-salv button small{margin-left:6px;font-weight:400}

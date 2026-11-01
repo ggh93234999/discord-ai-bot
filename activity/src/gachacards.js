@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const money = (n) => Number(n).toLocaleString();
 const stars = (n, max = 5) => "★".repeat(n) + "☆".repeat(Math.max(0, max - n));
 const ERR = {
-  real_off: "真代幣模式還沒開放", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
+  real_off: "真代幣模式還沒開放", no_dup: "沒有重複的卡可以分解", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_ticket: "抽卡券不夠", signed: "今天已經簽到過了", not_owned: "你還沒有這張卡", max_star: "已經是最高星級", no_ink: "墨點不夠", already: "這張卡你已經有了", bad_card: "沒有這張卡", error: "發生錯誤，再試一次",
 };
 const pidOf = () => { try { let p = localStorage.getItem("gcpid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("gcpid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
@@ -53,6 +53,7 @@ export function mountGachaCards(root, { env, back }) {
       if (m.a === "view") { st = m; showBar(); if (!resultOpen && !modalOpen) draw(); else if (modalOpen && refreshModal) refreshModal(); }
       else if (m.a === "pull") showResults(m);
       else if (m.a === "signed") statusEl.textContent = `簽到成功，抽卡券 +${m.tickets}`;
+      else if (m.a === "salvaged") statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`;
       else if (m.a === "upgraded") statusEl.textContent = `升到 ${m.star} 星了（花 ${m.cost} 墨點）`;
       else if (m.a === "swapped") { statusEl.textContent = `兌換成功（花 ${money(m.cost)} 墨點）` + (m.rewards && m.rewards.length ? "，" + m.rewards.map((r) => `${r.text}，抽卡券 +${r.tickets}`).join("；") : ""); }
       else if (m.a === "err") { statusEl.textContent = ERR[m.error] || ERR.error; if (m.balance != null && st) { st.balance = m.balance; showBar(); } }
@@ -86,7 +87,7 @@ export function mountGachaCards(root, { env, back }) {
         <button class="gc-sign"${st.canSign ? "" : " disabled"}>${st.canSign ? "📅 每日簽到，領 1 張抽卡券" : "📅 今天簽到過了"}</button>
         <details class="gc-rules"><summary>機率與規則</summary>
           <p>機率：SSR ${st.rate.SSR / 10}%、SR ${st.rate.SR / 10}%、R ${st.rate.R / 10}%、N ${st.rate.N / 10}%，每抽都是獨立機率，沒有保底。每天簽到送 1 抽。</p>
-          <p>抽到重複的卡會轉成墨點：N ${st.dupInk.N}、R ${st.dupInk.R}、SR ${st.dupInk.SR}、SSR ${st.dupInk.SSR}。墨點可以在圖鑑裡替卡升星（最高 ${st.maxStar} 星），或直接兌換還沒有的卡（N ${st.swap.N}、R ${st.swap.R}、SR ${st.swap.SR}、SSR ${money(st.swap.SSR)}）。</p>
+          <p>抽到重複的卡會留在收藏裡，到圖鑑可以自己決定要不要分解成墨點（每張：N ${st.dupInk.N}、R ${st.dupInk.R}、SR ${st.dupInk.SR}、SSR ${st.dupInk.SSR}）。墨點可以在圖鑑裡替卡升星（最高 ${st.maxStar} 星），或直接兌換還沒有的卡（N ${st.swap.N}、R ${st.swap.R}、SR ${st.swap.SR}、SSR ${money(st.swap.SSR)}）。</p>
           <p>練習模式和真代幣模式的收藏是分開的；<b>每次進入練習模式，收藏都會清空重來</b>（重新給 10 萬練習幣和 10 抽）。獎勵只發抽卡券和墨點，不會直接發代幣。</p>
         </details>
         <div class="gc-sub">🏆 圖鑑獎勵（收集到幾張不同的卡，一次性）</div><div class="gc-mss">${ms}</div>
@@ -115,7 +116,7 @@ export function mountGachaCards(root, { env, back }) {
     resultOpen = true;
     const res = m.results, many = res.length > 1;
     const best = res.reduce((b, r) => (RAR.indexOf(r.rarity) < RAR.indexOf(b) ? r.rarity : b), "N");
-    const newN = res.filter((r) => r.isNew).length, ink = res.reduce((s, r) => s + r.ink, 0);
+    const newN = res.filter((r) => r.isNew).length, dupN = res.filter((r) => !r.isNew).length;
     const el = document.createElement("div");
     el.className = "gc-result";
     root.append(el);
@@ -131,7 +132,7 @@ export function mountGachaCards(root, { env, back }) {
         const c = BYID[r.id];
         return `<div class="gc-rc2 ${r.rarity}" data-i="${i}">
           <div class="gc-flip"><div class="gc-face gc-back"><span>墨</span></div>
-            <div class="gc-face gc-front"><img src="${ART[r.id]}" alt="${esc(c.name)}" draggable="false"><span class="gc-badge ${r.rarity}">${r.rarity}</span>${r.isNew ? `<span class="gc-new">NEW</span>` : `<span class="gc-dup">重複 +${r.ink} 墨</span>`}</div></div>
+            <div class="gc-face gc-front"><img src="${ART[r.id]}" alt="${esc(c.name)}" draggable="false"><span class="gc-badge ${r.rarity}">${r.rarity}</span>${r.isNew ? `<span class="gc-new">NEW</span>` : `<span class="gc-dup">重複</span>`}</div></div>
           <div class="gc-cap"><b>${esc(c.name)}</b><small>No.${String(r.id).padStart(3, "0")}${many ? "" : "　" + esc(c.type)}</small></div></div>`;
       };
       el.innerHTML = `<div class="gc-rbox ${many ? "many" : "single"}">
@@ -139,7 +140,7 @@ export function mountGachaCards(root, { env, back }) {
         <div class="gc-rgrid2${many ? "" : " one"}">${res.map(cardHtml).join("")}</div>
         <div class="gc-single"></div>
         <div class="gc-rfoot" hidden>
-          <div class="gc-rsum">新卡 ${newN} 張${ink ? `，重複轉成墨點 +${ink}` : ""}</div>
+          <div class="gc-rsum">新卡 ${newN} 張${dupN ? `，重複 ${dupN} 張（留在收藏，到圖鑑決定要不要分解成墨點）` : ""}</div>
           ${m.rewards && m.rewards.length ? `<div class="gc-rrew">${m.rewards.map((r) => `🏆 ${esc(r.text)}：抽卡券 +${r.tickets}`).join("<br>")}</div>` : ""}
         </div>
         <div class="gc-rbtns">${many ? `<button class="gc-all">全部翻開</button>` : ""}<button class="gc-rok" hidden>確定</button></div></div>`;
@@ -166,7 +167,7 @@ export function mountGachaCards(root, { env, back }) {
           z.innerHTML = `<button class="gc-nav gc-zp" aria-label="上一張"${res.length < 2 ? " hidden" : ""}>◀</button>
             <div class="gc-big ${r.rarity}"><img src="${ART[r.id]}" alt="${esc(cd.name)}" draggable="false">
             <div class="gc-info"><div class="gc-ttl"><b>${esc(cd.name)}</b><span class="gc-badge ${r.rarity}">${r.rarity}・${RNAME[r.rarity]}</span></div>
-            <div class="gc-meta">${esc(cd.type)}　No.${String(r.id).padStart(3, "0")}　${pos + 1} / ${res.length}　${r.isNew ? "新卡" : `重複，轉成墨點 +${r.ink}`}</div><p>${esc(cd.desc)}</p></div>
+            <div class="gc-meta">${esc(cd.type)}　No.${String(r.id).padStart(3, "0")}　${pos + 1} / ${res.length}　${r.isNew ? "新卡" : "重複，留在收藏（到圖鑑可分解成墨點）"}</div><p>${esc(cd.desc)}</p></div>
             <button class="gc-x" aria-label="關閉">✕</button></div>
             <button class="gc-nav gc-zn" aria-label="下一張"${res.length < 2 ? " hidden" : ""}>▶</button>`;
         };
@@ -201,11 +202,13 @@ export function mountGachaCards(root, { env, back }) {
   function drawBook() {
     const types = [...new Set(CARDS.filter(inSet).map((c) => c.type))];
     if (type !== "all" && !types.includes(type)) type = "all";
-    const mine = st ? st.cards : {};
+    const mine = st ? st.cards : {}, dups = st ? st.dups || {} : {};
+    const dupTot = Object.values(dups).reduce((x, y) => x + y, 0), dupInk = Object.entries(dups).reduce((x, [id, n]) => x + n * st.dupInk[BYID[id].rarity], 0);
     const nOwn = CARDS.filter((c) => inSet(c) && mine[c.id]).length, total = CARDS.filter(inSet).length;
     const counts = Object.fromEntries(RAR.map((r) => [r, CARDS.filter((c) => inSet(c) && c.rarity === r).length]));
     body.innerHTML = `
       <div class="gc-hint">已收集 <b>${nOwn}</b> / ${total} 張　${RAR.map((r) => `<b class="gc-r ${r}">${r}</b> ${CARDS.filter((c) => inSet(c) && c.rarity === r && mine[c.id]).length}/${counts[r]}`).join("　")}</div>
+      ${dupTot ? `<div class="gc-salvbar">有 <b>${dupTot}</b> 張重複的卡<button class="gc-salvgrid">全部分解成墨點 +${money(dupInk)}</button></div>` : ""}
       <div class="gc-tabs gc-set"></div><div class="gc-tabs gc-own"></div><div class="gc-tabs gc-rar"></div><div class="gc-tabs gc-typ"></div><div class="gc-grid"></div>`;
     tabs(body.querySelector(".gc-set"), [["all", "全部"], ["east", "東方"], ["west", "西方"], ["orig", "原創"], ["whim", "異想"]], set, "s");
     tabs(body.querySelector(".gc-own"), [["have", "已擁有"], ["miss", "未擁有"], ["all", "全部"]], own, "o");
@@ -217,7 +220,7 @@ export function mountGachaCards(root, { env, back }) {
     body.querySelector(".gc-grid").innerHTML = list.length ? list.map((c) => `
       <button class="gc-card ${c.rarity}${mine[c.id] ? "" : " lock"}" data-id="${c.id}">
         <img src="${ART[c.id]}" alt="${esc(c.name)}" loading="lazy" draggable="false">
-        <span class="gc-badge ${c.rarity}">${c.rarity}</span>${mine[c.id] ? `<span class="gc-star">${"★".repeat(mine[c.id])}</span>` : `<span class="gc-lockt">未擁有</span>`}
+        <span class="gc-badge ${c.rarity}">${c.rarity}</span>${mine[c.id] && dups[c.id] ? `<span class="gc-dupn">×${dups[c.id] + 1}</span>` : ""}${mine[c.id] ? `<span class="gc-star">${"★".repeat(mine[c.id])}</span>` : `<span class="gc-lockt">未擁有</span>`}
         <span class="gc-name">${esc(c.name)}</span>
       </button>`).join("") : `<div class="mempty">${own === "have" && !nOwn ? "還沒有卡，到「抽卡」抽幾張吧" : own === "have" ? "這個條件下還沒有已擁有的卡" : "沒有符合的卡"}</div>`;
   }
@@ -229,6 +232,8 @@ export function mountGachaCards(root, { env, back }) {
     const close = () => { el.remove(); modalOpen = false; refreshModal = null; document.removeEventListener("keydown", onKey); drawBook(); };
     const show = () => {
       const c = curList[pos], star = st && st.cards[c.id] || 0;
+      const dn = st && st.dups && st.dups[c.id] || 0, per = st ? st.dupInk[c.rarity] : 0;
+      const salv = dn ? `<div class="gc-act gc-salv"><div class="gc-dnote">你有 ${dn} 張重複</div><button class="gc-salv1">分解 1 張<small>🖋️ +${per}</small></button>${dn > 1 ? `<button class="gc-salvall">分解全部 ${dn} 張<small>🖋️ +${per * dn}</small></button>` : ""}</div>` : "";
       let act = "";
       if (st) {
         if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act"><button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>🖋️ ${st.starBase[c.rarity] * star}</small></button></div>`;
@@ -237,7 +242,7 @@ export function mountGachaCards(root, { env, back }) {
       el.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${curList.length < 2 ? " hidden" : ""}>◀</button>
         <div class="gc-big ${c.rarity}"><img class="${star ? "" : "gc-blur"}" src="${ART[c.id]}" alt="${esc(c.name)}" draggable="false">
         <div class="gc-info"><div class="gc-ttl"><b>${esc(c.name)}</b><span class="gc-badge ${c.rarity}">${c.rarity}・${RNAME[c.rarity]}</span></div>
-        <div class="gc-meta">${esc(c.type)}　No.${String(c.id).padStart(2, "0")}　${pos + 1} / ${curList.length}　${star ? `<span class="gc-stars">${stars(star)}</span>` : "未擁有"}</div><p>${esc(c.desc)}</p>${act}</div>
+        <div class="gc-meta">${esc(c.type)}　No.${String(c.id).padStart(2, "0")}　${pos + 1} / ${curList.length}　${star ? `<span class="gc-stars">${stars(star)}</span>` : "未擁有"}</div><p>${esc(c.desc)}</p>${act}${salv}</div>
         <button class="gc-x" aria-label="關閉">✕</button></div>
         <button class="gc-nav gc-next" aria-label="下一張"${curList.length < 2 ? " hidden" : ""}>▶</button>`;
     };
@@ -252,6 +257,8 @@ export function mountGachaCards(root, { env, back }) {
     el.addEventListener("click", (e) => {
       if (e.target.closest(".gc-prev")) go(-1); else if (e.target.closest(".gc-next")) go(1);
       else if (e.target.closest(".gc-up")) send({ a: "upgrade", id: curList[pos].id });
+      else if (e.target.closest(".gc-salv1")) send({ a: "salvage", id: curList[pos].id, n: 1 });
+      else if (e.target.closest(".gc-salvall")) { const c = curList[pos]; confirmAsk(`把「${c.name}」的重複卡全部分解成墨點？`, () => send({ a: "salvage", id: c.id })); }
       else if (e.target.closest(".gc-swap")) { const c = curList[pos]; confirmAsk(`用 ${money(st.swap[c.rarity])} 墨點兌換「${c.name}」？`, () => send({ a: "swap", id: c.id })); }
       else if (e.target === el || e.target.closest(".gc-x")) close();
     });
@@ -263,6 +270,7 @@ export function mountGachaCards(root, { env, back }) {
     if (mt) { tab = mt.dataset.tab; root.querySelectorAll(".gc-main .tab").forEach((x) => x.classList.toggle("on", x === mt)); draw(); return; }
     const t = e.target.closest("[data-r],[data-t],[data-s],[data-o]");
     if (t && t.closest(".gc-tabs") && !t.closest(".gc-main")) { if (t.dataset.r !== undefined) filter = t.dataset.r; if (t.dataset.t !== undefined) type = t.dataset.t; if (t.dataset.s !== undefined) set = t.dataset.s; if (t.dataset.o !== undefined) own = t.dataset.o; drawBook(); return; }
+    if (e.target.closest(".gc-salvgrid")) { const d = st && st.dups || {}, n = Object.values(d).reduce((x, y) => x + y, 0); confirmAsk(`把全部 ${n} 張重複的卡分解成墨點？`, () => send({ a: "salvage", id: "all" })); return; }
     const c = e.target.closest(".gc-card"); if (c) detail(Number(c.dataset.id));
   });
 

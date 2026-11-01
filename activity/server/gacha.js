@@ -40,8 +40,8 @@ export function gachaSave(now = false) {
 }
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const today = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);     // 以台灣時間換日
-const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, pulls: 0, daily: "", claimed: [], nm: "" });
-const userOf = (key) => (db.users[key] ||= fresh(key.startsWith("r:")));
+const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, dups: {}, pulls: 0, daily: "", claimed: [], nm: "" });
+const userOf = (key) => { const u = (db.users[key] ||= fresh(key.startsWith("r:"))); u.dups ||= {}; return u; };
 const locks = new Set();
 
 // ---- 抽一張（沒有保底，每抽都是獨立機率）
@@ -54,9 +54,9 @@ function rollOne(u) {
 }
 function takeCard(u, c) {
   const had = u.cards[c.id] || 0;
-  if (!had) { u.cards[c.id] = 1; return { id: c.id, rarity: c.rarity, isNew: true, ink: 0, star: 1 }; }
-  u.ink += DUP_INK[c.rarity];
-  return { id: c.id, rarity: c.rarity, isNew: false, ink: DUP_INK[c.rarity], star: had };
+  if (!had) { u.cards[c.id] = 1; return { id: c.id, rarity: c.rarity, isNew: true, star: 1 }; }
+  u.dups[c.id] = (u.dups[c.id] || 0) + 1;     // 重複的卡先留著，之後在圖鑑由玩家決定要不要分解成墨點
+  return { id: c.id, rarity: c.rarity, isNew: false, worth: DUP_INK[c.rarity], star: had };
 }
 // 圖鑑獎勵：達成就自動發一次
 function checkRewards(u) {
@@ -82,7 +82,7 @@ const note = (ws, r) => { if (r && typeof r.balance === "number") ws.crbal = r.b
 function viewOf(u, real, bal) {
   const owned = Object.keys(u.cards).length;
   return {
-    t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, owned, total: CARDS.length,
+    t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, dups: u.dups, owned, total: CARDS.length,
     pulls: u.pulls, canSign: u.daily !== today(),
     claimed: u.claimed, milestones: MILESTONES, setBonus: SETBONUS, price: PRICE, tenPrice: TEN_PRICE, rate: RATE,
     dupInk: DUP_INK, starBase: STAR_BASE, swap: SWAP, maxStar: MAX_STAR,
@@ -145,6 +145,20 @@ export async function handleGacha(ws, m) {
       if (u.ink < cost) { err("no_ink"); return; }
       u.ink -= cost; u.cards[cid] = star + 1; gachaSave(true);
       out(ws, { t: "gc", a: "upgraded", id: cid, star: star + 1, cost });
+      await send(); return;
+    }
+    if (a === "salvage") {      // 把重複的卡分解成墨點：id 指定哪張卡（"all" 全部），n 要分解幾張（省略＝全部）
+      const ids = m.id === "all" ? Object.keys(u.dups).map(Number) : [Number(m.id)];
+      let ink = 0, cnt = 0;
+      for (const cid of ids) {
+        const c = CARD.get(cid), have = u.dups[cid] || 0; if (!c || have < 1) continue;
+        const k = m.id === "all" || m.n == null ? have : Math.max(1, Math.min(have, Math.floor(Number(m.n)) || 1));
+        u.dups[cid] = have - k; if (u.dups[cid] <= 0) delete u.dups[cid];
+        ink += k * DUP_INK[c.rarity]; cnt += k;
+      }
+      if (!cnt) { err("no_dup"); return; }
+      u.ink += ink; gachaSave(true);
+      out(ws, { t: "gc", a: "salvaged", count: cnt, ink });
       await send(); return;
     }
     if (a === "swap") {
