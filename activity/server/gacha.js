@@ -144,6 +144,25 @@ export async function handleGacha(ws, m) {
   const send = async () => out(ws, viewOf(u, real, real ? await realBalance(ws) : null));
   const a = m.a;
   if (a === "get") { await send(); return; }
+  if (a === "dauto") {      // 自動組隊：沒在出任務的卡裡，挑派去這個任務墨點最多的組合（要算類別加成、星級、同卡組羈絆）
+    if (!MISSION[m.m]) { err("error"); return; }
+    const busy = new Set(busyIds(u)), mine = Object.keys(u.cards).map(Number).filter((i) => !busy.has(i) && CARD.get(i));
+    if (!mine.length) { out(ws, { t: "gc", a: "dauto", ids: [], ink: 0, tick: 0, match: 0, bond: false }); return; }
+    const solo = (i) => calcTeam(u, [i], m.m).ink, val = new Map(mine.map((i) => [i, solo(i)]));
+    const byV = [...mine].sort((x, y) => val.get(y) - val.get(x));
+    const pool = new Set(byV.slice(0, 30));
+    for (const set of Object.keys(SETS)) byV.filter((i) => CARD.get(i).set === set).slice(0, 12).forEach((i) => pool.add(i));      // 每個卡組多留幾張，湊羈絆用
+    const P = [...pool]; let best = null, bestInk = -1;
+    const tryIds = (ids) => { const r = calcTeam(u, ids, m.m); if (r.ink > bestInk) { bestInk = r.ink; best = { ids, ...r }; } };
+    for (let i = 0; i < P.length; i++) {
+      tryIds([P[i]]);
+      for (let j = i + 1; j < P.length && TEAM_MAX >= 2; j++) {
+        tryIds([P[i], P[j]]);
+        for (let k = j + 1; k < P.length && TEAM_MAX >= 3; k++) tryIds([P[i], P[j], P[k]]);
+      }
+    }
+    out(ws, { t: "gc", a: "dauto", ...best }); return;
+  }
   if (a === "dprev") {      // 預覽這隊派去這個任務能拿多少
     const ids = [...new Set((Array.isArray(m.ids) ? m.ids : []).map(Number))].filter((i) => u.cards[i]).slice(0, TEAM_MAX);
     if (!ids.length || !MISSION[m.m]) { out(ws, { t: "gc", a: "dprev", ink: 0, tick: 0, match: 0, bond: false }); return; }

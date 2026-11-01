@@ -66,6 +66,7 @@ export function mountGachaCards(root, { env, back }) {
       if (m.a === "view") { st = m; if (m.disp) srvOff = m.disp.now - Date.now(); showBar(); if (!resultOpen && !modalOpen) draw(); else if (modalOpen && refreshModal) refreshModal(); }
       else if (m.a === "pull") showResults(m);
       else if (m.a === "signed") { sfx.sign(); statusEl.textContent = `簽到成功，抽卡券 +${m.tickets}`; }
+      else if (m.a === "dauto") { if (dispSel) { dispSel.ids = m.ids.slice(); dprev = m; sfx.place(); if (tab === "disp") drawDisp(); statusEl.textContent = m.ids.length ? "已選出這個任務墨點最多的隊伍" : "沒有可派的卡"; } }
       else if (m.a === "dprev") { dprev = m; if (tab === "disp" && dispSel) drawDisp(); }
       else if (m.a === "dsent") { sfx.send(); dispSel = null; dprev = null; statusEl.textContent = "出發了！"; }
       else if (m.a === "dclaimed") { sfx.claim(); statusEl.textContent = `領回 ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`; }
@@ -308,7 +309,7 @@ export function mountGachaCards(root, { env, back }) {
       const ms = mname(dispSel.m);
       const mine = Object.keys(st.cards).map(Number).filter((id) => !busy.has(id))
         .sort((a, b) => (ms.types.includes(BYID[b].type) - ms.types.includes(BYID[a].type)) || RAR.indexOf(BYID[a].rarity) - RAR.indexOf(BYID[b].rarity) || a - b);
-      picker = `<div class="gc-picker"><div class="gc-ph"><b>第 ${dispSel.slot + 1} 隊：選任務和卡片（最多 ${d.teamMax} 張）</b></div>
+      picker = `<div class="gc-picker"><div class="gc-ph"><b>第 ${dispSel.slot + 1} 隊：選任務和卡片（最多 ${d.teamMax} 張）</b><button class="gc-auto">自動選最多</button></div>
         <div class="gc-ms2">${d.missions.map((x) => `<button class="gc-mis${x.id === dispSel.m ? " on" : ""}" data-m="${x.id}">${mi(x.id)}<span>${x.name}</span><small>${x.hours} 小時${d.speed > 1 ? `（練習 ${fmtT(x.hours * 3600e3 / d.speed)}）` : ""}・${x.types.join("／")}加成${x.tick ? `・${I.tix}${Math.round(x.tick * 100)}%` : ""}</small></button>`).join("")}</div>
         <div class="gc-pv">${dprev && dispSel.ids.length ? `預計 ${I.ink} <b>+${dprev.ink}</b>${dprev.tick ? `　${I.tix} ${Math.round(dprev.tick * 100)}% +1` : ""}　類別符合 ${dprev.match} 張${dprev.bond ? "　✓ 同卡組羈絆 +20%" : ""}` : "點下面的卡加入隊伍（類別符合任務的卡墨點 ×1.5，整隊同卡組再 ×1.2）"}</div>
         <div class="gc-pgrid">${mine.length ? mine.map((id) => { const sel = dispSel.ids.includes(id), hit = ms.types.includes(BYID[id].type);
@@ -330,6 +331,7 @@ export function mountGachaCards(root, { env, back }) {
       if (k >= 0) dispSel.ids.splice(k, 1); else if (dispSel.ids.length < st.disp.teamMax) dispSel.ids.push(id); else { statusEl.textContent = `一隊最多 ${st.disp.teamMax} 張`; return true; }
       askPrev(); drawDisp(); return true;
     }
+    if (t.closest(".gc-auto") && dispSel) { send({ a: "dauto", m: dispSel.m }); return true; }
     if (t.closest(".gc-pcancel")) { dispSel = null; dprev = null; drawDisp(); return true; }
     if (t.closest(".gc-send") && dispSel && dispSel.ids.length) { send({ a: "dsend", slot: dispSel.slot, ids: dispSel.ids, m: dispSel.m }); return true; }
     const cl = t.closest(".gc-claim"); if (cl) { send({ a: "dclaim", slot: Number(cl.dataset.i) }); return true; }

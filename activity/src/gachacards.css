@@ -226,3 +226,5 @@ html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots .gc-swp{position:absolute;right:4px;top:4px;z-index:2;padding:1px 7px;background:rgba(240,235,219,.92);border:1px solid #16140f;border-radius:2px;color:#16140f;font-size:12px;font-weight:700}
 .gc-act button.gc-updup{background:#40605a;border-color:#40605a;color:#f1ecdd;margin-bottom:8px}.gc-act button.gc-updup small{margin-left:6px;font-weight:400;opacity:.85}
 .gc-lb{position:absolute;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(18,16,12,.88)}
+.game.gcards.slots .gc-ph{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.game.gcards.slots .gc-auto{flex:none;padding:3px 10px;border:1.5px solid #b5342a;border-radius:2px;background:transparent;color:#b5342a;font-weight:700;font-size:13px;cursor:pointer}
