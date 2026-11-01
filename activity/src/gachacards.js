@@ -288,7 +288,6 @@ export function mountGachaCards(root, { env, back }) {
   modeBtns.forEach((b) => b.addEventListener("click", () => {
     if (b.dataset.m === "practice") { if (real()) setMode("practice"); return; }
     if (real()) return;
-    statusEl.textContent = ERR.real_off; return;
     if (!env || !env.inDiscord || !env.sdk) { statusEl.textContent = "真代幣模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
     confirmAsk("真代幣模式抽卡會扣你在機器人那邊的真代幣。收藏和練習模式是分開的。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
   }));
