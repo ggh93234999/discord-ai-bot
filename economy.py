@@ -134,7 +134,7 @@ def debt_of(gid: int, uid: int) -> int:
     if not ln:
         return 0
     days = max(0.0, (time.time() - float(ln["t"])) / 86400)
-    return min(int(ln["p"] * LOAN_CAP_MULT), math.ceil(ln["p"] * (1 + LOAN_RATE) ** days - 1e-9))
+    return min(int(ln["p"] * LOAN_CAP_MULT), int(ln["p"] * (1 + LOAN_RATE) ** days))
 
 
 def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:

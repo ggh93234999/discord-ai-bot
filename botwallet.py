@@ -30,9 +30,9 @@ import json
 import time
 from pathlib import Path
 
-PAY_MAX = 5_000            # 單次上限
-PAY_PER_USER_DAY = 10_000  # 每個人 24 小時內最多收這麼多
-PAY_ALL_DAY = 50_000       # 大笨bot 24 小時內最多給出這麼多
+PAY_MAX = 100_000          # 單次上限
+PAY_PER_USER_DAY = 500_000  # 每個人 24 小時內最多收這麼多（和全日上限一樣，等於不另外限制個人）
+PAY_ALL_DAY = 500_000      # 大笨bot 24 小時內最多給出這麼多
 LOG_FILE = Path(__file__).parent / "bot_pay_log.json"
 
 PAY_TOOL = {
