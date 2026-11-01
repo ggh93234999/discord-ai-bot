@@ -28,6 +28,31 @@ const DAILY_TICKETS = 1, START_TICKETS = 30;                       // 每日簽�
 const PRACTICE_COIN = 100000, PRACTICE_TICKETS = 10;               // 練習模式：每次進入都清空收藏，重新給 10 萬練習幣和 10 抽
 const starCost = (r, star) => STAR_BASE[r] * star;
 
+// ---- 派遣（套二）：把卡派出去按真實時間探險，回來領墨點，長任務還有機會拿抽卡券。不發代幣，不影響整體經濟。
+// 一張卡同時只能在一隊；一隊 1～3 張。每張卡每小時的墨點：看稀有度、星級，卡的類別符合任務有加成，整隊同卡組有羈絆加成。
+export const MISSIONS = [
+  { id: "forest", name: "山林巡遊", icon: "🌲", hours: 1, mult: 1, types: ["神獸", "幻獸"], tick: 0 },
+  { id: "town", name: "城鎮遊歷", icon: "🏘️", hours: 2, mult: 1.1, types: ["人物"], tick: 0 },
+  { id: "ruin", name: "遺跡探索", icon: "🏛️", hours: 4, mult: 1.25, types: ["器物"], tick: 0.1 },
+  { id: "scenery", name: "山水采風", icon: "🌄", hours: 8, mult: 1.5, types: ["山水", "風景"], tick: 0.2 },
+];
+const MISSION = Object.fromEntries(MISSIONS.map((x) => [x.id, x]));
+const INK_RATE = { N: 1, R: 2, SR: 3, SSR: 6 };       // 每張卡每小時的基本墨點
+const STAR_BONUS = 0.1, MATCH_BONUS = 1.5, BOND_BONUS = 1.2;      // 每多一星 +10%；類別符合 ×1.5；整隊（2 張以上）同卡組 ×1.2
+const NSLOTS = 3, TEAM_MAX = 3, PRACTICE_SPEED = 60;               // 練習模式時間縮短 60 倍，方便試玩
+const speedOf = (real) => (real ? 1 : PRACTICE_SPEED);
+function calcTeam(u, ids, mid) {
+  const ms = MISSION[mid]; let per = 0, match = 0;
+  for (const id of ids) {
+    const c = CARD.get(id), star = u.cards[id] || 1, hit = ms.types.includes(c.type);
+    per += INK_RATE[c.rarity] * (1 + STAR_BONUS * (star - 1)) * (hit ? MATCH_BONUS : 1); if (hit) match++;
+  }
+  const bond = ids.length >= 2 && ids.every((id) => CARD.get(id).set === CARD.get(ids[0]).set);
+  const ink = Math.max(1, Math.round(per * (bond ? BOND_BONUS : 1) * ms.hours * ms.mult));
+  return { ink, tick: ms.tick, match, bond };
+}
+const busyIds = (u) => (u.slots || []).flatMap((s) => (s ? s.ids : []));
+
 // ---- 存檔
 const GFILE = fileURLToPath(new URL("./gacha.json", import.meta.url));
 let db = { users: {} };
@@ -40,8 +65,8 @@ export function gachaSave(now = false) {
 }
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const today = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);     // 以台灣時間換日
-const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, dups: {}, pulls: 0, daily: "", claimed: [], nm: "" });
-const userOf = (key) => { const u = (db.users[key] ||= fresh(key.startsWith("r:"))); u.dups ||= {}; return u; };
+const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, dups: {}, slots: [null, null, null], pulls: 0, daily: "", claimed: [], nm: "" });
+const userOf = (key) => { const u = (db.users[key] ||= fresh(key.startsWith("r:"))); u.dups ||= {}; u.slots ||= [null, null, null]; return u; };
 const locks = new Set();
 
 // ---- 抽一張（沒有保底，每抽都是獨立機率）
@@ -82,7 +107,7 @@ const note = (ws, r) => { if (r && typeof r.balance === "number") ws.crbal = r.b
 function viewOf(u, real, bal) {
   const owned = Object.keys(u.cards).length;
   return {
-    t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, dups: u.dups, owned, total: CARDS.length,
+    t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, dups: u.dups, disp: { now: Date.now(), speed: speedOf(real), nslots: NSLOTS, teamMax: TEAM_MAX, slots: u.slots, missions: MISSIONS, rates: INK_RATE, bonus: { star: STAR_BONUS, match: MATCH_BONUS, bond: BOND_BONUS } }, owned, total: CARDS.length,
     pulls: u.pulls, canSign: u.daily !== today(),
     claimed: u.claimed, milestones: MILESTONES, setBonus: SETBONUS, price: PRICE, tenPrice: TEN_PRICE, rate: RATE,
     dupInk: DUP_INK, starBase: STAR_BASE, swap: SWAP, maxStar: MAX_STAR,
@@ -105,6 +130,11 @@ export async function handleGacha(ws, m) {
   const send = async () => out(ws, viewOf(u, real, real ? await realBalance(ws) : null));
   const a = m.a;
   if (a === "get") { await send(); return; }
+  if (a === "dprev") {      // 預覽這隊派去這個任務能拿多少
+    const ids = [...new Set((Array.isArray(m.ids) ? m.ids : []).map(Number))].filter((i) => u.cards[i]).slice(0, TEAM_MAX);
+    if (!ids.length || !MISSION[m.m]) { out(ws, { t: "gc", a: "dprev", ink: 0, tick: 0, match: 0, bond: false }); return; }
+    out(ws, { t: "gc", a: "dprev", ...calcTeam(u, ids, m.m) }); return;
+  }
 
   if (locks.has(key)) { err("busy"); return; }
   locks.add(key);
@@ -146,6 +176,34 @@ export async function handleGacha(ws, m) {
       u.ink -= cost; u.cards[cid] = star + 1; gachaSave(true);
       out(ws, { t: "gc", a: "upgraded", id: cid, star: star + 1, cost });
       await send(); return;
+    }
+    if (a === "dsend") {
+      const slot = Number(m.slot), ms = MISSION[m.m], ids = [...new Set((Array.isArray(m.ids) ? m.ids : []).map(Number))];
+      if (!Number.isInteger(slot) || slot < 0 || slot >= NSLOTS || !ms) { err("bad_slot"); return; }
+      if (u.slots[slot]) { err("slot_busy"); return; }
+      if (!ids.length || ids.length > TEAM_MAX) { err("bad_team"); return; }
+      const away = new Set(busyIds(u));
+      if (ids.some((i) => !u.cards[i] || !CARD.has(i))) { err("not_owned"); return; }
+      if (ids.some((i) => away.has(i))) { err("card_busy"); return; }
+      const t = calcTeam(u, ids, ms.id), now = Date.now();
+      u.slots[slot] = { ids, m: ms.id, at: now, end: now + ms.hours * 3600e3 / speedOf(real), ink: t.ink, tick: t.tick };
+      gachaSave(true); out(ws, { t: "gc", a: "dsent", slot }); await send(); return;
+    }
+    if (a === "dclaim") {
+      const idx = m.slot === "all" ? [...u.slots.keys()] : [Number(m.slot)], now = Date.now();
+      let ink = 0, tix = 0, n = 0;
+      for (const i of idx) {
+        const s = Number.isInteger(i) ? u.slots[i] : null; if (!s || s.end > now) continue;
+        ink += s.ink; n++; if (s.tick && randomInt(1000) < s.tick * 1000) tix++;
+        u.slots[i] = null;
+      }
+      if (!n) { err("not_done"); return; }
+      u.ink += ink; u.tickets += tix; gachaSave(true);
+      out(ws, { t: "gc", a: "dclaimed", n, ink, tickets: tix }); await send(); return;
+    }
+    if (a === "dcall") {      // 中途召回：拿不到任何獎勵
+      const i = Number(m.slot); if (!Number.isInteger(i) || !u.slots[i]) { err("bad_slot"); return; }
+      u.slots[i] = null; gachaSave(true); out(ws, { t: "gc", a: "dcalled" }); await send(); return;
     }
     if (a === "salvage") {      // 把重複的卡分解成墨點：id 指定哪張卡（"all" 全部），n 要分解幾張（省略＝全部）
       const ids = m.id === "all" ? Object.keys(u.dups).map(Number) : [Number(m.id)];

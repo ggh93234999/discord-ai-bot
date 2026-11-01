@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const money = (n) => Number(n).toLocaleString();
 const stars = (n, max = 5) => "★".repeat(n) + "☆".repeat(Math.max(0, max - n));
 const ERR = {
-  real_off: "真代幣模式還沒開放", no_dup: "沒有重複的卡可以分解", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
+  real_off: "真代幣模式還沒開放", no_dup: "沒有重複的卡可以分解", bad_slot: "這個隊伍欄位不能用", slot_busy: "這一隊已經出發了", bad_team: "一隊要 1～3 張卡", card_busy: "有卡片已經在別隊出發了", not_done: "還沒完成，不能領取", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_ticket: "抽卡券不夠", signed: "今天已經簽到過了", not_owned: "你還沒有這張卡", max_star: "已經是最高星級", no_ink: "墨點不夠", already: "這張卡你已經有了", bad_card: "沒有這張卡", error: "發生錯誤，再試一次",
 };
 const pidOf = () => { try { let p = localStorage.getItem("gcpid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("gcpid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
@@ -30,7 +30,7 @@ export function mountGachaCards(root, { env, back }) {
       <div class="confirm" hidden><div class="ctext"></div><div class="cbtns"><button class="cyes">確定</button><button class="cno">取消</button></div></div>
       <div class="status">連線中…</div>
       <div class="gc-bar"><span>💰 <em class="ballabel">練習幣</em> <b class="bal">--</b></span><span>🖋️ 墨點 <b class="ink">--</b></span><span>🎟️ 抽卡券 <b class="tix">--</b></span></div>
-      <div class="gc-tabs gc-main"><button class="tab on" data-tab="pull">🎴 抽卡</button><button class="tab" data-tab="book">📖 圖鑑</button></div>
+      <div class="gc-tabs gc-main"><button class="tab on" data-tab="pull">🎴 抽卡</button><button class="tab" data-tab="disp">🧭 派遣</button><button class="tab" data-tab="book">📖 圖鑑</button></div>
       <div class="gc-body"></div>
     </div>`;
   const $ = (s) => root.querySelector(s);
@@ -50,9 +50,13 @@ export function mountGachaCards(root, { env, back }) {
       const m = JSON.parse(e.data);
       if (m.t === "bauthed") return onAuthed(m);
       if (m.t !== "gc") return;
-      if (m.a === "view") { st = m; showBar(); if (!resultOpen && !modalOpen) draw(); else if (modalOpen && refreshModal) refreshModal(); }
+      if (m.a === "view") { st = m; if (m.disp) srvOff = m.disp.now - Date.now(); showBar(); if (!resultOpen && !modalOpen) draw(); else if (modalOpen && refreshModal) refreshModal(); }
       else if (m.a === "pull") showResults(m);
       else if (m.a === "signed") statusEl.textContent = `簽到成功，抽卡券 +${m.tickets}`;
+      else if (m.a === "dprev") { dprev = m; if (tab === "disp" && dispSel) drawDisp(); }
+      else if (m.a === "dsent") { dispSel = null; dprev = null; statusEl.textContent = "出發了！"; }
+      else if (m.a === "dclaimed") statusEl.textContent = `領回 🖋️ ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`;
+      else if (m.a === "dcalled") statusEl.textContent = "已召回";
       else if (m.a === "salvaged") statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`;
       else if (m.a === "upgraded") statusEl.textContent = `升到 ${m.star} 星了（花 ${m.cost} 墨點）`;
       else if (m.a === "swapped") { statusEl.textContent = `兌換成功（花 ${money(m.cost)} 墨點）` + (m.rewards && m.rewards.length ? "，" + m.rewards.map((r) => `${r.text}，抽卡券 +${r.tickets}`).join("；") : ""); }
@@ -263,9 +267,75 @@ export function mountGachaCards(root, { env, back }) {
       else if (e.target === el || e.target.closest(".gc-x")) close();
     });
   }
-  function draw() { if (tab === "pull") drawPull(); else drawBook(); }
+  // ---- 派遣分頁（套二）：把卡派去探險，按真實時間，回來領墨點（長任務有機會拿抽卡券）
+  let dispSel = null, dprev = null, srvOff = 0;
+  const srvNow = () => Date.now() + srvOff;
+  const fmtT = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); if (s < 60) return s + " 秒"; const m = Math.ceil(s / 60); if (m < 60) return m + " 分"; const h = Math.floor(m / 60), r = m % 60; return h + " 小時" + (r ? " " + r + " 分" : ""); };
+  const thumb = (id, extra = "") => `<span class="gc-th ${BYID[id].rarity}${extra}"><img src="${ART[id]}" alt="${esc(BYID[id].name)}" draggable="false"></span>`;
+  function drawDisp() {
+    if (!st || !st.disp) { body.innerHTML = `<p class="mempty">讀取中…</p>`; return; }
+    const d = st.disp;
+    const now = srvNow(), busy = new Set(d.slots.flatMap((s) => (s ? s.ids : [])));
+    const doneN = d.slots.filter((s) => s && s.end <= now).length;
+    const mname = (id) => d.missions.find((x) => x.id === id);
+    const slots = d.slots.map((s, i) => {
+      if (!s) return `<div class="gc-slot idle"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>空閒</span></div><button class="gc-go" data-i="${i}">派遣</button></div>`;
+      const ms = mname(s.m), left = s.end - now, total = s.end - s.at, ok = left <= 0;
+      return `<div class="gc-slot ${ok ? "done" : "run"}"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>${ms.icon} ${ms.name}</span></div>
+        <div class="gc-ths">${s.ids.map((id) => thumb(id)).join("")}</div>
+        <div class="gc-prog" data-end="${s.end}" data-at="${s.at}"><i style="width:${ok ? 100 : Math.max(2, (1 - left / total) * 100)}%"></i><span>${ok ? "完成了" : "剩 " + fmtT(left)}</span></div>
+        <div class="gc-sr">預計 🖋️ +${s.ink}${s.tick ? `　🎟️ ${Math.round(s.tick * 100)}% +1` : ""}</div>
+        ${ok ? `<button class="gc-claim" data-i="${i}">領取</button>` : `<button class="gc-recall" data-i="${i}">召回（沒有獎勵）</button>`}</div>`;
+    }).join("");
+    let picker = "";
+    if (dispSel) {
+      const ms = mname(dispSel.m);
+      const mine = Object.keys(st.cards).map(Number).filter((id) => !busy.has(id))
+        .sort((a, b) => (ms.types.includes(BYID[b].type) - ms.types.includes(BYID[a].type)) || RAR.indexOf(BYID[a].rarity) - RAR.indexOf(BYID[b].rarity) || a - b);
+      picker = `<div class="gc-picker"><div class="gc-ph"><b>第 ${dispSel.slot + 1} 隊：選任務和卡片（最多 ${d.teamMax} 張）</b></div>
+        <div class="gc-ms2">${d.missions.map((x) => `<button class="gc-mis${x.id === dispSel.m ? " on" : ""}" data-m="${x.id}"><span>${x.icon} ${x.name}</span><small>${x.hours} 小時${d.speed > 1 ? `（練習 ${fmtT(x.hours * 3600e3 / d.speed)}）` : ""}・${x.types.join("／")}加成${x.tick ? `・🎟️${Math.round(x.tick * 100)}%` : ""}</small></button>`).join("")}</div>
+        <div class="gc-pv">${dprev && dispSel.ids.length ? `預計 🖋️ <b>+${dprev.ink}</b>${dprev.tick ? `　🎟️ ${Math.round(dprev.tick * 100)}% +1` : ""}　類別符合 ${dprev.match} 張${dprev.bond ? "　✓ 同卡組羈絆 +20%" : ""}` : "點下面的卡加入隊伍（類別符合任務的卡墨點 ×1.5，整隊同卡組再 ×1.2）"}</div>
+        <div class="gc-pgrid">${mine.length ? mine.map((id) => { const sel = dispSel.ids.includes(id), hit = ms.types.includes(BYID[id].type);
+          return `<button class="gc-pc ${BYID[id].rarity}${sel ? " sel" : ""}${hit ? " hit" : ""}" data-id="${id}" title="${esc(BYID[id].name)}"><img src="${ART[id]}" alt="" draggable="false"><span class="gc-badge ${BYID[id].rarity}">${BYID[id].rarity}</span><span class="gc-star">${"★".repeat(st.cards[id])}</span>${sel ? `<span class="gc-chk">✓</span>` : ""}</button>`; }).join("") : `<p class="mempty">沒有可派遣的卡</p>`}</div>
+        <div class="gc-pbtns"><button class="gc-send"${dispSel.ids.length ? "" : " disabled"}>出發（${dispSel.ids.length}/${d.teamMax}）</button><button class="gc-pcancel">取消</button></div></div>`;
+    }
+    body.innerHTML = `<div class="gc-disp">
+      <div class="gc-dnote">把卡派出去探險，按真實時間計算，回來領墨點。一張卡同時只能在一隊。${d.speed > 1 ? "<br><b>練習模式時間縮短 60 倍</b>，方便試玩。" : ""}</div>
+      ${doneN > 1 ? `<button class="gc-claimall">全部領取（${doneN} 隊完成）</button>` : ""}
+      <div class="gc-slots">${slots}</div>${picker}</div>`;
+  }
+  function askPrev() { if (dispSel && dispSel.ids.length) send({ a: "dprev", ids: dispSel.ids, m: dispSel.m }); else { dprev = null; } }
+  function dispClick(e) {
+    const t = e.target;
+    const go = t.closest(".gc-go"); if (go) { dispSel = { slot: Number(go.dataset.i), m: "forest", ids: [] }; dprev = null; drawDisp(); return true; }
+    const mis = t.closest(".gc-mis"); if (mis && dispSel) { dispSel.m = mis.dataset.m; askPrev(); drawDisp(); return true; }
+    const pc = t.closest(".gc-pc"); if (pc && dispSel) {
+      const id = Number(pc.dataset.id), k = dispSel.ids.indexOf(id);
+      if (k >= 0) dispSel.ids.splice(k, 1); else if (dispSel.ids.length < st.disp.teamMax) dispSel.ids.push(id); else { statusEl.textContent = `一隊最多 ${st.disp.teamMax} 張`; return true; }
+      askPrev(); drawDisp(); return true;
+    }
+    if (t.closest(".gc-pcancel")) { dispSel = null; dprev = null; drawDisp(); return true; }
+    if (t.closest(".gc-send") && dispSel && dispSel.ids.length) { send({ a: "dsend", slot: dispSel.slot, ids: dispSel.ids, m: dispSel.m }); return true; }
+    const cl = t.closest(".gc-claim"); if (cl) { send({ a: "dclaim", slot: Number(cl.dataset.i) }); return true; }
+    if (t.closest(".gc-claimall")) { send({ a: "dclaim", slot: "all" }); return true; }
+    const rc = t.closest(".gc-recall"); if (rc) { confirmAsk("中途召回這一隊？不會拿到任何獎勵。", () => send({ a: "dcall", slot: Number(rc.dataset.i) })); return true; }
+    return false;
+  }
+  const dispTick = setInterval(() => {
+    if (document.hidden || tab !== "disp" || !st || !st.disp) return;
+    const now = srvNow(); let finished = false;
+    body.querySelectorAll(".gc-prog").forEach((p) => {
+      const end = Number(p.dataset.end), at = Number(p.dataset.at), left = end - now;
+      if (left <= 0) { if (!p.closest(".done")) finished = true; return; }
+      p.querySelector("i").style.width = Math.max(2, (1 - left / (end - at)) * 100) + "%"; p.querySelector("span").textContent = "剩 " + fmtT(left);
+    });
+    if (finished && !resultOpen && !modalOpen) drawDisp();
+  }, 1000);
+
+  function draw() { if (tab === "pull") drawPull(); else if (tab === "disp") drawDisp(); else drawBook(); }
 
   root.addEventListener("click", (e) => {
+    if (tab === "disp" && dispClick(e)) return;
     const mt = e.target.closest(".gc-main [data-tab]");
     if (mt) { tab = mt.dataset.tab; root.querySelectorAll(".gc-main .tab").forEach((x) => x.classList.toggle("on", x === mt)); draw(); return; }
     const t = e.target.closest("[data-r],[data-t],[data-s],[data-o]");
@@ -282,7 +352,7 @@ export function mountGachaCards(root, { env, back }) {
   }
   function setMode(m) {
     mode = m; modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m)); root.querySelector(".gcards").classList.toggle("realmode", m === "real");
-    st = null; if (m === "practice") needEnter = true; draw(); showBar(); send({ a: "get" });
+    st = null; dispSel = null; dprev = null; if (m === "practice") needEnter = true; draw(); showBar(); send({ a: "get" });
     statusEl.textContent = m === "real" ? `真代幣模式：${session ? session.name : ""}，抽卡會扣真代幣！` : "練習模式：收藏獨立，用練習幣";
   }
   modeBtns.forEach((b) => b.addEventListener("click", () => {
@@ -319,5 +389,5 @@ export function mountGachaCards(root, { env, back }) {
   }
 
   draw(); connect();
-  return () => { closed = true; try { ws && ws.close(); } catch {} root.innerHTML = ""; };
+  return () => { closed = true; clearInterval(dispTick); try { ws && ws.close(); } catch {} root.innerHTML = ""; };
 }
