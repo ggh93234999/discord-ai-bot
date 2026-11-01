@@ -65,8 +65,8 @@ export function gachaSave(now = false) {
 }
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const today = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);     // 以台灣時間換日
-const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, dups: {}, slots: [null, null, null], pulls: 0, daily: "", claimed: [], nm: "" });
-const userOf = (key) => { const u = (db.users[key] ||= fresh(key.startsWith("r:"))); u.dups ||= {}; u.slots ||= [null, null, null]; return u; };
+const fresh = (real) => ({ coin: real ? 0 : PRACTICE_COIN, ink: 0, tickets: real ? START_TICKETS : PRACTICE_TICKETS, cards: {}, dups: {}, slots: [null, null, null], show: [null, null, null], pulls: 0, daily: "", claimed: [], nm: "" });
+const userOf = (key) => { const u = (db.users[key] ||= fresh(key.startsWith("r:"))); u.dups ||= {}; u.slots ||= [null, null, null]; u.show ||= [null, null, null]; return u; };
 const locks = new Set();
 
 // ---- 抽一張（沒有保底，每抽都是獨立機率）
@@ -107,7 +107,7 @@ const note = (ws, r) => { if (r && typeof r.balance === "number") ws.crbal = r.b
 function viewOf(u, real, bal) {
   const owned = Object.keys(u.cards).length;
   return {
-    t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, dups: u.dups, disp: { now: Date.now(), speed: speedOf(real), nslots: NSLOTS, teamMax: TEAM_MAX, slots: u.slots, missions: MISSIONS, rates: INK_RATE, bonus: { star: STAR_BONUS, match: MATCH_BONUS, bond: BOND_BONUS } }, owned, total: CARDS.length,
+    t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, dups: u.dups, show: u.show, disp: { now: Date.now(), speed: speedOf(real), nslots: NSLOTS, teamMax: TEAM_MAX, slots: u.slots, missions: MISSIONS, rates: INK_RATE, bonus: { star: STAR_BONUS, match: MATCH_BONUS, bond: BOND_BONUS } }, owned, total: CARDS.length,
     pulls: u.pulls, canSign: u.daily !== today(),
     claimed: u.claimed, milestones: MILESTONES, setBonus: SETBONUS, price: PRICE, tenPrice: TEN_PRICE, rate: RATE,
     dupInk: DUP_INK, starBase: STAR_BASE, swap: SWAP, maxStar: MAX_STAR,
@@ -130,6 +130,16 @@ export async function handleGacha(ws, m) {
   const send = async () => out(ws, viewOf(u, real, real ? await realBalance(ws) : null));
   const a = m.a;
   if (a === "get") { await send(); return; }
+  if (a === "shelf") {      // 大家的展示櫃：只列真代幣模式、有擺卡的人（練習模式的收藏每次都清掉，不公開）
+    const list = [];
+    for (const [k, v] of Object.entries(db.users)) {
+      if (!k.startsWith("r:") || !v.show) continue;
+      const cards = v.show.filter((c) => c && v.cards[c]).map((c) => ({ id: c, star: v.cards[c] }));
+      if (cards.length) list.push({ nm: v.nm || "（無名）", cards, own: k === key });
+    }
+    list.sort((x, y) => (y.own - x.own) || y.cards.reduce((t, c) => t + c.star, 0) - x.cards.reduce((t, c) => t + c.star, 0));
+    out(ws, { t: "gc", a: "shelf", list: list.slice(0, 30) }); return;
+  }
   if (a === "dprev") {      // 預覽這隊派去這個任務能拿多少
     const ids = [...new Set((Array.isArray(m.ids) ? m.ids : []).map(Number))].filter((i) => u.cards[i]).slice(0, TEAM_MAX);
     if (!ids.length || !MISSION[m.m]) { out(ws, { t: "gc", a: "dprev", ink: 0, tick: 0, match: 0, bond: false }); return; }
@@ -218,6 +228,18 @@ export async function handleGacha(ws, m) {
       u.ink += ink; gachaSave(true);
       out(ws, { t: "gc", a: "salvaged", count: cnt, ink });
       await send(); return;
+    }
+    if (a === "show") {      // 展示櫃：最多 3 張，slot 0~2；id 空＝拿下來
+      const sl = Number(m.slot);
+      if (!(sl >= 0 && sl <= 2)) { err("error"); return; }
+      if (m.id == null) u.show[sl] = null;
+      else {
+        const cid = Number(m.id);
+        if (!u.cards[cid]) { err("not_owned"); return; }
+        const at = u.show.indexOf(cid); if (at >= 0) u.show[at] = null;      // 已經在別格就搬過來
+        u.show[sl] = cid;
+      }
+      gachaSave(true); await send(); return;
     }
     if (a === "swap") {
       const cid = Number(m.id), c = CARD.get(cid);
