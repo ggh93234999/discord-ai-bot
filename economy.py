@@ -125,7 +125,8 @@ def house_add(gid: int, delta: int) -> int | None:
 
 # ---------------------------------------------------------------- 轉帳紀錄（大笨bot 查帳用）
 LEDGER_FILE = Path(__file__).parent / "transfers.json"
-LEDGER_KEEP = 3000
+LEDGER_KEEP = 12000
+GAME_KINDS = ("遊戲結算", "遊戲派彩")      # 機器人當莊家的輸贏；查帳預設不列，避免蓋掉真正的轉帳
 
 
 def _ledger() -> list:
@@ -145,6 +146,35 @@ def record(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str = 
         tmp.replace(LEDGER_FILE)
     except OSError as e:
         log.warning("記轉帳紀錄失敗：%r", e)
+    if kind not in GAME_KINDS:
+        _post_ledger(gid, kind, frm, to, amount, note)
+
+
+LEDGER_CHANNEL = "大笨bot的帳本"
+
+
+def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str) -> None:
+    """把這筆轉帳也發到伺服器的「大笨bot的帳本」文字頻道（找不到頻道、沒權限就算了，不影響轉帳）。遊戲輸贏太多，不發。"""
+    try:
+        guild = _client.get_guild(int(gid)) if _client else None
+        if guild is None:
+            return
+        ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
+        if ch is None:
+            return
+        icon = {"轉帳": "💸", "發錢": "🎁", "借款": "🦈", "還款": "💰", "大笨bot送錢": "🎀"}.get(kind, "🪙")
+        text = f"{icon} **{kind}**　{frm[1]} → {to[1]}　🪙{int(amount):,}" + (f"\n> {note}" if note else "")
+        loop = asyncio.get_running_loop()
+        loop.create_task(_send_ledger(ch, text))
+    except Exception as ex:                              # 帳本頻道的問題不能拖累轉帳
+        log.warning("發帳本頻道失敗：%r", ex)
+
+
+async def _send_ledger(ch, text: str) -> None:
+    try:
+        await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
+    except Exception as ex:
+        log.warning("帳本頻道送出失敗：%r", ex)
 
 
 def _bot_party() -> tuple:
@@ -713,6 +743,11 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, back - bet, name)   # 同一個事件迴圈裡，沒有 await，不會被別的請求插隊
             house_add(gid, bet - back)               # 莊家：玩家輸的進它的口袋，贏的從它的口袋出
+            _net = bet - back                        # >0 玩家輸給莊家；<0 莊家賠給玩家
+            if _net > 0:
+                record(gid, "遊戲結算", (uid, name), _bot_party(), _net, str(d.get("why") or "遊戲")[:30])
+            elif _net < 0:
+                record(gid, "遊戲結算", _bot_party(), (uid, name), -_net, str(d.get("why") or "遊戲")[:30])
             log.info("Activity %s結算：%s 賭 %s 拿回 %s → 餘額 %s", str(d.get("why") or "老虎機")[:20], name, bet, back, new)
             return web.json_response({"ok": True, "balance": new})
 
@@ -733,6 +768,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, amount, name)
             house_add(gid, -amount)                  # 對賭的彩金從莊家（先前收下賭注的人）出
+            record(gid, "遊戲派彩", _bot_party(), (uid, name), amount, str(d.get("why") or "派彩")[:30])
             log.info("Activity %s派彩：%s +%s → 餘額 %s", str(d.get("why") or "")[:20], name, amount, new)
             return web.json_response({"ok": True, "balance": new})
 

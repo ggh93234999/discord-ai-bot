@@ -171,6 +171,7 @@ LOG_TOOL = {
             "properties": {
                 "who": {"type": "string", "description": "只看跟這個人有關的紀錄（名字，部分符合就行）；沒填就是全部"},
                 "limit": {"type": "integer", "description": "最近幾筆，預設 15，最多 40"},
+                "games": {"type": "boolean", "description": "要連遊戲輸贏（老虎機、抽卡、賭局等你當莊家的流水）一起列才填 true；預設不列"},
             },
         },
     },
@@ -187,7 +188,8 @@ def run_log(guild_id: int | None, args: dict) -> str:
     except (TypeError, ValueError):
         limit = 15
     who = str(args.get("who") or "").strip().lstrip("@").lower()
-    items = [x for x in economy._ledger() if x["gid"] == guild_id and (not who or who in x["from"][1].lower() or who in x["to"][1].lower())]
+    games = bool(args.get("games"))
+    items = [x for x in economy._ledger() if x["gid"] == guild_id and (games or x["kind"] not in economy.GAME_KINDS) and (not who or who in x["from"][1].lower() or who in x["to"][1].lower())]
     lines = []
     for x in items[-limit:][::-1]:
         t = datetime.fromtimestamp(x["t"], ZoneInfo("Asia/Taipei")).strftime("%m-%d %H:%M")
