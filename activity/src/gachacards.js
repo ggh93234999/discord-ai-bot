@@ -2,6 +2,8 @@
 // 模式和種菜、賭場一樣：練習模式（練習幣、獨立收藏）／真代幣模式（Discord 授權後動用機器人錢包的真代幣）。
 import CARDS from "./gacha-cards.json";
 import { wsUrl } from "./gomoku.js";
+import "@fontsource/lxgw-wenkai-tc/400.css";
+import "@fontsource/lxgw-wenkai-tc/700.css";
 import "./gachacards.css";
 
 const ART = {};

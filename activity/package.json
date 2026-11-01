@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.0.0",
+    "@fontsource/lxgw-wenkai-tc": "^5.3.1",
     "@pixi/canvas-display": "^6.5.10",
     "@pixi/canvas-prepare": "^6.5.10",
     "@pixi/canvas-renderer": "^6.5.10",
