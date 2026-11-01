@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const money = (n) => Number(n).toLocaleString();
 const stars = (n, max = 5) => "★".repeat(n) + "☆".repeat(Math.max(0, max - n));
 const ERR = {
-  need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
+  real_off: "真代幣模式還沒開放", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_ticket: "抽卡券不夠", signed: "今天已經簽到過了", not_owned: "你還沒有這張卡", max_star: "已經是最高星級", no_ink: "墨點不夠", already: "這張卡你已經有了", bad_card: "沒有這張卡", error: "發生錯誤，再試一次",
 };
 const pidOf = () => { try { let p = localStorage.getItem("gcpid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("gcpid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
@@ -210,6 +210,7 @@ export function mountGachaCards(root, { env, back }) {
   modeBtns.forEach((b) => b.addEventListener("click", () => {
     if (b.dataset.m === "practice") { if (real()) setMode("practice"); return; }
     if (real()) return;
+    statusEl.textContent = ERR.real_off; return;
     if (!env || !env.inDiscord || !env.sdk) { statusEl.textContent = "真代幣模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
     confirmAsk("真代幣模式抽卡會扣你在機器人那邊的真代幣。收藏和練習模式是分開的。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
   }));

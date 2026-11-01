@@ -4,7 +4,9 @@
 import fs from "node:fs";
 import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { botSettle, botInfo } from "./bet.js";
+import { botSettle, botInfo, ENV } from "./bet.js";
+
+const REAL_ON = ENV.GACHA_REAL === "on";      // 真代幣抽卡預設關閉（.env 設 GACHA_REAL=on 才開）
 
 const CARDS = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../src/gacha-cards.json", import.meta.url)), "utf8"));
 const CARD = new Map(CARDS.map((c) => [c.id, c]));
@@ -99,6 +101,7 @@ function viewOf(u, real, bal) {
 
 export async function handleGacha(ws, m) {
   const real = !!m.real;
+  if (real && !REAL_ON) { out(ws, { t: "gc", a: "err", error: "real_off" }); return; }
   let id;
   if (real) { if (!ws.user) { out(ws, { t: "gc", a: "err", error: "need_login" }); return; } id = ws.user.uid; }
   else id = ws.user ? ws.user.uid : "g" + (String(m.pid || "").replace(/[^\w-]/g, "").slice(0, 40) || ws.cid || "x");
