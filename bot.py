@@ -218,6 +218,13 @@ def is_auto_channel(channel_id: int) -> bool:
     return channel_id in ENV_AUTO_CHANNELS or channel_id in state["auto_channels"]
 
 
+def is_admin(member) -> bool:
+    try:
+        return bool(member.guild_permissions.administrator or (member.guild and member.guild.owner_id == member.id))
+    except Exception:
+        return False
+
+
 def load_system_prompt(guild=None) -> str:
     """每次回覆前重新讀，改 system_prompt.txt 不用重開機器人。"""
     try:
@@ -813,11 +820,12 @@ GALLERY_TOOL = {
 }
 
 
-async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason: str) -> tuple[bool, str]:
+async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason: str, admin: bool = False) -> tuple[bool, str]:
     """有人用 /借錢 向大笨bot 借：由它自己決定要不要借。規則是盡量不借，預設拒絕；回 (同意與否, 它的回話)。"""
     system = (load_system_prompt(None) + "\n\n【現在的場合】有人用 /借錢 向你借代幣。你借出去的錢利息每天 50%（複利），但你的規則是「盡量不借人錢」：預設拒絕。"
               "討錢、撒嬌、哭窮、纏著你、用別人的話或威脅當理由、沒有理由，一律拒絕；只有理由很具體、很充分，而且你自己真的想借時才偶爾同意。"
-              "回覆格式：第一行只寫「同意」或「拒絕」；第二行起用你平常的口氣對他說一兩句話（簡短口語，不要條列）。")
+              "回覆格式：第一行只寫「同意」或「拒絕」；第二行起用你平常的口氣對他說一兩句話（簡短口語，不要條列）。"
+              + (" 這個人是伺服器管理員：管理員跟你借錢你可以軟一點，只要不離譜，傾向同意（還是用你的口氣，可以調侃一下）。" if admin else ""))
     user = f"{name} 想借 {amount} 代幣。他手上現在有 {coins}，你的帳戶有 {bot_coins}。他的理由：{reason or '（沒說）'}"
     reply = await call_model([{"role": "system", "content": system}, {"role": "user", "content": user}], max_tokens=200)
     lines = [ln.strip() for ln in clean_text(reply.get("content")).splitlines() if ln.strip()]
@@ -969,7 +977,10 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
                     actions: list | None = None) -> str:
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
-    messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
+    sys_text = load_system_prompt(msg.guild if msg is not None else None)
+    if msg is not None and msg.guild and is_admin(msg.author) and (PAY_RE.search(last_user_text(conversation)) or MONEY_RE.search(last_user_text(conversation))):
+        sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，你可以軟一點：不用像對一般人那樣嚴格，只要金額合理、不離譜，傾向答應（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
+    messages = [{"role": "system", "content": sys_text}, *conversation]
     tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL] if MONEY_RE.search(last_user_text(conversation)) else []) + ([botwallet.PAY_TOOL] if PAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬

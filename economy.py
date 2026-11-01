@@ -925,7 +925,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         ok, say = False, "（大笨bot 現在不想理你）"
         if loan_judge is not None:
             try:
-                ok, say = await loan_judge(name, 金額, balance(gid, uid), house_balance(gid) or 0, 理由.strip()[:200])
+                ok, say = await loan_judge(name, 金額, balance(gid, uid), house_balance(gid) or 0, 理由.strip()[:200], bool(interaction.user.guild_permissions.administrator))
             except Exception as e:
                 log.warning("借錢判斷失敗：%r", e)
         if ok:
