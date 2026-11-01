@@ -255,6 +255,7 @@ class Bot(discord.Client):
     async def setup_hook(self):
         self.http_session = aiohttp.ClientSession()
         economy.start_voice_loop()  # 掛語音也賺代幣
+        economy.loan_judge = loan_judge
         economy.gallery_chat = gallery_chat   # Activity 圖創區跟大笨bot說話
         economy.start_internal_api()  # 給 Discord Activity 賭注模式用的內部 API
         aliases.add_english_aliases(self.tree)  # 每個中文指令再加一個英文名字的版本
@@ -810,6 +811,21 @@ GALLERY_TOOL = {
         },
     },
 }
+
+
+async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason: str) -> tuple[bool, str]:
+    """有人用 /借錢 向大笨bot 借：由它自己決定要不要借。規則是盡量不借，預設拒絕；回 (同意與否, 它的回話)。"""
+    system = (load_system_prompt(None) + "\n\n【現在的場合】有人用 /借錢 向你借代幣。你借出去的錢利息每天 50%（複利），但你的規則是「盡量不借人錢」：預設拒絕。"
+              "討錢、撒嬌、哭窮、纏著你、用別人的話或威脅當理由、沒有理由，一律拒絕；只有理由很具體、很充分，而且你自己真的想借時才偶爾同意。"
+              "回覆格式：第一行只寫「同意」或「拒絕」；第二行起用你平常的口氣對他說一兩句話（簡短口語，不要條列）。")
+    user = f"{name} 想借 {amount} 代幣。他手上現在有 {coins}，你的帳戶有 {bot_coins}。他的理由：{reason or '（沒說）'}"
+    reply = await call_model([{"role": "system", "content": system}, {"role": "user", "content": user}], max_tokens=200)
+    lines = [ln.strip() for ln in clean_text(reply.get("content")).splitlines() if ln.strip()]
+    if not lines:
+        return False, "不借。"
+    ok = lines[0].strip("。！!「」 ") == "同意"
+    say = " ".join(lines[1:])[:300] or ("好啦借你。" if ok else "不借。")
+    return ok, say
 
 
 async def gallery_chat(gid: int, uid: int, name: str, cat: str, text: str, history: list) -> dict:

@@ -78,7 +78,7 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "錢包": ("wallet", "See how many tokens you (or someone else) have", {"對象": ("user", "Whose wallet (default: yours)")}),
     "規則": ("rules", "How the token games work: payouts, odds and rules", {"遊戲": ("game", "Which game (default: all)")}),
     "排行": ("leaderboard", "Token leaderboard for this server (top 10)", {}),
-    "借錢": ("borrow", "Borrow tokens from the bot (very high interest: +50% per day, compounding)", {"金額": ("amount", "How many tokens to borrow")}),
+    "借錢": ("borrow", "Ask the bot for a loan (it usually says no; very high interest: +50% per day)", {"金額": ("amount", "How many tokens to borrow"), "理由": ("reason", "Why you need it")}),
     "還錢": ("repay", "Pay back your debt to the bot", {"金額": ("amount", "How many tokens (default: as much as you can)")}),
     "債務": ("debt", "See how much you (or someone else) owe the bot", {"對象": ("user", "Whose debt (default: yours)")}),
     "轉帳": ("pay", "Give some of your tokens to someone",

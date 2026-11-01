@@ -142,9 +142,9 @@ def loan_limit(gid: int, uid: int) -> int:
     return min(LOAN_MAX, max(LOAN_BASE, balance(gid, uid)))
 
 
-def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
-    """成功回 None，失敗回原因。錢從大笨bot 的帳戶出。"""
-    a = _acct(gid, uid, name)
+def check_borrow(gid: int, uid: int, amount: int) -> str | None:
+    """能不能借（不含大笨bot 自己的意願）：不能就回原因。"""
+    a = _acct(gid, uid)
     if a.get("loan"):
         return f"你還欠著 {fmt(debt_of(gid, uid))}，先還清才能再借。"
     lim = loan_limit(gid, uid)
@@ -153,6 +153,19 @@ def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
     h = house_balance(gid)
     if h is None or h < amount:
         return f"大笨bot 手頭不夠（現在只有 {fmt(h or 0)}），借不出這麼多。"
+    return None
+
+
+loan_judge = None       # bot.py 設定：async (name, amount, coins, bot_coins, reason) -> (同意與否, 大笨bot 的回話)
+_loan_ask: dict = {}    # 同一個人 60 秒內只能求一次
+
+
+def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
+    """成功回 None，失敗回原因。錢從大笨bot 的帳戶出。"""
+    err = check_borrow(gid, uid, amount)
+    if err:
+        return err
+    a = _acct(gid, uid, name)
     house_add(gid, -amount)
     a["coins"] = int(a["coins"]) + amount
     a["loan"] = {"p": amount, "t": time.time()}
@@ -880,18 +893,37 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         add(gid, 對象.id, 金額, 對象.display_name)
         await interaction.response.send_message(f"💸 {interaction.user.display_name} 轉了 {fmt(金額)} 給 {對象.display_name}")
 
-    @tree.command(name="借錢", description="跟大笨bot 借代幣（一般最多 10 萬；利息超高：每天 +50%，複利）")
-    @app_commands.describe(金額="借多少")
+    @tree.command(name="借錢", description="跟大笨bot 借代幣：要它同意（它盡量不借）；一般最多 10 萬，利息超高：每天 +50% 複利")
+    @app_commands.describe(金額="借多少", 理由="為什麼要借（理由充分它比較可能同意）")
     @app_commands.guild_only()
-    async def cmd_borrow(interaction: discord.Interaction, 金額: app_commands.Range[int, 100, LOAN_MAX]):
-        err = borrow(interaction.guild_id, interaction.user.id, interaction.user.display_name, 金額)
+    async def cmd_borrow(interaction: discord.Interaction, 金額: app_commands.Range[int, 100, LOAN_MAX], 理由: str = ""):
+        gid, uid, name = interaction.guild_id, interaction.user.id, interaction.user.display_name
+        err = check_borrow(gid, uid, 金額)
         if err:
             await interaction.response.send_message(err, ephemeral=True)
             return
-        await interaction.response.send_message(
-            f"🦈 **{interaction.user.display_name}** 向大笨bot 借了 {fmt(金額)}。\n"
-            f"利息每天 **+{int(LOAN_RATE * 100)}%**（複利，一直滾，最多滾到 {LOAN_CAP_MULT} 倍），1 天後要還 {fmt(int(金額 * (1 + LOAN_RATE)))}、"
-            f"3 天後 {fmt(int(金額 * (1 + LOAN_RATE) ** 3))}。用 `/還錢` 還，`/債務` 看欠多少。還清之前不能再借、也不能轉帳。")
+        now = time.time()
+        if now - _loan_ask.get((gid, uid), 0) < 60:
+            await interaction.response.send_message("剛剛才問過，大笨bot 還在煩，等一分鐘再來。", ephemeral=True)
+            return
+        _loan_ask[(gid, uid)] = now
+        await interaction.response.defer()
+        ok, say = False, "（大笨bot 現在不想理你）"
+        if loan_judge is not None:
+            try:
+                ok, say = await loan_judge(name, 金額, balance(gid, uid), house_balance(gid) or 0, 理由.strip()[:200])
+            except Exception as e:
+                log.warning("借錢判斷失敗：%r", e)
+        if ok:
+            err = borrow(gid, uid, name, 金額)      # 同意之後再檢查一次（等待期間帳戶可能變了）
+            if err:
+                await interaction.followup.send(err)
+                return
+            await interaction.followup.send(
+                f"🦈 {say}\n**{name}** 向大笨bot 借了 {fmt(金額)}。利息每天 **+{int(LOAN_RATE * 100)}%**（複利，最多滾到 {LOAN_CAP_MULT} 倍），"
+                f"1 天後要還 {fmt(int(金額 * (1 + LOAN_RATE)))}、3 天後 {fmt(int(金額 * (1 + LOAN_RATE) ** 3))}。`/還錢` 還、`/債務` 看欠多少；還清之前不能再借、也不能轉帳。")
+        else:
+            await interaction.followup.send(f"🙅 **{name}** 想借 {fmt(金額)}，被大笨bot 拒絕了：{say}")
 
     @tree.command(name="還錢", description="還大笨bot 的債")
     @app_commands.describe(金額="還多少，不填就是盡量還（還清或把手上的錢用光）")
