@@ -170,6 +170,73 @@ def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: 
         log.warning("發帳本頻道失敗：%r", ex)
 
 
+GAME_DIGEST_EVERY = 6 * 3600            # 賭博類每隔多久彙整一次發到帳本頻道
+GAME_DIGEST_FILE = Path(__file__).parent / "game_digest.json"
+
+
+def _digest_state() -> dict:
+    try:
+        return json.loads(GAME_DIGEST_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def build_game_digest(gid: int, since: float, until: float) -> str | None:
+    """把這段時間的遊戲輸贏（老虎機、抽卡、賭局…）彙整成一則訊息；沒有就回 None。"""
+    nets: dict[str, list] = {}
+    bot_net = 0
+    for x in _ledger():
+        if x["gid"] != gid or x["kind"] not in GAME_KINDS or not (since < x["t"] <= until):
+            continue
+        if x["kind"] == "遊戲結算" and x["to"][1] == HOUSE_NAME:       # 玩家 → 莊家
+            who, d = x["from"][1], -x["amount"]
+        elif x["from"][1] == HOUSE_NAME:                               # 莊家 → 玩家
+            who, d = x["to"][1], x["amount"]
+        else:
+            continue
+        r = nets.setdefault(who, [0, 0])
+        r[0] += d
+        r[1] += 1
+        bot_net -= d
+    if not nets:
+        return None
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    f = lambda t: datetime.fromtimestamp(t, ZoneInfo("Asia/Taipei")).strftime("%m-%d %H:%M")
+    rows = sorted(nets.items(), key=lambda kv: -abs(kv[1][0]))
+    lines = [f"{'🔺' if n > 0 else '🔻' if n < 0 else '➖'} {w}　{n:+,}　（{c} 筆）" for w, (n, c) in rows[:15]]
+    if len(rows) > 15:
+        lines.append(f"…還有 {len(rows) - 15} 人")
+    return (f"🎰 **賭博／遊戲彙整**　{f(since) if since else '起'} ~ {f(until)}\n" + "\n".join(lines)
+            + f"\n大笨bot 這段時間 **{bot_net:+,}**（玩家 🔺 贏、🔻 輸）")
+
+
+async def game_digest_loop(client) -> None:
+    await client.wait_until_ready()
+    while not client.is_closed():
+        await asyncio.sleep(600)
+        try:
+            state, now, changed = _digest_state(), time.time(), False
+            for guild in client.guilds:
+                last = float(state.get(str(guild.id), 0))
+                if last and now - last < GAME_DIGEST_EVERY:
+                    continue
+                if not last:                                   # 第一次：從現有的遊戲紀錄開始算，並等滿一個週期再發
+                    gt = [x["t"] for x in _ledger() if x["gid"] == guild.id and x["kind"] in GAME_KINDS]
+                    if not gt or now - min(gt) < GAME_DIGEST_EVERY:
+                        continue
+                text = build_game_digest(guild.id, last, now)
+                state[str(guild.id)] = now
+                changed = True
+                ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
+                if text and ch:
+                    await ch.send(text[:1990], allowed_mentions=discord.AllowedMentions.none())
+            if changed:
+                GAME_DIGEST_FILE.write_text(json.dumps(state), encoding="utf-8")
+        except Exception:
+            log.exception("賭博彙整迴圈出錯")
+
+
 async def _send_ledger(ch, text: str) -> None:
     try:
         await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
@@ -679,7 +746,10 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
 
     global start_voice_loop, start_internal_api, _client
     _client = client
-    start_voice_loop = lambda: asyncio.create_task(voice_earn_loop())
+    def _start_loops():
+        asyncio.create_task(game_digest_loop(client))
+        return asyncio.create_task(voice_earn_loop())
+    start_voice_loop = _start_loops
 
     # ---- 內部 API：給 Discord Activity 的後端用（只聽 127.0.0.1，要帶金鑰）。
     # 錢包只有機器人這個行程在讀寫，Activity 想動錢一律透過這裡，避免兩邊同時改 wallet.json。
