@@ -101,29 +101,75 @@ export function mountGachaCards(root, { env, back }) {
     $(".gc-sign").onclick = () => send({ a: "sign" });
   }
 
-  // ---- 抽卡結果
+  // ---- 抽卡結果：先放一段「墨氣凝聚」的演出（顏色看這次抽到最好的稀有度），再一張一張翻開，每張下面都有名稱和編號
   let resultOpen = false;
+  const GLOW = { SSR: "#f3c64a", SR: "#e0614d", R: "#5fb7a8", N: "#a9a39a" };
+  function burst(host, rarity) {
+    const n = rarity === "SSR" ? 36 : rarity === "SR" ? 20 : 0;
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement("i"); s.className = "gc-sp";
+      const a = Math.random() * 6.283, d = 40 + Math.random() * (rarity === "SSR" ? 120 : 80);
+      s.style.cssText = `--x:${Math.cos(a) * d}px;--y:${Math.sin(a) * d}px;--c:${GLOW[rarity]};--s:${3 + Math.random() * 5}px;animation-delay:${Math.random() * 0.15}s`;
+      host.append(s); setTimeout(() => s.remove(), 1400);
+    }
+  }
   function showResults(m) {
     resultOpen = true;
+    const res = m.results, many = res.length > 1;
+    const best = res.reduce((b, r) => (RAR.indexOf(r.rarity) < RAR.indexOf(b) ? r.rarity : b), "N");
+    const newN = res.filter((r) => r.isNew).length, ink = res.reduce((s, r) => s + r.ink, 0);
     const el = document.createElement("div");
     el.className = "gc-result";
-    const best = m.results.reduce((b, r) => (RAR.indexOf(r.rarity) < RAR.indexOf(b) ? r.rarity : b), "N");
-    const newN = m.results.filter((r) => r.isNew).length, ink = m.results.reduce((s, r) => s + r.ink, 0);
-    el.innerHTML = `<div class="gc-rbox ${best}">
-      <div class="gc-rtitle">${m.results.length === 1 ? "抽到了" : "十連結果"}${best === "SSR" ? " 🌟" : ""}</div>
-      <div class="gc-rgrid${m.results.length === 1 ? " one" : ""}">${m.results.map((r, i) => { const c = BYID[r.id]; return `
-        <div class="gc-rc ${r.rarity}" style="--d:${i * 0.12}s">
-          <img src="${ART[r.id]}" alt="${esc(c.name)}" draggable="false">
-          <span class="gc-badge ${r.rarity}">${r.rarity}</span>${r.isNew ? `<span class="gc-new">NEW</span>` : `<span class="gc-dup">+${r.ink} 墨</span>`}
-          <span class="gc-name">${esc(c.name)}</span>
-        </div>`; }).join("")}</div>
-      <div class="gc-rsum">新卡 ${newN} 張${ink ? `，重複轉成墨點 +${ink}` : ""}</div>
-      ${m.rewards && m.rewards.length ? `<div class="gc-rrew">${m.rewards.map((r) => `🏆 ${esc(r.text)}：抽卡券 +${r.tickets}`).join("<br>")}</div>` : ""}
-      <button class="gc-rok">確定</button></div>`;
     root.append(el);
-    const close = () => { el.remove(); resultOpen = false; draw(); };
-    el.querySelector(".gc-rok").onclick = close;
-    el.addEventListener("click", (e) => { if (e.target === el) close(); });
+    let timers = [], done = false;
+    const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
+    const close = () => { timers.forEach(clearTimeout); el.remove(); resultOpen = false; draw(); };
+
+    // 第一段：墨氣凝聚
+    el.innerHTML = `<div class="gc-summon ${best}"><div class="gc-orb"><i></i><i></i><i></i><b></b></div><div class="gc-stxt">${best === "SSR" ? "天降異象…" : best === "SR" ? "墨氣翻湧…" : "落墨成卡…"}</div><small>點一下跳過</small></div>`;
+    const reveal = () => {
+      if (done) return; done = true; timers.forEach(clearTimeout); timers = [];
+      const cardHtml = (r, i) => {
+        const c = BYID[r.id];
+        return `<div class="gc-rc2 ${r.rarity}" data-i="${i}">
+          <div class="gc-flip"><div class="gc-face gc-back"><span>墨</span></div>
+            <div class="gc-face gc-front"><img src="${ART[r.id]}" alt="${esc(c.name)}" draggable="false"><span class="gc-badge ${r.rarity}">${r.rarity}</span>${r.isNew ? `<span class="gc-new">NEW</span>` : `<span class="gc-dup">重複 +${r.ink} 墨</span>`}</div></div>
+          <div class="gc-cap"><b>${esc(c.name)}</b><small>No.${String(r.id).padStart(3, "0")}${many ? "" : "　" + esc(c.type)}</small></div></div>`;
+      };
+      el.innerHTML = `<div class="gc-rbox ${many ? "many" : "single"}">
+        <div class="gc-rtitle">${many ? "十連結果" : "抽到了"}</div>
+        <div class="gc-rgrid2${many ? "" : " one"}">${res.map(cardHtml).join("")}</div>
+        <div class="gc-single"></div>
+        <div class="gc-rfoot" hidden>
+          <div class="gc-rsum">新卡 ${newN} 張${ink ? `，重複轉成墨點 +${ink}` : ""}</div>
+          ${m.rewards && m.rewards.length ? `<div class="gc-rrew">${m.rewards.map((r) => `🏆 ${esc(r.text)}：抽卡券 +${r.tickets}`).join("<br>")}</div>` : ""}
+        </div>
+        <div class="gc-rbtns">${many ? `<button class="gc-all">全部翻開</button>` : ""}<button class="gc-rok" hidden>確定</button></div></div>`;
+      const box = el.querySelector(".gc-rbox"), cards = [...el.querySelectorAll(".gc-rc2")];
+      let shown = 0;
+      const flip = (i) => {
+        const c = cards[i]; if (!c || c.classList.contains("on")) return;
+        c.classList.add("on"); shown++;
+        const r = res[i], host = c.querySelector(".gc-flip");
+        if (r.rarity === "SSR" || r.rarity === "SR") { burst(host, r.rarity); c.classList.add("pop"); if (r.rarity === "SSR") { box.classList.add("flash"); setTimeout(() => box.classList.remove("flash"), 700); } }
+        if (!many) {
+          const cd = BYID[r.id];
+          el.querySelector(".gc-single").innerHTML = `<div class="gc-sinfo ${r.rarity}"><div class="gc-sname">${esc(cd.name)}</div><div class="gc-smeta"><span class="gc-badge ${r.rarity}">${r.rarity}・${RNAME[r.rarity]}</span> No.${String(r.id).padStart(3, "0")}　${esc(cd.type)}</div><p>${esc(cd.desc)}</p></div>`;
+        }
+        if (shown >= res.length) finish();
+      };
+      const finish = () => { el.querySelector(".gc-rfoot").hidden = false; el.querySelector(".gc-rok").hidden = false; const a = el.querySelector(".gc-all"); if (a) a.hidden = true; };
+      cards.forEach((c, i) => c.addEventListener("click", () => flip(i)));
+      const all = el.querySelector(".gc-all");
+      if (all) all.onclick = () => { timers.forEach(clearTimeout); cards.forEach((_, i) => flip(i)); };
+      el.querySelector(".gc-rok").onclick = close;
+      // 自動翻：稀有的留久一點。十連先翻 N、R，最後才翻 SR、SSR 當壓軸。
+      const order = res.map((r, i) => i).sort((a, b) => RAR.indexOf(res[b].rarity) - RAR.indexOf(res[a].rarity) || a - b);
+      let t = 500;
+      for (const i of order) { later(() => flip(i), t); t += res[i].rarity === "SSR" ? 1500 : res[i].rarity === "SR" ? 900 : many ? 280 : 400; }
+    };
+    el.querySelector(".gc-summon").addEventListener("click", reveal);
+    later(reveal, best === "SSR" ? 2300 : best === "SR" ? 1700 : 1100);
   }
 
   // ---- 圖鑑分頁
