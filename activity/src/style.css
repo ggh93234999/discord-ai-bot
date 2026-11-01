@@ -408,6 +408,9 @@ body.pk-myturn .game.poker{background:#16296b}
 @media (max-width:520px){ .card.wide { grid-column:1 / -1; } }
 .card.wide[data-g="farm"], .card.wide[data-g="farm"]:hover { background:#e9e2cf url("./farm-ink.svg") right center/cover no-repeat; }
 .card.wide[data-g="theater"], .card.wide[data-g="theater"]:hover { background:#e9e2cf url("./theater-ink.svg") right center/cover no-repeat; }
+.card.wide[data-g="gachacards"], .card.wide[data-g="gachacards"]:hover { background:#ece6d3 url("./gacha-ui/menu-bg.jpg") right center/cover no-repeat; }
+.card.wide[data-g="gachacards"]:hover { border-color:#b5342a; }
+.card.wide[data-g="gachacards"] small { max-width:50%; }
 
 .fgxp{text-align:center;font-size:13px;color:#e2c46a;margin:2px 0}.fgxp small{opacity:.6;margin-left:4px}
 
