@@ -127,6 +127,7 @@ def house_add(gid: int, delta: int) -> int | None:
 # ---------------------------------------------------------------- 轉帳紀錄（大笨bot 查帳用）
 LEDGER_FILE = Path(__file__).parent / "transfers.json"
 LEDGER_KEEP = 12000
+NO_HOUSE_WHY = ("鍛造", "種菜")      # 不是賭博的玩法：錢不經過大笨bot 的帳戶，也不記帳本
 GAME_KINDS = ("遊戲結算", "遊戲派彩")      # 機器人當莊家的輸贏；查帳預設不列，避免蓋掉真正的轉帳
 
 
@@ -935,10 +936,12 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, back - bet, name)   # 同一個事件迴圈裡，沒有 await，不會被別的請求插隊
             new -= deduct_debt(gid, uid, back - bet)  # 有欠債的人，贏的錢先扣一部分還債
-            house_add(gid, bet - back)               # 莊家：玩家輸的進它的口袋，贏的從它的口袋出
+            _nh = str(d.get("why") or "").startswith(NO_HOUSE_WHY)      # 鍛造、種菜：不算莊家的帳
+            if not _nh:
+                house_add(gid, bet - back)           # 莊家：玩家輸的進它的口袋，贏的從它的口袋出
             _net = bet - back                        # >0 玩家輸給莊家；<0 莊家賠給玩家
-            if str(d.get("why") or "").startswith("鍛造"):
-                pass                                 # 鍛造不記進帳本／賭博彙整（錢照樣經過莊家帳戶）
+            if _nh:
+                pass                                 # 鍛造、種菜不記進帳本／賭博彙整
             elif _net > 0:
                 record(gid, "遊戲結算", (uid, name), _bot_party(), _net, str(d.get("why") or "遊戲")[:30])
             elif _net < 0:
@@ -962,8 +965,10 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "no_guild"})
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, amount, name)
-            house_add(gid, -amount)                  # 對賭的彩金從莊家（先前收下賭注的人）出
-            if not str(d.get("why") or "").startswith("鍛造"):
+            _nh = str(d.get("why") or "").startswith(NO_HOUSE_WHY)
+            if not _nh:
+                house_add(gid, -amount)              # 對賭的彩金從莊家（先前收下賭注的人）出
+            if not _nh:
                 record(gid, "遊戲派彩", _bot_party(), (uid, name), amount, str(d.get("why") or "派彩")[:30])
             log.info("Activity %s派彩：%s +%s → 餘額 %s", str(d.get("why") or "")[:20], name, amount, new)
             return web.json_response({"ok": True, "balance": new})
