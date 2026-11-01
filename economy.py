@@ -937,7 +937,9 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             new -= deduct_debt(gid, uid, back - bet)  # 有欠債的人，贏的錢先扣一部分還債
             house_add(gid, bet - back)               # 莊家：玩家輸的進它的口袋，贏的從它的口袋出
             _net = bet - back                        # >0 玩家輸給莊家；<0 莊家賠給玩家
-            if _net > 0:
+            if str(d.get("why") or "").startswith("鍛造"):
+                pass                                 # 鍛造不記進帳本／賭博彙整（錢照樣經過莊家帳戶）
+            elif _net > 0:
                 record(gid, "遊戲結算", (uid, name), _bot_party(), _net, str(d.get("why") or "遊戲")[:30])
             elif _net < 0:
                 record(gid, "遊戲結算", _bot_party(), (uid, name), -_net, str(d.get("why") or "遊戲")[:30])
@@ -961,7 +963,8 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, amount, name)
             house_add(gid, -amount)                  # 對賭的彩金從莊家（先前收下賭注的人）出
-            record(gid, "遊戲派彩", _bot_party(), (uid, name), amount, str(d.get("why") or "派彩")[:30])
+            if not str(d.get("why") or "").startswith("鍛造"):
+                record(gid, "遊戲派彩", _bot_party(), (uid, name), amount, str(d.get("why") or "派彩")[:30])
             log.info("Activity %s派彩：%s +%s → 餘額 %s", str(d.get("why") or "")[:20], name, amount, new)
             return web.json_response({"ok": True, "balance": new})
 
