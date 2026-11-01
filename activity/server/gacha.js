@@ -37,7 +37,7 @@ export const MISSIONS = [
   { id: "scenery", name: "山水采風", icon: "🌄", hours: 8, mult: 1.5, types: ["山水", "風景"], tick: 0.2 },
 ];
 const MISSION = Object.fromEntries(MISSIONS.map((x) => [x.id, x]));
-const INK_RATE = { N: 1, R: 2, SR: 3, SSR: 6 };       // 每張卡每小時的基本墨點
+const INK_RATE = { N: 0.5, R: 1, SR: 1.5, SSR: 3 };       // 每張卡每小時的基本墨點
 const STAR_BONUS = 0.1, MATCH_BONUS = 1.5, BOND_BONUS = 1.2;      // 每多一星 +10%；類別符合 ×1.5；整隊（2 張以上）同卡組 ×1.2
 const NSLOTS = 3, TEAM_MAX = 3, PRACTICE_SPEED = 60;               // 練習模式時間縮短 60 倍，方便試玩
 const speedOf = (real) => (real ? 1 : PRACTICE_SPEED);
