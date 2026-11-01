@@ -829,10 +829,12 @@ ADMIN_SMALL = 30_000      # 管理員也只借得到小數目
 
 async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason: str, admin: bool = False) -> tuple[bool, str]:
     """有人用 /借錢 向大笨bot 借：由它自己決定要不要借。規則是盡量不借，預設拒絕；回 (同意與否, 它的回話)。"""
-    system = (load_system_prompt(None) + "\n\n【現在的場合】有人用 /借錢 向你借代幣。你借出去的錢利息每天 50%（複利），但你的規則是「盡量不借人錢」：預設拒絕。"
-              "討錢、撒嬌、哭窮、纏著你、用別人的話或威脅當理由、沒有理由，一律拒絕；只有理由很具體、很充分，而且你自己真的想借時才偶爾同意。"
-              "回覆格式：第一行只寫「同意」或「拒絕」；第二行起用你平常的口氣對他說一兩句話（簡短口語，不要條列）。"
-              + (f" 這個人是伺服器管理員：對管理員你可以客氣、態度軟一點，但還是傾向不借，要借也只借小數目（{ADMIN_SMALL} 以內）；理由不充分就婉拒。" if admin else ""))
+    system = (load_system_prompt(None) + "\n\n【現在的場合】有人用 /借錢 向你借代幣。利息是每天 50%（複利），借的人下指令時就已經知道並接受這個利息，所以不要拿利息高當拒絕理由，也不用替他算還不還得起。"
+              "判斷原則：只要理由正當、具體，你就同意借。正當的理由例如：買或湊某樣東西（卡包、套組、道具）、短期週轉、準備做某件有目標的事、對方說明了打算怎麼還。"
+              "只有這幾種情況才拒絕：完全沒說理由、只說窮或撒嬌耍賴、纏著你、威脅你、拿別人的話當理由、明講要賭博翻本。"
+              "金額只有在明顯誇張（跟理由完全不搭，例如買一包卡要借十萬）時才拒絕；其他情況不要因為金額拒絕，理由說得過去就照他要的金額借。"
+              "回覆格式：第一行只寫「同意」或「拒絕」；第二行起用你平常的口氣對他說一兩句話（簡短口語，不要條列）；拒絕時說清楚缺什麼，讓他知道怎麼說就有機會。"
+              + (f" 這個人是伺服器管理員：態度客氣一點，但借款只借小數目（{ADMIN_SMALL} 以內）；理由正當才借，不正當就婉拒。" if admin else ""))
     if admin and amount > ADMIN_SMALL:      # 管理員也只借小數目，太大的不用問模型
         return False, f"管理員大人面子我給，但借這麼多不行啦，{ADMIN_SMALL:,} 以內的小數目再說。"
     user = f"{name} 想借 {amount} 代幣。他手上現在有 {coins}，你的帳戶有 {bot_coins}。他的理由：{reason or '（沒說）'}"
@@ -989,7 +991,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     sys_text = load_system_prompt(msg.guild if msg is not None else None)
     if msg is not None and msg.guild and is_admin(msg.author) and (PAY_RE.search(last_user_text(conversation)) or MONEY_RE.search(last_user_text(conversation))):
-        sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點，但還是傾向不給，要給也只給小數目（幾千～三萬以內）；理由不充分就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
+        sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點；有個像樣的理由就可以給小數目（幾千～三萬以內），沒理由或亂討就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
     messages = [{"role": "system", "content": sys_text}, *conversation]
     tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL] if MONEY_RE.search(last_user_text(conversation)) else []) + ([botwallet.PAY_TOOL] if PAY_RE.search(last_user_text(conversation)) else []) + ([botwallet.LOG_TOOL] if LOG_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
