@@ -190,14 +190,16 @@ def build_game_digest(gid: int, since: float, until: float) -> str | None:
         if x["gid"] != gid or x["kind"] not in GAME_KINDS or not (since < x["t"] <= until):
             continue
         if x["kind"] == "遊戲結算" and x["to"][1] == HOUSE_NAME:       # 玩家 → 莊家
-            who, d = x["from"][1], -x["amount"]
+            who, d = x["from"], -x["amount"]
         elif x["from"][1] == HOUSE_NAME:                               # 莊家 → 玩家
-            who, d = x["to"][1], x["amount"]
+            who, d = x["to"], x["amount"]
         else:
             continue
-        r = nets.setdefault(who, [0, 0])
+        # 用使用者 ID 分組：同一個人在 Discord 和 Activity 的顯示名字可能不同
+        r = nets.setdefault(str(who[0]), [0, 0, who[1]])
         r[0] += d
         r[1] += 1
+        r[2] = who[1]
         bot_net -= d
     if not nets:
         return None
@@ -205,7 +207,7 @@ def build_game_digest(gid: int, since: float, until: float) -> str | None:
     from zoneinfo import ZoneInfo
     f = lambda t: datetime.fromtimestamp(t, ZoneInfo("Asia/Taipei")).strftime("%m-%d %H:%M")
     rows = sorted(nets.items(), key=lambda kv: -abs(kv[1][0]))
-    lines = [f"{'🔺' if n > 0 else '🔻' if n < 0 else '➖'} {w}　{n:+,}　（{c} 筆）" for w, (n, c) in rows[:15]]
+    lines = [f"{'🔺' if n > 0 else '🔻' if n < 0 else '➖'} {nm}　{n:+,}　（{c} 筆）" for _, (n, c, nm) in rows[:15]]
     if len(rows) > 15:
         lines.append(f"…還有 {len(rows) - 15} 人")
     return (f"🎰 **賭博／遊戲彙整**　{f(since) if since else '起'} ~ {f(until)}\n" + "\n".join(lines)
