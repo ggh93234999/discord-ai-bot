@@ -973,7 +973,7 @@ ACT_RE = re.compile(r"activity|遊戲間|在玩|在打|玩什麼|玩啥|誰在(�
 
 REPAY_RE = re.compile(r"還(你)?(錢|債|款|幣|代幣)|還清|還你|還款|我要還|來還", re.I)
 LOG_RE = re.compile(r"轉帳|轉账|紀錄|記錄|誰.{0,5}(轉|給|借|欠)|轉給|有人轉|收到.{0,4}(錢|幣)|欠.{0,4}(誰|多少|錢)|帳目|帳單|流水|欠債|欠款", re.I)
-PAY_RE = re.compile(r"給我.{0,4}(錢|幣|代幣)|(發|轉|匯|打|賞|送|借).{0,4}(我|給我).{0,6}(錢|幣|代幣)|(發|轉|匯|打|賞|送).{0,3}(錢|幣|代幣|紅包)|紅包|打賞|請我|獎勵|\\bpay\\b|轉帳|借我.{0,3}(錢|幣)|窮|沒錢", re.I)
+PAY_RE = re.compile(r"給我.{0,4}(錢|幣|代幣)|(發|轉|匯|打|賞|送|借).{0,4}(我|給我).{0,6}(錢|幣|代幣)|(發|轉|匯|打|賞|送).{0,3}(錢|幣|代幣|紅包)|紅包|打賞|請我|獎勵|\bpay\b|轉帳|借我.{0,3}(錢|幣)|窮|沒錢", re.I)
 MONEY_RE = re.compile(r"你.{0,6}(代幣|代币|多少錢|多少钱|多少幣|身家|錢包|荷包|存款|餘額|口袋)|(代幣|代币|錢包|餘額).{0,6}你|莊家.{0,6}(賺|賠|多少|有)|bot.{0,6}(代幣|錢)", re.I)
 ALMANAC_RE = re.compile(r"吉日|黃道|黄道|擇日|择日|宜忌|黃曆|黄历|農民曆|农民历|適合.{0,6}(結婚|搬家|入宅|開店|開市|動土|訂婚|買車)|哪天.{0,4}(搬|結婚|開)", re.I)
 
@@ -990,6 +990,22 @@ def last_user_text(conversation: list[dict]) -> str:
     return ""
 
 
+# 只要最近幾句話跟錢有關，就把錢相關的工具全部交給模型（不再一個工具一個字眼地挑，免得它「沒有工具」卻以為自己不能轉帳）
+MONEY_ANY_RE = re.compile(r"錢|幣|代幣|轉帳|轉账|轉我|轉給|匯|紅包|打賞|賞我|給我|發我|借|還|欠|債|帳|賬|餘額|身家|錢包|荷包|存款|利息|貸款|莊家|獎勵|請我|零用|零花|資助|\bpay\b|窮", re.I)
+
+
+def recent_user_text(conversation: list[dict], n: int = 3) -> str:
+    out = []
+    for m in reversed(conversation):
+        if m.get("role") != "user":
+            continue
+        c = m.get("content")
+        out.append(c if isinstance(c, str) else " ".join(str(x.get("text", "")) for x in c if isinstance(x, dict)) if isinstance(c, list) else "")
+        if len(out) >= n:
+            break
+    return "\n".join(out)
+
+
 async def ask_model(conversation: list[dict], on_status=None, msg: discord.Message | None = None,
                     actions: list | None = None) -> str:
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
@@ -998,7 +1014,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     if msg is not None and msg.guild and is_admin(msg.author) and (PAY_RE.search(last_user_text(conversation)) or MONEY_RE.search(last_user_text(conversation))):
         sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點；有個像樣的理由就可以給小數目（幾千～三萬以內），沒理由或亂討就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
     messages = [{"role": "system", "content": sys_text}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL] if MONEY_RE.search(last_user_text(conversation)) else []) + ([botwallet.PAY_TOOL] if PAY_RE.search(last_user_text(conversation)) else []) + ([botwallet.LOG_TOOL] if LOG_RE.search(last_user_text(conversation)) else []) + ([botwallet.REPAY_TOOL] if REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL] if (msg is not None and msg.guild and MONEY_ANY_RE.search(recent_user_text(conversation))) or MONEY_RE.search(last_user_text(conversation)) or PAY_RE.search(last_user_text(conversation)) or LOG_RE.search(last_user_text(conversation)) or REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
