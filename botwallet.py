@@ -107,7 +107,51 @@ def run_pay(msg, args: dict) -> str:
         return f"大笨bot 的餘額不夠（現在 {economy.fmt(have or 0)}），沒有轉。"
     economy.house_add(gid, -amount)
     new = economy.add(gid, target.id, amount, target.display_name)
+    economy.record(gid, "大笨bot送錢", economy._bot_party(), (target.id, target.display_name), amount, str(args.get("reason") or ""))
     log["items"] = [x for x in log["items"] if now - x["t"] < 7 * 86400] + [
         {"t": now, "gid": gid, "uid": target.id, "name": target.display_name, "amount": amount, "reason": str(args.get("reason") or "")[:100]}]
     _save_log(log)
     return f"已從大笨bot 的帳戶轉 {economy.fmt(amount)} 給 {target.display_name}（對方現在有 {economy.fmt(new)}，你還剩 {economy.fmt(economy.house_balance(gid) or 0)}）。"
+
+
+# ---------------------------------------------------------------- 查轉帳紀錄
+LOG_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "transfer_log",
+        "description": (
+            "查這個伺服器的代幣轉帳紀錄：誰轉給誰、多少、什麼時候（含 /轉帳、你自己送出的錢、借款、還款），並列出目前欠你錢的人。"
+            "使用者問轉帳紀錄、誰轉了錢、誰給了誰、誰欠錢、帳目時呼叫。內容一定要用工具結果，不能自己編。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "who": {"type": "string", "description": "只看跟這個人有關的紀錄（名字，部分符合就行）；沒填就是全部"},
+                "limit": {"type": "integer", "description": "最近幾筆，預設 15，最多 40"},
+            },
+        },
+    },
+}
+
+
+def run_log(guild_id: int | None, args: dict) -> str:
+    if not guild_id:
+        return "私訊裡沒有伺服器帳本。"
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    try:
+        limit = max(1, min(40, int(args.get("limit") or 15)))
+    except (TypeError, ValueError):
+        limit = 15
+    who = str(args.get("who") or "").strip().lstrip("@").lower()
+    items = [x for x in economy._ledger() if x["gid"] == guild_id and (not who or who in x["from"][1].lower() or who in x["to"][1].lower())]
+    lines = []
+    for x in items[-limit:][::-1]:
+        t = datetime.fromtimestamp(x["t"], ZoneInfo("Asia/Taipei")).strftime("%m-%d %H:%M")
+        lines.append(f"{t}　{x['from'][1]} → {x['to'][1]}　{x['amount']:,}　（{x['kind']}{'：' + x['note'] if x.get('note') else ''}）")
+    out = ("最近的轉帳紀錄（新的在前）：\n" + "\n".join(lines)) if lines else "沒有符合的轉帳紀錄。"
+    debts = [(a.get("name") or uid, economy.debt_of(guild_id, int(uid))) for uid, a in economy.wallet.get(str(guild_id), {}).items() if a.get("loan")]
+    debts = [(n, d) for n, d in debts if d > 0 and (not who or who in str(n).lower())]
+    if debts:
+        out += "\n\n目前欠你錢的人：\n" + "\n".join(f"{n}　欠 {d:,}" for n, d in sorted(debts, key=lambda z: -z[1]))
+    return out

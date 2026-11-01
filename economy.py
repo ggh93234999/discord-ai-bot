@@ -123,6 +123,34 @@ def house_add(gid: int, delta: int) -> int | None:
     return a["coins"]
 
 
+# ---------------------------------------------------------------- 轉帳紀錄（大笨bot 查帳用）
+LEDGER_FILE = Path(__file__).parent / "transfers.json"
+LEDGER_KEEP = 3000
+
+
+def _ledger() -> list:
+    try:
+        return json.loads(LEDGER_FILE.read_text(encoding="utf-8")).get("items", [])
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def record(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str = "") -> None:
+    """記一筆錢的移動。frm / to 是 (id, 名字)。kind：轉帳／發錢／借款／還款／大笨bot送錢。"""
+    try:
+        items = _ledger()
+        items.append({"t": time.time(), "gid": gid, "kind": kind, "from": [str(frm[0]), frm[1]], "to": [str(to[0]), to[1]], "amount": int(amount), "note": note[:100]})
+        tmp = LEDGER_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"items": items[-LEDGER_KEEP:]}, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(LEDGER_FILE)
+    except OSError as e:
+        log.warning("記轉帳紀錄失敗：%r", e)
+
+
+def _bot_party() -> tuple:
+    return (_client.user.id if _client and _client.user else 0, HOUSE_NAME)
+
+
 # ---------------------------------------------------------------- 大笨bot 放貸：利率超高
 LOAN_RATE = 0.5        # 每天利息 50%，複利（按經過的時間連續算）
 LOAN_BASE = 100_000     # 一般最多借多少
@@ -170,6 +198,7 @@ def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
     a["coins"] = int(a["coins"]) + amount
     a["loan"] = {"p": amount, "t": time.time()}
     _save()
+    record(gid, "借款", _bot_party(), (uid, name), amount)
     return None
 
 
@@ -184,6 +213,7 @@ def repay(gid: int, uid: int, amount: int | None) -> tuple[int, int]:
         return 0, d
     a["coins"] = int(a["coins"]) - pay
     house_add(gid, pay)
+    record(gid, "還款", (uid, a.get("name") or str(uid)), _bot_party(), pay)
     left = d - pay
     if left <= 0:
         a.pop("loan", None)
@@ -898,6 +928,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return
             add(gid, interaction.user.id, -金額, who)
             house_add(gid, 金額)
+            record(gid, "轉帳", (interaction.user.id, who), _bot_party(), 金額)
             await interaction.response.send_message(f"💸 {who} 轉了 {fmt(金額)} 給大笨bot（它現在有 {fmt(house_balance(gid) or 0)}）")
             return
         if debt_of(gid, interaction.user.id):
@@ -905,6 +936,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             return
         add(gid, interaction.user.id, -金額, interaction.user.display_name)
         add(gid, 對象.id, 金額, 對象.display_name)
+        record(gid, "轉帳", (interaction.user.id, interaction.user.display_name), (對象.id, 對象.display_name), 金額)
         await interaction.response.send_message(f"💸 {interaction.user.display_name} 轉了 {fmt(金額)} 給 {對象.display_name}")
 
     @tree.command(name="借錢", description="跟大笨bot 借代幣：要它同意（它盡量不借）；一般最多 10 萬，利息超高：每天 +50% 複利")
@@ -992,6 +1024,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             await interaction.response.send_message("只有機器人擁有者能發錢。", ephemeral=True)
             return
         new = add(interaction.guild_id, 對象.id, 金額, 對象.display_name)
+        record(interaction.guild_id, "發錢", (interaction.user.id, "擁有者（憑空發錢）"), (對象.id, 對象.display_name), 金額)
         await interaction.response.send_message(f"💰 發給 {對象.display_name} {fmt(金額)}　餘額 {fmt(new)}")
 
     @tree.command(name="擲硬幣", description="猜正反面，猜中賭注翻倍，猜錯輸光")
