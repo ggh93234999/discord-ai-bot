@@ -135,7 +135,7 @@ export function mountGachaCards(root, { env, back }) {
           <div class="gc-cap"><b>${esc(c.name)}</b><small>No.${String(r.id).padStart(3, "0")}${many ? "" : "　" + esc(c.type)}</small></div></div>`;
       };
       el.innerHTML = `<div class="gc-rbox ${many ? "many" : "single"}">
-        <div class="gc-rtitle">${many ? "十連結果" : "抽到了"}</div>
+        <div class="gc-rtitle">${many ? "十連結果" : "抽到了"}</div><div class="gc-hint2">翻開的卡可以點一下放大</div>
         <div class="gc-rgrid2${many ? "" : " one"}">${res.map(cardHtml).join("")}</div>
         <div class="gc-single"></div>
         <div class="gc-rfoot" hidden>
@@ -157,7 +157,33 @@ export function mountGachaCards(root, { env, back }) {
         if (shown >= res.length) finish();
       };
       const finish = () => { el.querySelector(".gc-rfoot").hidden = false; el.querySelector(".gc-rok").hidden = false; const a = el.querySelector(".gc-all"); if (a) a.hidden = true; };
-      cards.forEach((c, i) => c.addEventListener("click", () => flip(i)));
+      // 翻開的卡可以點開放大看（◀ ▶ 或左右鍵切換這次抽到的其他卡）
+      const zoom = (i0) => {
+        let pos = i0;
+        const z = document.createElement("div"); z.className = "gc-zoom";
+        const showZ = () => {
+          const r = res[pos], cd = BYID[r.id];
+          z.innerHTML = `<button class="gc-nav gc-zp" aria-label="上一張"${res.length < 2 ? " hidden" : ""}>◀</button>
+            <div class="gc-big ${r.rarity}"><img src="${ART[r.id]}" alt="${esc(cd.name)}" draggable="false">
+            <div class="gc-info"><div class="gc-ttl"><b>${esc(cd.name)}</b><span class="gc-badge ${r.rarity}">${r.rarity}・${RNAME[r.rarity]}</span></div>
+            <div class="gc-meta">${esc(cd.type)}　No.${String(r.id).padStart(3, "0")}　${pos + 1} / ${res.length}　${r.isNew ? "新卡" : `重複，轉成墨點 +${r.ink}`}</div><p>${esc(cd.desc)}</p></div>
+            <button class="gc-x" aria-label="關閉">✕</button></div>
+            <button class="gc-nav gc-zn" aria-label="下一張"${res.length < 2 ? " hidden" : ""}>▶</button>`;
+        };
+        const move = (d) => { for (let k = 1; k <= res.length; k++) { const j = (pos + d * k + res.length * k) % res.length; if (cards[j].classList.contains("on")) { pos = j; break; } } showZ(); };
+        const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); closeZ(); } else if (e.key === "ArrowRight") move(1); else if (e.key === "ArrowLeft") move(-1); };
+        const closeZ = () => { z.remove(); document.removeEventListener("keydown", onKey, true); };
+        document.addEventListener("keydown", onKey, true);
+        z.addEventListener("click", (e) => {
+          if (e.target.closest(".gc-zp")) move(-1); else if (e.target.closest(".gc-zn")) move(1);
+          else if (e.target === z || e.target.closest(".gc-x")) closeZ();
+        });
+        let x0 = null;
+        z.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+        z.addEventListener("touchend", (e) => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) move(dx < 0 ? 1 : -1); });
+        showZ(); el.append(z);
+      };
+      cards.forEach((c, i) => c.addEventListener("click", () => { if (c.classList.contains("on")) zoom(i); else flip(i); }));
       const all = el.querySelector(".gc-all");
       if (all) all.onclick = () => { timers.forEach(clearTimeout); cards.forEach((_, i) => flip(i)); };
       el.querySelector(".gc-rok").onclick = close;

@@ -1548,6 +1548,10 @@ body.tv-fs{overflow:hidden}
 .gc-sp{position:absolute;left:50%;top:50%;width:var(--s);height:var(--s);border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);pointer-events:none;animation:gcsp 1.2s ease-out forwards}
 @keyframes gcsp{from{transform:translate(-50%,-50%);opacity:1}to{transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y)));opacity:0}}
 .gc-single:empty{display:none}
+.gc-hint2{margin-top:-6px;font-size:12px;opacity:.55}
+.gc-zoom{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;background:rgba(10,9,8,.9)}
+.gc-rc2.on .gc-flip{cursor:zoom-in}
+@media (max-width:520px){.gc-zp,.gc-zn{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:36px;height:56px;background:rgba(0,0,0,.45)}.gc-zp{left:4px}.gc-zn{right:4px}}
 .gc-sinfo{width:100%;text-align:center;animation:gcin .5s ease both;padding:0 4px}
 .gc-sname{font-size:26px;font-weight:800;letter-spacing:3px}.gc-sinfo.SSR .gc-sname{color:#f3c64a;text-shadow:0 0 14px rgba(243,198,74,.7)}.gc-sinfo.SR .gc-sname{color:#f08a78}
 .gc-smeta{margin:4px 0 6px;font-size:13px;opacity:.85}.gc-smeta .gc-badge{position:static}
