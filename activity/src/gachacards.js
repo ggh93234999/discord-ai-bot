@@ -2,6 +2,7 @@
 // 模式和種菜、賭場一樣：練習模式（練習幣、獨立收藏）／真代幣模式（Discord 授權後動用機器人錢包的真代幣）。
 import CARDS from "./gacha-cards.json";
 import { wsUrl } from "./gomoku.js";
+import { sfx } from "./gachasfx.js";
 import "@fontsource/lxgw-wenkai-tc/400.css";
 import "@fontsource/lxgw-wenkai-tc/700.css";
 import "./gachacards.css";
@@ -63,17 +64,16 @@ export function mountGachaCards(root, { env, back }) {
       if (m.t === "bauthed") return onAuthed(m);
       if (m.t !== "gc") return;
       if (m.a === "view") { st = m; if (m.disp) srvOff = m.disp.now - Date.now(); showBar(); if (!resultOpen && !modalOpen) draw(); else if (modalOpen && refreshModal) refreshModal(); }
-      else if (m.a === "shelf") { shelf = m.list; if (tab === "show" && !resultOpen && !modalOpen) drawShow(); }
       else if (m.a === "pull") showResults(m);
-      else if (m.a === "signed") statusEl.textContent = `簽到成功，抽卡券 +${m.tickets}`;
+      else if (m.a === "signed") { sfx.sign(); statusEl.textContent = `簽到成功，抽卡券 +${m.tickets}`; }
       else if (m.a === "dprev") { dprev = m; if (tab === "disp" && dispSel) drawDisp(); }
-      else if (m.a === "dsent") { dispSel = null; dprev = null; statusEl.textContent = "出發了！"; }
-      else if (m.a === "dclaimed") statusEl.textContent = `領回 ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`;
-      else if (m.a === "dcalled") statusEl.textContent = "已召回";
-      else if (m.a === "salvaged") statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`;
-      else if (m.a === "upgraded") statusEl.textContent = `升到 ${m.star} 星了（花 ${m.cost} 墨點）`;
-      else if (m.a === "swapped") { statusEl.textContent = `兌換成功（花 ${money(m.cost)} 墨點）` + (m.rewards && m.rewards.length ? "，" + m.rewards.map((r) => `${r.text}，抽卡券 +${r.tickets}`).join("；") : ""); }
-      else if (m.a === "err") { statusEl.textContent = ERR[m.error] || ERR.error; if (m.balance != null && st) { st.balance = m.balance; showBar(); } }
+      else if (m.a === "dsent") { sfx.send(); dispSel = null; dprev = null; statusEl.textContent = "出發了！"; }
+      else if (m.a === "dclaimed") { sfx.claim(); statusEl.textContent = `領回 ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`; }
+      else if (m.a === "dcalled") { sfx.recall(); statusEl.textContent = "已召回"; }
+      else if (m.a === "salvaged") { sfx.salvage(); statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`; }
+      else if (m.a === "upgraded") { sfx.star(); statusEl.textContent = `升到 ${m.star} 星了（花 ${m.cost} 墨點）`; }
+      else if (m.a === "swapped") { sfx.swap(); if (m.rewards && m.rewards.length) setTimeout(sfx.reward, 600); statusEl.textContent = `兌換成功（花 ${money(m.cost)} 墨點）` + (m.rewards && m.rewards.length ? "，" + m.rewards.map((r) => `${r.text}，抽卡券 +${r.tickets}`).join("；") : ""); }
+      else if (m.a === "err") { sfx.err(); statusEl.textContent = ERR[m.error] || ERR.error; if (m.balance != null && st) { st.balance = m.balance; showBar(); } }
     };
     ws.onclose = () => { if (closed) return; statusEl.textContent = "連線中斷，重新連線…"; setTimeout(connect, Math.min(5000, 700 * ++retry)); };
     ws.onerror = () => {};
@@ -134,6 +134,7 @@ export function mountGachaCards(root, { env, back }) {
     const res = m.results, many = res.length > 1;
     const best = res.reduce((b, r) => (RAR.indexOf(r.rarity) < RAR.indexOf(b) ? r.rarity : b), "N");
     const newN = res.filter((r) => r.isNew).length, dupN = res.filter((r) => !r.isNew).length;
+    sfx.summon(best);
     const el = document.createElement("div");
     el.className = "gc-result";
     root.append(el);
@@ -167,6 +168,7 @@ export function mountGachaCards(root, { env, back }) {
         const c = cards[i]; if (!c || c.classList.contains("on")) return;
         c.classList.add("on"); shown++;
         const r = res[i], host = c.querySelector(".gc-flip");
+        sfx.flip(); if (!many || r.rarity === "SSR" || r.rarity === "SR") setTimeout(() => sfx.reveal(r.rarity, r.isNew), 140); else if (r.isNew) setTimeout(() => sfx.reveal("N", true), 140);
         if (r.rarity === "SSR" || r.rarity === "SR") { burst(host, r.rarity); c.classList.add("pop"); if (r.rarity === "SSR") { box.classList.add("flash"); setTimeout(() => box.classList.remove("flash"), 700); } }
         if (!many) {
           const cd = BYID[r.id];
@@ -174,7 +176,7 @@ export function mountGachaCards(root, { env, back }) {
         }
         if (shown >= res.length) finish();
       };
-      const finish = () => { el.querySelector(".gc-rfoot").hidden = false; el.querySelector(".gc-rok").hidden = false; const a = el.querySelector(".gc-all"); if (a) a.hidden = true; };
+      const finish = () => { if (m.rewards && m.rewards.length) setTimeout(sfx.reward, 500); el.querySelector(".gc-rfoot").hidden = false; el.querySelector(".gc-rok").hidden = false; const a = el.querySelector(".gc-all"); if (a) a.hidden = true; };
       // 翻開的卡可以點開放大看（◀ ▶ 或左右鍵切換這次抽到的其他卡）
       const zoom = (i0) => {
         let pos = i0;
@@ -345,32 +347,30 @@ export function mountGachaCards(root, { env, back }) {
     if (finished && !resultOpen && !modalOpen) drawDisp();
   }, 1000);
 
-  let shelf = null, pickSlot = null;
+  let pickSlot = null;
   function drawShow() {
     const mine = st ? st.cards : {}, sh = st && st.show || [null, null, null];
     const slot = (id, i) => id && mine[id] && BYID[id] ? `<button class="gc-sh on ${BYID[id].rarity}" data-sl="${i}"><img src="${ART[id]}" alt="" draggable="false"><span class="gc-badge ${BYID[id].rarity}">${BYID[id].rarity}</span><span class="gc-star">${"★".repeat(mine[id])}</span><span class="gc-name">${esc(BYID[id].name)}</span></button>` : `<button class="gc-sh" data-sl="${i}"><i>＋</i><span>選一張</span></button>`;
-    const others = shelf ? shelf.filter((x) => !x.own) : [];
     body.innerHTML = `
-      <div class="gc-hint">挑 3 張你最喜歡的卡擺在展示櫃，點格子更換，點已擺的卡可以拿下來。${real() ? "真代幣模式的展示櫃大家都看得到。" : "練習模式的展示櫃不公開，每次進來也會清空。"}</div>
+      <div class="gc-hint">挑 3 張你最喜歡的卡擺在展示櫃，點格子更換，點已擺的卡可以拿下來。${real() ? "真代幣模式的展示櫃會上名卡榜。" : "練習模式每次進來展示櫃都會清空。"}</div>
       <div class="gc-shelf">${sh.map(slot).join("")}</div>
       ${pickSlot !== null ? `<div class="gc-pick"><div class="gc-hint">選一張放進第 ${pickSlot + 1} 格${sh[pickSlot] ? `　<button class="gc-unshow">拿下來</button>` : ""}　<button class="gc-pickx">取消</button></div><div class="gc-grid">${CARDS.filter((c) => mine[c.id]).sort((a, b) => RAR.indexOf(a.rarity) - RAR.indexOf(b.rarity) || a.id - b.id).map((c) => `<button class="gc-card ${c.rarity}" data-pk="${c.id}"><img src="${ART[c.id]}" alt="" loading="lazy" draggable="false"><span class="gc-badge ${c.rarity}">${c.rarity}</span><span class="gc-star">${"★".repeat(mine[c.id])}</span><span class="gc-name">${esc(c.name)}</span></button>`).join("") || `<div class="mempty">還沒有卡，先去抽幾張吧</div>`}</div></div>` : ""}
-      <h3 class="gc-h3">大家的展示櫃</h3>
-      ${!real() ? `<div class="mempty">開啟真代幣模式後才看得到別人的展示櫃</div>` : !shelf ? `<div class="mempty">載入中…</div>` : others.length ? others.map((x) => `<div class="gc-other"><b>${esc(x.nm)}</b><div class="gc-shelf sm">${x.cards.map((c) => `<div class="gc-sh on ${BYID[c.id].rarity}"><img src="${ART[c.id]}" alt="" loading="lazy" draggable="false"><span class="gc-badge ${BYID[c.id].rarity}">${BYID[c.id].rarity}</span><span class="gc-star">${"★".repeat(c.star)}</span><span class="gc-name">${esc(BYID[c.id].name)}</span></div>`).join("")}</div></div>`).join("") : `<div class="mempty">還沒有人擺展示櫃</div>`}`;
-    if (real() && !shelf) send({ a: "shelf" });
+      <div class="gc-hint">展示的卡會依「展示分」（稀有度分 × 星數）排進選單裡的「名卡榜」，N 1・R 3・SR 12・SSR 40 分，升星分數更高。</div>`;
   }
   function draw() { if (tab === "pull") drawPull(); else if (tab === "disp") drawDisp(); else if (tab === "show") drawShow(); else drawBook(); }
 
   root.addEventListener("click", (e) => {
+    sfx.unlock(); if (e.target.closest("button") && !e.target.closest(".gc-main [data-tab]")) sfx.tap();
     if (tab === "disp" && dispClick(e)) return;
     if (tab === "show") {
       const sl = e.target.closest("[data-sl]"), pk = e.target.closest("[data-pk]");
-      if (pk) { send({ a: "show", slot: pickSlot, id: Number(pk.dataset.pk) }); pickSlot = null; shelf = null; return; }
-      if (e.target.closest(".gc-unshow")) { send({ a: "show", slot: pickSlot, id: null }); pickSlot = null; shelf = null; return; }
+      if (pk) { sfx.place(); send({ a: "show", slot: pickSlot, id: Number(pk.dataset.pk) }); pickSlot = null; return; }
+      if (e.target.closest(".gc-unshow")) { sfx.take(); send({ a: "show", slot: pickSlot, id: null }); pickSlot = null; return; }
       if (e.target.closest(".gc-pickx")) { pickSlot = null; drawShow(); return; }
       if (sl && sl.closest(".gc-shelf") && !sl.closest(".sm") && sl.dataset.sl !== undefined) { pickSlot = Number(sl.dataset.sl); drawShow(); return; }
     }
     const mt = e.target.closest(".gc-main [data-tab]");
-    if (mt) { tab = mt.dataset.tab; root.querySelectorAll(".gc-main .tab").forEach((x) => x.classList.toggle("on", x === mt)); draw(); return; }
+    if (mt) { sfx.tab(); tab = mt.dataset.tab; root.querySelectorAll(".gc-main .tab").forEach((x) => x.classList.toggle("on", x === mt)); draw(); return; }
     const t = e.target.closest("[data-r],[data-t],[data-s],[data-o]");
     if (t && t.closest(".gc-tabs") && !t.closest(".gc-main")) { if (t.dataset.r !== undefined) filter = t.dataset.r; if (t.dataset.t !== undefined) type = t.dataset.t; if (t.dataset.s !== undefined) set = t.dataset.s; if (t.dataset.o !== undefined) own = t.dataset.o; drawBook(); return; }
     if (e.target.closest(".gc-salvgrid")) { const d = st && st.dups || {}, n = Object.values(d).reduce((x, y) => x + y, 0); confirmAsk(`把全部 ${n} 張重複的卡分解成墨點？`, () => send({ a: "salvage", id: "all" })); return; }
@@ -385,7 +385,7 @@ export function mountGachaCards(root, { env, back }) {
   }
   function setMode(m) {
     mode = m; modeBtns.forEach((b) => b.classList.toggle("on", b.dataset.m === m)); root.querySelector(".gcards").classList.toggle("realmode", m === "real");
-    st = null; shelf = null; pickSlot = null; dispSel = null; dprev = null; if (m === "practice") needEnter = true; draw(); showBar(); send({ a: "get" });
+    st = null; pickSlot = null; dispSel = null; dprev = null; if (m === "practice") needEnter = true; draw(); showBar(); send({ a: "get" });
     statusEl.textContent = m === "real" ? `真代幣模式：${session ? session.name : ""}，抽卡會扣真代幣！` : "練習模式：收藏獨立，用練習幣";
   }
   modeBtns.forEach((b) => b.addEventListener("click", () => {

@@ -115,6 +115,19 @@ function viewOf(u, real, bal) {
   };
 }
 
+// 名卡榜：每個人擺在展示櫃的 3 張卡，依「展示分」排行（稀有度分 × 星數）。真代幣榜和練習榜分開，不需要登入就能看。
+const SHOW_PT = { N: 1, R: 3, SR: 12, SSR: 40 };
+export function handleGachaBoard(ws, m) {
+  const real = !!m.real, pre = real ? "r:" : "p:", rows = [];
+  for (const [k, u] of Object.entries(db.users)) {
+    if (!k.startsWith(pre) || !u.show) continue;
+    const cards = u.show.filter((c) => c && u.cards[c] && CARD.get(c)).map((c) => ({ id: c, star: u.cards[c], rarity: CARD.get(c).rarity }));
+    if (!cards.length) continue;
+    rows.push({ name: u.nm || (k.startsWith("p:g") ? "匿名玩家" : "玩家" + k.slice(-4)), cards, score: cards.reduce((t, c) => t + SHOW_PT[c.rarity] * c.star, 0), owned: Object.keys(u.cards).length });
+  }
+  rows.sort((x, y) => y.score - x.score || y.owned - x.owned);
+  out(ws, { t: "gboard", real, rows: rows.slice(0, 30), total: rows.length });
+}
 const a0 = (m) => m.a;
 export async function handleGacha(ws, m) {
   const real = !!m.real;
@@ -130,16 +143,6 @@ export async function handleGacha(ws, m) {
   const send = async () => out(ws, viewOf(u, real, real ? await realBalance(ws) : null));
   const a = m.a;
   if (a === "get") { await send(); return; }
-  if (a === "shelf") {      // 大家的展示櫃：只列真代幣模式、有擺卡的人（練習模式的收藏每次都清掉，不公開）
-    const list = [];
-    for (const [k, v] of Object.entries(db.users)) {
-      if (!k.startsWith("r:") || !v.show) continue;
-      const cards = v.show.filter((c) => c && v.cards[c]).map((c) => ({ id: c, star: v.cards[c] }));
-      if (cards.length) list.push({ nm: v.nm || "（無名）", cards, own: k === key });
-    }
-    list.sort((x, y) => (y.own - x.own) || y.cards.reduce((t, c) => t + c.star, 0) - x.cards.reduce((t, c) => t + c.star, 0));
-    out(ws, { t: "gc", a: "shelf", list: list.slice(0, 30) }); return;
-  }
   if (a === "dprev") {      // 預覽這隊派去這個任務能拿多少
     const ids = [...new Set((Array.isArray(m.ids) ? m.ids : []).map(Number))].filter((i) => u.cards[i]).slice(0, TEAM_MAX);
     if (!ids.length || !MISSION[m.m]) { out(ws, { t: "gc", a: "dprev", ink: 0, tick: 0, match: 0, bond: false }); return; }

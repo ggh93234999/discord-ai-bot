@@ -10,7 +10,7 @@ import { createVb, stepVb, snapshotVb, WIN } from "./vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./multi.js";
 import { handleFarm, recoverFarmPending } from "./farm.js";
-import { handleGacha } from "./gacha.js";
+import { handleGacha, handleGachaBoard } from "./gacha.js";
 import { handleGallery, serveGallery } from "./gallery.js";
 import { listRooms, handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./casino.js";
 import * as chessEng from "./chess.js";
@@ -345,6 +345,7 @@ wss.on("connection", (ws, req) => {
       return send(ws, { t: "slot", kind, bet, back, balance: ws.practice, ...r });
     }
     if (m.t === "gl") { handleGallery(ws, m).catch((e) => console.log("圖創區錯誤", e && e.message)); return; }
+    if (m.t === "gboard") { handleGachaBoard(ws, m); return; }
     if (m.t === "gc") { handleGacha(ws, m).catch((e) => console.log("卡冊錯誤", e && e.message)); return; }
     if (m.t === "fm") { handleFarm(ws, m).catch((e) => console.log("農場錯誤", e && e.message)); return; }
     if (m.t === "clist") { send(ws, { t: "clist", rooms: [...listRooms(), ...listBoardRooms()] }); return; }     // 旁觀大廳：賭場／牌桌＋棋類

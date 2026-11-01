@@ -22,6 +22,7 @@ import { mountSpectateLobby } from "./spectate.js";
 import { mountLolBet } from "../lolbet/client.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountGachaCards } from "./gachacards.js";
+import { mountCardBoard } from "./cardboard.js";
 import { mountDown } from "./stairs.js";
 import { mountFarm } from "./farm.js";
 import { mountGallery } from "./gallery.js";
@@ -108,6 +109,7 @@ const GAMES = [
   { id: "factory", cat: "life", wide: true, cls: "factorycard", icon: "🏭", name: "自動化工廠", players: "1 人", desc: "挖礦、熔鍊、組裝，用傳送帶把產品送去出貨口換錢（原型）", mount: mountFactory },
   { id: "forgeboard", cat: "life", icon: "🏆", name: "神兵榜", players: "不限", desc: "全服最高階的劍排行，看誰的劍最強", mount: mountForgeBoard },
   { id: "gachacards", cat: "life", wide: true, icon: "🎴", name: "水墨卡冊", players: "1 人（個人收藏）", desc: "300 張水墨風卡牌：東方 100、西方 100、原創虛構 50、異想天開 50（幻獸、人物、器物、風景），可以抽卡、收集、升星，也能派卡片出去探險賺墨點", mount: mountGachaCards },
+  { id: "cardboard", cat: "life", icon: "🎴", name: "名卡榜", players: "不限", desc: "全服展示櫃排行，看誰擺的 3 張最愛卡最厲害", mount: mountCardBoard },
   { id: "horse", cat: "casino", icon: "🏇", name: "賽馬", players: "全服共用", desc: "選馬看賠率，跑贏拿回賠率倍", mount: mountCasino("horse") },
   { id: "dice", cat: "casino", icon: "🎲", name: "骰子", players: "1 人", desc: "跟莊家比兩顆骰子點數", mount: mountCasino("dice") },
   { id: "coin", cat: "casino", icon: "🪙", name: "擲硬幣", players: "1 人", desc: "猜正反面，猜中翻倍", mount: mountCasino("coin") },
