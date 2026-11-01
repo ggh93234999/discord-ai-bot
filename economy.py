@@ -125,7 +125,8 @@ def house_add(gid: int, delta: int) -> int | None:
 
 # ---------------------------------------------------------------- 大笨bot 放貸：利率超高
 LOAN_RATE = 0.5        # 每天利息 50%，複利（按經過的時間連續算）
-LOAN_MAX = 50_000      # 單次最多借多少
+LOAN_BASE = 100_000     # 一般最多借多少
+LOAN_MAX = 500_000      # 絕對上限：手上錢越多，可借的越多（可借 = 手上的錢，但至少 LOAN_BASE、最多 LOAN_MAX）
 LOAN_CAP_MULT = 10     # 欠款最多滾到本金的幾倍就不再增加
 
 
@@ -137,11 +138,18 @@ def debt_of(gid: int, uid: int) -> int:
     return min(int(ln["p"] * LOAN_CAP_MULT), int(ln["p"] * (1 + LOAN_RATE) ** days))
 
 
+def loan_limit(gid: int, uid: int) -> int:
+    return min(LOAN_MAX, max(LOAN_BASE, balance(gid, uid)))
+
+
 def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
     """成功回 None，失敗回原因。錢從大笨bot 的帳戶出。"""
     a = _acct(gid, uid, name)
     if a.get("loan"):
         return f"你還欠著 {fmt(debt_of(gid, uid))}，先還清才能再借。"
+    lim = loan_limit(gid, uid)
+    if amount > lim:
+        return f"你現在最多只能借 {fmt(lim)}（一般最多 {fmt(LOAN_BASE)}，手上的錢越多可借越多，上限 {fmt(LOAN_MAX)}）。"
     h = house_balance(gid)
     if h is None or h < amount:
         return f"大笨bot 手頭不夠（現在只有 {fmt(h or 0)}），借不出這麼多。"
@@ -872,7 +880,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         add(gid, 對象.id, 金額, 對象.display_name)
         await interaction.response.send_message(f"💸 {interaction.user.display_name} 轉了 {fmt(金額)} 給 {對象.display_name}")
 
-    @tree.command(name="借錢", description="跟大笨bot 借代幣（利息超高：每天 +50%，複利）")
+    @tree.command(name="借錢", description="跟大笨bot 借代幣（一般最多 10 萬；利息超高：每天 +50%，複利）")
     @app_commands.describe(金額="借多少")
     @app_commands.guild_only()
     async def cmd_borrow(interaction: discord.Interaction, 金額: app_commands.Range[int, 100, LOAN_MAX]):
