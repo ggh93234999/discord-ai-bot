@@ -90,6 +90,7 @@ def try_earn(gid: int, uid: int, name: str) -> bool:
     a["last"] = now
     a["coins"] = int(a["coins"]) + EARN_AMOUNT
     _save()
+    deduct_debt(gid, uid, EARN_AMOUNT)
     return True
 
 
@@ -146,7 +147,7 @@ def record(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str = 
         tmp.replace(LEDGER_FILE)
     except OSError as e:
         log.warning("記轉帳紀錄失敗：%r", e)
-    if kind not in GAME_KINDS:
+    if kind not in QUIET_KINDS:
         _post_ledger(gid, kind, frm, to, amount, note)
 
 
@@ -296,10 +297,11 @@ def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
     a["loan"] = {"p": amount, "t": time.time()}
     _save()
     record(gid, "借款", _bot_party(), (uid, name), amount)
+    _schedule_role_sync(gid, uid)
     return None
 
 
-def repay(gid: int, uid: int, amount: int | None) -> tuple[int, int]:
+def repay(gid: int, uid: int, amount: int | None, kind: str = "還款") -> tuple[int, int]:
     """還錢給大笨bot。回傳 (實際還了多少, 還剩多少債)。amount=None 就是盡量還（還清或用光手上的錢）。"""
     a = _acct(gid, uid)
     d = debt_of(gid, uid)
@@ -310,14 +312,128 @@ def repay(gid: int, uid: int, amount: int | None) -> tuple[int, int]:
         return 0, d
     a["coins"] = int(a["coins"]) - pay
     house_add(gid, pay)
-    record(gid, "還款", (uid, a.get("name") or str(uid)), _bot_party(), pay)
+    record(gid, kind, (uid, a.get("name") or str(uid)), _bot_party(), pay)
     left = d - pay
     if left <= 0:
         a.pop("loan", None)
     else:
         a["loan"] = {"p": left, "t": time.time()}      # 剩下的重新從現在起算
     _save()
+    _schedule_role_sync(gid, uid)
     return pay, max(0, left)
+
+
+DEBT_CUT = 0.5                    # 有欠債時，賺到的錢（掛語音、遊戲贏的）先扣這個比例還債
+DEBT_ROLE = "欠債人"               # 只要有欠債就掛，還清就拿掉
+DEBT_REMIND_HOUR = 20             # 每天幾點（台北時間）在帳本頻道催債
+QUIET_KINDS = GAME_KINDS + ("自動還款",)      # 這些不逐筆發帳本頻道（自動還款改成每日催債時一起報）
+DEBT_REMIND_FILE = Path(__file__).parent / "debt_remind.json"
+
+
+def deduct_debt(gid: int, uid: int, income: int) -> int:
+    """賺到 income 之後，如果有欠債，先扣一部分還債。回傳實際扣了多少（呼叫的人要把餘額減掉這個數）。"""
+    if income <= 0 or not debt_of(gid, uid):
+        return 0
+    cut = int(income * DEBT_CUT)
+    if cut <= 0:
+        return 0
+    pay, _ = repay(gid, uid, cut, kind="自動還款")
+    return pay
+
+
+def _schedule_role_sync(gid: int, uid: int) -> None:
+    try:
+        guild = _client.get_guild(int(gid)) if _client else None
+        if guild is not None:
+            asyncio.get_running_loop().create_task(_sync_debt_role(guild, int(uid)))
+    except RuntimeError:                     # 不在事件迴圈裡（測試時），之後的定時同步會補上
+        pass
+
+
+async def _sync_debt_role(guild, uid: int) -> None:
+    try:
+        has = debt_of(guild.id, uid) > 0
+        role = discord.utils.get(guild.roles, name=DEBT_ROLE)
+        if role is None:
+            if not has:
+                return
+            role = await guild.create_role(name=DEBT_ROLE, colour=discord.Colour.dark_red(), reason="有欠大笨bot 的債")
+        m = guild.get_member(uid)
+        if m is None:
+            m = await guild.fetch_member(uid)
+        if has and role not in m.roles:
+            await m.add_roles(role, reason="欠大笨bot 的債")
+        elif not has and role in m.roles:
+            await m.remove_roles(role, reason="債還清了")
+    except discord.Forbidden:
+        log.warning("沒有管理身分組的權限（或「%s」身分組比機器人的身分組高），無法同步欠債身分組", DEBT_ROLE)
+    except discord.NotFound:
+        pass
+    except Exception as ex:
+        log.warning("同步欠債身分組失敗：%r", ex)
+
+
+async def sync_all_debt_roles(guild) -> None:
+    debtors = {int(u) for u, a in wallet.get(str(guild.id), {}).items() if a.get("loan") and debt_of(guild.id, int(u)) > 0}
+    for uid in debtors:
+        await _sync_debt_role(guild, uid)
+    role = discord.utils.get(guild.roles, name=DEBT_ROLE)
+    if role:
+        for m in list(role.members):
+            if m.id not in debtors:
+                await _sync_debt_role(guild, m.id)
+
+
+def build_debt_reminder(gid: int) -> str | None:
+    now = time.time()
+    taken: dict[str, int] = {}
+    for x in _ledger():
+        if x["gid"] == gid and x["kind"] == "自動還款" and now - x["t"] < 86400:
+            taken[x["from"][0]] = taken.get(x["from"][0], 0) + x["amount"]
+    rows = []
+    for uid, a in wallet.get(str(gid), {}).items():
+        ln = a.get("loan")
+        d = debt_of(gid, int(uid)) if ln else 0
+        if d > 0:
+            rows.append((d, uid, ln, taken.get(str(uid), 0)))
+    if not rows:
+        return None
+    rows.sort(reverse=True)
+    lines = []
+    for d, uid, ln, t in rows[:20]:
+        days = max(0.0, (now - float(ln["t"])) / 86400)
+        lines.append(f"<@{uid}>　現在欠 **{fmt(d)}**（本金 {fmt(ln['p'])}、滾了 {days:.1f} 天）　今天已自動扣走 **{fmt(t)}**")
+    return ("📣 **大笨bot 每日催債**\n" + "\n".join(lines)
+            + f"\n\n利息每天 +{int(LOAN_RATE * 100)}%。你們賺的錢（掛語音、遊戲贏的）會先被扣 {int(DEBT_CUT * 100)}% 還債；"
+            "想一次還清就用 `/還錢`，或直接跟我說要還錢。還清之前不能借、不能轉帳。")
+
+
+async def debt_loop(client) -> None:
+    await client.wait_until_ready()
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    while not client.is_closed():
+        try:
+            try:
+                state = json.loads(DEBT_REMIND_FILE.read_text(encoding="utf-8"))
+            except (FileNotFoundError, json.JSONDecodeError):
+                state = {}
+            tp = datetime.now(ZoneInfo("Asia/Taipei"))
+            today, changed = tp.strftime("%Y-%m-%d"), False
+            for guild in client.guilds:
+                await sync_all_debt_roles(guild)
+                if tp.hour >= DEBT_REMIND_HOUR and state.get(str(guild.id)) != today:
+                    text = build_debt_reminder(guild.id)
+                    ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
+                    if text and ch:
+                        await ch.send(text[:1990], allowed_mentions=discord.AllowedMentions(users=True))
+                        state[str(guild.id)] = today
+                        changed = True
+            if changed:
+                DEBT_REMIND_FILE.write_text(json.dumps(state), encoding="utf-8")
+        except Exception:
+            log.exception("催債迴圈出錯")
+        await asyncio.sleep(600)
 
 
 # ---------------------------------------------------------------- 遊戲
@@ -439,6 +555,7 @@ class BlackjackView(discord.ui.View):
             return f"💥 爆牌，輸了 {fmt(self.bet)}", discord.Color.red()
         if dv > 21 or pv > dv:
             add(self.gid, self.user.id, self.bet * 2)
+            deduct_debt(self.gid, self.user.id, self.bet)
             return f"🎉 你贏了！+{fmt(self.bet)}", discord.Color.green()
         if pv == dv:
             add(self.gid, self.user.id, self.bet)
@@ -450,6 +567,7 @@ class BlackjackView(discord.ui.View):
         self.stop()
         if natural:
             add(self.gid, self.user.id, int(self.bet * 2.5))
+            deduct_debt(self.gid, self.user.id, int(self.bet * 1.5))
             text, color = f"🌟 Blackjack！+{fmt(int(self.bet * 1.5))}", discord.Color.gold()
         else:
             text, color = self.settle()
@@ -703,6 +821,7 @@ async def run_race(race: Race, active: dict):
             if h == winner:
                 pay = int(amt * race.odds[h])
                 new = add(race.guild_id, uid, pay)
+                new -= deduct_debt(race.guild_id, uid, pay - amt)
                 lines.append(f"🎉 {name} 押 {race.names[h]} {fmt(amt)} → 拿回 {fmt(pay)}（+{fmt(pay - amt)}）　餘額 {fmt(new)}")
             else:
                 lines.append(f"😢 {name} 押 {race.names[h]} {fmt(amt)} → 輸了")
@@ -748,6 +867,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
     _client = client
     def _start_loops():
         asyncio.create_task(game_digest_loop(client))
+        asyncio.create_task(debt_loop(client))
         return asyncio.create_task(voice_earn_loop())
     start_voice_loop = _start_loops
 
@@ -812,6 +932,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "insufficient", "balance": have})
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, back - bet, name)   # 同一個事件迴圈裡，沒有 await，不會被別的請求插隊
+            new -= deduct_debt(gid, uid, back - bet)  # 有欠債的人，贏的錢先扣一部分還債
             house_add(gid, bet - back)               # 莊家：玩家輸的進它的口袋，贏的從它的口袋出
             _net = bet - back                        # >0 玩家輸給莊家；<0 莊家賠給玩家
             if _net > 0:
@@ -1147,6 +1268,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         name = {"heads": "正面", "tails": "反面"}[res]
         if res == 猜.value:
             new = add(gid, uid, 賭注, interaction.user.display_name)
+            new -= deduct_debt(gid, uid, 賭注)
             await interaction.response.send_message(f"🪙 **{name}**！猜中了，+{fmt(賭注)}　餘額 {fmt(new)}")
         else:
             new = add(gid, uid, -賭注, interaction.user.display_name)
@@ -1166,6 +1288,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         head = f"🎲 你 {me[0]}+{me[1]}=**{sum(me)}**　vs　我 {bot_[0]}+{bot_[1]}=**{sum(bot_)}**\n"
         if sum(me) > sum(bot_):
             new = add(gid, uid, 賭注, interaction.user.display_name)
+            new -= deduct_debt(gid, uid, 賭注)
             await interaction.response.send_message(head + f"你贏了！+{fmt(賭注)}　餘額 {fmt(new)}")
         elif sum(me) < sum(bot_):
             new = add(gid, uid, -賭注, interaction.user.display_name)
@@ -1222,6 +1345,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         back = int(賭注 * mult)
         new = add(gid, uid, back)
         net = back - 賭注
+        new -= deduct_debt(gid, uid, net)
         sign = f"+{fmt(net)}" if net > 0 else (f"-{fmt(-net)}" if net < 0 else "打平")
         try:
             await interaction.edit_original_response(content=render(final, f"{wins_text}　{sign}　餘額 {fmt(new)}"))
@@ -1258,6 +1382,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 e = view.embed(f"🤝 雙方都是 Blackjack，退回賭注\n餘額 {fmt(balance(interaction.guild_id, interaction.user.id))}")
             else:
                 add(interaction.guild_id, interaction.user.id, int(賭注 * 2.5))
+                deduct_debt(interaction.guild_id, interaction.user.id, int(賭注 * 1.5))
                 e = view.embed(f"🌟 Blackjack！+{fmt(int(賭注 * 1.5))}\n餘額 {fmt(balance(interaction.guild_id, interaction.user.id))}",
                                discord.Color.gold())
             await interaction.response.send_message(embed=e)
