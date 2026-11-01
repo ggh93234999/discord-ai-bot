@@ -120,7 +120,7 @@ html body:has(.gcards){background:#d9d1bb}
 .gc-summon.R{--g:#40605a}.gc-summon.SR{--g:#b5342a}.gc-summon.SSR{--g:#c79a2a}
 .gc-orb{position:relative;width:min(70vw,300px);aspect-ratio:1}
 .gc-orb::before{content:"";position:absolute;inset:-10%;border-radius:50%;background:radial-gradient(circle,var(--g) 0%,transparent 62%);opacity:.35;animation:gchalo 1.4s ease-in-out infinite alternate}
-.gc-orb::after{content:"";position:absolute;inset:0;background:url("./gacha-ui/bloom.jpg") center/contain no-repeat;mix-blend-mode:multiply;-webkit-mask:radial-gradient(circle,#000 52%,transparent 71%);mask:radial-gradient(circle,#000 52%,transparent 71%);animation:gcbloom 2.4s ease-out infinite}
+.gc-orb::after{content:"";position:absolute;inset:0;background:url("./gacha-ui/bloom.jpg") center/contain no-repeat;mix-blend-mode:multiply;-webkit-mask:radial-gradient(circle,#000 62%,transparent 80%);mask:radial-gradient(circle,#000 62%,transparent 80%);animation:gcbloom 2.4s ease-out infinite}
 .gc-orb i,.gc-orb b{display:none}
 .gc-summon.SSR .gc-orb,.gc-summon.SR .gc-orb{animation:gcshake .2s linear infinite}
 .gc-stxt{font-size:22px;font-weight:800;letter-spacing:.45em;text-indent:.45em}.gc-summon small{color:#4d493f;font-size:12px}
