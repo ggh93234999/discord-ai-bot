@@ -2,9 +2,19 @@
 // 模式和種菜、賭場一樣：練習模式（練習幣、獨立收藏）／真代幣模式（Discord 授權後動用機器人錢包的真代幣）。
 import CARDS from "./gacha-cards.json";
 import { wsUrl } from "./gomoku.js";
+import "./gachacards.css";
 
 const ART = {};
 for (const [p, url] of Object.entries(import.meta.glob("./gacha-art/*.jpg", { eager: true, query: "?url", import: "default" }))) ART[Number(p.split("/").pop().slice(0, -4))] = url;
+const MIS_ART = {};
+for (const [p, url] of Object.entries(import.meta.glob("./gacha-ui/m_*.jpg", { eager: true, query: "?url", import: "default" }))) MIS_ART[p.split("/").pop().slice(2, -4)] = url;
+const mi = (id) => (MIS_ART[id] ? `<img class="gc-mi" src="${MIS_ART[id]}" alt="" draggable="false">` : "");
+// 數值小圖示（手繪風單色 SVG）：幣＝方孔錢、墨點＝墨滴、券＝紙券
+const I = {
+  coin: '<svg class="gc-ico i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><rect x="8.5" y="8.5" width="7" height="7"/></svg>',
+  ink: '<svg class="gc-ico i-ink" viewBox="0 0 24 24"><path d="M12 2c3.2 5 6.5 8.2 6.5 12.2a6.5 6.5 0 0 1-13 0C5.5 10.200 8.800 7 12 2z"/></svg>',
+  tix: '<svg class="gc-ico i-tix" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M9 6v12" stroke-dasharray="2 2"/></svg>',
+};
 const BYID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const RAR = ["SSR", "SR", "R", "N"];
 const RNAME = { SSR: "傳說", SR: "稀世", R: "珍品", N: "凡品" };
@@ -22,15 +32,15 @@ export function mountGachaCards(root, { env, back }) {
   const inSet = (c) => set === "all" || c.set === set;
   root.innerHTML = `
     <div class="game slots gcards">
-      <header><button class="back">← 選單</button><h2>🎴 水墨卡冊</h2><span></span></header>
+      <header class="gc-head"><button class="back">← 選單</button><h2 class="gc-title">水墨卡冊<i></i></h2></header>
       <div class="modebar">
-        <button class="mode on" data-m="practice">🎮 練習模式</button>
-        <button class="mode" data-m="real">💰 真代幣模式</button>
+        <button class="mode on" data-m="practice">練習模式</button>
+        <button class="mode" data-m="real">真代幣模式</button>
       </div>
       <div class="confirm" hidden><div class="ctext"></div><div class="cbtns"><button class="cyes">確定</button><button class="cno">取消</button></div></div>
       <div class="status">連線中…</div>
-      <div class="gc-bar"><span>💰 <em class="ballabel">練習幣</em> <b class="bal">--</b></span><span>🖋️ 墨點 <b class="ink">--</b></span><span>🎟️ 抽卡券 <b class="tix">--</b></span></div>
-      <div class="gc-tabs gc-main"><button class="tab on" data-tab="pull">🎴 抽卡</button><button class="tab" data-tab="disp">🧭 派遣</button><button class="tab" data-tab="book">📖 圖鑑</button></div>
+      <div class="gc-bar"><span>${I.coin}<em class="ballabel">練習幣</em> <b class="bal">--</b></span><span>${I.ink}墨點 <b class="ink">--</b></span><span>${I.tix}抽卡券 <b class="tix">--</b></span></div>
+      <div class="gc-tabs gc-main"><button class="tab on" data-tab="pull">抽卡</button><button class="tab" data-tab="disp">派遣</button><button class="tab" data-tab="book">圖鑑</button></div>
       <div class="gc-body"></div>
     </div>`;
   const $ = (s) => root.querySelector(s);
@@ -55,7 +65,7 @@ export function mountGachaCards(root, { env, back }) {
       else if (m.a === "signed") statusEl.textContent = `簽到成功，抽卡券 +${m.tickets}`;
       else if (m.a === "dprev") { dprev = m; if (tab === "disp" && dispSel) drawDisp(); }
       else if (m.a === "dsent") { dispSel = null; dprev = null; statusEl.textContent = "出發了！"; }
-      else if (m.a === "dclaimed") statusEl.textContent = `領回 🖋️ ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`;
+      else if (m.a === "dclaimed") statusEl.textContent = `領回 ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`;
       else if (m.a === "dcalled") statusEl.textContent = "已召回";
       else if (m.a === "salvaged") statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`;
       else if (m.a === "upgraded") statusEl.textContent = `升到 ${m.star} 星了（花 ${m.cost} 墨點）`;
@@ -77,25 +87,25 @@ export function mountGachaCards(root, { env, back }) {
   function drawPull() {
     if (!st) { body.innerHTML = `<p class="mempty">讀取中…</p>`; return; }
     const cur = real() ? "真代幣" : "練習幣";
-    const ms = st.milestones.map(([n, t]) => `<span class="gc-ms${st.claimed.includes("m" + n) ? " done" : ""}">${n} 張 → 🎟️${t}</span>`).join("");
-    const sets = Object.entries(st.sets).map(([s, x]) => `<div class="gc-setrow"><b>${x.name}</b><span class="gc-setbar"><i style="width:${x.have / x.n * 100}%"></i></span><span>${x.have} / ${x.n}</span><em>${st.claimed.includes("s" + s) ? "已領" : "集滿 🎟️" + st.setBonus[s]}</em></div>`).join("");
+    const ms = st.milestones.map(([n, t]) => `<span class="gc-ms${st.claimed.includes("m" + n) ? " done" : ""}">${n} 張 → ${I.tix}${t}</span>`).join("");
+    const sets = Object.entries(st.sets).map(([s, x]) => `<div class="gc-setrow"><b>${x.name}</b><span class="gc-setbar"><i style="width:${x.have / x.n * 100}%"></i></span><span>${x.have} / ${x.n}</span><em>${st.claimed.includes("s" + s) ? "已領" : `集滿 ${I.tix}` + st.setBonus[s]}</em></div>`).join("");
     body.innerHTML = `
       <div class="gc-pull">
         <div class="gc-big-ink"><b>${st.owned}</b> / ${st.total} 張　<small>累計抽了 ${st.pulls} 次</small></div>
         <div class="gc-btns">
           <button class="gc-one">抽 1 次<small>${money(st.price)} ${cur}</small></button>
           <button class="gc-ten">十連抽<small>${money(st.tenPrice)} ${cur}（九折）</small></button>
-          <button class="gc-t1"${st.tickets >= 1 ? "" : " disabled"}>用券抽 1 次<small>🎟️ ×1</small></button>
-          <button class="gc-t10"${st.tickets >= 10 ? "" : " disabled"}>用券十連<small>🎟️ ×10</small></button>
+          <button class="gc-t1"${st.tickets >= 1 ? "" : " disabled"}>用券抽 1 次<small>${I.tix} ×1</small></button>
+          <button class="gc-t10"${st.tickets >= 10 ? "" : " disabled"}>用券十連<small>${I.tix} ×10</small></button>
         </div>
-        <button class="gc-sign"${st.canSign ? "" : " disabled"}>${st.canSign ? "📅 每日簽到，領 1 張抽卡券" : "📅 今天簽到過了"}</button>
+        <button class="gc-sign"${st.canSign ? "" : " disabled"}>${st.canSign ? "每日簽到，領 1 張抽卡券" : "今天已經簽到過了"}</button>
         <details class="gc-rules"><summary>機率與規則</summary>
           <p>機率：SSR ${st.rate.SSR / 10}%、SR ${st.rate.SR / 10}%、R ${st.rate.R / 10}%、N ${st.rate.N / 10}%，每抽都是獨立機率，沒有保底。每天簽到送 1 抽。</p>
           <p>抽到重複的卡會留在收藏裡，到圖鑑可以自己決定要不要分解成墨點（每張：N ${st.dupInk.N}、R ${st.dupInk.R}、SR ${st.dupInk.SR}、SSR ${st.dupInk.SSR}）。墨點可以在圖鑑裡替卡升星（最高 ${st.maxStar} 星），或直接兌換還沒有的卡（N ${st.swap.N}、R ${st.swap.R}、SR ${st.swap.SR}、SSR ${money(st.swap.SSR)}）。</p>
           <p>練習模式和真代幣模式的收藏是分開的；<b>每次進入練習模式，收藏都會清空重來</b>（重新給 10 萬練習幣和 10 抽）。獎勵只發抽卡券和墨點，不會直接發代幣。</p>
         </details>
-        <div class="gc-sub">🏆 圖鑑獎勵（收集到幾張不同的卡，一次性）</div><div class="gc-mss">${ms}</div>
-        <div class="gc-sub">📚 卡組進度</div><div class="gc-sets">${sets}</div>
+        <div class="gc-sub">圖鑑獎勵（收集到幾張不同的卡，一次性）</div><div class="gc-mss">${ms}</div>
+        <div class="gc-sub">卡組進度</div><div class="gc-sets">${sets}</div>
       </div>`;
     const cost = (n) => `${n === 10 ? st.tenPrice : st.price} ${cur}`;
     const ask = (n) => confirmAsk(`花 ${cost(n)} 抽 ${n === 10 ? "十連" : "1 次"}？${real() ? "（真代幣會被扣）" : ""}`, () => send({ a: "pull", n, pay: "coin" }));
@@ -145,7 +155,7 @@ export function mountGachaCards(root, { env, back }) {
         <div class="gc-single"></div>
         <div class="gc-rfoot" hidden>
           <div class="gc-rsum">新卡 ${newN} 張${dupN ? `，重複 ${dupN} 張（留在收藏，到圖鑑決定要不要分解成墨點）` : ""}</div>
-          ${m.rewards && m.rewards.length ? `<div class="gc-rrew">${m.rewards.map((r) => `🏆 ${esc(r.text)}：抽卡券 +${r.tickets}`).join("<br>")}</div>` : ""}
+          ${m.rewards && m.rewards.length ? `<div class="gc-rrew">${m.rewards.map((r) => `◆ ${esc(r.text)}：抽卡券 +${r.tickets}`).join("<br>")}</div>` : ""}
         </div>
         <div class="gc-rbtns">${many ? `<button class="gc-all">全部翻開</button>` : ""}<button class="gc-rok" hidden>確定</button></div></div>`;
       const box = el.querySelector(".gc-rbox"), cards = [...el.querySelectorAll(".gc-rc2")];
@@ -237,11 +247,11 @@ export function mountGachaCards(root, { env, back }) {
     const show = () => {
       const c = curList[pos], star = st && st.cards[c.id] || 0;
       const dn = st && st.dups && st.dups[c.id] || 0, per = st ? st.dupInk[c.rarity] : 0;
-      const salv = dn ? `<div class="gc-act gc-salv"><div class="gc-dnote">你有 ${dn} 張重複</div><button class="gc-salv1">分解 1 張<small>🖋️ +${per}</small></button>${dn > 1 ? `<button class="gc-salvall">分解全部 ${dn} 張<small>🖋️ +${per * dn}</small></button>` : ""}</div>` : "";
+      const salv = dn ? `<div class="gc-act gc-salv"><div class="gc-dnote">你有 ${dn} 張重複</div><button class="gc-salv1">分解 1 張<small>${I.ink} +${per}</small></button>${dn > 1 ? `<button class="gc-salvall">分解全部 ${dn} 張<small>${I.ink} +${per * dn}</small></button>` : ""}</div>` : "";
       let act = "";
       if (st) {
-        if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act"><button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>🖋️ ${st.starBase[c.rarity] * star}</small></button></div>`;
-        else act = `<div class="gc-act"><button class="gc-swap"${st.ink >= st.swap[c.rarity] ? "" : " disabled"}>用墨點兌換<small>🖋️ ${money(st.swap[c.rarity])}</small></button></div>`;
+        if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act"><button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>${I.ink} ${st.starBase[c.rarity] * star}</small></button></div>`;
+        else act = `<div class="gc-act"><button class="gc-swap"${st.ink >= st.swap[c.rarity] ? "" : " disabled"}>用墨點兌換<small>${I.ink} ${money(st.swap[c.rarity])}</small></button></div>`;
       }
       el.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${curList.length < 2 ? " hidden" : ""}>◀</button>
         <div class="gc-big ${c.rarity}"><img class="${star ? "" : "gc-blur"}" src="${ART[c.id]}" alt="${esc(c.name)}" draggable="false">
@@ -281,10 +291,10 @@ export function mountGachaCards(root, { env, back }) {
     const slots = d.slots.map((s, i) => {
       if (!s) return `<div class="gc-slot idle"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>空閒</span></div><button class="gc-go" data-i="${i}">派遣</button></div>`;
       const ms = mname(s.m), left = s.end - now, total = s.end - s.at, ok = left <= 0;
-      return `<div class="gc-slot ${ok ? "done" : "run"}"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>${ms.icon} ${ms.name}</span></div>
+      return `<div class="gc-slot ${ok ? "done" : "run"}"><div class="gc-sh"><b>第 ${i + 1} 隊</b><span>${mi(ms.id)}${ms.name}</span></div>
         <div class="gc-ths">${s.ids.map((id) => thumb(id)).join("")}</div>
         <div class="gc-prog" data-end="${s.end}" data-at="${s.at}"><i style="width:${ok ? 100 : Math.max(2, (1 - left / total) * 100)}%"></i><span>${ok ? "完成了" : "剩 " + fmtT(left)}</span></div>
-        <div class="gc-sr">預計 🖋️ +${s.ink}${s.tick ? `　🎟️ ${Math.round(s.tick * 100)}% +1` : ""}</div>
+        <div class="gc-sr">預計 ${I.ink} +${s.ink}${s.tick ? `　${I.tix} ${Math.round(s.tick * 100)}% +1` : ""}</div>
         ${ok ? `<button class="gc-claim" data-i="${i}">領取</button>` : `<button class="gc-recall" data-i="${i}">召回（沒有獎勵）</button>`}</div>`;
     }).join("");
     let picker = "";
@@ -293,8 +303,8 @@ export function mountGachaCards(root, { env, back }) {
       const mine = Object.keys(st.cards).map(Number).filter((id) => !busy.has(id))
         .sort((a, b) => (ms.types.includes(BYID[b].type) - ms.types.includes(BYID[a].type)) || RAR.indexOf(BYID[a].rarity) - RAR.indexOf(BYID[b].rarity) || a - b);
       picker = `<div class="gc-picker"><div class="gc-ph"><b>第 ${dispSel.slot + 1} 隊：選任務和卡片（最多 ${d.teamMax} 張）</b></div>
-        <div class="gc-ms2">${d.missions.map((x) => `<button class="gc-mis${x.id === dispSel.m ? " on" : ""}" data-m="${x.id}"><span>${x.icon} ${x.name}</span><small>${x.hours} 小時${d.speed > 1 ? `（練習 ${fmtT(x.hours * 3600e3 / d.speed)}）` : ""}・${x.types.join("／")}加成${x.tick ? `・🎟️${Math.round(x.tick * 100)}%` : ""}</small></button>`).join("")}</div>
-        <div class="gc-pv">${dprev && dispSel.ids.length ? `預計 🖋️ <b>+${dprev.ink}</b>${dprev.tick ? `　🎟️ ${Math.round(dprev.tick * 100)}% +1` : ""}　類別符合 ${dprev.match} 張${dprev.bond ? "　✓ 同卡組羈絆 +20%" : ""}` : "點下面的卡加入隊伍（類別符合任務的卡墨點 ×1.5，整隊同卡組再 ×1.2）"}</div>
+        <div class="gc-ms2">${d.missions.map((x) => `<button class="gc-mis${x.id === dispSel.m ? " on" : ""}" data-m="${x.id}">${mi(x.id)}<span>${x.name}</span><small>${x.hours} 小時${d.speed > 1 ? `（練習 ${fmtT(x.hours * 3600e3 / d.speed)}）` : ""}・${x.types.join("／")}加成${x.tick ? `・${I.tix}${Math.round(x.tick * 100)}%` : ""}</small></button>`).join("")}</div>
+        <div class="gc-pv">${dprev && dispSel.ids.length ? `預計 ${I.ink} <b>+${dprev.ink}</b>${dprev.tick ? `　${I.tix} ${Math.round(dprev.tick * 100)}% +1` : ""}　類別符合 ${dprev.match} 張${dprev.bond ? "　✓ 同卡組羈絆 +20%" : ""}` : "點下面的卡加入隊伍（類別符合任務的卡墨點 ×1.5，整隊同卡組再 ×1.2）"}</div>
         <div class="gc-pgrid">${mine.length ? mine.map((id) => { const sel = dispSel.ids.includes(id), hit = ms.types.includes(BYID[id].type);
           return `<button class="gc-pc ${BYID[id].rarity}${sel ? " sel" : ""}${hit ? " hit" : ""}" data-id="${id}" title="${esc(BYID[id].name)}"><img src="${ART[id]}" alt="" draggable="false"><span class="gc-badge ${BYID[id].rarity}">${BYID[id].rarity}</span><span class="gc-star">${"★".repeat(st.cards[id])}</span>${sel ? `<span class="gc-chk">✓</span>` : ""}</button>`; }).join("") : `<p class="mempty">沒有可派遣的卡</p>`}</div>
         <div class="gc-pbtns"><button class="gc-send"${dispSel.ids.length ? "" : " disabled"}>出發（${dispSel.ids.length}/${d.teamMax}）</button><button class="gc-pcancel">取消</button></div></div>`;
