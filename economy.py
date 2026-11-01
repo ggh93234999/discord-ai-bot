@@ -127,7 +127,7 @@ def house_add(gid: int, delta: int) -> int | None:
 # ---------------------------------------------------------------- 轉帳紀錄（大笨bot 查帳用）
 LEDGER_FILE = Path(__file__).parent / "transfers.json"
 LEDGER_KEEP = 12000
-NO_HOUSE_WHY = ("鍛造", "種菜")      # 不是賭博的玩法：錢不經過大笨bot 的帳戶，也不記帳本
+NO_HOUSE_WHY = ("鍛造", "種菜", "抽卡")      # 不是賭博的玩法：錢不經過大笨bot 的帳戶，也不記帳本
 GAME_KINDS = ("遊戲結算", "遊戲派彩")      # 機器人當莊家的輸贏；查帳預設不列，避免蓋掉真正的轉帳
 
 
