@@ -124,7 +124,7 @@ html body:has(.gcards){background:#d9d1bb}
 .gc-orb i,.gc-orb b{display:none}
 .gc-summon.SSR .gc-orb,.gc-summon.SR .gc-orb{animation:gcshake .2s linear infinite}
 .gc-stxt{font-size:22px;font-weight:800;letter-spacing:.45em;text-indent:.45em}.gc-summon small{color:#4d493f;font-size:12px}
-@keyframes gcbloom{0%{transform:scale(.35) rotate(0);opacity:.2}35%{opacity:1}100%{transform:scale(1.1) rotate(25deg);opacity:1}}
+@keyframes gcbloom{0%{transform:scale(.3);opacity:.15}30%{opacity:1}100%{transform:scale(1.12);opacity:1}}
 @keyframes gchalo{from{transform:scale(.8)}to{transform:scale(1.1)}}
 @keyframes gcshake{0%{transform:translate(0,0)}25%{transform:translate(2px,-2px)}50%{transform:translate(-2px,2px)}75%{transform:translate(2px,2px)}100%{transform:translate(0,0)}}
 .gc-rbox{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;width:min(560px,100%);max-height:100%;overflow:auto;padding:16px 12px 18px;border:2px solid #16140f;border-radius:1px;background:#e8e1cf url("./gacha-ui/paper.jpg") center/cover;color:#16140f;text-align:center;box-shadow:0 0 0 5px #e8e1cf,0 0 0 6px #8a8576}
