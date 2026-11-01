@@ -96,6 +96,32 @@ def fmt(n: int) -> str:
     return f"{COIN}{n:,}"
 
 
+# ---- 大笨bot 自己的帳戶（莊家）：Activity 裡玩家輸的錢進它的口袋、贏的從它的口袋出；錢不夠付時帳戶歸零（玩家的彩金照付）。
+HOUSE_START = 1_000_000
+HOUSE_NAME = "大笨bot"
+_client = None
+
+
+def _house(gid: int):
+    if _client is None or _client.user is None:
+        return None
+    return wallet.setdefault(str(gid), {}).setdefault(str(_client.user.id), {"coins": HOUSE_START, "last": 0.0, "name": HOUSE_NAME, "house": True})
+
+
+def house_balance(gid: int) -> int | None:
+    a = _house(gid)
+    return None if a is None else int(a["coins"])
+
+
+def house_add(gid: int, delta: int) -> int | None:
+    a = _house(gid)
+    if a is None:
+        return None
+    a["coins"] = max(0, int(a["coins"]) + int(delta))
+    _save()
+    return a["coins"]
+
+
 # ---------------------------------------------------------------- 遊戲
 
 def slot_spin() -> tuple[list[str], int, str]:
@@ -520,7 +546,8 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             except Exception:
                 log.exception("語音賺幣迴圈出錯")
 
-    global start_voice_loop, start_internal_api
+    global start_voice_loop, start_internal_api, _client
+    _client = client
     start_voice_loop = lambda: asyncio.create_task(voice_earn_loop())
 
     # ---- 內部 API：給 Discord Activity 的後端用（只聽 127.0.0.1，要帶金鑰）。
@@ -584,6 +611,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "insufficient", "balance": have})
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, back - bet, name)   # 同一個事件迴圈裡，沒有 await，不會被別的請求插隊
+            house_add(gid, bet - back)               # 莊家：玩家輸的進它的口袋，贏的從它的口袋出
             log.info("Activity %s結算：%s 賭 %s 拿回 %s → 餘額 %s", str(d.get("why") or "老虎機")[:20], name, bet, back, new)
             return web.json_response({"ok": True, "balance": new})
 
@@ -603,6 +631,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "no_guild"})
             name = str(d.get("name") or uid)[:80]
             new = add(gid, uid, amount, name)
+            house_add(gid, -amount)                  # 對賭的彩金從莊家（先前收下賭注的人）出
             log.info("Activity %s派彩：%s +%s → 餘額 %s", str(d.get("why") or "")[:20], name, amount, new)
             return web.json_response({"ok": True, "balance": new})
 

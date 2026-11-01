@@ -42,6 +42,7 @@ import webimg
 import divination
 import actstatus
 import almanac
+import botwallet
 import dmlog
 import fortune
 import models
@@ -612,6 +613,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return divination.run_tool(args)
         if name == "almanac":
             return almanac.run(args)
+        if name == "bot_wallet":
+            return botwallet.run(msg.guild.id if msg is not None and msg.guild else None)
         if name == "activity_status":
             return await actstatus.run(msg.guild.id if msg is not None and msg.guild else None)
         if name == "fortune_chart":
@@ -712,6 +715,8 @@ def tool_status(name: str, args_json: str) -> str:
         return "🧭 排命盤中…" if args.get("kind") == "bazi" else "🧭 排盤、畫星盤中…"
     if name == "almanac":
         return "📅 查黃曆、擇日"
+    if name == "bot_wallet":
+        return "🪙 數自己的代幣"
     if name == "activity_status":
         return "👀 看大家在玩什麼"
     if name == "divination":
@@ -923,6 +928,7 @@ def strip_meta(text: str) -> str:
 # 冷門工具只在使用者這句話提到相關字眼時才放進工具清單（工具說明每次都會算進 token，不常用的別一直帶著）
 ACT_RE = re.compile(r"activity|遊戲間|在玩|在打|玩什麼|玩啥|誰在(玩|打)|有人(在)?(玩|打)|開著", re.I)
 
+MONEY_RE = re.compile(r"你.{0,6}(代幣|代币|多少錢|多少钱|多少幣|身家|錢包|荷包|存款|餘額|口袋)|(代幣|代币|錢包|餘額).{0,6}你|莊家.{0,6}(賺|賠|多少|有)|bot.{0,6}(代幣|錢)", re.I)
 ALMANAC_RE = re.compile(r"吉日|黃道|黄道|擇日|择日|宜忌|黃曆|黄历|農民曆|农民历|適合.{0,6}(結婚|搬家|入宅|開店|開市|動土|訂婚|買車)|哪天.{0,4}(搬|結婚|開)", re.I)
 
 
@@ -943,7 +949,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     """跟模型對話；模型要用工具就執行、把結果丟回去，直到它給出最後答案。
     actions：會被填入「實際執行的動作結果」，由程式直接附在回覆下面，不靠模型轉述。"""
     messages = [{"role": "system", "content": load_system_prompt(msg.guild if msg is not None else None)}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL] if MONEY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
