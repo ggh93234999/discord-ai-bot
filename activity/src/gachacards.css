@@ -9,11 +9,11 @@ html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots button{font-family:var(--serif)}
 
 /* 頂部橫幅：水墨遠山 + 直排標題 */
-.game.gcards.slots .gc-head{position:relative;display:flex;align-items:flex-start;justify-content:space-between;height:156px;padding:10px 14px;margin:0;background:none;border:0;overflow:hidden}
-.game.gcards.slots .gc-head::before{content:"";position:absolute;inset:0;background:url("./gacha-ui/banner.jpg") right center/cover no-repeat;mix-blend-mode:multiply;opacity:.95;pointer-events:none}
+.game.gcards.slots .gc-head{position:relative;display:flex;align-items:flex-start;justify-content:space-between;height:196px;padding:10px 14px;margin:0;background:none;border:0;overflow:hidden}
+.game.gcards.slots .gc-head::before{content:"";position:absolute;inset:0;background:url("./gacha-ui/banner.jpg") right 35%/cover no-repeat;mix-blend-mode:multiply;opacity:.95;pointer-events:none}
 .game.gcards.slots .gc-head::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,transparent,var(--ink2) 15%,var(--ink) 50%,var(--ink2) 85%,transparent);opacity:.7}
 .game.gcards.slots .gc-head .back{position:relative;z-index:1;padding:6px 12px;border:1px solid var(--ink);border-radius:2px;background:rgba(241,236,221,.7);color:var(--ink);font-size:14px;cursor:pointer}
-.game.gcards.slots .gc-title{position:relative;z-index:1;margin:0 8px 0 0;writing-mode:vertical-rl;font-size:30px;font-weight:900;letter-spacing:.12em;line-height:1;color:var(--ink);text-shadow:0 0 1px var(--ink)}
+.game.gcards.slots .gc-title{flex:none;width:max-content;height:max-content;align-self:flex-start;position:relative;z-index:1;margin:0 4px 0 0;padding:12px 9px 10px;background:rgba(240,235,219,.93);border:1px solid #16140f;box-shadow:0 0 0 3px rgba(240,235,219,.93),0 0 0 4px #16140f;writing-mode:vertical-rl;font-size:30px;font-weight:900;letter-spacing:.12em;line-height:1;color:var(--ink);text-shadow:0 0 1px var(--ink)}
 .game.gcards.slots .gc-title i{display:block;margin-top:.5em;width:.55em;height:.55em;background:var(--seal);border-radius:1px;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
 
 /* 模式切換：像兩枚印章，選中的蓋紅章 */
