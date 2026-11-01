@@ -26,6 +26,7 @@ server/horses.json
 server/forge.json
 server/casino_log.json
 server/farm.json
+server/gacha.json
 
 # 圖創區：使用者畫的圖與紀錄
 server/gallery_data
