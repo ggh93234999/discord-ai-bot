@@ -21,6 +21,7 @@ export const RATE = { SSR: 15, SR: 85, R: 300, N: 600 };           // 千分比�
 const DUP_INK = { N: 5, R: 15, SR: 50, SSR: 150 };                 // 抽到重複的卡轉成幾點墨點
 const STAR_BASE = { N: 10, R: 25, SR: 80, SSR: 250 };             // 升星：從 k 星到 k+1 星要 base×k 墨點
 const MAX_STAR = 5;
+const DUP_STAR = { 1: 1, 2: 1, 3: 2, 4: 3 };                      // 用重複卡升星：從 k 星升到 k+1 星要幾張重複（共 7 張升滿）
 const SWAP = { N: 100, R: 300, SR: 1200, SSR: 4000 };              // 用墨點直接兌換還沒有的卡
 const MILESTONES = [[10, 1], [25, 2], [50, 3], [100, 5], [150, 8], [200, 10], [250, 12], [300, 20]];     // 收集到幾張不同的卡 → 一次性送幾張抽卡券
 const SETBONUS = { east: 20, west: 20, orig: 10, whim: 10 };       // 集滿一個卡組 → 抽卡券
@@ -110,7 +111,7 @@ function viewOf(u, real, bal) {
     t: "gc", a: "view", real, balance: real ? bal : u.coin, ink: u.ink, tickets: u.tickets, cards: u.cards, dups: u.dups, show: u.show, disp: { now: Date.now(), speed: speedOf(real), nslots: NSLOTS, teamMax: TEAM_MAX, slots: u.slots, missions: MISSIONS, rates: INK_RATE, bonus: { star: STAR_BONUS, match: MATCH_BONUS, bond: BOND_BONUS } }, owned, total: CARDS.length,
     pulls: u.pulls, canSign: u.daily !== today(),
     claimed: u.claimed, milestones: MILESTONES, setBonus: SETBONUS, price: PRICE, tenPrice: TEN_PRICE, rate: RATE,
-    dupInk: DUP_INK, starBase: STAR_BASE, swap: SWAP, maxStar: MAX_STAR,
+    dupInk: DUP_INK, dupStar: DUP_STAR, starBase: STAR_BASE, swap: SWAP, maxStar: MAX_STAR,
     sets: Object.fromEntries(Object.entries(SETIDS).map(([s, ids]) => [s, { name: SETS[s], have: ids.filter((i) => u.cards[i]).length, n: ids.length }])),
   };
 }
@@ -185,10 +186,11 @@ export async function handleGacha(ws, m) {
       if (!c || !star) { err("not_owned"); return; }
       if (star >= MAX_STAR) { err("max_star"); return; }
       if (m.dup) {      // 拿 1 張重複的同一張卡來升星，不花墨點
-        if (!(u.dups[cid] > 0)) { err("no_dup"); return; }
-        if (--u.dups[cid] <= 0) delete u.dups[cid];
+        const need = DUP_STAR[star];
+        if (!((u.dups[cid] || 0) >= need)) { err("no_dup", { need }); return; }
+        u.dups[cid] -= need; if (u.dups[cid] <= 0) delete u.dups[cid];
         u.cards[cid] = star + 1; gachaSave(true);
-        out(ws, { t: "gc", a: "upgraded", id: cid, star: star + 1, cost: 0, dup: true });
+        out(ws, { t: "gc", a: "upgraded", id: cid, star: star + 1, cost: 0, dup: true, need });
         await send(); return;
       }
       const cost = starCost(c.rarity, star);

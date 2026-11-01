@@ -25,7 +25,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const money = (n) => Number(n).toLocaleString();
 const stars = (n, max = 5) => "★".repeat(n) + "☆".repeat(Math.max(0, max - n));
 const ERR = {
-  real_off: "真代幣模式還沒開放", no_dup: "沒有重複的卡可以分解", bad_slot: "這個隊伍欄位不能用", slot_busy: "這一隊已經出發了", bad_team: "一隊要 1～3 張卡", card_busy: "有卡片已經在別隊出發了", not_done: "還沒完成，不能領取", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
+  real_off: "真代幣模式還沒開放", no_dup: "重複的卡不夠", bad_slot: "這個隊伍欄位不能用", slot_busy: "這一隊已經出發了", bad_team: "一隊要 1～3 張卡", card_busy: "有卡片已經在別隊出發了", not_done: "還沒完成，不能領取", need_login: "要先登入才能用真代幣模式", bot_down: "機器人暫時連不上，稍後再試", insufficient: "代幣不夠", busy: "上一個動作還在處理，等一下再按",
   no_ticket: "抽卡券不夠", signed: "今天已經簽到過了", not_owned: "你還沒有這張卡", max_star: "已經是最高星級", no_ink: "墨點不夠", already: "這張卡你已經有了", bad_card: "沒有這張卡", error: "發生錯誤，再試一次",
 };
 const pidOf = () => { try { let p = localStorage.getItem("gcpid"); if (!p) { p = Math.random().toString(36).slice(2, 12); localStorage.setItem("gcpid", p); } return p; } catch { return "x" + Math.random().toString(36).slice(2, 10); } };
@@ -71,7 +71,7 @@ export function mountGachaCards(root, { env, back }) {
       else if (m.a === "dclaimed") { sfx.claim(); statusEl.textContent = `領回 ${m.ink} 墨點${m.tickets ? `，還拿到抽卡券 +${m.tickets}` : ""}`; }
       else if (m.a === "dcalled") { sfx.recall(); statusEl.textContent = "已召回"; }
       else if (m.a === "salvaged") { sfx.salvage(); statusEl.textContent = `分解了 ${m.count} 張重複卡，墨點 +${m.ink}`; }
-      else if (m.a === "upgraded") { sfx.star(); statusEl.textContent = m.dup ? `用 1 張重複卡升到 ${m.star} 星了` : `升到 ${m.star} 星了（花 ${m.cost} 墨點）`; }
+      else if (m.a === "upgraded") { sfx.star(); statusEl.textContent = m.dup ? `用 ${m.need} 張重複卡升到 ${m.star} 星了` : `升到 ${m.star} 星了（花 ${m.cost} 墨點）`; }
       else if (m.a === "swapped") { sfx.swap(); if (m.rewards && m.rewards.length) setTimeout(sfx.reward, 600); statusEl.textContent = `兌換成功（花 ${money(m.cost)} 墨點）` + (m.rewards && m.rewards.length ? "，" + m.rewards.map((r) => `${r.text}，抽卡券 +${r.tickets}`).join("；") : ""); }
       else if (m.a === "err") { sfx.err(); statusEl.textContent = ERR[m.error] || ERR.error; if (m.balance != null && st) { st.balance = m.balance; showBar(); } }
     };
@@ -255,7 +255,7 @@ export function mountGachaCards(root, { env, back }) {
       const salv = dn ? `<div class="gc-act gc-salv"><div class="gc-dnote">你有 ${dn} 張重複</div><button class="gc-salv1">分解 1 張<small>${I.ink} +${per}</small></button>${dn > 1 ? `<button class="gc-salvall">分解全部 ${dn} 張<small>${I.ink} +${per * dn}</small></button>` : ""}</div>` : "";
       let act = "";
       if (st) {
-        if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act">${dn ? `<button class="gc-updup">用 1 張重複卡升到 ${star + 1} 星<small>剩 ${dn - 1} 張重複</small></button>` : ""}<button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>${I.ink} ${st.starBase[c.rarity] * star}</small></button></div>`;
+        if (star) act = star >= st.maxStar ? `<div class="gc-act">已滿星 ★★★★★</div>` : `<div class="gc-act">${dn ? `<button class="gc-updup"${dn >= st.dupStar[star] ? "" : " disabled"}>用 ${st.dupStar[star]} 張重複卡升到 ${star + 1} 星<small>你有 ${dn} 張重複</small></button>` : ""}<button class="gc-up"${st.ink >= st.starBase[c.rarity] * star ? "" : " disabled"}>升到 ${star + 1} 星<small>${I.ink} ${st.starBase[c.rarity] * star}</small></button></div>`;
         else act = `<div class="gc-act"><button class="gc-swap"${st.ink >= st.swap[c.rarity] ? "" : " disabled"}>用墨點兌換<small>${I.ink} ${money(st.swap[c.rarity])}</small></button></div>`;
       }
       el.innerHTML = `<button class="gc-nav gc-prev" aria-label="上一張"${curList.length < 2 ? " hidden" : ""}>◀</button>
