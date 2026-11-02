@@ -17,19 +17,22 @@ function loadEnv(file) {
 
 const dir = fileURLToPath(new URL(".", import.meta.url));
 export const ENV = { ...loadEnv(dir + ".env"), ...loadEnv(dir + "../../.env"), ...process.env };
-const CLIENT_ID = ENV.DISCORD_CLIENT_ID || "1560169041493102594";
+const CLIENT_ID = ENV.DISCORD_CLIENT_ID || ENV.VITE_CLIENT_ID || "";
 const CLIENT_SECRET = ENV.DISCORD_CLIENT_SECRET || "";
-export const GUILD_ID = ENV.ACTIVITY_GUILD_ID || "1560169531777744938";
+export const GUILD_ID = ENV.ACTIVITY_GUILD_ID || "";
 const BOT_API = ENV.BOT_API || "http://127.0.0.1:3107";
-let INTERNAL_KEY = "";
-try { INTERNAL_KEY = fs.readFileSync(dir + "internal.key", "utf8").trim(); } catch {}
+// 內部金鑰：INTERNAL_KEY（.env，由機器人第一次啟動時自動產生）；舊版 internal.key 檔仍可用。
+// 沒讀到就每次重讀，這樣機器人晚一步產生也不用重啟 Activity。
+let INTERNAL_KEY = String(ENV.INTERNAL_KEY || "").trim();
+function loadKey() {
+  if (INTERNAL_KEY.length >= 32) return INTERNAL_KEY;
+  try { INTERNAL_KEY = String(loadEnv(dir + "../../.env").INTERNAL_KEY || "").trim(); } catch {}
+  if (INTERNAL_KEY.length < 32) { try { INTERNAL_KEY = fs.readFileSync(dir + "internal.key", "utf8").trim(); } catch {} }
+  return INTERNAL_KEY.length >= 32 ? INTERNAL_KEY : "";
+}
 
-// 玩家目前在哪個伺服器開的 Activity（登入時記下；沒記錄就用預設伺服器）
-const userGid = new Map();
-export const gidOf = (uid) => userGid.get(String(uid)) || GUILD_ID;
-
-export const internalKey = () => INTERNAL_KEY;
-export const betEnabled = () => !!(CLIENT_SECRET && INTERNAL_KEY);
+export const internalKey = () => loadKey();
+export const betEnabled = () => !!(CLIENT_SECRET && loadKey());
 
 // ---- 登入憑證：隨機字串 → 玩家身分，只存在記憶體，12 小時過期
 const sessions = new Map();
@@ -45,7 +48,7 @@ setInterval(() => { for (const [k, s] of sessions) if (s.exp < Date.now()) sessi
 // ---- 機器人內部 API
 async function bot(path, body) {
   const r = await fetch(BOT_API + path, {
-    method: "POST", headers: { "X-Key": INTERNAL_KEY, "Content-Type": "application/json" },
+    method: "POST", headers: { "X-Key": loadKey(), "Content-Type": "application/json" },
     body: JSON.stringify(body), signal: AbortSignal.timeout(4000),
   });
   return r.json();
@@ -53,7 +56,7 @@ async function bot(path, body) {
 // 圖創區：問機器人這句話要怎麼回、要不要畫圖（語言模型可能要想一陣子）
 export async function botGalleryChat(gid, uid, name, cat, text, history) {
   const r = await fetch(BOT_API + "/gallery/chat", {
-    method: "POST", headers: { "X-Key": INTERNAL_KEY, "Content-Type": "application/json" },
+    method: "POST", headers: { "X-Key": loadKey(), "Content-Type": "application/json" },
     body: JSON.stringify({ gid, uid, name, cat, text, history }), signal: AbortSignal.timeout(160_000),
   });
   return r.json();

@@ -10,7 +10,6 @@ from pathlib import Path
 import aiohttp
 
 log = logging.getLogger("discord-ai-bot.actstatus")
-KEY_FILE = paths.ROOT / "activity" / "server" / "internal.key"
 URL = os.getenv("ACTIVITY_API", "http://127.0.0.1:3101").rstrip("/") + "/api/internal/presence"   # Activity 後端位址（預設同一台）
 
 NAMES = {
@@ -42,7 +41,7 @@ async def run(guild_id: int | None) -> str:
     if not guild_id:
         return "這裡不是伺服器，看不到 Activity 的人。"
     try:
-        key = KEY_FILE.read_text().strip()
+        key = paths.internal_key()
     except OSError:
         return "Activity 沒有開，查不到。"
     try:

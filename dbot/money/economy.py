@@ -177,11 +177,9 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
     async def internal_api():
         from aiohttp import web
         import hmac
-        key_file = paths.ROOT / "activity" / "server" / "internal.key"
-        try:
-            key = key_file.read_text().strip()
-        except OSError:
-            log.info("沒有 internal.key，不啟動 Activity 內部 API")
+        key = paths.internal_key(create=True)
+        if not key:
+            log.info("沒有 INTERNAL_KEY（.env 寫不進去），不啟動 Activity 內部 API")
             return
         if len(key) < 32:
             return

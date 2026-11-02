@@ -30,3 +30,40 @@ def record(name: str) -> Path:
 
 def logfile(name: str) -> Path:
     return _place(LOGS, name)
+
+
+def internal_key(create: bool = False) -> str:
+    """機器人 ↔ Activity 後端共用的內部金鑰（INTERNAL_KEY）。
+    讀取順序：環境變數 → 專案 .env → 舊版 activity/server/internal.key。
+    create=True（只有機器人用）：全都沒有就自己產生一把，寫進 .env，架設的人不用手動設定。"""
+    import os
+    import secrets
+    k = os.environ.get("INTERNAL_KEY", "").strip()
+    if len(k) >= 32:
+        return k
+    envf = ROOT / ".env"
+    try:
+        for line in envf.read_text(encoding="utf-8-sig").splitlines():
+            if line.strip().startswith("INTERNAL_KEY="):
+                k = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if len(k) >= 32:
+                    return k
+    except OSError:
+        pass
+    try:
+        k = (ROOT / "activity" / "server" / "internal.key").read_text().strip()
+        if len(k) >= 32:
+            return k
+    except OSError:
+        pass
+    if not create:
+        return ""
+    k = secrets.token_hex(32)
+    try:
+        with open(envf, "a", encoding="utf-8") as f:
+            f.write(("\n" if envf.exists() and not envf.read_text(encoding="utf-8").endswith("\n") else "") + f"INTERNAL_KEY={k}\n")
+        os.environ["INTERNAL_KEY"] = k
+    except OSError as e:
+        print(f"[paths] 無法把 INTERNAL_KEY 寫進 .env：{e!r}")
+        return ""
+    return k
