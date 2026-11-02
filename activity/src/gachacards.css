@@ -3,9 +3,7 @@
 .game.gcards.slots{--paper:#e8e1cf;--paper2:#f1ecdd;--ink:#16140f;--ink2:#4d493f;--ink3:#8a8576;--seal:#b5342a;--dai:#40605a;--gold:#a8832a;
   --serif:"LXGW WenKai TC","Noto Serif TC","Source Han Serif TC","Songti TC","STSong","PMingLiU",serif;
   display:block;width:100%;box-sizing:border-box;min-height:100vh;padding:0 0 28px;color:var(--ink);font-family:var(--serif);
-  background:var(--paper);isolation:isolate;}
-/* 紙紋放在固定的偽元素上，不用 background-attachment:fixed（iOS 上它會只畫第一屏，往下捲就露出深色底） */
-.game.gcards.slots::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--paper) url("./gacha-ui/paper.jpg") center top/cover no-repeat}
+  background:var(--paper) url("./gacha-ui/paper.jpg") center top/cover no-repeat;}
 html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots *{box-sizing:border-box}
 .game.gcards.slots button{font-family:var(--serif)}
