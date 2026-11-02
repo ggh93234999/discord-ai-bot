@@ -395,6 +395,17 @@ class PanelView(discord.ui.View):
     async def vol_up(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._vol(interaction, VOLUME_STEP)
 
+    @discord.ui.button(emoji="📻", label="電台", style=discord.ButtonStyle.secondary, row=1)
+    async def radio_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        p = self.player
+        await interaction.response.defer()
+        msg = await do_radio(interaction.user, p.text_channel or interaction.channel, not p.radio)
+        if not p.radio and "電台" not in msg:
+            await interaction.followup.send(msg, ephemeral=True)
+        elif msg.startswith(("要先", "進不了")):
+            await interaction.followup.send(msg, ephemeral=True)
+        await p.refresh_panel()
+
     async def _vol(self, interaction: discord.Interaction, delta: int):
         p = self.player
         new = max(1, min(MAX_VOLUME, p.volume + delta))
@@ -572,6 +583,8 @@ class GuildPlayer:
             return
         embed = self.build_embed(left=left)
         view = None if left else self.view
+        if view is not None:      # 電台開著就把按鈕亮成綠色
+            view.radio_btn.style = discord.ButtonStyle.success if self.radio else discord.ButtonStyle.secondary
         if self.panel is not None and not repost:
             try:
                 await self.panel.edit(embed=embed, view=view)
