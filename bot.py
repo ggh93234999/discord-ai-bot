@@ -23,8 +23,6 @@ import os
 import random
 import re
 from datetime import datetime
-from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import aiohttp
 import discord
@@ -49,99 +47,67 @@ from dbot.ai import fortune
 from dbot.core import models
 from dbot.music import music
 from dbot.core import vstatus
-
-BASE_DIR = Path(__file__).resolve().parent
-
-
-def load_env_file(path: Path) -> None:
-    """讀 .env（不覆蓋已存在的環境變數；systemd 已經用 EnvironmentFile 帶進來也沒關係）。"""
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8-sig").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-
-load_env_file(BASE_DIR / ".env")
-
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "").strip()
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:4000/v1").strip().rstrip("/")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen").strip()
-REASONING_EFFORT = os.getenv("REASONING_EFFORT", "none").strip()  # none = 不思考，回得快
-REMOTE_REASONING_EFFORT = os.getenv("REMOTE_REASONING_EFFORT", "none").strip()  # 線上模型（deepseek）的思考程度，none = 不思考，省錢
-LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "300"))
-SLOW_NOTICE_SECONDS = int(os.getenv("SLOW_NOTICE_SECONDS", "15"))
-LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "24h").strip()
-HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "30"))
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1500"))
-ENV_AUTO_CHANNELS = {
-    int(x) for x in re.split(r"[,\s]+", os.getenv("AUTO_REPLY_CHANNEL_IDS", "")) if x.isdigit()
-}
-# 看圖：最近幾則訊息裡的圖片才送給模型、最多幾張、縮到多大
-IMAGE_LOOKBACK = int(os.getenv("IMAGE_LOOKBACK", "4"))
-MAX_IMAGES = int(os.getenv("MAX_IMAGES", "4"))
-IMAGE_MAX_SIDE = int(os.getenv("IMAGE_MAX_SIDE", "1280"))
-# 上網：每次回覆最多呼叫幾輪工具
-WEB_TOOLS = os.getenv("WEB_TOOLS", "on").strip().lower() not in ("off", "0", "false", "no")
-MAX_TOOL_ROUNDS = int(os.getenv("MAX_TOOL_ROUNDS", "5"))
-TZ = ZoneInfo(os.getenv("TZ_NAME", "Asia/Taipei"))
-
-SYSTEM_PROMPT_FILE = BASE_DIR / "system_prompt.txt"
-STATE_FILE = paths.record("state.json")
-DEFAULT_SYSTEM_PROMPT = (
-    "你是 Discord 伺服器裡的一位成員，用繁體中文跟大家自然聊天。"
-    "回覆要簡短口語，像朋友在聊天，不要用條列或標題。"
+from dbot.core import runtime
+from dbot.ai.nudges import (
+    ACTION_TOOLS,
+    ACT_RE,
+    ALMANAC_RE,
+    CARD_MAX_TOKENS,
+    CARD_NUDGE,
+    CARD_TOOLS,
+    CLAIM_RE,
+    DRAW_ASK_RE,
+    DRAW_NUDGE,
+    DRAW_REFUSE_RE,
+    FAKE_MEDIA_RE,
+    FILE_RE,
+    LOG_RE,
+    MONEY_ANY_RE,
+    MONEY_RE,
+    MULTI_NUDGE,
+    NUDGE,
+    PAY_RE,
+    PLAYING_CLAIM_RE,
+    REPAY_RE,
+    STATE_NUDGE,
+    TITLE_NUDGE,
+    last_user_text,
+    recent_user_text,
+    strip_fake_media,
+    strip_meta,
 )
-TOOL_GUIDE = (
-    "【系統自動訊息】對話紀錄裡標著「系統自動訊息」的內容（畫好的圖、「好了（…秒）」、排隊狀態）是程式貼的，不是你寫的。"
-    "你不可以自己寫「[圖片：…]」或「好了（快速・…秒）」這類字；圖只有你呼叫 draw_image／edit_image、而且程式真的畫完才會貼出來，沒呼叫就不要說畫好了。"
-    "【重要】你可以上網。你有三個工具：weather（查天氣預報）、web_search（搜尋網路）和 fetch_url（讀取網頁內容）。"
-    "問天氣一律用 weather。"
-    "你的知識停在訓練時，可能已經過時：凡是問「最新」「現在」「今年」「最近」的東西"
-    "（產品型號、版本、誰擔任什麼職位、排名、活動），都要先 web_search 確認，不要用猜的。"
-    "只要問題牽涉即時或會變動的資訊（天氣、新聞、價格、匯率、比賽、營業時間、最近發生的事、"
-    "某個東西的最新版本），或你不確定答案，就一定要先呼叫 web_search，絕對不要說「我沒辦法查」"
-    "或叫對方自己去查。搜尋摘要不夠就用 fetch_url 打開最相關的一兩個網頁。"
-    "查完用自己的話回答，最後附上一兩個來源網址（用 <網址> 包起來，避免 Discord 產生預覽）。"
-    "一般聊天、常識、數學、不需要即時資訊的問題就直接回答，不要搜尋。"
-    "沒有呼叫工具的回覆，絕對不要放任何網址或假裝有來源。"
-    "要你隨機選數字、骰骰子、抽號碼時，一定要呼叫 random_number，不能自己編數字。"
-    "有人要占卜、算命、抽塔羅、抽籤、擲筊、卜卦時，一定要呼叫 divination，結果以工具為準，絕對不能自己編牌或編籤；"
-    "結果卡會由程式貼在你的回覆上面（已經列出每張牌的位置、牌名、正逆位，或籤號、卦名），你的回覆一開頭就直接講意思，"
-    "不要再把抽到的牌／籤／卦重新列一遍、複述一次，也不要用「第一張是…」「你抽到…」這類開場；提到牌時只用牌名簡稱帶過即可。"
-    "接著完整解讀，回答對方真正想問的事。"
-    "有人要排八字、命盤、星盤、看上升星座時，呼叫 fortune_chart（要出生日期，時間、出生地、性別有就填，缺的資料先問）；"
-    "命盤卡和星盤圖會由程式貼出，你只要解讀，不要自己排盤或編干支、星座。"
-    "【占卜、算命的回覆不受「簡短」限制】塔羅、籤詩、擲筊、易經、八字、星盤都要完整解釋：逐張牌／逐句籤詩／每個重點（日主、五行、十神、大運、三巨頭、行星宮位相位）說明「代表什麼意思」（不是重述抽到什麼），"
-    "再串起來回答對方的問題、給具體建議，可以分成幾段、用小標題或條列讓它好讀，大約 400～900 字（八字＋星盤一起排可以更長）。"
-    "絕對不能只說一句「結果在上面」或只貼圖不解釋。"
-    "在伺服器裡你還有 music 工具，可以在使用者所在的語音頻道放 YouTube 音樂、跳過、暫停、停止、看佇列；"
-    "有人叫你放歌就直接用它，放歌後簡短回一句就好，不用附來源網址。"
-    "你還有 create_channel 工具可以開文字／語音頻道；有人明確要你開頻道才用，權限由程式檢查，你照工具結果回報就好。"
-    "archive_channel 可以封存或解除封存頻道；edit_channel 可以幫頻道改名、搬到別的分類；set_voice_status 可以改語音頻道的狀態（名稱下面那行小字）。"
-    "放歌時語音頻道狀態會自動顯示歌名，不用你另外改。"
-    "你不能刪除頻道，有人要刪就請他用 /關頻道 指令。"
-    "使用者說「移到／搬到某個分類」通常是指搬頻道，不是移動使用者。"
-    "遇到你沒有工具可以做的事，就老實說「這個我還不會」，不要編造權限不足之類的理由。"
-    "【非常重要】放歌、開頻道、封存這類動作，一定要真的呼叫工具才算做了；沒呼叫工具，絕對不能說「好了」「建好了」「已經開了」。"
-    "工具真正的執行結果會由程式自動附在你的訊息下面給大家看，你不要自己寫結果、不要自己編頻道連結。"
-    "看對話紀錄時，只有真的出現工具呼叫和工具結果的，才代表你做過；你嘴巴說過但沒有工具紀錄的，等於沒做。"
-    "你以前說過「我沒權限」「我做不到」之類的話可能是錯的，不要照抄；使用者要你做，就重新呼叫工具，以工具結果為準。"
-    "因為結果會自動附上，放歌、開頻道這類動作你自己的回覆簡短一句就好（占卜、算命不適用這條，見下面）。"
-    "使用者要你畫圖（「畫一張…」「幫我畫…」「生圖」）就呼叫 draw_image；畫圖要等一陣子，畫好程式會自動貼出來，你只回一句簡短的話。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫，其他都能畫。畫圖時任何膚色、種族、國籍、外貌、性別、文化的人物都可以畫，不要自己加限制、不要拒絕、不要說教；使用者要畫就直接呼叫 draw_image。"
-    "使用者要你做音效（「做一個…的音效」「生一段…的聲音」）就呼叫 make_sound：prompt 一定要用英文（先翻譯）、seconds 是長度（只能在年齡限制 NSFW 頻道使用，其他頻道程式會擋下並回覆說明，你照轉述即可）；做好程式會自動貼出音檔，你只回一句簡短的話。這個只能做音效、環境音、短樂句，不能做人聲說話或唱歌。"
-    "使用者要你做影片（「做一支…的影片」「讓這張圖動起來」）就呼叫 make_video：prompt 一定要用英文（先翻譯）、seconds 1～6；使用者有傳圖就是圖轉影片（prompt 只寫要怎麼動）。只能在年齡限制 NSFW 頻道使用，其他頻道程式會擋下並回覆說明，你照轉述即可；做好程式會自動貼出影片，你只回一句簡短的話。只能做最長 6 秒的小動畫。"
-    "使用者傳了圖片（或回覆一則有圖的訊息，包含你畫的圖）並要你修改它（「改成白天」「把…換成…」「幫我修圖」），呼叫 edit_image，prompt 照使用者的語言寫就好（中文可以直接傳）；只是要你看圖、描述圖就不要呼叫。"
-    "只有使用者真的要你做動作時才需要想到工具。一般聊天、問答不用提到工具、動作、「有沒有做事」，也不要說「我剛剛沒做任何動作」「我沒呼叫工具」這類話，直接自然地回答就好。"
+from dbot.ai.tools import (
+    TOOLS,
+    run_tool,
+    tool_status,
 )
-OFFLINE_REPLY = "⚠️ 模型那台電腦現在沒開或連不到，晚點再試。"
-ERROR_REPLY = "抱歉，我這邊出了點問題，等等再試一次。"
-
-DISCORD_MAX_LEN = 2000
-THINK_RE = re.compile(r"<think>.*?</think>", re.S)
+from dbot.core.config import (
+    DEFAULT_SYSTEM_PROMPT,
+    DISCORD_MAX_LEN,
+    DISCORD_TOKEN,
+    ENV_AUTO_CHANNELS,
+    ERROR_REPLY,
+    HISTORY_LIMIT,
+    IMAGE_LOOKBACK,
+    IMAGE_MAX_SIDE,
+    LLM_API_KEY,
+    LLM_BASE_URL,
+    LLM_MODEL,
+    MAX_IMAGES,
+    MAX_TOOL_ROUNDS,
+    OFFLINE_REPLY,
+    SLOW_NOTICE_SECONDS,
+    STATE_FILE,
+    SYSTEM_PROMPT_FILE,
+    TOOL_GUIDE,
+    TZ,
+    WEB_TOOLS,
+)
+from dbot.ai.llm import (
+    call_model,
+    clean_text,
+)
+from dbot.ai import media_cmds
 
 logging.basicConfig(
     level=logging.INFO,
@@ -196,8 +162,6 @@ ACTION_LINE_RE = re.compile(r"^-# ⚙️.*$\n?", re.M)
 # 程式（不是模型）自動貼的訊息：畫好的圖、「好了（…秒）」、畫圖失敗／暫停、智慧畫圖的原句與擴寫。
 # 讀歷史時要標成「系統自動訊息」，不然模型會以為是自己寫的、照著模仿（沒畫圖也假裝「好了」）。
 PROGRAM_PREFIXES = ("🖼️ ", "🎨 ", "📝 ", "🔎 ")
-# 模型自己亂寫的假圖片標記和假「好了」：送出前拿掉
-FAKE_MEDIA_RE = re.compile(r"\[圖片：[^\]\n]*\]|🖼️\s*好了（[^）\n]*）|好了（(?:快速|構圖與文字較乾淨)[^）\n]*）")
 
 
 def is_program_post(msg: discord.Message) -> bool:
@@ -207,12 +171,6 @@ def is_program_post(msg: discord.Message) -> bool:
         return True
     return any(a.filename.startswith(("draw_", "edit_", "web_")) for a in msg.attachments) and not msg.content.strip()
 
-
-def strip_fake_media(text: str) -> str:
-    out = FAKE_MEDIA_RE.sub("", text)
-    out = re.sub(r"[ \t]+\n", "\n", out)
-    out = re.sub(r"\n{3,}", "\n\n", out).strip()
-    return out or "我沒有真的畫圖。要畫的話再跟我說一次。"
 
 
 def is_auto_channel(channel_id: int) -> bool:
@@ -292,6 +250,8 @@ class Bot(discord.Client):
 
 
 client = Bot()
+runtime.client = client
+media_cmds.register(client)
 music.setup(client, client.tree)
 channels.setup(client, client.tree, state, save_state)
 models.setup(client, client.tree, state, save_state, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, TZ)
@@ -471,339 +431,6 @@ async def build_conversation(channel) -> list[dict]:
 
 # ---------------------------------------------------------------- 上網工具
 
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "weather",
-            "description": "查某個地點現在的天氣和未來幾天的預報（溫度、降雨機率、天氣狀況）。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "location": {"type": "string", "description": "地名，用英文最準，例如 Taipei、Hualien、Fengbin、Tokyo"},
-                    "days": {"type": "integer", "description": "要幾天的預報，預設 3，最多 7"},
-                },
-                "required": ["location"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "用搜尋引擎搜尋網路，回傳標題、網址和摘要。查即時資訊、新聞、天氣、價格、不熟的東西時使用。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "搜尋關鍵字"},
-                    "max_results": {"type": "integer", "description": "幾筆結果，預設 5，最多 10"},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fetch_url",
-            "description": "打開一個網頁，回傳主要文字內容。搜尋摘要不夠詳細時使用。",
-            "parameters": {
-                "type": "object",
-                "properties": {"url": {"type": "string", "description": "網址"}},
-                "required": ["url"],
-            },
-        },
-    },
-]
-
-
-def _web_search(query: str, max_results: int = 5) -> str:
-    from ddgs import DDGS
-
-    max_results = max(1, min(int(max_results or 5), 10))
-    results = DDGS().text(query, region="tw-tzh", max_results=max_results)
-    if not results:
-        return "沒有搜尋結果。"
-    lines = []
-    for i, r in enumerate(results, 1):
-        lines.append(f"{i}. {r.get('title', '')}\n   {r.get('href', '')}\n   {r.get('body', '')}")
-    return "\n".join(lines)
-
-
-def _fetch_url(url: str) -> str:
-    import trafilatura
-
-    html = trafilatura.fetch_url(url)
-    if not html:
-        return "打不開這個網頁。"
-    text = trafilatura.extract(html, include_links=False, include_tables=True) or ""
-    text = text.strip()
-    if not text:
-        return "這個網頁抓不到文字內容（可能要 JavaScript 才會顯示）。"
-    return text[:6000] + ("\n…（後面省略）" if len(text) > 6000 else "")
-
-
-WMO_CODES = {
-    0: "晴", 1: "大致晴朗", 2: "多雲", 3: "陰", 45: "霧", 48: "霧淞",
-    51: "毛毛雨", 53: "毛毛雨", 55: "較強毛毛雨", 56: "凍毛毛雨", 57: "凍毛毛雨",
-    61: "小雨", 63: "中雨", 65: "大雨", 66: "凍雨", 67: "強凍雨",
-    71: "小雪", 73: "中雪", 75: "大雪", 77: "雪粒",
-    80: "陣雨", 81: "較強陣雨", 82: "豪雨", 85: "陣雪", 86: "強陣雪",
-    95: "雷雨", 96: "雷雨伴冰雹", 99: "強雷雨伴冰雹",
-}
-
-
-async def _weather(location: str, days: int = 3) -> str:
-    days = max(1, min(int(days or 3), 7))
-    s = client.http_session
-    t = aiohttp.ClientTimeout(total=20)
-    place = None
-    for name in dict.fromkeys([location, location + "市", location + "縣"]):
-        async with s.get("https://geocoding-api.open-meteo.com/v1/search",
-                         params={"name": name, "count": 1, "language": "zh"}, timeout=t) as r:
-            res = (await r.json()).get("results")
-        if res:
-            place = res[0]
-            break
-    if not place:
-        return f"找不到「{location}」這個地點，試試用英文地名。"
-    params = {
-        "latitude": place["latitude"], "longitude": place["longitude"], "timezone": "auto", "forecast_days": days,
-        "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
-        "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max",
-    }
-    async with s.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=t) as r:
-        d = await r.json()
-    c = d["current"]
-    where = " ".join(x for x in (place.get("name"), place.get("admin1"), place.get("country")) if x)
-    out = [
-        f"地點：{where}",
-        f"現在（{c['time']}）：{WMO_CODES.get(c['weather_code'], c['weather_code'])}，{c['temperature_2m']}°C，"
-        f"體感 {c['apparent_temperature']}°C，濕度 {c['relative_humidity_2m']}%，風速 {c['wind_speed_10m']} km/h，"
-        f"降水 {c['precipitation']} mm",
-        "預報：",
-    ]
-    dl = d["daily"]
-    for i, day in enumerate(dl["time"]):
-        out.append(
-            f"  {day}：{WMO_CODES.get(dl['weather_code'][i], dl['weather_code'][i])}，"
-            f"{dl['temperature_2m_min'][i]}～{dl['temperature_2m_max'][i]}°C，"
-            f"降雨機率 {dl['precipitation_probability_max'][i]}%，紫外線 {dl['uv_index_max'][i]}"
-        )
-    out.append("資料來源：Open-Meteo")
-    return "\n".join(out)
-
-
-async def run_tool(name: str, args_json: str, msg: discord.Message | None = None) -> str:
-    try:
-        args = json.loads(args_json or "{}")
-    except json.JSONDecodeError:
-        return "參數格式錯誤。"
-    try:
-        if name == "set_voice_status":
-            if msg is None:
-                return "這裡不能用。"
-            return await channels.run_vstatus_tool(msg, args)
-        if name == "edit_channel":
-            if msg is None:
-                return "這裡不能用。"
-            return await channels.run_edit_tool(msg, args)
-        if name == "archive_channel":
-            if msg is None:
-                return "這裡不能用。"
-            return await channels.run_archive_tool(msg, args)
-        if name == "create_channel":
-            if msg is None:
-                return "這裡不能開頻道。"
-            return await channels.run_tool(msg, args)
-        if name == "random_number":
-            return extras.run_tool(args)
-        if name == "divination":
-            return divination.run_tool(args)
-        if name == "almanac":
-            return almanac.run(args)
-        if name == "transfer_log":
-            return botwallet.run_log(msg.guild.id if msg is not None and msg.guild else None, args)
-        if name == "bot_pay":
-            return botwallet.run_pay(msg, args)
-        if name == "bot_collect":
-            return botwallet.run_collect(msg, args)
-        if name == "bot_wallet":
-            return botwallet.run(msg.guild.id if msg is not None and msg.guild else None)
-        if name == "activity_status":
-            return await actstatus.run(msg.guild.id if msg is not None and msg.guild else None)
-        if name == "fortune_chart":
-            text, files = await fortune.run(client.http_session, args)
-            return text + "".join(f"\n[[FILE:{f}]]" for f in files)
-        if name == "music_status":
-            return music.real_state(msg.guild if msg else None)
-        if name == "member_status":
-            return memberstatus.run(msg.guild if msg else None, args)
-        if name == "music":
-            if msg is None:
-                return "這裡不能放音樂。"
-            return await music.run_tool(msg, args)
-        if name == "draw_image":
-            if msg is None:
-                return "這裡不能畫圖。"
-            if not imagegen.channel_ok(msg.channel):
-                return imagegen.NSFW_ONLY_REPLY
-            return await imagegen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "", "clean" if args.get("edit_quality") == "clean" else "fast")
-        if name == "make_video":
-            if msg is None:
-                return "這裡不能做影片。"
-            if not imagegen.channel_ok(msg.channel):
-                return videogen.NSFW_REPLY
-            imgs = await imagegen.collect_images(msg)
-            return await videogen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "", imgs[0] if imgs else None)
-        if name == "make_sound":
-            if msg is None:
-                return "這裡不能做音效。"
-            if not imagegen.channel_ok(msg.channel):
-                return NSFW_SFX_REPLY
-            return await sfxgen.submit(client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "")
-        if name == "edit_image":
-            if msg is None:
-                return "這裡不能改圖。"
-            if not imagegen.channel_ok(msg.channel):
-                return imagegen.NSFW_ONLY_REPLY
-            images = webimg.recall(msg.channel.id) if args.get("use_found") else await imagegen.collect_images(msg)
-            if args.get("use_found") and not images:
-                return "最近沒有上網找到的圖（超過 30 分鐘會清掉），請先用 web_image 找圖，或把圖片傳上來。"
-            return await imagegen.submit_edit(client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "",
-                                            "clean" if args.get("edit_quality") == "clean" else "fast")
-        if name == "web_image":
-            if msg is None:
-                return "這裡不能抓圖。"
-            items = await webimg.find(client.http_session, str(args.get("query") or "").strip(), str(args.get("url") or "").strip(),
-                                      args.get("count") or 1, safe=not webimg.is_nsfw(msg.channel))
-            if not items:
-                return "沒有找到可以下載的圖片（換個關鍵字，或直接給我圖片網址）。"
-            webimg.remember(msg.channel.id, items)
-            if args.get("send", True) is not False:
-                for n, (raw, fname, ctype, title, src) in enumerate(items):
-                    path = await asyncio.to_thread(imagegen._to_file, raw) if len(raw) > imagegen.DISCORD_LIMIT else None
-                    ext = Path(path).suffix.lstrip(".") if path else fname.rsplit(".", 1)[-1]
-                    f = discord.File(path or io.BytesIO(raw), filename=f"web_{msg.id}_{n + 1}.{ext}")
-                    text = f"🔎 {title}\n<{src}>"[:500] if title else f"🔎 <{src}>"[:500]
-                    try:
-                        await (msg.reply(text, file=f, mention_author=False) if n == 0 else msg.channel.send(text, file=f))
-                    except discord.HTTPException:
-                        await msg.channel.send(text, file=f)
-            sent = "並貼到頻道了" if args.get("send", True) is not False else "（沒有貼出）"
-            return (f"找到 {len(items)} 張圖{sent}。來源：" + "；".join(i[4] for i in items)
-                    + "。這些是網路上的圖、不是你畫的。要改它們就呼叫 edit_image 並設 use_found=true。")
-        if name == "weather":
-            return await _weather(args.get("location", ""), args.get("days", 3))
-        if name == "web_search":
-            return await asyncio.wait_for(asyncio.to_thread(_web_search, args.get("query", ""), args.get("max_results", 5)), 30)
-        if name == "fetch_url":
-            return await asyncio.wait_for(asyncio.to_thread(_fetch_url, args.get("url", "")), 30)
-        return f"沒有 {name} 這個工具。"
-    except Exception as e:
-        log.warning("工具 %s 失敗：%r", name, e)
-        return f"工具執行失敗：{e}"
-
-
-def tool_status(name: str, args_json: str) -> str:
-    try:
-        args = json.loads(args_json or "{}")
-    except json.JSONDecodeError:
-        args = {}
-    if name == "music":
-        return music.tool_status(args)
-    if name in ("draw_image", "edit_image"):
-        return imagegen.tool_status(args)
-    if name == "make_sound":
-        return sfxgen.tool_status(args)
-    if name == "make_video":
-        return videogen.tool_status(args)
-    if name == "web_image":
-        return f"🔎 上網找圖：{args.get('query') or args.get('url') or ''}"[:80]
-    if name == "music_status":
-        return "🔎 確認播放狀態"
-    if name == "member_status":
-        return f"👀 看成員狀態：{args.get('name') or '大家'}"[:80]
-    if name == "random_number":
-        return "🎲 抽數字"
-    if name == "fortune_chart":
-        return "🧭 排命盤中…" if args.get("kind") == "bazi" else "🧭 排盤、畫星盤中…"
-    if name == "almanac":
-        return "📅 查黃曆、擇日"
-    if name == "bot_wallet":
-        return "🪙 數自己的代幣"
-    if name == "bot_pay":
-        return "💸 考慮要不要給錢"
-    if name == "bot_collect":
-        return "💰 收還款"
-    if name == "transfer_log":
-        return "📒 翻轉帳紀錄"
-    if name == "activity_status":
-        return "👀 看大家在玩什麼"
-    if name == "divination":
-        return {"tarot": "🔮 洗牌、抽塔羅…", "jiaobei": "🙏 擲筊中…", "qian": "🏮 搖籤筒…", "iching": "☯️ 擲錢起卦…"}.get(args.get("kind"), "🔮 占卜中…")
-    if name == "create_channel":
-        return channels.tool_status(args)
-    if name == "set_voice_status":
-        return f"📝 改語音頻道狀態：{args.get('status') or '（清除）'}"
-    if name == "edit_channel":
-        return f"✏️ 改頻道：{args.get('channel') or '這個頻道'}"
-    if name == "archive_channel":
-        return "📦 " + ("解除封存" if args.get("action") == "unarchive" else "封存") + f"：{args.get('channel') or '這個頻道'}"
-    if name == "weather":
-        return f"🌤️ 查天氣：{args.get('location', '')}"
-    if name == "web_search":
-        return f"🔎 搜尋：{args.get('query', '')}"
-    if name == "fetch_url":
-        return f"📄 讀網頁：<{args.get('url', '')}>"
-    return f"🔧 {name}"
-
-
-# ---------------------------------------------------------------- 呼叫模型
-
-def flatten_for_remote(messages: list[dict]) -> list[dict]:
-    """線上模型不一定吃「內容是文字陣列」的格式：沒有圖的就壓成純文字，有圖的保留（deepseek 看得懂圖）。"""
-    out = []
-    for m in messages:
-        c = m.get("content")
-        if isinstance(c, list) and all(p.get("type") == "text" for p in c):
-            m = {**m, "content": "\n".join(p.get("text", "") for p in c if p.get("text"))}
-        out.append(m)
-    return out
-
-
-async def call_model(messages: list[dict], use_tools: bool | list = False, max_tokens: int | None = None) -> dict:
-    model = models.current()
-    local = models.is_local(model)
-    body = {"model": model, "max_tokens": max_tokens or MAX_TOKENS,
-            "messages": messages if local else flatten_for_remote(messages)}
-    # 思考模式：qwen 和 deepseek 都靠 reasoning_effort 控制。DeepSeek 不帶參數預設會思考，
-    # 思考的 token 也計費（實測約多 3~4 倍），所以線上模型也要送，預設 none。
-    effort = REASONING_EFFORT if local else REMOTE_REASONING_EFFORT
-    if effort:
-        body["reasoning_effort"] = effort
-    if local and LLM_KEEP_ALIVE:
-        body["keep_alive"] = LLM_KEEP_ALIVE  # 叫 Ollama 別太快把模型卸載（重新載入要一兩分鐘）
-    if use_tools:
-        body["tools"] = use_tools if isinstance(use_tools, list) else TOOLS
-    headers = {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
-    async with client.http_session.post(
-        f"{LLM_BASE_URL}/chat/completions",
-        json=body,
-        headers=headers,
-        timeout=aiohttp.ClientTimeout(total=LLM_TIMEOUT),
-    ) as resp:
-        data = await resp.json(content_type=None)
-        if resp.status != 200:
-            raise RuntimeError(f"模型回 HTTP {resp.status}：{str(data)[:300]}")
-    models.record(model, data.get("usage"))
-    return data["choices"][0]["message"]
-
-
-def clean_text(text: str | None) -> str:
-    return THINK_RE.sub("", text or "").strip()
-
-
 GALLERY_TOOL = {
     "type": "function",
     "function": {
@@ -909,102 +536,6 @@ def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
                     "quality": a.get("quality") if a.get("quality") in imagegen.QUALITY else "fast"})
     return out
 
-
-ACTION_TOOLS = {"draw_image", "edit_image", "make_sound", "make_video", "web_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
-CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
-CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
-FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
-CLAIM_RE = re.compile(
-    r"(建好|開好|建立好|創好|已經?(建立|開(?!始|心|學)|建|創|封存|解除|刪|移除|清空|鎖|隱藏|放(?!學|假)|播|加入|跳過|暫停|停止)|"
-    r"(封存|鎖|藏|開|建|創)(起來|好)了|頻道.{0,6}(好了|完成)|幫你(放|播|點|排|開|建|封存|搬|移|改)|正在播放|開始播放|排(好了|進|入)|已排|"
-    r"(點|放|播)了(一|兩|三|[0-9]+)?首|(點|放|播|來)(一首|首歌)|給你(放|播|點)|播放中|加入佇列|放進佇列|(搬|移|改)(好|過去)了|(移|拿|刪)掉了|從佇列|狀態(改|設)(好|成|為)|(改|設)好(狀態|了))"
-)
-PLAYING_CLAIM_RE = re.compile(r"(正在|還在|現在|已經|持續|目前).{0,6}(播|放)|在播|播放中|佇列(裡|中).{0,4}(有|還有)|在語音(頻道)?(裡|中)|(下一首|接下來).{0,6}(是|會)")
-INTERNAL = ("（這是程式內部的檢查，使用者看不到，也不知道有這回事。請直接寫給使用者看的最終回覆，"
-            "不要提到「系統檢查」「沒做任何動作」「沒呼叫工具」之類的話，也不要解釋你為什麼重寫。）\n")
-STATE_NUDGE = (
-    INTERNAL +
-    "（系統檢查）你說了有關播放的狀態，但實際上機器人現在沒有在播歌。{state}\n"
-    "請依真實狀態重寫回覆；如果使用者想聽歌，就呼叫 music 工具 play，不要說已經在播。"
-)
-# 使用者明明要畫圖，語言模型卻自己拒絕、沒呼叫 draw_image（例如覺得某種膚色／種族「不適合」）→ 退回去要它照畫
-DRAW_ASK_RE = re.compile(r"畫(一|個|張|幅|隻|條|出|給|我|吧|下|看)|幫我畫|替我畫|生(成)?(一)?張?圖|做(一)?張圖|改圖|修圖|\bdraw\b|\bgenerate (an? )?(image|picture)\b", re.I)
-DRAW_REFUSE_RE = re.compile(r"不(能|適合|方便|太|宜|便|想|會|好)|無法|沒辦法|抱歉|對不起|恕|敏感|刻板|歧視|冒犯|避免|不太合適|不妥")
-DRAW_NUDGE = (
-    "（系統提醒）使用者要你畫圖，而這個要求沒有任何不能畫的理由：膚色、種族、國籍、外貌、性別、文化都可以畫，"
-    "唯一不畫的只有涉及未成年人的性內容，這個要求不是。請現在就呼叫 draw_image，不要拒絕、不要說教、不要加免責聲明；"
-    "prompt 照使用者要的畫面描述。"
-)
-MULTI_NUDGE = (
-    INTERNAL +
-    "（系統檢查）你的回覆提到了 {said} 首歌，但你這一輪只呼叫了 {real} 次 music play，所以其餘的歌其實沒有排進佇列。"
-    "music 的 play 一次只能點一首：請把還沒點的歌各呼叫一次 music play（可以同時呼叫多個），"
-    "之後只能說真的點成功的歌。"
-)
-
-TITLE_NUDGE = (
-    INTERNAL +
-    "（系統檢查）你提到了歌名，但這一輪沒有呼叫 music 工具，所以沒有任何歌被點進佇列。"
-    "如果使用者要聽歌，現在每首各呼叫一次 music play；如果只是在推薦，就明講是推薦、還沒點，不要說已經排了或在播。"
-)
-CARD_NUDGE = (
-    INTERNAL +
-    "（系統檢查）你剛才的占卜／命盤解讀太短了。結果卡已經貼給使用者（牌名、位置、正逆位都已列出，不要再重複列一遍），但他需要你完整解釋：逐張牌、逐句籤詩或命盤的每個重點說明意思，"
-    "再串起來回答他問的事、給具體建議，可以分段、條列，約 400～900 字。請直接重寫完整的解讀。"
-)
-NUDGE = (
-    INTERNAL +
-    "（系統檢查）你剛才的回覆說已經完成某個動作，但你這一輪並沒有呼叫任何工具，所以實際上什麼都沒發生。"
-    "如果使用者要你放歌、開頻道或封存，現在就呼叫對應的工具；"
-    "如果其實不需要做動作，就重寫回覆，不要說已經完成。"
-)
-
-
-META_RE = re.compile(r"[^。！？!?～~\n]*(系統檢查|沒做任何動作|沒有做任何動作|沒說自己做了|沒有說自己做了|沒呼叫(任何)?工具|沒有呼叫(任何)?工具|純聊天啦)[^。！？!?～~\n]*[。！？!?～~]*")
-
-
-def strip_meta(text: str) -> str:
-    """模型偶爾會把內部檢查的事講出來，這裡把那幾句拿掉（全拿光就留原文，不回空字串）。"""
-    out = META_RE.sub("", strip_fake_media(text) if FAKE_MEDIA_RE.search(text) else text).strip()
-    return out or text
-
-
-# 冷門工具只在使用者這句話提到相關字眼時才放進工具清單（工具說明每次都會算進 token，不常用的別一直帶著）
-ACT_RE = re.compile(r"activity|遊戲間|在玩|在打|玩什麼|玩啥|誰在(玩|打)|有人(在)?(玩|打)|開著", re.I)
-
-REPAY_RE = re.compile(r"還(你)?(錢|債|款|幣|代幣)|還清|還你|還款|我要還|來還", re.I)
-LOG_RE = re.compile(r"轉帳|轉账|紀錄|記錄|誰.{0,5}(轉|給|借|欠)|轉給|有人轉|收到.{0,4}(錢|幣)|欠.{0,4}(誰|多少|錢)|帳目|帳單|流水|欠債|欠款", re.I)
-PAY_RE = re.compile(r"給我.{0,4}(錢|幣|代幣)|(發|轉|匯|打|賞|送|借).{0,4}(我|給我).{0,6}(錢|幣|代幣)|(發|轉|匯|打|賞|送).{0,3}(錢|幣|代幣|紅包)|紅包|打賞|請我|獎勵|\bpay\b|轉帳|借我.{0,3}(錢|幣)|窮|沒錢", re.I)
-MONEY_RE = re.compile(r"你.{0,6}(代幣|代币|多少錢|多少钱|多少幣|身家|錢包|荷包|存款|餘額|口袋)|(代幣|代币|錢包|餘額).{0,6}你|莊家.{0,6}(賺|賠|多少|有)|bot.{0,6}(代幣|錢)", re.I)
-ALMANAC_RE = re.compile(r"吉日|黃道|黄道|擇日|择日|宜忌|黃曆|黄历|農民曆|农民历|適合.{0,6}(結婚|搬家|入宅|開店|開市|動土|訂婚|買車)|哪天.{0,4}(搬|結婚|開)", re.I)
-
-
-def last_user_text(conversation: list[dict]) -> str:
-    for m in reversed(conversation):
-        if m.get("role") == "user":
-            c = m.get("content")
-            if isinstance(c, str):
-                return c
-            if isinstance(c, list):
-                return " ".join(str(x.get("text", "")) for x in c if isinstance(x, dict))
-            return ""
-    return ""
-
-
-# 只要最近幾句話跟錢有關，就把錢相關的工具全部交給模型（不再一個工具一個字眼地挑，免得它「沒有工具」卻以為自己不能轉帳）
-MONEY_ANY_RE = re.compile(r"錢|幣|代幣|轉帳|轉账|轉我|轉給|匯|紅包|打賞|賞我|給我|發我|借|還|欠|債|帳|賬|餘額|身家|錢包|荷包|存款|利息|貸款|莊家|獎勵|請我|零用|零花|資助|\bpay\b|窮", re.I)
-
-
-def recent_user_text(conversation: list[dict], n: int = 3) -> str:
-    out = []
-    for m in reversed(conversation):
-        if m.get("role") != "user":
-            continue
-        c = m.get("content")
-        out.append(c if isinstance(c, str) else " ".join(str(x.get("text", "")) for x in c if isinstance(x, dict)) if isinstance(c, list) else "")
-        if len(out) >= n:
-            break
-    return "\n".join(out)
 
 
 async def ask_model(conversation: list[dict], on_status=None, msg: discord.Message | None = None,
@@ -1370,179 +901,6 @@ async def cmd_auto(interaction: discord.Interaction, 開關: app_commands.Choice
         msg = "⏸️ 這個頻道關掉自動回覆了，要 @我 我才會回。"
     save_state()
     await interaction.response.send_message(msg)
-
-
-@client.tree.command(name="畫圖", description="畫一張圖（約 30 秒～數分鐘，畫好會貼在頻道）")
-@app_commands.describe(內容="想畫什麼（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式", 大小="一般（預設）／大圖／超大圖（要等比較久，只有快速畫質）")
-@app_commands.choices(
-    畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
-          app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
-    形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
-          app_commands.Choice(name="直式", value="portrait")],
-    大小=[app_commands.Choice(name="一般（預設）", value="normal"), app_commands.Choice(name="大圖（約1900像素）", value="large"), app_commands.Choice(name="超大圖（長邊2048像素）", value="huge")])
-async def cmd_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square", 大小: str = "normal"):
-    if not imagegen.channel_ok(interaction.channel):
-        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
-        return
-    if not imagegen.enabled():
-        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
-        return
-    await interaction.response.defer(thinking=True)
-    res = await imagegen.submit(client.http_session, {"prompt": 內容, "quality": 畫質, "shape": 形狀, "scale": 大小},
-                                interaction.user.id, imagegen.say_for_interaction(interaction), 內容)
-    await interaction.followup.send(res)
-
-
-@client.tree.command(name="智慧畫圖", description="先把你的一句話擴寫成完整的畫圖提示詞再畫（擴寫約 10～30 秒）")
-@app_commands.describe(內容="想畫什麼，一句話就好（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式",
-                       提示詞語言="擴寫出來的提示詞用英文（預設）還是中文", 大小="一般（預設）／大圖／超大圖（要等比較久，只有快速畫質）")
-@app_commands.choices(
-    畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
-          app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
-    形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
-          app_commands.Choice(name="直式", value="portrait")],
-    提示詞語言=[app_commands.Choice(name="英文（預設）", value="en"), app_commands.Choice(name="中文", value="zh")],
-    大小=[app_commands.Choice(name="一般（預設）", value="normal"), app_commands.Choice(name="大圖（約1900像素）", value="large"), app_commands.Choice(name="超大圖（長邊2048像素）", value="huge")])
-async def cmd_smart_draw(interaction: discord.Interaction, 內容: str, 畫質: str = "fast", 形狀: str = "square", 提示詞語言: str = "en", 大小: str = "normal"):
-    if not imagegen.channel_ok(interaction.channel):
-        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
-        return
-    if not imagegen.enabled():
-        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
-        return
-    why = imagegen.check_prompt(內容)
-    if why:
-        await interaction.response.send_message(why + "（這張沒有畫）", ephemeral=True)
-        return
-    await interaction.response.defer(thinking=True)
-    expanded = await imagegen.expand_prompt(client.http_session, 內容, 畫質, lang=提示詞語言)
-    note = ""
-    if expanded:
-        note = f"📝 原句：{內容[:300]}\n✨ 擴寫後的提示詞：{expanded[:900]}\n"
-        prompt = expanded
-    else:
-        note = f"📝 原句：{內容[:300]}\n（提示詞擴寫失敗，這張直接用你的原句畫）\n"
-        prompt = 內容
-    log.info("智慧畫圖 user=%s 原句=%s 擴寫=%s", interaction.user.id, 內容[:80], (expanded or "失敗")[:200])
-    res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀, "scale": 大小},
-                                interaction.user.id, imagegen.say_for_interaction(interaction), 內容, extra=f"\n📝 原句：{內容[:300]}")
-    await interaction.followup.send(note + res)
-
-
-@client.tree.command(name="改圖", description="改一張圖（快速約 20 秒、文字與構圖較乾淨約 100 秒）：附上圖片，或貼訊息連結，或什麼都不給＝改頻道裡最近那張圖")
-@app_commands.describe(內容="要怎麼改（中英文都可以），例如：把背景改成白天", 圖片="要修改的圖（可不附）", 訊息="要改哪則訊息裡的圖：貼那則訊息的連結（可不填）",
-                       參考圖2="選填：第二張參考圖", 參考圖3="選填：第三張參考圖", 畫質="快速（預設，約 20 秒）／文字與構圖較乾淨（Qwen-Image-Edit，要加字改字選這個，約 70～100 秒）")
-@app_commands.choices(畫質=[app_commands.Choice(name="快速（約20秒）", value="fast"), app_commands.Choice(name="文字與構圖較乾淨（約100秒，較慢）", value="clean")])
-async def cmd_edit(interaction: discord.Interaction, 內容: str, 圖片: discord.Attachment | None = None, 訊息: str | None = None,
-                   參考圖2: discord.Attachment | None = None, 參考圖3: discord.Attachment | None = None, 畫質: str = "fast"):
-    if not imagegen.channel_ok(interaction.channel):
-        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
-        return
-    if not imagegen.enabled():
-        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
-        return
-    atts = [a for a in (圖片, 參考圖2, 參考圖3) if a is not None]
-    if any(not (a.content_type or "").startswith("image/") for a in atts):
-        await interaction.response.send_message("請上傳圖片檔（PNG／JPEG／WEBP）。", ephemeral=True)
-        return
-    await interaction.response.defer(thinking=True)
-    note = ""
-    if atts:
-        images = [(await a.read(), a.filename or "image.png", (a.content_type or "image/png").split(";")[0]) for a in atts]
-    else:
-        images, note = await imagegen.find_images(client, interaction.channel, 訊息)
-    res = await imagegen.submit_edit(client.http_session, 內容, images, interaction.user.id,
-                                     imagegen.say_for_interaction(interaction), 內容, 畫質)
-    await interaction.followup.send((res + ("\n-# " + note if note and images else "")) if images else note or res)
-
-
-class EditModal(discord.ui.Modal, title="改這張圖"):
-    內容 = discord.ui.TextInput(label="要怎麼改？", placeholder="例如：把背景改成白天，其他部分維持不變", style=discord.TextStyle.paragraph, max_length=500)
-
-    def __init__(self, target: discord.Message):
-        super().__init__()
-        self.target = target
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
-        images = await imagegen.images_of(self.target)
-        res = await imagegen.submit_edit(client.http_session, str(self.內容), images, interaction.user.id,
-                                         imagegen.say_for_interaction(interaction), str(self.內容))
-        await interaction.followup.send(res)
-
-
-@client.tree.context_menu(name="改這張圖")
-async def ctx_edit(interaction: discord.Interaction, message: discord.Message):
-    if not imagegen.channel_ok(interaction.channel):
-        await interaction.response.send_message(imagegen.NSFW_ONLY_REPLY, ephemeral=True)
-        return
-    if not imagegen.enabled():
-        await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
-        return
-    if not any((a.content_type or "").startswith("image/") for a in message.attachments):
-        await interaction.response.send_message("這則訊息沒有圖片。", ephemeral=True)
-        return
-    await interaction.response.send_modal(EditModal(message))
-
-
-NSFW_SFX_REPLY = "🔞 做音效和畫圖一樣，只能在「年齡限制（NSFW）」頻道使用，請到 NSFW 頻道再試。"
-_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
-
-
-async def _sfx_to_english(text: str, video: bool = False) -> str:
-    """音效模型只懂英文：描述有中文就先請語言模型翻成一句英文的音效描述。翻失敗就原樣回傳（讓呼叫的人處理）。"""
-    if not _CJK_RE.search(text):
-        return text
-    try:
-        reply = await call_model([
-            {"role": "system", "content": ("You translate short-video requests into one concrete English description for a text-to-video model "
-                                           "(subject + action + environment + sound, e.g. 'A red paper lantern floating over a calm night lake, gentle ripples, soft wind and crickets'). "
-                                           "If the request is only about how an existing picture should move, describe just the motion. Output only the English description, no quotes, no explanation.")
-                                          if video else
-                                          "You translate sound-effect requests into a short, concrete English description for a text-to-sound-effect model "
-                                          "(describe the sound itself and the environment, e.g. 'footsteps on gravel, slow, night, crickets'). Output only the English description, no quotes, no explanation."},
-            {"role": "user", "content": text}], use_tools=False, max_tokens=120)
-        out = clean_text(reply.get("content")).strip().strip('"“”')
-        return out if out and not _CJK_RE.search(out) else text
-    except Exception as e:
-        log.warning("音效描述翻譯失敗：%r", e)
-        return text
-
-
-@client.tree.command(name="音效", description="做一段音效（約 10 秒～數分鐘，做好會貼在頻道）：環境音、物品聲、短樂句；不是語音也不是歌")
-@app_commands.describe(內容="想要什麼聲音（中英文都可以），例如：雨夜裡的腳步聲", 秒數="長度 1～47 秒，預設 5", 避免="選填：不要出現的東西（英文），例如 music, speech")
-async def cmd_sfx(interaction: discord.Interaction, 內容: str, 秒數: app_commands.Range[int, 1, 47] = 5, 避免: str = ""):
-    if not imagegen.channel_ok(interaction.channel):
-        await interaction.response.send_message(NSFW_SFX_REPLY, ephemeral=True)
-        return
-    if not sfxgen.enabled():
-        await interaction.response.send_message("音效功能目前沒開。", ephemeral=True)
-        return
-    await interaction.response.defer(thinking=True)
-    prompt = await _sfx_to_english(內容)
-    res = await sfxgen.submit(client.http_session, {"prompt": prompt, "seconds": 秒數, "avoid": 避免}, interaction.user.id,
-                              imagegen.say_for_interaction(interaction), 內容)
-    await interaction.followup.send(res + (f"\n（英文描述：{prompt}）" if prompt != 內容 and "排進" in res else ""))
-
-
-@client.tree.command(name="影片", description="做一支最長 6 秒的小動畫影片（約 2～3 分鐘）：文字轉影片，或附上圖片讓它動起來")
-@app_commands.describe(內容="畫面與動作（中英文都可以）；有附圖就只寫「要怎麼動」", 秒數="長度 1～6 秒，預設 5", 圖片="選填：附圖＝讓這張圖動起來（圖轉影片）")
-async def cmd_video(interaction: discord.Interaction, 內容: str, 秒數: app_commands.Range[int, 1, 6] = 5, 圖片: discord.Attachment | None = None):
-    if not imagegen.channel_ok(interaction.channel):
-        await interaction.response.send_message(videogen.NSFW_REPLY, ephemeral=True)
-        return
-    if not videogen.enabled():
-        await interaction.response.send_message("影片功能目前沒開。", ephemeral=True)
-        return
-    if 圖片 is not None and not (圖片.content_type or "").startswith("image/"):
-        await interaction.response.send_message("請上傳圖片檔（PNG／JPEG／WEBP）。", ephemeral=True)
-        return
-    await interaction.response.defer(thinking=True)
-    img = (await 圖片.read(), 圖片.filename or "image.png", (圖片.content_type or "image/png").split(";")[0]) if 圖片 is not None else None
-    prompt = await _sfx_to_english(內容, video=True)
-    res = await videogen.submit(client.http_session, {"prompt": prompt, "seconds": 秒數}, interaction.user.id,
-                                imagegen.say_for_interaction(interaction), 內容, img)
-    await interaction.followup.send(res + (f"\n（英文描述：{prompt}）" if prompt != 內容 and "排進" in res else ""))
 
 
 @client.tree.command(name="help", description="看機器人會做什麼、有哪些指令")
