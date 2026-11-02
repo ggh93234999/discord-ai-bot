@@ -26,3 +26,5 @@ activity/server/video_cache
 music_state.json
 transfers.json
 bot_pay_log.json
+game_digest.json
+debt_remind.json

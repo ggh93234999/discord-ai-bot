@@ -158,7 +158,6 @@ journalctl -u discord-bot -f         # 即時 log
 | `discord-bot.service.example` | systemd 服務檔範例（改使用者與路徑後裝到 /etc/systemd/system/） |
 | `requirements.txt` | Python 套件（建議用虛擬環境） |
 | `run.bat` | 在 Windows 上手動測試用（要連得到模型 API） |
-| `_old_claude_api/` | 舊版備份（只在伺服器本機，不進 git） |
 
 邀請連結（含斜線指令權限，把 `YOUR_CLIENT_ID` 換成 Discord Developer Portal 的 Application ID；權限值可依需要調整）：
 https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=281475265154064
