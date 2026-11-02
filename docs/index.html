@@ -88,22 +88,44 @@ h3{margin:0;font-family:var(--kai);font-weight:400;font-size:24px;line-height:1.
 @media (max-width:520px){.rows li{grid-template-columns:48px 1fr;gap:4px 12px}.stamp{width:44px;height:44px;font-size:25px}}
 
 
-/* ---------- 水墨插圖（AI 畫的，畫在宣紙色上所以用 multiply 疊進紙面） ---------- */
+/* ---------- 水墨插圖（AI 畫的） ---------- */
 .hero-art{position:absolute;top:0;right:0;width:min(86%,1040px);aspect-ratio:1344/768;z-index:0;pointer-events:none}
 .hero-art img{display:block;width:100%;height:100%;object-fit:cover;opacity:.62;mix-blend-mode:multiply;
   -webkit-mask-image:radial-gradient(ellipse 60% 50% at 58% 42%,#000 32%,transparent 100%);mask-image:radial-gradient(ellipse 60% 50% at 58% 42%,#000 32%,transparent 100%)}
-.art{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:cover;mix-blend-mode:multiply;
-  -webkit-mask-image:radial-gradient(closest-side,#000 58%,transparent 100%);mask-image:radial-gradient(closest-side,#000 58%,transparent 100%)}
-.rows li.has-art{grid-template-columns:64px 1fr 150px;align-items:start}
-.rows li.has-art .art{align-self:center}
-.rows li.has-art .art{width:150px;height:150px}
-@media (max-width:720px){
-  .rows li.has-art{grid-template-columns:64px 1fr}
-  .rows li.has-art .art{grid-column:2;width:min(100%,200px);height:auto;margin-top:2px}
-  .hero-art{width:130%;right:-30%;opacity:.8}
-}
-@media (max-width:520px){.rows li.has-art{grid-template-columns:48px 1fr}}
+@media (max-width:720px){.hero-art{width:130%;right:-30%;opacity:.8}}
 .chat{background:rgba(233,229,216,.55)}
+/* ---------- 功能卡片：每張都有一幅畫，像冊頁 ---------- */
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:34px 28px;margin:0;padding-top:6px}
+.card{display:flex;flex-direction:column;padding:9px 9px 20px;background:rgba(255,255,255,.3);border:1px solid rgba(31,30,28,.2);border-radius:3px;
+  box-shadow:0 10px 22px -16px rgba(31,30,28,.55)}
+.card figure{position:relative;margin:0}
+.card img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;object-position:center 60%;border-radius:2px;background:var(--paper-2)}
+.card .stamp{position:absolute;left:14px;bottom:-26px;background:var(--paper);box-shadow:0 0 0 3px var(--paper)}
+.card:nth-child(2n) .stamp{--r:2.5deg}
+.card:nth-child(3n) .stamp{--r:-1deg}
+.card .body{padding:0 12px}
+.card h3{margin:4px 0 6px 68px;min-height:36px;font-size:23px}
+.card p{margin:.2em 0 0;font-size:16px;line-height:1.8}
+.card p.small{font-size:14.5px;color:var(--ink-2)}
+.cards .card:last-child:nth-child(odd){grid-column:1/-1;flex-direction:row;align-items:center;gap:22px;padding:9px 22px 9px 9px}
+.cards .card:last-child:nth-child(odd) figure{flex:0 0 42%}
+.cards .card:last-child:nth-child(odd) .stamp{left:12px;bottom:12px}
+.cards .card:last-child:nth-child(odd) .body{padding:0}
+.cards .card:last-child:nth-child(odd) h3{margin-left:0}
+@media (max-width:720px){
+  .cards{grid-template-columns:1fr;gap:34px}
+  .cards .card:last-child:nth-child(odd){flex-direction:column;align-items:stretch;gap:0;padding:9px 9px 20px}
+  .cards .card:last-child:nth-child(odd) figure{flex:none}
+  .cards .card:last-child:nth-child(odd) .stamp{left:14px;bottom:-26px}
+  .cards .card:last-child:nth-child(odd) .body{padding:0 12px}
+  .cards .card:last-child:nth-child(odd) h3{margin-left:68px}
+}
+/* ---------- 山水留白：段落之間的霧 ---------- */
+.mist{height:170px;margin-top:clamp(16px,4vw,48px);opacity:.5;mix-blend-mode:multiply;pointer-events:none;
+  background:url(img/hero.jpg) var(--bx,0%) var(--by,62%)/1500px auto no-repeat;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 35%,#000 65%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 35%,#000 65%,transparent)}
+.mist.m2{--bx:100%;--by:30%}
+@media (max-width:720px){.mist{height:110px;background-size:900px auto}}
 /* ---------- 自己架 ---------- */
 .steps{margin:0;padding:0 0 0 2.4em;list-style:cjk-ideographic;max-width:44rem}
 .steps li{padding-left:.4em;margin:0 0 1.1em}
@@ -162,53 +184,71 @@ footer p{margin:0;color:var(--ink-2);font-size:15px}
     <div class="wrap">
       <h2>它會做的事</h2>
       <p class="intro">私訊它、在頻道 @它、回覆它的訊息，它就會回。其他機器人說的話一律不理，免得兩隻機器人吵個沒完。</p>
-      <ul class="rows">
-        <li class="has-art"><span class="stamp" aria-hidden="true">聊</span><div><h3>聊天、看圖、上網</h3>
-          <p>讀頻道前面的訊息當上下文，圖片也看得懂（最近 4 則裡最多 4 張）。問天氣會去查，需要即時資訊時自己決定要不要搜尋、打開網頁。後面接什麼模型由你決定，本機的 Ollama，或 OpenAI、DeepSeek 這類線上服務都行。</p></div><img class="art" src="img/chat.jpg" width="640" height="640" loading="lazy" alt="水墨畫：一支毛筆靠在硯台上，旁邊濺著幾點墨"></li>
-        <li class="has-art"><span class="stamp" aria-hidden="true">樂</span><div><h3>放 YouTube 音樂</h3>
-          <p>進語音頻道後說「放周杰倫的晴天」，或用指令貼網址、整個播放清單。有佇列、插播、播放面板和進度條，沒人聽了會自己離開。</p></div><img class="art" src="img/music.jpg" width="640" height="640" loading="lazy" alt="水墨畫：月夜的河邊擺著古琴和竹笛，煙霧裡飄著音符"></li>
-        <li class="has-art"><span class="stamp" aria-hidden="true">卜</span><div><h3>占卜</h3>
-          <p>塔羅（78 張，正逆位）、擲筊、六十甲子籤、易經起卦，還能排八字命盤和星盤，並附上圖。牌、籤、卦都由程式用亂數決定，模型只負責解讀。</p></div><img class="art" src="img/divine.jpg" width="640" height="640" loading="lazy" alt="水墨畫：烏龜、三枚銅錢和一爐香，月牙掛在雲上"></li>
-        <li><span class="stamp" aria-hidden="true">管</span><div><h3>開頻道、改頻道</h3>
-          <p>叫它開、改名、封存頻道，或建立「有人進去就自動開一間、走光就刪掉」的臨時語音房。叫它做事的人自己要有「管理頻道」權限，不然它不理你。</p></div></li>
-                <li class="has-art"><span class="stamp" aria-hidden="true">錢</span><div><h3>代幣、借貸與帳本</h3>
+      <div class="cards">
+      <article class="card"><figure><img src="img/chat.jpg" width="640" height="640" loading="lazy" alt="水墨畫：兩杯空茶杯冒著熱氣，旁邊一盞紙燈籠"><span class="stamp" aria-hidden="true">聊</span></figure>
+        <div class="body"><h3>聊天、看圖、上網</h3>
+          <p>讀頻道前面的訊息當上下文，圖片也看得懂（最近 4 則裡最多 4 張）。問天氣會去查，需要即時資訊時自己決定要不要搜尋、打開網頁。後面接什麼模型由你決定，本機的 Ollama，或 OpenAI、DeepSeek 這類線上服務都行。</p></div></article>
+      <article class="card"><figure><img src="img/draw.jpg" width="640" height="640" loading="lazy" alt="水墨畫：一支毛筆靠在硯台上，旁邊濺著幾點墨"><span class="stamp" aria-hidden="true">畫</span></figure>
+        <div class="body"><h3>畫圖、音效、影片</h3>
+          <p>用 <code>/畫圖</code> 或直接說「畫一張…」，它會叫後面的繪圖模型來畫，也能改圖、做音效、做最長 6 秒的小動畫。活動選單裡的「圖創區」可以把畫好的圖分類收藏，還能跟大笨bot 討論要怎麼改。</p></div></article>
+      <article class="card"><figure><img src="img/music.jpg" width="640" height="640" loading="lazy" alt="水墨畫：月夜的河邊擺著古琴和竹笛，煙霧裡飄著音符"><span class="stamp" aria-hidden="true">樂</span></figure>
+        <div class="body"><h3>放 YouTube 音樂</h3>
+          <p>進語音頻道後說「放周杰倫的晴天」，或用指令貼網址、整個播放清單。有佇列、插播、播放面板和進度條，沒人聽了會自己離開。</p></div></article>
+      <article class="card"><figure><img src="img/divine.jpg" width="640" height="640" loading="lazy" alt="水墨畫：烏龜、三枚銅錢和一爐香，月牙掛在雲上"><span class="stamp" aria-hidden="true">卜</span></figure>
+        <div class="body"><h3>占卜</h3>
+          <p>塔羅（78 張，正逆位）、擲筊、六十甲子籤、易經起卦，還能排八字命盤和星盤，並附上圖。牌、籤、卦都由程式用亂數決定，模型只負責解讀。</p></div></article>
+      <article class="card"><figure><img src="img/coins.jpg" width="640" height="640" loading="lazy" alt="水墨畫：一串串銅錢、算盤和一卷帳冊"><span class="stamp" aria-hidden="true">錢</span></figure>
+        <div class="body"><h3>代幣、借貸與帳本</h3>
           <p>在頻道說話、掛語音就會慢慢賺代幣，只能拿來玩，不是現金。缺錢可以跟大笨bot 借，它很小氣，理由要講得動聽，而且利息每天五成。欠債不還，賺到的錢會先被扣一半、掛上「欠債人」身分組，每晚八點公告。</p>
-          <p class="small">每筆轉帳和借還款，都能發到你指定的帳本頻道；沒設定就不發。一隻機器人待在好幾個伺服器也沒問題，各伺服器的帳各算各的。</p></div><img class="art" src="img/coins.jpg" width="640" height="640" loading="lazy" alt="水墨畫：一串串銅錢、算盤和一卷帳冊"></li>
-        <li><span class="stamp" aria-hidden="true">畫</span><div><h3>畫圖、音效、影片</h3>
-          <p>用 <code>/畫圖</code> 或直接說「畫一張…」，它會叫後面的繪圖模型來畫，也能改圖、做音效、做最長 6 秒的小動畫。活動選單裡的「圖創區」可以把畫好的圖分類收藏，還能跟大笨bot 討論要怎麼改。</p></div></li>
-        <li><span class="stamp" aria-hidden="true">雜</span><div><h3>投票、抽籤、總結</h3>
-          <p>按鈕投票、從一串選項抽人、亂數、總結最近的對話。</p></div></li>
-      </ul>
+          <p class="small">每筆轉帳和借還款，都能發到你指定的帳本頻道；沒設定就不發。一隻機器人待在好幾個伺服器也沒問題，各伺服器的帳各算各的。</p></div></article>
+      <article class="card"><figure><img src="img/manage.jpg" width="640" height="640" loading="lazy" alt="水墨畫：木門後面是幾間亮著燈籠的小屋，門上掛著一串鑰匙"><span class="stamp" aria-hidden="true">管</span></figure>
+        <div class="body"><h3>開頻道、改頻道</h3>
+          <p>叫它開、改名、封存頻道，或建立「有人進去就自動開一間、走光就刪掉」的臨時語音房。叫它做事的人自己要有「管理頻道」權限，不然它不理你。</p></div></article>
+      <article class="card"><figure><img src="img/misc.jpg" width="640" height="640" loading="lazy" alt="水墨畫：籤筒、骰子和一個小木投票箱"><span class="stamp" aria-hidden="true">雜</span></figure>
+        <div class="body"><h3>投票、抽籤、總結</h3>
+          <p>按鈕投票、從一串選項抽人、亂數、總結最近的對話。</p>
+          <p class="small">每個中文指令都有英文別名（例如 <code>/畫圖</code> 也能打 <code>/imagine</code>），輸入 <code>/help</code> 看完整清單。</p></div></article>
+    </div>
     </div>
   </section>
 
+  <div class="mist m1" aria-hidden="true"></div>
   <section>
     <div class="wrap">
       <h2>牌桌</h2>
       <p class="intro">在語音頻道按下 Activity，就會開出一個即時同步的遊戲視窗。人不夠的位置可以補電腦，其他人先在旁邊看。</p>
-      <ul class="rows">
-        <li><span class="stamp" aria-hidden="true">棋</span><div><h3>棋類</h3>
+      <div class="cards">
+      <article class="card"><figure><img src="img/chess.jpg" width="640" height="640" loading="lazy" alt="水墨畫：石桌上擺著象棋棋盤和一碗圍棋子"><span class="stamp" aria-hidden="true">棋</span></figure>
+        <div class="body"><h3>棋類</h3>
           <p>五子棋、四連棋、黑白棋、西洋棋、象棋。西洋棋和象棋可以加電腦對手，分新手、普通、高手、大師四級；電腦的棋是自己算的，不靠任何線上服務。</p>
-          <p class="small">新手只看一步而且常亂走，大師每步想三秒，大約能看七到十步。</p></div></li>
-        <li class="has-art"><span class="stamp" aria-hidden="true">牌</span><div><h3>麻將、橋牌、德州撲克</h3>
-          <p>台灣麻將（16 張）和日本麻將（立直、寶牌、振聽）、台灣簡易橋牌、德州撲克，都能補電腦。電腦各有個性，有的愛衝，有的愛吃碰，也有真的會讀牌防守的。只用練習點數。</p></div><img class="art" src="img/table.jpg" width="640" height="640" loading="lazy" alt="水墨畫：竹林裡的石桌上擺著麻將牌、棋子和一杯熱茶"></li>
-        <li><span class="stamp" aria-hidden="true">賭</span><div><h3>老虎機、21 點、賽馬</h3>
-          <p>還有骰子和擲硬幣。可以選練習幣，或機器人的虛擬代幣。賽馬的 10 匹馬各有能力值和戰績，強馬賠得少，冷門賠得多。</p></div></li>
-                <li class="has-art"><span class="stamp" aria-hidden="true">卡</span><div><h3>水墨卡冊</h3>
+          <p class="small">新手只看一步而且常亂走，大師每步想三秒，大約能看七到十步。</p></div></article>
+      <article class="card"><figure><img src="img/table.jpg" width="640" height="640" loading="lazy" alt="水墨畫：竹林裡的石桌上擺著麻將牌、棋子和一杯熱茶"><span class="stamp" aria-hidden="true">牌</span></figure>
+        <div class="body"><h3>麻將、橋牌、德州撲克</h3>
+          <p>台灣麻將（16 張）和日本麻將（立直、寶牌、振聽）、台灣簡易橋牌、德州撲克，都能補電腦。電腦各有個性，有的愛衝，有的愛吃碰，也有真的會讀牌防守的。只用練習點數。</p></div></article>
+      <article class="card"><figure><img src="img/horse.jpg" width="640" height="640" loading="lazy" alt="水墨畫：幾匹馬在霧中的跑道上奔馳"><span class="stamp" aria-hidden="true">賭</span></figure>
+        <div class="body"><h3>老虎機、21 點、賽馬</h3>
+          <p>還有骰子和擲硬幣。可以選練習幣，或機器人的虛擬代幣。賽馬的 10 匹馬各有能力值和戰績，強馬賠得少，冷門賠得多。</p></div></article>
+      <article class="card"><figure><img src="img/cards.jpg" width="640" height="640" loading="lazy" alt="水墨畫：幾張卡片攤開，背後隱約升起一條龍的影子"><span class="stamp" aria-hidden="true">卡</span></figure>
+        <div class="body"><h3>水墨卡冊</h3>
           <p>用代幣抽卡，收集三百張水墨畫的卡：神獸、人物、山水、器物各一批，從樸素的 N 一路到金光閃閃的 SSR。抽到的卡收進卡冊，還有名卡榜可以比誰收得多。</p>
-          <p class="small">每一張都是 AI 用毛筆水墨的風格畫的。</p></div><img class="art" src="img/cards.jpg" width="640" height="640" loading="lazy" alt="水墨畫：幾張卡片攤開，背後隱約升起一條龍的影子"></li>
-        <li class="has-art"><span class="stamp" aria-hidden="true">鍛</span><div><h3>鍛造</h3>
-          <p>把一把劍鍛到一百階，每一階的外觀都不一樣。每次鍛造有機率成功，也有機率劍碎，整把歸零。賣不賣、要不要衝，自己決定。</p></div><img class="art" src="img/forge.jpg" width="640" height="640" loading="lazy" alt="水墨畫：鐵匠在山中爐火前鍛一把發光的劍"></li>
-        <li class="has-art"><span class="stamp" aria-hidden="true">農</span><div><h3>種菜</h3>
-          <p>每個人一塊田，菜照真實時間慢慢長，關掉也不會停。收成能賣錢，運氣好還會長出大顆的和金色的。朋友的菜熟了，也可以溜去偷一個。</p></div><img class="art" src="img/farm.jpg" width="640" height="640" loading="lazy" alt="水墨畫：春雨中的菜園，戴斗笠的農夫扛著鋤頭"></li>
-        <li><span class="stamp" aria-hidden="true">動</span><div><h3>動作小遊戲</h3>
-          <p>小朋友下樓梯最多 4 人一起玩，彈珠台一個人玩。</p></div></li>
-        <li><span class="stamp" aria-hidden="true">影</span><div><h3>一起看影片</h3>
-          <p>貼 YouTube 連結或打關鍵字排進清單，大家同步播放、暫停和拖進度。畫質、字幕各自選，字幕直接用影片原本的，不經過 AI 翻譯。</p></div></li>
-      </ul>
+          <p class="small">每一張都是 AI 用毛筆水墨的風格畫的。</p></div></article>
+      <article class="card"><figure><img src="img/forge.jpg" width="640" height="640" loading="lazy" alt="水墨畫：鐵匠在山中爐火前鍛一把發光的劍"><span class="stamp" aria-hidden="true">鍛</span></figure>
+        <div class="body"><h3>鍛造</h3>
+          <p>把一把劍鍛到一百階，每一階的外觀都不一樣。每次鍛造有機率成功，也有機率劍碎，整把歸零。賣不賣、要不要衝，自己決定。</p></div></article>
+      <article class="card"><figure><img src="img/farm.jpg" width="640" height="640" loading="lazy" alt="水墨畫：春雨中的菜園，戴斗笠的農夫扛著鋤頭"><span class="stamp" aria-hidden="true">農</span></figure>
+        <div class="body"><h3>種菜</h3>
+          <p>每個人一塊田，菜照真實時間慢慢長，關掉也不會停。收成能賣錢，運氣好還會長出大顆的和金色的。朋友的菜熟了，也可以溜去偷一個。</p></div></article>
+      <article class="card"><figure><img src="img/action.jpg" width="640" height="640" loading="lazy" alt="水墨畫：一個小人從長長的石階上滾下來"><span class="stamp" aria-hidden="true">動</span></figure>
+        <div class="body"><h3>動作小遊戲</h3>
+          <p>小朋友下樓梯最多 4 人一起玩，彈珠台一個人玩。</p></div></article>
+      <article class="card"><figure><img src="img/theater.jpg" width="640" height="640" loading="lazy" alt="水墨畫：燈籠照亮的皮影戲紙幕，前面坐著一小群觀眾剪影"><span class="stamp" aria-hidden="true">影</span></figure>
+        <div class="body"><h3>一起看影片</h3>
+          <p>貼 YouTube 連結或打關鍵字排進清單，大家同步播放、暫停和拖進度。畫質、字幕各自選，字幕直接用影片原本的，不經過 AI 翻譯。</p></div></article>
+    </div>
     </div>
   </section>
 
+  <div class="mist m2" aria-hidden="true"></div>
   <section id="host">
     <div class="wrap">
       <h2>自己架一隻</h2>
