@@ -57,7 +57,7 @@ def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
     house_add(gid, -amount)
     a["coins"] = int(a["coins"]) + amount
     # 已有欠款就加碼：把累積到現在的欠款連同新借的併成新本金，從現在起重新計息
-    a["loan"] = {"p": owed + amount, "t": time.time()}
+    a["loan"] = {"p": owed + amount, "t": time.time(), "b": time.time()}
     _save()
     record(gid, "借款", _bot_party(), (uid, name), amount)
     _schedule_role_sync(gid, uid)
@@ -80,13 +80,14 @@ def repay(gid: int, uid: int, amount: int | None, kind: str = "還款") -> tuple
     if left <= 0:
         a.pop("loan", None)
     else:
-        a["loan"] = {"p": left, "t": time.time()}      # 剩下的重新從現在起算
+        a["loan"] = {"p": left, "t": time.time(), "b": a["loan"].get("b", a["loan"]["t"])}      # 剩下的重新從現在起算
     _save()
     _schedule_role_sync(gid, uid)
     return pay, max(0, left)
 
 
-DEBT_CUT = 0.5                    # 有欠債時，賺到的錢（掛語音、遊戲贏的）先扣這個比例還債
+DEBT_CUT_AFTER = 3 * 86400        # 借款滿這麼久才開始自動扣（只扣賭博贏的錢）
+DEBT_CUT = 0.5                    # 借款滿 3 天後，賭博贏的錢先扣這個比例還債（掛機賺的不扣）
 DEBT_ROLE = "欠債人"               # 只要有欠債就掛，還清就拿掉
 DEBT_REMIND_HOUR = 20             # 每天幾點（台北時間）在帳本頻道催債
 DEBT_REMIND_FILE = paths.record("debt_remind.json")
@@ -95,6 +96,9 @@ DEBT_REMIND_FILE = paths.record("debt_remind.json")
 def deduct_debt(gid: int, uid: int, income: int) -> int:
     """賺到 income 之後，如果有欠債，先扣一部分還債。回傳實際扣了多少（呼叫的人要把餘額減掉這個數）。"""
     if income <= 0 or not debt_of(gid, uid):
+        return 0
+    ln = _acct(gid, uid)["loan"]
+    if time.time() - float(ln.get("b", ln["t"])) < DEBT_CUT_AFTER:     # 借款滿 3 天才會自動扣
         return 0
     cut = int(income * DEBT_CUT)
     if cut <= 0:
@@ -207,5 +211,4 @@ def try_earn(gid: int, uid: int, name: str) -> bool:
     a["last"] = now
     a["coins"] = int(a["coins"]) + EARN_AMOUNT
     _save()
-    deduct_debt(gid, uid, EARN_AMOUNT)
-    return True
+    return True        # 掛機／發言賺的錢不會被拿去還債
