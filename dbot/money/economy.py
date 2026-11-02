@@ -19,40 +19,112 @@ import paths
 import discord
 from discord import app_commands
 
-log = logging.getLogger("discord-ai-bot.economy")
 
-WALLET_FILE = paths.record("wallet.json")
-EARN_AMOUNT = 10          # 每次賺多少
-EARN_INTERVAL = 60        # 至少間隔幾秒才能再賺一次
-START_COINS = 200         # 新玩家起始代幣
-COIN = "🪙"
-RNG = random.SystemRandom()   # 賭博用真亂數
-
-SLOT_SYMBOLS = ["🍒", "🍋", "💎"]   # 3 格單排只用 3 種圖案
-SLOT_TRIPLE = {"🍒": 2, "🍋": 2.5, "💎": 3.2}   # 三個一樣：拿回幾倍賭注
-SLOT_PAIR = 1                                                           # 兩個一樣：賭注退回
-
-wallet: dict = {}
-
-
-def _load() -> dict:
-    try:
-        return json.loads(WALLET_FILE.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def _save() -> None:
-    try:
-        tmp = WALLET_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(wallet, ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp.replace(WALLET_FILE)
-    except OSError as e:
-        log.warning("存錢包失敗：%r", e)
-
-
-wallet = _load()
-
+from . import account
+from .account import (
+    COIN,
+    EARN_AMOUNT,
+    EARN_INTERVAL,
+    HOUSE_NAME,
+    HOUSE_START,
+    RNG,
+    START_COINS,
+    WALLET_FILE,
+    _acct,
+    _client,
+    _house,
+    _load,
+    _save,
+    add,
+    balance,
+    fmt,
+    house_add,
+    house_balance,
+    log,
+    wallet,
+)
+from .ledger import (
+    GAME_DIGEST_EVERY,
+    GAME_DIGEST_FILE,
+    GAME_KINDS,
+    LEDGER_CHANNEL,
+    LEDGER_FILE,
+    LEDGER_KEEP,
+    NO_HOUSE_WHY,
+    _bot_party,
+    _digest_state,
+    _ledger,
+    _post_ledger,
+    _send_ledger,
+    build_game_digest,
+    game_digest_loop,
+    record,
+)
+from .loans import (
+    DEBT_CUT,
+    DEBT_REMIND_FILE,
+    DEBT_REMIND_HOUR,
+    DEBT_ROLE,
+    LOAN_BASE,
+    LOAN_CAP_MULT,
+    LOAN_MAX,
+    LOAN_RATE,
+    QUIET_KINDS,
+    _loan_ask,
+    _schedule_role_sync,
+    _sync_debt_role,
+    borrow,
+    build_debt_reminder,
+    check_borrow,
+    debt_loop,
+    debt_of,
+    deduct_debt,
+    loan_judge,
+    loan_limit,
+    repay,
+    sync_all_debt_roles,
+    try_earn,
+)
+from .minigames import (
+    BlackjackView,
+    CARD_RANKS,
+    CARD_SUITS,
+    GRID_PAY,
+    GRID_SCALE,
+    GRID_SYMBOLS,
+    PAIR_PAY_3X3,
+    SLOT_PAIR,
+    SLOT_SYMBOLS,
+    SLOT_TRIPLE,
+    grid_lines,
+    grid_spin,
+    hand_text,
+    hand_value,
+    slot_spin,
+)
+from .horse_race import (
+    BetModal,
+    FORMS,
+    FORM_WEIGHTS,
+    HORSES_FILE,
+    HORSES_PER_RACE,
+    HORSE_EDGE,
+    HORSE_POOL,
+    NUM_EMOJI,
+    RACE_TICKS,
+    Race,
+    RaceView,
+    STRENGTH_TEMP,
+    TRACK_LEN,
+    _load_horses,
+    _save_horses,
+    bar,
+    horse_strength,
+    horses,
+    plan_race,
+    record_results,
+    run_race,
+)
 
 def on_message(msg: discord.Message) -> None:
     """由 bot.py 的 on_message 呼叫：在伺服器發言就可能賺幣（每分鐘最多一次）。"""
@@ -64,786 +136,9 @@ start_voice_loop = lambda: None   # setup() 之後換成真的
 start_internal_api = lambda: None   # setup() 之後換成真的
 gallery_chat = None                 # bot.py 設定：Activity 圖創區的「跟大笨bot說話」處理函式 async (gid, uid, name, cat, text, history) -> dict
 
-
-def _acct(gid: int, uid: int, name: str | None = None) -> dict:
-    a = wallet.setdefault(str(gid), {}).setdefault(str(uid), {"coins": START_COINS, "last": 0.0, "name": name or str(uid)})
-    if name:
-        a["name"] = name
-    return a
-
-
-def balance(gid: int, uid: int) -> int:
-    return int(wallet.get(str(gid), {}).get(str(uid), {}).get("coins", START_COINS))
-
-
-def add(gid: int, uid: int, delta: int, name: str | None = None) -> int:
-    a = _acct(gid, uid, name)
-    a["coins"] = max(0, int(a["coins"]) + int(delta))
-    _save()
-    return a["coins"]
-
-
-def try_earn(gid: int, uid: int, name: str) -> bool:
-    a = _acct(gid, uid, name)
-    now = time.time()
-    if now - a["last"] < EARN_INTERVAL - 1:
-        return False
-    a["last"] = now
-    a["coins"] = int(a["coins"]) + EARN_AMOUNT
-    _save()
-    deduct_debt(gid, uid, EARN_AMOUNT)
-    return True
-
-
-def fmt(n: int) -> str:
-    return f"{COIN}{n:,}"
-
-
-# ---- 大笨bot 自己的帳戶（莊家）：Activity 裡玩家輸的錢進它的口袋、贏的從它的口袋出；錢不夠付時帳戶歸零（玩家的彩金照付）。
-HOUSE_START = 1_000_000
-HOUSE_NAME = "大笨bot"
-_client = None
-
-
-def _house(gid: int):
-    if _client is None or _client.user is None:
-        return None
-    return wallet.setdefault(str(gid), {}).setdefault(str(_client.user.id), {"coins": HOUSE_START, "last": 0.0, "name": HOUSE_NAME, "house": True})
-
-
-def house_balance(gid: int) -> int | None:
-    a = _house(gid)
-    return None if a is None else int(a["coins"])
-
-
-def house_add(gid: int, delta: int) -> int | None:
-    a = _house(gid)
-    if a is None:
-        return None
-    a["coins"] = max(0, int(a["coins"]) + int(delta))
-    _save()
-    return a["coins"]
-
-
-# ---------------------------------------------------------------- 轉帳紀錄（大笨bot 查帳用）
-LEDGER_FILE = paths.logfile("transfers.json")
-LEDGER_KEEP = 12000
-NO_HOUSE_WHY = ("鍛造", "種菜", "抽卡")      # 不是賭博的玩法：錢不經過大笨bot 的帳戶，也不記帳本
-GAME_KINDS = ("遊戲結算", "遊戲派彩")      # 機器人當莊家的輸贏；查帳預設不列，避免蓋掉真正的轉帳
-
-
-def _ledger() -> list:
-    try:
-        return json.loads(LEDGER_FILE.read_text(encoding="utf-8")).get("items", [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-def record(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str = "") -> None:
-    """記一筆錢的移動。frm / to 是 (id, 名字)。kind：轉帳／發錢／借款／還款／大笨bot送錢。"""
-    try:
-        items = _ledger()
-        items.append({"t": time.time(), "gid": gid, "kind": kind, "from": [str(frm[0]), frm[1]], "to": [str(to[0]), to[1]], "amount": int(amount), "note": note[:100]})
-        tmp = LEDGER_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"items": items[-LEDGER_KEEP:]}, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(LEDGER_FILE)
-    except OSError as e:
-        log.warning("記轉帳紀錄失敗：%r", e)
-    if kind not in QUIET_KINDS:
-        _post_ledger(gid, kind, frm, to, amount, note)
-
-
-LEDGER_CHANNEL = "大笨bot的帳本"
-
-
-def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str) -> None:
-    """把這筆轉帳也發到伺服器的「大笨bot的帳本」文字頻道（找不到頻道、沒權限就算了，不影響轉帳）。遊戲輸贏太多，不發。"""
-    try:
-        guild = _client.get_guild(int(gid)) if _client else None
-        if guild is None:
-            return
-        ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
-        if ch is None:
-            return
-        icon = {"轉帳": "💸", "發錢": "🎁", "借款": "🦈", "還款": "💰", "大笨bot送錢": "🎀"}.get(kind, "🪙")
-        text = f"{icon} **{kind}**　{frm[1]} → {to[1]}　🪙{int(amount):,}" + (f"\n> {note}" if note else "")
-        loop = asyncio.get_running_loop()
-        loop.create_task(_send_ledger(ch, text))
-    except Exception as ex:                              # 帳本頻道的問題不能拖累轉帳
-        log.warning("發帳本頻道失敗：%r", ex)
-
-
-GAME_DIGEST_EVERY = 10 * 60            # 賭博類每隔多久彙整一次發到帳本頻道
-GAME_DIGEST_FILE = paths.record("game_digest.json")
-
-
-def _digest_state() -> dict:
-    try:
-        return json.loads(GAME_DIGEST_FILE.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def build_game_digest(gid: int, since: float, until: float) -> str | None:
-    """把這段時間的遊戲輸贏（老虎機、抽卡、賭局…）彙整成一則訊息；沒有就回 None。"""
-    nets: dict[str, list] = {}
-    bot_net = 0
-    for x in _ledger():
-        if x["gid"] != gid or x["kind"] not in GAME_KINDS or not (since < x["t"] <= until):
-            continue
-        if x["kind"] == "遊戲結算" and x["to"][1] == HOUSE_NAME:       # 玩家 → 莊家
-            who, d = x["from"], -x["amount"]
-        elif x["from"][1] == HOUSE_NAME:                               # 莊家 → 玩家
-            who, d = x["to"], x["amount"]
-        else:
-            continue
-        # 用使用者 ID 分組：同一個人在 Discord 和 Activity 的顯示名字可能不同
-        r = nets.setdefault(str(who[0]), [0, 0, who[1]])
-        r[0] += d
-        r[1] += 1
-        r[2] = who[1]
-        bot_net -= d
-    if not nets:
-        return None
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    f = lambda t: datetime.fromtimestamp(t, ZoneInfo("Asia/Taipei")).strftime("%m-%d %H:%M")
-    rows = sorted(nets.items(), key=lambda kv: -abs(kv[1][0]))
-    lines = [f"{'🔺' if n > 0 else '🔻' if n < 0 else '➖'} {nm}　{n:+,}　（{c} 筆）" for _, (n, c, nm) in rows[:15]]
-    if len(rows) > 15:
-        lines.append(f"…還有 {len(rows) - 15} 人")
-    return (f"🎰 **賭博／遊戲彙整**　{f(since) if since else '起'} ~ {f(until)}\n" + "\n".join(lines)
-            + f"\n大笨bot 這段時間 **{bot_net:+,}**（玩家 🔺 贏、🔻 輸）")
-
-
-async def game_digest_loop(client) -> None:
-    await client.wait_until_ready()
-    while not client.is_closed():
-        await asyncio.sleep(600)
-        try:
-            state, now, changed = _digest_state(), time.time(), False
-            for guild in client.guilds:
-                last = float(state.get(str(guild.id), 0))
-                if last and now - last < GAME_DIGEST_EVERY - 30:
-                    continue
-                if not last:                                   # 第一次：從現有的遊戲紀錄開始算，並等滿一個週期再發
-                    gt = [x["t"] for x in _ledger() if x["gid"] == guild.id and x["kind"] in GAME_KINDS]
-                    if not gt or now - min(gt) < GAME_DIGEST_EVERY:
-                        continue
-                text = build_game_digest(guild.id, last, now)
-                state[str(guild.id)] = now
-                changed = True
-                ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
-                if text and ch:
-                    await ch.send(text[:1990], allowed_mentions=discord.AllowedMentions.none())
-            if changed:
-                GAME_DIGEST_FILE.write_text(json.dumps(state), encoding="utf-8")
-        except Exception:
-            log.exception("賭博彙整迴圈出錯")
-
-
-async def _send_ledger(ch, text: str) -> None:
-    try:
-        await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
-    except Exception as ex:
-        log.warning("帳本頻道送出失敗：%r", ex)
-
-
-def _bot_party() -> tuple:
-    return (_client.user.id if _client and _client.user else 0, HOUSE_NAME)
-
-
-# ---------------------------------------------------------------- 大笨bot 放貸：利率超高
-LOAN_RATE = 0.5        # 每天利息 50%，複利（按經過的時間連續算）
-LOAN_BASE = 100_000     # 一般最多借多少
-LOAN_MAX = 500_000      # 絕對上限：手上錢越多，可借的越多（可借 = 手上的錢，但至少 LOAN_BASE、最多 LOAN_MAX）
-LOAN_CAP_MULT = 10     # 欠款最多滾到本金的幾倍就不再增加
-
-
-def debt_of(gid: int, uid: int) -> int:
-    ln = wallet.get(str(gid), {}).get(str(uid), {}).get("loan")
-    if not ln:
-        return 0
-    days = max(0.0, (time.time() - float(ln["t"])) / 86400)
-    return min(int(ln["p"] * LOAN_CAP_MULT), int(ln["p"] * (1 + LOAN_RATE) ** days))
-
-
-def loan_limit(gid: int, uid: int) -> int:
-    return min(LOAN_MAX, max(LOAN_BASE, balance(gid, uid)))
-
-
-def check_borrow(gid: int, uid: int, amount: int) -> str | None:
-    """能不能借（不含大笨bot 自己的意願）：不能就回原因。"""
-    a = _acct(gid, uid)
-    if a.get("loan"):
-        return f"你還欠著 {fmt(debt_of(gid, uid))}，先還清才能再借。"
-    lim = loan_limit(gid, uid)
-    if amount > lim:
-        return f"你現在最多只能借 {fmt(lim)}（一般最多 {fmt(LOAN_BASE)}，手上的錢越多可借越多，上限 {fmt(LOAN_MAX)}）。"
-    h = house_balance(gid)
-    if h is None or h < amount:
-        return f"大笨bot 手頭不夠（現在只有 {fmt(h or 0)}），借不出這麼多。"
-    return None
-
-
-loan_judge = None       # bot.py 設定：async (name, amount, coins, bot_coins, reason) -> (同意與否, 大笨bot 的回話)
-_loan_ask: dict = {}    # 同一個人 60 秒內只能求一次
-
-
-def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
-    """成功回 None，失敗回原因。錢從大笨bot 的帳戶出。"""
-    err = check_borrow(gid, uid, amount)
-    if err:
-        return err
-    a = _acct(gid, uid, name)
-    house_add(gid, -amount)
-    a["coins"] = int(a["coins"]) + amount
-    a["loan"] = {"p": amount, "t": time.time()}
-    _save()
-    record(gid, "借款", _bot_party(), (uid, name), amount)
-    _schedule_role_sync(gid, uid)
-    return None
-
-
-def repay(gid: int, uid: int, amount: int | None, kind: str = "還款") -> tuple[int, int]:
-    """還錢給大笨bot。回傳 (實際還了多少, 還剩多少債)。amount=None 就是盡量還（還清或用光手上的錢）。"""
-    a = _acct(gid, uid)
-    d = debt_of(gid, uid)
-    if not d:
-        return 0, 0
-    pay = min(d, int(a["coins"]), amount if amount is not None else d)
-    if pay <= 0:
-        return 0, d
-    a["coins"] = int(a["coins"]) - pay
-    house_add(gid, pay)
-    record(gid, kind, (uid, a.get("name") or str(uid)), _bot_party(), pay)
-    left = d - pay
-    if left <= 0:
-        a.pop("loan", None)
-    else:
-        a["loan"] = {"p": left, "t": time.time()}      # 剩下的重新從現在起算
-    _save()
-    _schedule_role_sync(gid, uid)
-    return pay, max(0, left)
-
-
-DEBT_CUT = 0.5                    # 有欠債時，賺到的錢（掛語音、遊戲贏的）先扣這個比例還債
-DEBT_ROLE = "欠債人"               # 只要有欠債就掛，還清就拿掉
-DEBT_REMIND_HOUR = 20             # 每天幾點（台北時間）在帳本頻道催債
-QUIET_KINDS = GAME_KINDS + ("自動還款",)      # 這些不逐筆發帳本頻道（自動還款改成每日催債時一起報）
-DEBT_REMIND_FILE = paths.record("debt_remind.json")
-
-
-def deduct_debt(gid: int, uid: int, income: int) -> int:
-    """賺到 income 之後，如果有欠債，先扣一部分還債。回傳實際扣了多少（呼叫的人要把餘額減掉這個數）。"""
-    if income <= 0 or not debt_of(gid, uid):
-        return 0
-    cut = int(income * DEBT_CUT)
-    if cut <= 0:
-        return 0
-    pay, _ = repay(gid, uid, cut, kind="自動還款")
-    return pay
-
-
-def _schedule_role_sync(gid: int, uid: int) -> None:
-    try:
-        guild = _client.get_guild(int(gid)) if _client else None
-        if guild is not None:
-            asyncio.get_running_loop().create_task(_sync_debt_role(guild, int(uid)))
-    except RuntimeError:                     # 不在事件迴圈裡（測試時），之後的定時同步會補上
-        pass
-
-
-async def _sync_debt_role(guild, uid: int) -> None:
-    try:
-        has = debt_of(guild.id, uid) > 0
-        role = discord.utils.get(guild.roles, name=DEBT_ROLE)
-        if role is None:
-            if not has:
-                return
-            role = await guild.create_role(name=DEBT_ROLE, colour=discord.Colour.dark_red(), reason="有欠大笨bot 的債")
-        m = guild.get_member(uid)
-        if m is None:
-            m = await guild.fetch_member(uid)
-        if has and role not in m.roles:
-            await m.add_roles(role, reason="欠大笨bot 的債")
-        elif not has and role in m.roles:
-            await m.remove_roles(role, reason="債還清了")
-    except discord.Forbidden:
-        log.warning("沒有管理身分組的權限（或「%s」身分組比機器人的身分組高），無法同步欠債身分組", DEBT_ROLE)
-    except discord.NotFound:
-        pass
-    except Exception as ex:
-        log.warning("同步欠債身分組失敗：%r", ex)
-
-
-async def sync_all_debt_roles(guild) -> None:
-    debtors = {int(u) for u, a in wallet.get(str(guild.id), {}).items() if a.get("loan") and debt_of(guild.id, int(u)) > 0}
-    for uid in debtors:
-        await _sync_debt_role(guild, uid)
-    role = discord.utils.get(guild.roles, name=DEBT_ROLE)
-    if role:
-        for m in list(role.members):
-            if m.id not in debtors:
-                await _sync_debt_role(guild, m.id)
-
-
-def build_debt_reminder(gid: int) -> str | None:
-    now = time.time()
-    taken: dict[str, int] = {}
-    for x in _ledger():
-        if x["gid"] == gid and x["kind"] == "自動還款" and now - x["t"] < 86400:
-            taken[x["from"][0]] = taken.get(x["from"][0], 0) + x["amount"]
-    rows = []
-    for uid, a in wallet.get(str(gid), {}).items():
-        ln = a.get("loan")
-        d = debt_of(gid, int(uid)) if ln else 0
-        if d > 0:
-            rows.append((d, uid, ln, taken.get(str(uid), 0)))
-    if not rows:
-        return None
-    rows.sort(reverse=True)
-    lines = []
-    for d, uid, ln, t in rows[:20]:
-        days = max(0.0, (now - float(ln["t"])) / 86400)
-        lines.append(f"<@{uid}>　現在欠 **{fmt(d)}**（本金 {fmt(ln['p'])}、滾了 {days:.1f} 天）　今天已自動扣走 **{fmt(t)}**")
-    return ("📣 **大笨bot 每日催債**\n" + "\n".join(lines)
-            + f"\n\n利息每天 +{int(LOAN_RATE * 100)}%。你們賺的錢（掛語音、遊戲贏的）會先被扣 {int(DEBT_CUT * 100)}% 還債；"
-            "想一次還清就用 `/還錢`，或直接跟我說要還錢。還清之前不能借、不能轉帳。")
-
-
-async def debt_loop(client) -> None:
-    await client.wait_until_ready()
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    while not client.is_closed():
-        try:
-            try:
-                state = json.loads(DEBT_REMIND_FILE.read_text(encoding="utf-8"))
-            except (FileNotFoundError, json.JSONDecodeError):
-                state = {}
-            tp = datetime.now(ZoneInfo("Asia/Taipei"))
-            today, changed = tp.strftime("%Y-%m-%d"), False
-            for guild in client.guilds:
-                await sync_all_debt_roles(guild)
-                if tp.hour >= DEBT_REMIND_HOUR and state.get(str(guild.id)) != today:
-                    text = build_debt_reminder(guild.id)
-                    ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
-                    if text and ch:
-                        await ch.send(text[:1990], allowed_mentions=discord.AllowedMentions(users=True))
-                        state[str(guild.id)] = today
-                        changed = True
-            if changed:
-                DEBT_REMIND_FILE.write_text(json.dumps(state), encoding="utf-8")
-        except Exception:
-            log.exception("催債迴圈出錯")
-        await asyncio.sleep(600)
-
-
-# ---------------------------------------------------------------- 遊戲
-
-def slot_spin() -> tuple[list[str], int, str]:
-    """回傳 (三個符號, 拿回的倍率×2 的整數不用，這裡回傳「拿回倍率」, 說明)。"""
-    reels = [RNG.choice(SLOT_SYMBOLS) for _ in range(3)]
-    if reels[0] == reels[1] == reels[2]:
-        return reels, SLOT_TRIPLE[reels[0]], f"三個 {reels[0]}！"
-    if len(set(reels)) == 2:
-        return reels, SLOT_PAIR, "兩個一樣，賭注退回"
-    return reels, 0, "沒中"
-
-
-# ---- 多格老虎機：9 格（3×3，8 條連線，3 格一樣）、16 格（4×4，10 條連線，4 格一樣）
-GRID_SYMBOLS = {3: ["🍒", "🍋", "🔔", "💎"], 4: ["🍒", "🍋", "💎"]}
-GRID_PAY = {
-    3: {"🍒": 1.2, "🍋": 1.6, "🔔": 2, "💎": 2.8},   # 只有 4 種圖案，約 41% 的把數會賺錢
-    4: {"🍒": 2, "🍋": 2.5, "💎": 3.2},   # 3 種圖案、4 格一樣才算一條線
-}
-GRID_SCALE = {3: 1.0, 4: 1.0}
-PAIR_PAY_3X3 = 0.0   # 3×3：每一橫排左邊兩格一樣（第三格不同）退 0.4 倍，讓常有小回饋   # 調到理論回報率約 95%
-
-
-def grid_lines(n: int) -> list[list[tuple[int, int]]]:
-    L = []
-    if n == 3:
-        L += [[(r, c) for c in range(3)] for r in range(3)]
-        L += [[(r, c) for r in range(3)] for c in range(3)]
-        L += [[(i, i) for i in range(3)], [(i, 2 - i) for i in range(3)]]
-    else:   # 4×4：整排、整欄 4 格一樣才算，加兩條對角線，共 10 條
-        L += [[(r, c) for c in range(4)] for r in range(4)]
-        L += [[(r, c) for r in range(4)] for c in range(4)]
-        L += [[(i, i) for i in range(4)], [(i, 3 - i) for i in range(4)]]
-    return L
-
-
-def grid_spin(n: int) -> tuple[list[list[str]], float, list[str]]:
-    """n=3 → 3×3、n=4 → 4×4。回傳 (盤面, 拿回的倍率, 中獎說明)。"""
-    syms = GRID_SYMBOLS[n]
-    g = [[RNG.choice(syms) for _ in range(n)] for _ in range(n)]
-    mult, wins = 0.0, []
-    for line in grid_lines(n):
-        cells = {g[r][c] for r, c in line}
-        if len(cells) == 1:
-            sym = g[line[0][0]][line[0][1]]
-            mult += GRID_PAY[n][sym]
-            wins.append(sym)
-    if n == 3 and PAIR_PAY_3X3:
-        for r in range(3):
-            if g[r][0] == g[r][1] != g[r][2]:
-                mult += PAIR_PAY_3X3
-                wins.append("左兩格")
-    mult *= GRID_SCALE[n]
-    return g, mult, wins
-
-
-CARD_RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
-CARD_SUITS = ["♠️", "♥️", "♦️", "♣️"]
-
-
-def hand_value(hand: list[tuple[str, str]]) -> int:
-    total, aces = 0, 0
-    for r, _ in hand:
-        if r == "A":
-            total, aces = total + 11, aces + 1
-        elif r in ("J", "Q", "K"):
-            total += 10
-        else:
-            total += int(r)
-    while total > 21 and aces:
-        total, aces = total - 10, aces - 1
-    return total
-
-
-def hand_text(hand, hide_second=False) -> str:
-    if hide_second:
-        return f"{hand[0][1]}{hand[0][0]}  🂠"
-    return "  ".join(f"{s}{r}" for r, s in hand)
-
-
-class BlackjackView(discord.ui.View):
-    def __init__(self, user: discord.Member, bet: int):
-        super().__init__(timeout=120)
-        self.user, self.bet = user, bet
-        self.gid = user.guild.id
-        deck = [(r, s) for r in CARD_RANKS for s in CARD_SUITS]
-        RNG.shuffle(deck)
-        self.deck = deck
-        self.player = [deck.pop(), deck.pop()]
-        self.dealer = [deck.pop(), deck.pop()]
-        self.message: discord.Message | None = None
-        self.done = False
-
-    def embed(self, final: str | None = None, color=discord.Color.blurple()) -> discord.Embed:
-        e = discord.Embed(title=f"🃏 21 點　賭注 {fmt(self.bet)}", color=color)
-        e.add_field(name=f"你（{hand_value(self.player)} 點）", value=hand_text(self.player), inline=False)
-        if final:
-            e.add_field(name=f"莊家（{hand_value(self.dealer)} 點）", value=hand_text(self.dealer), inline=False)
-            e.description = final
-        else:
-            e.add_field(name="莊家", value=hand_text(self.dealer, hide_second=True), inline=False)
-            e.set_footer(text="要牌 或 停牌；兩分鐘不動會自動停牌")
-        return e
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user.id:
-            await interaction.response.send_message("這局是別人的，你可以自己 `/21點`。", ephemeral=True)
-            return False
-        return True
-
-    def settle(self) -> tuple[str, discord.Color]:
-        """莊家補牌並結算，回傳 (說明, 顏色)。賭注開局時已扣，這裡只發回應得的錢。"""
-        pv = hand_value(self.player)
-        while hand_value(self.dealer) < 17 and pv <= 21:
-            self.dealer.append(self.deck.pop())
-        dv = hand_value(self.dealer)
-        if pv > 21:
-            return f"💥 爆牌，輸了 {fmt(self.bet)}", discord.Color.red()
-        if dv > 21 or pv > dv:
-            add(self.gid, self.user.id, self.bet * 2)
-            deduct_debt(self.gid, self.user.id, self.bet)
-            return f"🎉 你贏了！+{fmt(self.bet)}", discord.Color.green()
-        if pv == dv:
-            add(self.gid, self.user.id, self.bet)
-            return "🤝 平手，賭注退回", discord.Color.light_grey()
-        return f"😢 莊家贏，輸了 {fmt(self.bet)}", discord.Color.red()
-
-    async def finish(self, interaction: discord.Interaction | None, natural: bool = False):
-        self.done = True
-        self.stop()
-        if natural:
-            add(self.gid, self.user.id, int(self.bet * 2.5))
-            deduct_debt(self.gid, self.user.id, int(self.bet * 1.5))
-            text, color = f"🌟 Blackjack！+{fmt(int(self.bet * 1.5))}", discord.Color.gold()
-        else:
-            text, color = self.settle()
-        text += f"\n目前餘額 {fmt(balance(self.gid, self.user.id))}"
-        e = self.embed(text, color)
-        if interaction:
-            await interaction.response.edit_message(embed=e, view=None)
-        elif self.message:
-            try:
-                await self.message.edit(embed=e, view=None)
-            except discord.HTTPException:
-                pass
-
-    @discord.ui.button(label="要牌", emoji="➕", style=discord.ButtonStyle.primary)
-    async def hit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.player.append(self.deck.pop())
-        v = hand_value(self.player)
-        if v >= 21:
-            await self.finish(interaction)
-        else:
-            await interaction.response.edit_message(embed=self.embed(), view=self)
-
-    @discord.ui.button(label="停牌", emoji="✋", style=discord.ButtonStyle.secondary)
-    async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.finish(interaction)
-
-    async def on_timeout(self):
-        if not self.done:
-            await self.finish(None)
-
-
-# ---------------------------------------------------------------- 賽馬
-
-HORSES_FILE = paths.record("horses.json")
-HORSE_POOL = ["赤兔", "烏騅", "的盧", "絕影", "爪黃飛電", "踏雪", "照夜玉獅子", "追風", "驊騮", "飛黃"]
 # 賭博類斜線指令暫時下架：程式都還在，把 GAMBLING_ENABLED 改成 True 再重啟機器人就會回來
 GAMBLING_ENABLED = False
 GAMBLING_COMMANDS = ("賽馬", "擲硬幣", "骰子", "老虎機", "21點")
-HORSE_EDGE = 0.95                          # 賠率 = 0.95 / 機率（莊家抽 5%）
-HORSES_PER_RACE = 6
-STRENGTH_TEMP = 14.0                       # 越小，強弱差距越大
-TRACK_LEN = 20
-RACE_TICKS = 10
-NUM_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣"]
-FORMS = [("🔥 絕佳", 7), ("😀 良好", 3), ("😐 普通", 0), ("😓 欠佳", -4), ("🤕 低迷", -8)]
-FORM_WEIGHTS = [10, 30, 35, 18, 7]
-
-
-def _load_horses() -> dict:
-    try:
-        d = json.loads(HORSES_FILE.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        d = {}
-    changed = False
-    for n in HORSE_POOL:
-        if n not in d:     # 第一次出場前先給固定的能力值，之後不變
-            d[n] = {"spd": random.randint(55, 95), "sta": random.randint(55, 95), "bst": random.randint(55, 95),
-                    "races": 0, "wins": 0, "top3": 0, "last": []}
-            changed = True
-    if changed:
-        _save_horses(d)
-    return d
-
-
-def _save_horses(d: dict) -> None:
-    try:
-        tmp = HORSES_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp.replace(HORSES_FILE)
-    except OSError as e:
-        log.warning("存馬匹資料失敗：%r", e)
-
-
-horses: dict = _load_horses()
-
-
-def horse_strength(h: dict, form_bonus: int) -> float:
-    return 0.4 * h["spd"] + 0.3 * h["sta"] + 0.3 * h["bst"] + form_bonus
-
-
-def bar(v: int) -> str:
-    n = max(0, min(5, round((v - 40) / 11)))
-    return "▰" * n + "▱" * (5 - n)
-
-
-class Race:
-    def __init__(self, guild_id: int, channel_id: int, starter: str, wait: int):
-        self.names = random.sample(HORSE_POOL, HORSES_PER_RACE)
-        forms = [RNG.choices(FORMS, weights=FORM_WEIGHTS)[0] for _ in self.names]
-        self.forms = [f[0] for f in forms]
-        strengths = [horse_strength(horses[n], f[1]) for n, f in zip(self.names, forms)]
-        m = max(strengths)
-        exps = [pow(2.718281828, (x - m) / STRENGTH_TEMP) for x in strengths]
-        tot = sum(exps)
-        self.probs = [x / tot for x in exps]
-        self.odds = [max(1.1, round(HORSE_EDGE / p, 1)) for p in self.probs]
-        self.guild_id, self.channel_id, self.starter = guild_id, channel_id, starter
-        self.close_at = time.time() + wait
-        self.bets: dict[int, tuple[int, int, str]] = {}   # 使用者 ID → (馬, 賭注, 名字)
-        self.message: discord.Message | None = None
-        self.view: "RaceView | None" = None
-        self.closed = False
-
-    def bet_embed(self) -> discord.Embed:
-        e = discord.Embed(title="🏇 賽馬開跑倒數", color=discord.Color.orange())
-        e.description = (f"{self.starter} 開了一場賽馬！看數值和戰績，按下面的按鈕選馬、輸入賭注。\n"
-                         f"<t:{int(self.close_at)}:R> 截止下注　（賠率 = 中了拿回的倍數，含本金）")
-        for i, n in enumerate(self.names):
-            h = horses[n]
-            rec = f"{h['races']} 戰 {h['wins']} 勝（{h['wins'] * 100 // h['races']}%）" if h["races"] else "新馬，還沒有戰績"
-            last = "、".join(str(x) for x in h["last"][-5:]) or "—"
-            nb = [b for b in self.bets.values() if b[0] == i]
-            pool = f"　👥{len(nb)}人 {fmt(sum(b[1] for b in nb))}" if nb else ""
-            e.add_field(
-                name=f"{NUM_EMOJI[i]} {n}　×{self.odds[i]}　（勝率約 {self.probs[i] * 100:.0f}%）",
-                value=(f"速度 {bar(h['spd'])} {h['spd']}　耐力 {bar(h['sta'])} {h['sta']}　爆發 {bar(h['bst'])} {h['bst']}\n"
-                       f"今日狀態 {self.forms[i]}　戰績 {rec}\n近 5 場名次：{last}{pool}"),
-                inline=False)
-        if self.bets:
-            e.add_field(name="已下注", value="\n".join(f"{nm}：{NUM_EMOJI[hh]}{self.names[hh]} {fmt(a)}" for hh, a, nm in self.bets.values())[:1000],
-                        inline=False)
-        e.set_footer(text="每人一注；重按別匹馬會改注（賭注退回再重下）· 賠率已反映能力與狀態，強馬賠得少")
-        return e
-
-    def track_lines(self, pos: list[int], finished: list[int] | None = None) -> str:
-        lines = []
-        for i, n in enumerate(self.names):
-            p = min(pos[i], TRACK_LEN)
-            mark = "🏆" if finished and finished[0] == i and pos[i] >= TRACK_LEN else "🐎"
-            lines.append(f"{NUM_EMOJI[i]} {'·' * p}{mark}{'·' * (TRACK_LEN - p)}🏁　{n}")
-        return "\n".join(lines)
-
-
-def plan_race(probs: list[float]) -> tuple[list[list[int]], list[int]]:
-    """先決定名次（贏家依機率抽），再編排每一格的跑法讓動畫跟名次一致。回傳 (每個 tick 各馬位置, 名次)。"""
-    n = len(probs)
-    winner = RNG.choices(range(n), weights=probs)[0]
-    rest = [i for i in range(n) if i != winner]
-    rest.sort(key=lambda i: RNG.random() * (1.2 - probs[i]))      # 其他馬名次：機率高的稍微前面
-    order = [winner] + rest
-    finish = {order[0]: RACE_TICKS}
-    for rank in range(1, n):
-        finish[order[rank]] = finish[order[rank - 1]] + RNG.randint(0 if rank > 1 else 1, 1)
-    last = max(finish.values())
-    frames = []
-    prev = [0] * n
-    for t in range(1, last + 1):
-        cur = []
-        for h in range(n):
-            if t >= finish[h]:
-                cur.append(TRACK_LEN)
-            else:
-                target = TRACK_LEN * t / finish[h]
-                v = int(round(target + RNG.uniform(-1.6, 1.6)))
-                v = max(prev[h], min(TRACK_LEN - 1, v))
-                cur.append(v)
-        frames.append(cur)
-        prev = cur
-    return frames, order
-
-
-def record_results(names: list[str], order: list[int]) -> None:
-    """把這場名次寫進每匹馬的戰績。"""
-    for place, idx in enumerate(order, 1):
-        h = horses[names[idx]]
-        h["races"] += 1
-        h["wins"] += place == 1
-        h["top3"] += place <= 3
-        h["last"] = (h["last"] + [place])[-5:]
-    _save_horses(horses)
-
-
-class BetModal(discord.ui.Modal):
-    def __init__(self, race: Race, horse: int, have: int):
-        super().__init__(title=f"下注 {race.names[horse]}（賠率 ×{race.odds[horse]}）")
-        self.race, self.horse = race, horse
-        self.amount = discord.ui.TextInput(label=f"賭注（你有 {have}）", placeholder="輸入整數，例如 50", max_length=12)
-        self.add_item(self.amount)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        race = self.race
-        if race.closed:
-            await interaction.response.send_message("下注已經截止了。", ephemeral=True)
-            return
-        try:
-            amt = int(self.amount.value.replace(",", "").strip())
-        except ValueError:
-            await interaction.response.send_message("賭注要輸入整數。", ephemeral=True)
-            return
-        uid, gid = interaction.user.id, race.guild_id
-        old = race.bets.get(uid)
-        if old:
-            add(gid, uid, old[1])          # 改注：先退回舊賭注
-        have = balance(gid, uid)
-        if amt < 1 or amt > have:
-            if old:
-                add(gid, uid, -old[1])     # 失敗就還原舊賭注
-            await interaction.response.send_message(f"賭注要在 1 ~ {have} 之間。", ephemeral=True)
-            return
-        add(gid, uid, -amt, interaction.user.display_name)
-        race.bets[uid] = (self.horse, amt, interaction.user.display_name)
-        await interaction.response.send_message(
-            f"✅ 已押 {NUM_EMOJI[self.horse]}**{race.names[self.horse]}** {fmt(amt)}，中了拿 {fmt(int(amt * race.odds[self.horse]))}。", ephemeral=True)
-        if race.message:
-            try:
-                await race.message.edit(embed=race.bet_embed())
-            except discord.HTTPException:
-                pass
-
-
-class RaceView(discord.ui.View):
-    def __init__(self, race: Race):
-        super().__init__(timeout=None)
-        self.race = race
-        for i, name in enumerate(race.names):
-            b = discord.ui.Button(label=f"{name} ×{race.odds[i]}", emoji=NUM_EMOJI[i], style=discord.ButtonStyle.primary,
-                                  row=i // 3)
-            b.callback = self._make_cb(i)
-            self.add_item(b)
-
-    def _make_cb(self, horse: int):
-        async def cb(interaction: discord.Interaction):
-            if self.race.closed:
-                await interaction.response.send_message("下注已經截止了。", ephemeral=True)
-                return
-            await interaction.response.send_modal(BetModal(self.race, horse, balance(self.race.guild_id, interaction.user.id)))
-        return cb
-
-
-async def run_race(race: Race, active: dict):
-    try:
-        await asyncio.sleep(max(0, race.close_at - time.time()))
-        race.closed = True
-        for item in race.view.children:
-            item.disabled = True
-        msg = race.message
-        if not race.bets:
-            await msg.edit(embed=discord.Embed(title="🏇 賽馬取消", description="沒人下注，這場取消了。", color=discord.Color.light_grey()), view=None)
-            return
-        frames, order = plan_race(race.probs)
-        title = "🏇 比賽開始！"
-        await msg.edit(embed=discord.Embed(title=title, description=race.track_lines([0] * 6), color=discord.Color.green()), view=None)
-        for pos in frames:
-            await asyncio.sleep(1.6)
-            done = [i for i in order if pos[i] >= TRACK_LEN]
-            await msg.edit(embed=discord.Embed(title=title, description=race.track_lines(pos, done), color=discord.Color.green()))
-        winner = order[0]
-        record_results(race.names, order)
-        lines = [f"🥇 {NUM_EMOJI[order[0]]}**{race.names[order[0]]}**　🥈 {race.names[order[1]]}　🥉 {race.names[order[2]]}", ""]
-        for uid, (h, amt, name) in race.bets.items():
-            if h == winner:
-                pay = int(amt * race.odds[h])
-                new = add(race.guild_id, uid, pay)
-                new -= deduct_debt(race.guild_id, uid, pay - amt)
-                lines.append(f"🎉 {name} 押 {race.names[h]} {fmt(amt)} → 拿回 {fmt(pay)}（+{fmt(pay - amt)}）　餘額 {fmt(new)}")
-            else:
-                lines.append(f"😢 {name} 押 {race.names[h]} {fmt(amt)} → 輸了")
-        e = discord.Embed(title="🏁 比賽結束", description=race.track_lines(frames[-1], order) + "\n\n" + "\n".join(lines)[:3500],
-                          color=discord.Color.gold())
-        await msg.edit(embed=e)
-    except Exception:
-        log.exception("賽馬出錯")
-        for uid, (h, amt, name) in race.bets.items():      # 出錯就把賭注退回
-            add(race.guild_id, uid, amt)
-        if race.message:
-            try:
-                await race.message.channel.send("🏇 比賽出了點問題，所有賭注已退回。")
-            except discord.HTTPException:
-                pass
-    finally:
-        active.pop(race.channel_id, None)
-
 
 # ---------------------------------------------------------------- 設定
 
@@ -867,8 +162,8 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             except Exception:
                 log.exception("語音賺幣迴圈出錯")
 
-    global start_voice_loop, start_internal_api, _client
-    _client = client
+    global start_voice_loop, start_internal_api
+    account._client = client
     def _start_loops():
         asyncio.create_task(game_digest_loop(client))
         asyncio.create_task(debt_loop(client))
@@ -1146,7 +441,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
     @app_commands.describe(對象="轉給誰", 金額="轉多少")
     @app_commands.guild_only()
     async def cmd_pay(interaction: discord.Interaction, 對象: discord.Member, 金額: app_commands.Range[int, 1]):
-        to_bot = _client is not None and _client.user is not None and 對象.id == _client.user.id      # 大笨bot 自己可以收錢
+        to_bot = account._client is not None and account._client.user is not None and 對象.id == account._client.user.id      # 大笨bot 自己可以收錢
         if (對象.bot and not to_bot) or 對象.id == interaction.user.id:
             await interaction.response.send_message("不能轉給其他機器人或自己。", ephemeral=True)
             return
@@ -1400,3 +695,4 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             return
         await interaction.response.send_message(embed=view.embed(), view=view)
         view.message = await interaction.original_response()
+
