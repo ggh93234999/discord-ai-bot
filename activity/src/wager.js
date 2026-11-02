@@ -26,7 +26,7 @@ export async function ensureSession(env, say) {
     client_id: env.clientId, response_type: "code", state: "", prompt: "none", scope: ["identify", "guilds"],
   });
   say("確認身分中…");
-  const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+  const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, gid: new URLSearchParams(location.search).get("guild_id") || "" }) });
   const j = await r.json().catch(() => ({}));
   if (r.status === 403) throw new Error("你不是這個伺服器的成員，不能對賭");
   if (!r.ok || !j.token) throw new Error("登入失敗（" + (j.error || r.status) + "）");

@@ -47,7 +47,9 @@ from .ledger import (
     GAME_DIGEST_EVERY,
     GAME_DIGEST_FILE,
     GAME_KINDS,
-    LEDGER_CHANNEL,
+    LEDGER_CHANNEL_FILE,
+    ledger_channel,
+    set_ledger_channel,
     LEDGER_FILE,
     LEDGER_KEEP,
     NO_HOUSE_WHY,
@@ -530,6 +532,31 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         ln = wallet[str(interaction.guild_id)][str(who.id)]["loan"]
         days = (time.time() - float(ln["t"])) / 86400
         await interaction.response.send_message(f"💀 **{who.display_name}** 欠大笨bot {fmt(d)}（本金 {fmt(ln['p'])}，已經滾了 {days:.1f} 天，每天 +{int(LOAN_RATE * 100)}%）")
+
+    @tree.command(name="設定帳本", description="（管理員）指定轉帳／借還款／賭博彙整要發到哪個文字頻道；沒設定就不寫帳本")
+    @app_commands.describe(頻道="帳本要發在哪個文字頻道")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def cmd_set_ledger(interaction: discord.Interaction, 頻道: discord.TextChannel):
+        if not interaction.permissions.manage_guild:
+            await interaction.response.send_message("需要「管理伺服器」權限。", ephemeral=True)
+            return
+        me = interaction.guild.me
+        if not 頻道.permissions_for(me).send_messages:
+            await interaction.response.send_message(f"大笨bot 在 {頻道.mention} 沒有發言權限，請先開權限再設定。", ephemeral=True)
+            return
+        set_ledger_channel(interaction.guild_id, 頻道.id)
+        await interaction.response.send_message(f"✅ 帳本頻道設定為 {頻道.mention}。")
+
+    @tree.command(name="關閉帳本", description="（管理員）不再把轉帳、借還款、賭博彙整發到帳本頻道")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def cmd_off_ledger(interaction: discord.Interaction):
+        if not interaction.permissions.manage_guild:
+            await interaction.response.send_message("需要「管理伺服器」權限。", ephemeral=True)
+            return
+        set_ledger_channel(interaction.guild_id, None)
+        await interaction.response.send_message("✅ 已關閉帳本，之後不會再發到頻道（紀錄仍會保存供查帳）。")
 
     races: dict[int, Race] = {}   # 頻道 ID → 進行中的賽馬
 

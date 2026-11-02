@@ -24,6 +24,10 @@ const BOT_API = ENV.BOT_API || "http://127.0.0.1:3107";
 let INTERNAL_KEY = "";
 try { INTERNAL_KEY = fs.readFileSync(dir + "internal.key", "utf8").trim(); } catch {}
 
+// 玩家目前在哪個伺服器開的 Activity（登入時記下；沒記錄就用預設伺服器）
+const userGid = new Map();
+export const gidOf = (uid) => userGid.get(String(uid)) || GUILD_ID;
+
 export const internalKey = () => INTERNAL_KEY;
 export const betEnabled = () => !!(CLIENT_SECRET && INTERNAL_KEY);
 
@@ -57,20 +61,20 @@ export async function botGalleryChat(gid, uid, name, cat, text, history) {
 // 機器人還沒更新前，settle 單筆上限是 1000；更新後 /wallet/info 會回報 max_bet
 export let maxBet = 1000;
 export const betLimit = () => maxBet;
-export const botInfo = async (uid) => { const r = await bot("/wallet/info", { gid: GUILD_ID, uid }); if (r && r.max_bet) maxBet = r.max_bet; return r; };
+export const botInfo = async (uid) => { const r = await bot("/wallet/info", { gid: gidOf(uid), uid }); if (r && r.max_bet) maxBet = r.max_bet; return r; };
 // 鍛造身分組：告訴機器人這個人現在手上每把劍的階數（機器人負責建立／指派／移除身分組）
-export const botRole = (uid, tiers) => bot("/forge/role", { gid: GUILD_ID, uid, tiers });
-export const botSettle = (uid, name, bet, back, why) => bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet, back, why });
+export const botRole = (uid, tiers) => bot("/forge/role", { gid: gidOf(uid), uid, tiers });
+export const botSettle = (uid, name, bet, back, why) => bot("/wallet/settle", { gid: gidOf(uid), uid, name, bet, back, why });
 // 派彩：優先用機器人的 /wallet/pay；機器人還沒更新（沒有這個介面）時，改用 settle 湊出同樣的淨額（押 1 拿回 amount+1）
 export async function botPay(uid, name, amount, why) {
   try {
-    const r = await bot("/wallet/pay", { gid: GUILD_ID, uid, name, amount, why });
+    const r = await bot("/wallet/pay", { gid: gidOf(uid), uid, name, amount, why });
     if (r && (r.ok || r.error === "no_guild" || r.error === "bad_amount")) return r;
   } catch {}
   // 備援：settle 規定 back ≤ bet×100，所以押 b、拿回 amount+b，淨額剛好是 amount（要玩家至少有 b 個代幣）
   const b = Math.max(1, Math.ceil(amount / 99));
   if (b > 1000) return { ok: false, error: "bad_amount" };
-  return bot("/wallet/settle", { gid: GUILD_ID, uid, name, bet: b, back: amount + b, why });
+  return bot("/wallet/settle", { gid: gidOf(uid), uid, name, bet: b, back: amount + b, why });
 }
 
 // ---- HTTP：POST /api/token { code } → { token, name }
@@ -100,8 +104,8 @@ export async function handleApi(req, res) {
     if (limited(ip)) return json(res, 429, { error: "too_many" });
     let body = "";
     for await (const chunk of req) { body += chunk; if (body.length > 2000) return json(res, 413, { error: "too_large" }); }
-    let code;
-    try { code = String(JSON.parse(body).code || ""); } catch { return json(res, 400, { error: "bad_request" }); }
+    let code, wantGid = "";
+    try { const j = JSON.parse(body); code = String(j.code || ""); wantGid = /^\d{5,25}$/.test(String(j.gid || "")) ? String(j.gid) : ""; } catch { return json(res, 400, { error: "bad_request" }); }
     if (!code || code.length > 200) return json(res, 400, { error: "bad_request" });
     try {
       const tr = await fetch("https://discord.com/api/v10/oauth2/token", {
@@ -113,7 +117,7 @@ export async function handleApi(req, res) {
       if (!tr.ok || !tok.access_token) { console.log("OAuth 換 token 失敗：", tr.status, tok.error || ""); return json(res, 401, { error: "oauth_failed" }); }
       const me = await discord("/users/@me", tok.access_token);
       let member = false, guilds = [];
-      try { guilds = (await discord("/users/@me/guilds", tok.access_token)).map((g) => String(g.id)); member = guilds.includes(GUILD_ID); } catch {}
+      try { guilds = (await discord("/users/@me/guilds", tok.access_token)).map((g) => String(g.id)); member = guilds.includes(wantGid || GUILD_ID); } catch {}
       // 用完就撤銷，不留著 access token
       fetch("https://discord.com/api/v10/oauth2/token/revoke", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -122,7 +126,9 @@ export async function handleApi(req, res) {
       if (!member) return json(res, 403, { error: "not_member" });
       const name = me.global_name || me.username || me.id;
       const token = randomBytes(24).toString("hex");
-      sessions.set(token, { uid: me.id, name, guilds, exp: Date.now() + SESSION_MS });
+      const gid = wantGid || GUILD_ID;
+      userGid.set(String(me.id), gid);
+      sessions.set(token, { uid: me.id, name, guilds, gid, exp: Date.now() + SESSION_MS });
       return json(res, 200, { token, name });
     } catch (e) {
       console.log("OAuth 流程錯誤：", e.message);

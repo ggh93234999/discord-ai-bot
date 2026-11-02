@@ -37,7 +37,30 @@ def record(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str = 
         _post_ledger(gid, kind, frm, to, amount, note)
 
 
-LEDGER_CHANNEL = "大笨bot的帳本"
+LEDGER_CHANNEL_FILE = paths.record("ledger_channels.json")   # {伺服器ID: 頻道ID}；沒設定的伺服器就不寫帳本
+
+
+def _channel_cfg() -> dict:
+    try:
+        return json.loads(LEDGER_CHANNEL_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def set_ledger_channel(gid: int, channel_id: int | None) -> None:
+    """設定（或用 None 關閉）這個伺服器的帳本頻道。"""
+    cfg = _channel_cfg()
+    if channel_id is None:
+        cfg.pop(str(gid), None)
+    else:
+        cfg[str(gid)] = int(channel_id)
+    LEDGER_CHANNEL_FILE.write_text(json.dumps(cfg), encoding="utf-8")
+
+
+def ledger_channel(guild):
+    """這個伺服器設定的帳本頻道；沒設定、頻道被刪就回 None（不寫帳本）。"""
+    cid = _channel_cfg().get(str(guild.id))
+    return guild.get_channel(int(cid)) if cid else None
 
 
 def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: str) -> None:
@@ -46,7 +69,7 @@ def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: 
         guild = account._client.get_guild(int(gid)) if account._client else None
         if guild is None:
             return
-        ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
+        ch = ledger_channel(guild)
         if ch is None:
             return
         icon = {"轉帳": "💸", "發錢": "🎁", "借款": "🦈", "還款": "💰", "大笨bot送錢": "🎀"}.get(kind, "🪙")
@@ -117,7 +140,7 @@ async def game_digest_loop(client) -> None:
                 text = build_game_digest(guild.id, last, now)
                 state[str(guild.id)] = now
                 changed = True
-                ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
+                ch = ledger_channel(guild)
                 if text and ch:
                     await ch.send(text[:1990], allowed_mentions=discord.AllowedMentions.none())
             if changed:

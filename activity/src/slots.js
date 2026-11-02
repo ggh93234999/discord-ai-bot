@@ -142,7 +142,7 @@ export function mountSlots(root, { env, back }) {
           client_id: env.clientId, response_type: "code", state: "", prompt: "none", scope: ["identify", "guilds"],
         });
         statusEl.textContent = "確認身分中…";
-        const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+        const r = await fetch("/.proxy/api/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, gid: new URLSearchParams(location.search).get("guild_id") || "" }) });
         console.log("token resp", r.status);
         const j = await r.json().catch(() => ({}));
         if (r.status === 403) { statusEl.textContent = "你不是這個伺服器的成員，不能用賭注模式"; return; }

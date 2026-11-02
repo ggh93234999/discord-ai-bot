@@ -7,7 +7,7 @@ import paths
 import time
 from . import account
 from .account import (EARN_AMOUNT, EARN_INTERVAL, _acct, _save, balance, fmt, house_add, house_balance, log, wallet)
-from .ledger import (GAME_KINDS, QUIET_KINDS, LEDGER_CHANNEL, _bot_party, _ledger, record)
+from .ledger import (GAME_KINDS, QUIET_KINDS, ledger_channel, _bot_party, _ledger, record)
 
 # ---------------------------------------------------------------- 大笨bot 放貸：利率超高
 LOAN_RATE = 0.5        # 每天利息 50%，複利（按經過的時間連續算）
@@ -183,7 +183,7 @@ async def debt_loop(client) -> None:
                 await sync_all_debt_roles(guild)
                 if tp.hour >= DEBT_REMIND_HOUR and state.get(str(guild.id)) != today:
                     text = build_debt_reminder(guild.id)
-                    ch = next((c for c in guild.text_channels if LEDGER_CHANNEL in c.name), None)
+                    ch = ledger_channel(guild)
                     if text and ch:
                         await ch.send(text[:1990], allowed_mentions=discord.AllowedMentions(users=True))
                         state[str(guild.id)] = today
