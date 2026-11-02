@@ -130,7 +130,7 @@ export function mountSlots(root, { env, back }) {
     if (b.dataset.m === "practice") { setMode("practice"); return; }
     if (real()) return;
     if (!env.inDiscord || !env.sdk) { statusEl.textContent = "賭注模式要在 Discord 裡開啟這個 Activity 才能用（要確認你的 Discord 身分）"; return; }
-    askConfirm("賭注模式會用到你在機器人那邊的真代幣，輸贏都會算數。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
+    if (session) login(); else askConfirm("賭注模式會用到你在機器人那邊的真代幣，輸贏都會算數。要開啟嗎？（第一次會跳出 Discord 授權視窗）", login);
   }));
 
   async function login() {

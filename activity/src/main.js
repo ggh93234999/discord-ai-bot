@@ -43,6 +43,19 @@ if ((inDiscord && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) 
 let sdk = null;
 export const env = { inDiscord, instanceId: params.get("instance_id") || params.get("room") || "local-test" };
 
+// 登入憑證（env.session）存在瀏覽器裡，換遊戲、重開 Activity 都不用再授權／再確認；每個伺服器各存一份（後端要知道你是從哪個伺服器開的）
+const SESS_KEY = "dbot_session_" + (params.get("guild_id") || "");
+let _sess = null;
+try { const j = JSON.parse(localStorage.getItem(SESS_KEY) || "null"); if (j && j.token && j.exp > Date.now()) _sess = { token: j.token, name: j.name }; } catch {}
+Object.defineProperty(env, "session", {
+  enumerable: true, configurable: true,
+  get() { return _sess; },
+  set(v) {
+    _sess = v || null;
+    try { if (_sess) localStorage.setItem(SESS_KEY, JSON.stringify({ token: _sess.token, name: _sess.name, exp: Date.now() + 11 * 3600 * 1000 })); else localStorage.removeItem(SESS_KEY); } catch {}
+  },
+});
+
 if (inDiscord && clientId) {
   sdk = new DiscordSDK(clientId);
   env.instanceId = sdk.instanceId || env.instanceId; env.sdk = sdk; env.clientId = clientId; env.guildId = sdk.guildId;
