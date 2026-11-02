@@ -2,20 +2,20 @@
 // 每個 Activity instance 的每種遊戲是一個「房間」：同房的人看得到彼此的名單與最新一把（旁觀），賽馬是全房一起押的回合制。
 // 練習模式：每條連線一份練習幣；賭注模式：用 bauth 綁定的 Discord 身分，動用機器人錢包的真代幣。
 // 真代幣押注中（21 點一手、賽馬一回合）會記在 casino_escrow.json，伺服器若在途中重啟，啟動時全額退回。
-import { listPokerTables } from "./poker.js";
-import { listMjTables } from "./mahjong.js";
-import { listBridgeTables } from "./bridge.js";
-import { listBigTwoTables } from "./bigtwo.js";
-import { listSevensTables } from "./sevens.js";
-import { listUnoTables } from "./uno.js";
-import { listAvalonTables } from "./avalon.js";
+import { listPokerTables } from "../table/poker.js";
+import { listMjTables } from "../mahjong/mahjong.js";
+import { listBridgeTables } from "../table/bridge.js";
+import { listBigTwoTables } from "../table/bigtwo.js";
+import { listSevensTables } from "../table/sevens.js";
+import { listUnoTables } from "../table/uno.js";
+import { listAvalonTables } from "../table/avalon.js";
 import { TIERS, MAX_PIECES, genStone, descLines, valueOf, pieceInfo, cutFee, newStoneState, canCut, applyCut, openSection, rubAt, lightAt, rubFee, lightFee, MAX_RUB, MAX_LIGHT, MARKET_MAX, RESTOCK_MS } from "./stone.js";
 import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { botSettle, botPay, botRole, botInfo, betLimit } from "./bet.js";
-import { arec, alog, botRecord } from "./paths.js";
-import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, realKeys, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "./forge.js";
+import { botSettle, botPay, botRole, botInfo, betLimit } from "../../bet.js";
+import { arec, alog, botRecord } from "../../paths.js";
+import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, realKeys, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "../life/forge.js";
 
 const MAX_PRACTICE = 1_000_000;
 export const CASINO_GAMES = ["slots", "coin", "dice", "bj", "horse", "stone", "forge"];

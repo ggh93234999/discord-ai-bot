@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import discord
 from discord import app_commands
 
-import models
+from dbot.core import models
 import paths
 
 log = logging.getLogger("discord-ai-bot.dmlog")

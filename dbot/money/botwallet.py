@@ -1,6 +1,6 @@
 """大笨bot 自己的代幣：被問到「你有多少錢／代幣」時才查帳（見 bot.py 的 MONEY_RE），平常不帶進對話。
 帳戶規則在 economy.py：Activity 裡玩家輸的錢進它的口袋，贏的從它的口袋出。"""
-import economy
+from dbot.money import economy
 import paths
 
 TOOL = {

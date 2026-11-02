@@ -3,7 +3,7 @@
 // 公開資料 pub：外表看得到的線索（場口外皮、松花、蟒帶、霧、癬、表面的裂、窗口），這些都由隱藏資料「有機率地」長出來，也夾雜假線索。
 // 價格 = 賣家看外表估的每公斤價 × 重量（所以貴的不一定好）；價值 = 翡翠體積 × 品質 × 重量 × 裂的折損。
 import { randomInt } from "node:crypto";
-import { hash3, GRID, GS, AXES, planeBasis, inside, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../shared/stonegeo.js";
+import { hash3, GRID, GS, AXES, planeBasis, inside, shapeParams, surfacePoint, sectionGrid, interiorAt, dot, cross, norm, dist } from "../../../shared/stonegeo.js";
 
 export const TIERS = [
   { name: "沒有翡翠" }, { name: "豆種" }, { name: "糯種" }, { name: "冰糯種" }, { name: "冰種" },

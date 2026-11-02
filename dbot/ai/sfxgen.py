@@ -18,7 +18,7 @@ import time
 
 import aiohttp
 
-import imagegen
+from dbot.ai import imagegen
 
 log = logging.getLogger("bot")
 

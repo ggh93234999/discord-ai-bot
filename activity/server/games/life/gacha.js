@@ -4,12 +4,12 @@
 import fs from "node:fs";
 import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { botSettle, botInfo, ENV } from "./bet.js";
-import { arec } from "./paths.js";
+import { botSettle, botInfo, ENV } from "../../bet.js";
+import { arec } from "../../paths.js";
 
 const REAL_ON = ENV.GACHA_REAL === "on";      // 真代幣抽卡預設關閉（.env 設 GACHA_REAL=on 才開）
 
-const CARDS = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../src/gacha-cards.json", import.meta.url)), "utf8"));
+const CARDS = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../../../src/gacha-cards.json", import.meta.url)), "utf8"));
 const CARD = new Map(CARDS.map((c) => [c.id, c]));
 const BYR = { SSR: [], SR: [], R: [], N: [] };
 for (const c of CARDS) BYR[c.rarity].push(c.id);

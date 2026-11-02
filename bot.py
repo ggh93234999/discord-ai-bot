@@ -30,25 +30,25 @@ import aiohttp
 import discord
 from discord import app_commands
 
-import aliases
-import channels
-import economy
-import extras
-import imagegen
-import sfxgen
-import videogen
-import memberstatus
+from dbot.core import aliases
+from dbot.core import channels
+from dbot.money import economy
+from dbot.ai import extras
+from dbot.ai import imagegen
+from dbot.ai import sfxgen
+from dbot.ai import videogen
+from dbot.core import memberstatus
 import paths
-import webimg
-import divination
-import actstatus
-import almanac
-import botwallet
-import dmlog
-import fortune
-import models
-import music
-import vstatus
+from dbot.ai import webimg
+from dbot.ai import divination
+from dbot.core import actstatus
+from dbot.ai import almanac
+from dbot.money import botwallet
+from dbot.core import dmlog
+from dbot.ai import fortune
+from dbot.core import models
+from dbot.music import music
+from dbot.core import vstatus
 
 BASE_DIR = Path(__file__).resolve().parent
 

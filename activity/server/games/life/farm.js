@@ -10,8 +10,8 @@
 import fs from "node:fs";
 import { randomInt, randomBytes, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { botSettle, botPay, botInfo } from "./bet.js";
-import { arec } from "./paths.js";
+import { botSettle, botPay, botInfo } from "../../bet.js";
+import { arec } from "../../paths.js";
 
 export const CROPS = [
   { id: "radish", icon: "🥕", name: "蘿蔔", seed: 10, min: 3, y: 20 },

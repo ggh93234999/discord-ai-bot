@@ -298,7 +298,7 @@ async def run(session: aiohttp.ClientSession, args: dict) -> tuple[str, list[str
         c, dt, im = bazi(y, mo, d, hh, mi, tzname, lon, args.get("gender"))
         cards.append("**🀄 八字**\n" + c); details.append(dt)
         try:
-            import drawimg
+            from dbot.ai import drawimg
             files.append(await asyncio.to_thread(drawimg.bazi_chart, f"{name + '的' if name else ''}八字命盤", im["sub"] + f"　{place}",
                                                  im["rows"], WX, im["count"], im["dm"], im["yun"]))
         except Exception as e:

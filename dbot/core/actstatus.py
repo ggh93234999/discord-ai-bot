@@ -1,6 +1,7 @@
 """讓大笨bot 知道「這個伺服器的人現在在 Activity 裡玩什麼」。
 Activity 後端（node，127.0.0.1:3101）記著每個玩家的瀏覽器回報的目前遊戲；這裡用內部金鑰去問，
 而且只問這個伺服器（gid）自己的人，不會看到別的伺服器。"""
+import paths
 import logging
 import os
 from collections import defaultdict
@@ -9,7 +10,7 @@ from pathlib import Path
 import aiohttp
 
 log = logging.getLogger("discord-ai-bot.actstatus")
-KEY_FILE = Path(__file__).parent / "activity" / "server" / "internal.key"
+KEY_FILE = paths.ROOT / "activity" / "server" / "internal.key"
 URL = os.getenv("ACTIVITY_API", "http://127.0.0.1:3101").rstrip("/") + "/api/internal/presence"   # Activity 後端位址（預設同一台）
 
 NAMES = {

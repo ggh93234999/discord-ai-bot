@@ -880,7 +880,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
     async def internal_api():
         from aiohttp import web
         import hmac
-        key_file = Path(__file__).parent / "activity" / "server" / "internal.key"
+        key_file = paths.ROOT / "activity" / "server" / "internal.key"
         try:
             key = key_file.read_text().strip()
         except OSError:
@@ -1256,7 +1256,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
     @app_commands.describe(金額="給多少", 對象="給誰，不填就是發給自己")
     @app_commands.guild_only()
     async def cmd_give(interaction: discord.Interaction, 金額: app_commands.Range[int, 1, 1_000_000_000], 對象: discord.Member = None):
-        import models
+        from dbot.core import models
         對象 = 對象 or interaction.user
         if not await models.is_admin(interaction.user.id):
             await interaction.response.send_message("只有機器人擁有者能發錢。", ephemeral=True)

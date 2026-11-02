@@ -128,7 +128,7 @@ SPREADS = {
 def _img(fn, *a) -> str:
     """畫圖失敗不影響占卜本身；成功回傳給 bot 用的 [[FILE:路徑]] 標記"""
     try:
-        import drawimg
+        from dbot.ai import drawimg
         return "\n[[FILE:" + getattr(drawimg, fn)(*a) + "]]"
     except Exception as e:
         logging.getLogger("discord-ai-bot.divination").warning("%s 圖片失敗：%r", fn, e)
@@ -150,7 +150,7 @@ def tarot(spread: str, question: str) -> str:
     head = f"🔮 **塔羅占卜**" + (f"｜問：{question}" if question else "")
     img = ""
     try:
-        import drawimg
+        from dbot.ai import drawimg
         img = "\n[[FILE:" + drawimg.tarot_spread([(p, i, TAROT[i][0], rv) for p, (i, rv) in zip(pos, drawn)], "塔羅占卜" + (f"｜{question}" if question else "")) + "]]"
     except Exception as e:
         logging.getLogger("discord-ai-bot.divination").warning("塔羅圖片失敗：%r", e)

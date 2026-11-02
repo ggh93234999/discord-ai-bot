@@ -4,7 +4,7 @@
 // 從零一路成功到 100 階，鍛造費總共剛好 100 萬。
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { arec } from "./paths.js";
+import { arec } from "../../paths.js";
 
 export const FORGE_MAX = 100;
 const RTP = 0.95, BOOST = Number(process.env.FBOOST || 1.03), TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費

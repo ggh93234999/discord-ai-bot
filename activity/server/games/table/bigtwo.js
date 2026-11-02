@@ -4,7 +4,7 @@
 // 別人出牌後要出同張數且同牌型、更大的牌（炸彈例外），或「過」；連續三家都過，最後出牌的人可以自由出任何牌型。
 // 伺服器負責發牌、判定、計分與電腦；前端只畫畫面和送操作。
 import { randomInt, randomBytes } from "node:crypto";
-import { classify, beats, cardsText, sortHand, strength, rstr, suitOf, CLUB3, TYPE_NAMES } from "../shared/bigtwo_rules.js";
+import { classify, beats, cardsText, sortHand, strength, rstr, suitOf, CLUB3, TYPE_NAMES } from "../../../shared/bigtwo_rules.js";
 
 const START_POINTS = 10000;
 const DEFAULT_CFG = { len: 3, base: 20, triple: false };

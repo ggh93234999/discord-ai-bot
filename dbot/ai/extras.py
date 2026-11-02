@@ -18,8 +18,8 @@ import aiohttp
 import discord
 from discord import app_commands
 
-import models
-import music
+from dbot.core import models
+from dbot.music import music
 
 log = logging.getLogger("discord-ai-bot.extras")
 

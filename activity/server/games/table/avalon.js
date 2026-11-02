@@ -3,7 +3,8 @@
 // 角色：梅林、刺客一定有；可選派西維爾＋莫甘娜、莫德雷德、奧伯倫。其餘是忠臣（好）或爪牙（壞）。
 // 電腦會補位、斷線的人也由電腦代打。伺服器負責發身分、判定和電腦；前端只畫畫面。沒有點數，只分勝負。
 import { randomInt, randomBytes } from "node:crypto";
-import { ENV } from "./bet.js";
+import { ENV } from "../../bet.js";
+import { botRecord } from "../../paths.js";
 import fs from "node:fs";
 
 const MAXP = 10, MINP = 5;
@@ -180,7 +181,7 @@ function botActRule(t, i) {
 // 模型位址／金鑰沿用機器人的 .env（LLM_BASE_URL、LLM_API_KEY），可用 AVALON_LLM_MODEL 指定模型，沒設就用 LLM_MODEL。
 const LLM_URL = String(ENV.AVALON_LLM_BASE_URL || ENV.LLM_BASE_URL || "").replace(/\/+$/, "");
 const LLM_KEY = ENV.AVALON_LLM_API_KEY || ENV.LLM_API_KEY || "";
-const STATE_FILE = new URL("../../state.json", import.meta.url);
+const STATE_FILE = botRecord("state.json");
 // 模型：AVALON_LLM_MODEL > 機器人目前用的模型（/模型 切換後存在 state.json）> LLM_MODEL
 function llmModel() {
   if (ENV.AVALON_LLM_MODEL) return ENV.AVALON_LLM_MODEL;

@@ -1,5 +1,5 @@
 // 老虎機（伺服器端）：用密碼學亂數決定結果，前端只負責演出。
-// 圖案與倍率要和機器人的 economy.py（SLOT_TRIPLE / GRID_PAY）保持一致。
+// 圖案與倍率要和機器人的 dbot/money/economy.py（SLOT_TRIPLE / GRID_PAY）保持一致。
 import { randomInt } from "node:crypto";
 
 export const KINDS = {

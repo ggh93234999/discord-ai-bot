@@ -15,7 +15,7 @@ import re
 import discord
 from discord import app_commands
 
-import vstatus
+from dbot.core import vstatus
 
 log = logging.getLogger("discord-ai-bot.channels")
 
@@ -371,7 +371,7 @@ async def run_edit_tool(msg: discord.Message, args: dict) -> str:
 
 async def do_voice_status(member: discord.Member, channel, text: str | None) -> str:
     """設定（text 有字）或清除（text 空白）語音頻道狀態。"""
-    import music  # 避免循環匯入
+    from dbot.music import music  # 避免循環匯入
 
     guild = member.guild
     if channel is None:

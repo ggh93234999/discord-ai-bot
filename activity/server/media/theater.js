@@ -7,7 +7,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-const DIR = fileURLToPath(new URL("./video_cache/", import.meta.url));
+const DIR = fileURLToPath(new URL("../video_cache/", import.meta.url));
 fs.mkdirSync(DIR, { recursive: true });
 const YTDLP = process.env.YTDLP || "/home/ggh93234999/.venvs/discord-bot/bin/yt-dlp";
 const MAX_DUR = 3 * 3600;                 // 最長 3 小時

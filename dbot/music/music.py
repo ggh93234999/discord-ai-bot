@@ -24,7 +24,7 @@ import discord
 import yt_dlp
 from discord import app_commands
 
-import vstatus
+from dbot.core import vstatus
 import paths
 
 log = logging.getLogger("discord-ai-bot.music")

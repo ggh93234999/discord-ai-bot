@@ -8,8 +8,8 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { ENV, botGalleryChat } from "./bet.js";
-import { arecDir } from "./paths.js";
+import { ENV, botGalleryChat } from "../bet.js";
+import { arecDir } from "../paths.js";
 
 const dir = fileURLToPath(new URL(".", import.meta.url));
 const DATA = ENV.GALLERY_DIR || arecDir("gallery_data");
