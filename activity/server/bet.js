@@ -31,6 +31,10 @@ function loadKey() {
   return INTERNAL_KEY.length >= 32 ? INTERNAL_KEY : "";
 }
 
+// 玩家目前在哪個伺服器開的 Activity（登入時記下；沒記錄就用預設伺服器）
+const userGid = new Map();
+export const gidOf = (uid) => userGid.get(String(uid)) || GUILD_ID;
+
 export const internalKey = () => loadKey();
 export const betEnabled = () => !!(CLIENT_SECRET && loadKey());
 
