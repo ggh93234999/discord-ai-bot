@@ -98,7 +98,7 @@ python bot.py
   - 出生地：台灣各縣市和常見城市內建經緯度與時區，其他地點用 Open-Meteo 地名搜尋，或由模型提供經緯度＋時區。
 - **斜線指令**
   - `/播放 <歌曲>`、`/跳過`、`/暫停`、`/繼續`、`/停止`、`/佇列`、`/隨機`
-  - 放歌時會在點歌的頻道貼一個**播放面板**：正在播放＋進度條（15 秒更新一次）、接下來的歌和總長度、播完會顯示「✅ 歌單播完了」，離開時顯示「👋 已離開」。面板被聊天洗上去時，換歌會自動重貼到最下面；`/佇列` 也能把它叫到最下面。按鈕：⏯️ 暫停/繼續、⏭️ 跳過、🔀 隨機、⏹️ 停止。
+  - 放歌時會在點歌的頻道貼一個**播放面板**：正在播放＋進度條（15 秒更新一次）、接下來的歌和總長度、播完會顯示「✅ 歌單播完了」，離開時顯示「👋 已離開」。面板被聊天洗上去時，換歌會自動重貼到最下面；`/佇列` 也能把它叫到最下面。按鈕：⏯️ 暫停/繼續、⏭️ 跳過、🔀 隨機、⏹️ 停止；第二排 🔉🔊 調音量、📻 電台開關（開著時亮綠色，佇列空了自動接相似的歌）。
   - 放歌時語音頻道狀態會自動顯示「🎶 歌名」，播完或離開時還原。
   - `/插播 <歌曲> [立刻播]`（英文 `/playnext`）：插歌。預設插到「下一首」；「立刻播」選開就馬上播並跳過現在這首。也可以直接說「插一首周杰倫的晴天」，AI 會用 music 工具的 `position`（end／next／now）
   - `/移除 <編號或歌名>`：從佇列拿掉某一首；`/清空佇列`：接下來的全拿掉（現在這首放完）
@@ -137,15 +137,15 @@ journalctl -u discord-bot -f         # 即時 log
 
 | 檔案 | 用途 |
 |---|---|
-| `bot.py` | 主程式 |
+| `bot.py` | 主程式：Discord client、對話流程、`/總結` `/重置` `/歡迎` `/自動回覆` 等指令（systemd 只啟動它） |
 | `paths.py` | 執行時資料（`data/`）的路徑統一在這裡決定 |
 | `dbot/core/` | 核心與管理：`models.py`（`/模型` 切換與用量統計）、`aliases.py`（中文指令的英文名字對照）、`dmlog.py`（`/私訊紀錄`）、`channels.py`（開頻道、臨時語音房）、`vstatus.py`（語音頻道狀態）、`memberstatus.py`、`actstatus.py` |
 | `dbot/ai/` | 給 AI 用的工具與生成：`dbot/ai/divination.py`＋`dbot/ai/divination_data/`（占卜與籤詩周易原文、塔羅牌圖）、`dbot/ai/fortune.py`＋`svg2png.py`（八字、星盤）、`dbot/ai/drawimg.py`（占卜與八字附圖）、`extras.py`（投票、抽籤、亂數、`/狀態`）、`almanac.py`、`webimg.py`、`imagegen.py`／`sfxgen.py`／`videogen.py`（畫圖、音效、影片） |
-| `dbot/money/` | 代幣與帳務：`dbot/money/economy.py`（錢包、借貸、賭博指令、給 Activity 用的內部 API）、`botwallet.py`（大笨bot 自己的錢包：送錢、收還款、查帳） |
-| `dbot/music/` | `dbot/music/music.py`：音樂播放 |
+| `dbot/money/` | 代幣與帳務：`account.py`（錢包存取、莊家＝大笨bot 的帳戶）、`ledger.py`（轉帳紀錄、帳本頻道、賭博彙整）、`loans.py`（借貸、還款、欠債扣款與催債）、`minigames.py`（老虎機、21 點）、`horse_race.py`（賽馬）、`economy.py`（斜線指令、給 Activity 用的內部 API，同時是對外窗口）、`botwallet.py`（大笨bot 自己的錢包工具：送錢、收還款、查帳） |
+| `dbot/music/` | 音樂播放：`tracks.py`（歌曲、搜尋、播放紀錄）、`player.py`（每個伺服器一個播放器）、`panel.py`（面板按鈕）、`persist.py`（重啟後接著播）、`actions.py`（點歌、電台、控制）、`ai_tools.py`（給 AI 的工具）、`music.py`（斜線指令與入口） |
 | `activity/` | Discord Activity 小遊戲（前端 `src/`、後端 `server/`，見下方） |
 | `update-ytdlp.sh.example` | 每週自動更新 yt-dlp 的範例腳本（改路徑後用 crontab 跑） |
-| `.env` | 設定與金鑰（只有自己讀得到，不要外傳） |
+| `.env` | **所有設定與金鑰都在這一個檔**（只有自己讀得到，不要外傳）。`INTERNAL_KEY`（機器人與 Activity 後端的內部金鑰）第一次啟動會自動產生寫進來，不用自己設 |
 | `.env.example` | 設定範本 |
 | `system_prompt.txt` | 機器人的個性設定 |
 | `state.json` 等 | 執行時資料（自動回覆頻道、錢包、播放紀錄、馬匹資料…），程式自己維護，已被 `.gitignore` 排除 |
@@ -165,6 +165,14 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 - `/發錢 對象 金額`（give）：機器人擁有者專用，直接發代幣。
 - `/老虎機 賭注 [格數]`：3 格（單排）、9 格（3×3，8 條連線）、16 格（4×4，整排整欄加兩條對角線共 10 條，4 格一樣才算，3 種圖案）。多格版可同時中很多條，3×3 只有 🍒🍋🔔💎 四種圖案（約 41% 的把數會賺錢，三個一樣 1.2~2.8 倍）。各版本理論回報率都調在約 95%。
 - `/賽馬 [等待秒數]`（horserace）：開一場賽馬，6 匹馬從 10 匹固定名單隨機出賽，每匹有速度／耐力／爆發數值（存 `horses.json`）、當天狀態和歷史戰績（出賽、勝場、近 5 場名次）。賠率 = 0.95 ÷ 勝率，勝率由能力＋狀態算出，所以強馬賠少、冷門賠多。按按鈕選馬、填賭注；每人一注，截止後播放跑道動畫並結算。機器人在比賽中途重啟，這場的賭注會損失。
+
+### 借貸、帳本與欠債
+- `/借錢 金額 理由`：跟大笨bot 借，由它（AI）判斷要不要借，理由正當就盡量借。一般最多 10 萬，手上錢越多可借越多（上限 50 萬）。利息每天 50%、複利，欠款最多滾到本金的 10 倍就不再增加。`/還錢` 還款、`/債務` 看欠多少；直接在聊天跟大笨bot 說「我要還錢」也可以。
+- 有欠債時，賺到的錢（發言、掛語音、遊戲贏的）會自動先扣 50% 還債，並掛上「欠債人」身分組，還清就拿掉；每天 20:00（台北時間）會在帳本頻道公告欠債名單和今天扣了多少。
+- 大笨bot 也能用工具轉帳給人（單次最多 10 萬、每人每天最多 50 萬）、收還款、查轉帳紀錄，不用另外下指令。
+- **帳本頻道**：`/設定帳本 頻道`（需要「管理伺服器」權限）指定一個文字頻道，轉帳、借款、還款會逐筆發在那裡，賭博類輸贏每 10 分鐘彙整一則（同一個人合併）。`/關閉帳本` 關掉；**沒設定就完全不發**。紀錄本身仍存在 `data/logs/transfers.json`，大笨bot 查帳用。
+- Activity 的賭博類遊戲（老虎機、21 點、賽馬、賭石…）以大笨bot 當莊家，輸贏進出它的帳戶；鍛造、種菜、抽卡的錢不經過莊家，也不記帳本。
+- **多個伺服器**：錢包、借貸、帳本都是每個伺服器各一份。Activity 從哪個伺服器開，就算那個伺服器的帳（抓不到伺服器 ID 時退回 `.env` 的 `ACTIVITY_GUILD_ID`）。
 
 ## Discord Activity 小遊戲（`activity/`）
 在語音頻道打開的內嵌遊戲視窗（Discord Embedded App SDK），WebSocket 即時同步。選單依序分五類：
@@ -304,8 +312,8 @@ Activity「桌遊・派對」分類，每個 instance 一桌，不足人數由�
 ```
 bot.py            機器人入口（systemd 只啟動它）
 paths.py          執行時資料路徑
-dbot/core/        核心與管理      dbot/ai/     AI 工具與生成
-dbot/money/       代幣與帳務      dbot/music/  音樂
+dbot/core/        設定（config.py）、核心與管理      dbot/ai/     AI 工具、模型呼叫、畫圖指令
+dbot/money/       代幣與帳務（account／ledger／loans／小遊戲）      dbot/music/  音樂（tracks／player／panel…）
 data/             執行時資料（records＝存檔、logs＝流水），不進 git
 activity/server/
   server.js bet.js wager.js paths.js   伺服器入口與共用的押注／託管／路徑
