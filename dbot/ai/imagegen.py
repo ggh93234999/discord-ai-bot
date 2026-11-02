@@ -297,7 +297,7 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
     env_name, default_model, eta, timeout = QUALITY[quality]
     model = os.getenv(env_name, default_model).strip() or default_model
     scale = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
-    if scale != "normal" and quality != "fast":      # 大尺寸只有快速畫質的模型支援
+    if scale != "normal" and quality not in ("fast", "chroma"):      # 大尺寸只有快速畫質和 Chroma 支援
         quality = "fast"
         env_name, default_model, eta, timeout = QUALITY[quality]
         model = os.getenv(env_name, default_model).strip() or default_model
