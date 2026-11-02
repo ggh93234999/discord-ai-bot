@@ -137,6 +137,7 @@ journalctl -u discord-bot -f         # 即時 log
 
 | 檔案 | 用途 |
 |---|---|
+| `GUIDE.md` | 給使用者看的功能手冊（每個主題固定格式＋關鍵字），大笨bot 的 `bot_help` 工具查的就是它；改功能時記得同步改 |
 | `bot.py` | 主程式：Discord client、對話流程、`/總結` `/重置` `/歡迎` `/自動回覆` 等指令（systemd 只啟動它） |
 | `paths.py` | 執行時資料（`data/`）的路徑統一在這裡決定 |
 | `dbot/core/` | 核心與管理：`models.py`（`/模型` 切換與用量統計）、`aliases.py`（中文指令的英文名字對照）、`dmlog.py`（`/私訊紀錄`）、`channels.py`（開頻道、臨時語音房）、`vstatus.py`（語音頻道狀態）、`memberstatus.py`、`actstatus.py` |
