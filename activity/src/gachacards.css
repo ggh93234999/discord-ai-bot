@@ -246,3 +246,9 @@ html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots .gc-tm.on{border:1.5px solid var(--ink);box-shadow:0 0 0 2px var(--paper2),0 0 0 3px var(--ink3);overflow:hidden}
 .game.gcards.slots .gc-tm.on img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .game.gcards.slots .gc-tm .gc-star{position:absolute;left:0;right:0;bottom:1px;text-align:center;font-size:9px;color:#e0b94a;text-shadow:0 0 2px #000}
+
+/* 手機版 Discord：頂端有一條約 45px 的列蓋在 Activity 上面（.dcm 由 main.js 在手機 Discord 內加上）。
+   水墨畫風版面自己設了頂端間距，沒吃到全站的 58px 規則，「← 選單」被蓋住點不到；彈窗也是貼齊畫面頂端，同樣要讓開。 */
+.dcm .game.gcards.slots .gc-head{height:244px;padding-top:58px}
+.dcm .gc-modal,.dcm .gc-zoom,.dcm .gc-result,.dcm .gc-lb{padding-top:58px}
+.dcm .game.gcards.slots .gc-picker{max-height:calc(100vh - 62px)}
