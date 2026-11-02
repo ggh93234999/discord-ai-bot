@@ -30,12 +30,13 @@ def loan_limit(gid: int, uid: int) -> int:
 
 def check_borrow(gid: int, uid: int, amount: int) -> str | None:
     """能不能借（不含大笨bot 自己的意願）：不能就回原因。"""
-    a = _acct(gid, uid)
-    if a.get("loan"):
-        return f"你還欠著 {fmt(debt_of(gid, uid))}，先還清才能再借。"
+    owed = debt_of(gid, uid)
     lim = loan_limit(gid, uid)
     if amount > lim:
         return f"你現在最多只能借 {fmt(lim)}（一般最多 {fmt(LOAN_BASE)}，手上的錢越多可借越多，上限 {fmt(LOAN_MAX)}）。"
+    if owed and owed + amount > LOAN_MAX:      # 加碼借：欠款加新借的不能超過上限
+        room = max(0, LOAN_MAX - owed)
+        return f"你已經欠 {fmt(owed)}，加碼後總債務不能超過 {fmt(LOAN_MAX)}，最多再借 {fmt(room)}。"
     h = house_balance(gid)
     if h is None or h < amount:
         return f"大笨bot 手頭不夠（現在只有 {fmt(h or 0)}），借不出這麼多。"
@@ -52,9 +53,11 @@ def borrow(gid: int, uid: int, name: str, amount: int) -> str | None:
     if err:
         return err
     a = _acct(gid, uid, name)
+    owed = debt_of(gid, uid)
     house_add(gid, -amount)
     a["coins"] = int(a["coins"]) + amount
-    a["loan"] = {"p": amount, "t": time.time()}
+    # 已有欠款就加碼：把累積到現在的欠款連同新借的併成新本金，從現在起重新計息
+    a["loan"] = {"p": owed + amount, "t": time.time()}
     _save()
     record(gid, "借款", _bot_party(), (uid, name), amount)
     _schedule_role_sync(gid, uid)

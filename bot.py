@@ -459,7 +459,7 @@ GALLERY_TOOL = {
 ADMIN_SMALL = 30_000      # 管理員也只借得到小數目
 
 
-async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason: str, admin: bool = False) -> tuple[bool, str]:
+async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason: str, admin: bool = False, owed: int = 0) -> tuple[bool, str]:
     """有人用 /借錢 向大笨bot 借：由它自己決定要不要借。規則是盡量不借，預設拒絕；回 (同意與否, 它的回話)。"""
     system = (load_system_prompt(None) + "\n\n【現在的場合】有人用 /借錢 向你借代幣。利息是每天 50%（複利），借的人下指令時就已經知道並接受這個利息，所以不要拿利息高當拒絕理由，也不用替他算還不還得起。"
               "判斷原則：只要理由正當、具體，你就同意借。正當的理由例如：買或湊某樣東西（卡包、套組、道具）、短期週轉、準備做某件有目標的事、對方說明了打算怎麼還。"
@@ -469,7 +469,7 @@ async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason:
               + (f" 這個人是伺服器管理員：態度客氣一點，但借款只借小數目（{ADMIN_SMALL} 以內）；理由正當才借，不正當就婉拒。" if admin else ""))
     if admin and amount > ADMIN_SMALL:      # 管理員也只借小數目，太大的不用問模型
         return False, f"管理員大人面子我給，但借這麼多不行啦，{ADMIN_SMALL:,} 以內的小數目再說。"
-    user = f"{name} 想借 {amount} 代幣。他手上現在有 {coins}，你的帳戶有 {bot_coins}。他的理由：{reason or '（沒說）'}"
+    user = f"{name} 想借 {amount} 代幣。他手上現在有 {coins}，你的帳戶有 {bot_coins}。他的理由：{reason or '（沒說）'}" + (f" 他現在還欠你 {owed}，這次是加碼借；理由正當就照借，但可以順口提一下他還欠著。" if owed else "")
     reply = await call_model([{"role": "system", "content": system}, {"role": "user", "content": user}], max_tokens=200)
     lines = [ln.strip() for ln in clean_text(reply.get("content")).splitlines() if ln.strip()]
     if not lines:

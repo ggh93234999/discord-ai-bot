@@ -490,7 +490,7 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         ok, say = False, "（大笨bot 現在不想理你）"
         if loan_judge is not None:
             try:
-                ok, say = await loan_judge(name, 金額, balance(gid, uid), house_balance(gid) or 0, 理由.strip()[:200], bool(interaction.user.guild_permissions.administrator))
+                ok, say = await loan_judge(name, 金額, balance(gid, uid), house_balance(gid) or 0, 理由.strip()[:200], bool(interaction.user.guild_permissions.administrator), debt_of(gid, uid))
             except Exception as e:
                 log.warning("借錢判斷失敗：%r", e)
         if ok:
@@ -498,9 +498,11 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
             if err:
                 await interaction.followup.send(err)
                 return
+            now_owe = debt_of(gid, uid)
+            extra = f"（加碼，現在總共欠 {fmt(now_owe)}）" if now_owe > 金額 else ""
             await interaction.followup.send(
-                f"🦈 {say}\n**{name}** 向大笨bot 借了 {fmt(金額)}。利息每天 **+{int(LOAN_RATE * 100)}%**（複利，最多滾到 {LOAN_CAP_MULT} 倍），"
-                f"1 天後要還 {fmt(int(金額 * (1 + LOAN_RATE)))}、3 天後 {fmt(int(金額 * (1 + LOAN_RATE) ** 3))}。`/還錢` 還、`/債務` 看欠多少；還清之前不能再借、也不能轉帳。")
+                f"🦈 {say}\n**{name}** 向大笨bot 借了 {fmt(金額)}{extra}。利息每天 **+{int(LOAN_RATE * 100)}%**（複利，最多滾到 {LOAN_CAP_MULT} 倍），"
+                f"1 天後要還 {fmt(int(金額 * (1 + LOAN_RATE)))}、3 天後 {fmt(int(金額 * (1 + LOAN_RATE) ** 3))}。`/還錢` 還、`/債務` 看欠多少；欠著可以再加碼借，但還清之前不能轉帳。")
         else:
             await interaction.followup.send(f"🙅 **{name}** 想借 {fmt(金額)}，被大笨bot 拒絕了：{say}")
 
