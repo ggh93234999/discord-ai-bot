@@ -16,7 +16,7 @@ def register(client):
     @app_commands.describe(內容="想畫什麼（中英文都可以）", 畫質="快速（預設）／構圖文字較乾淨／最高畫質（很久）", 形狀="正方形（預設）／橫式／直式", 大小="一般（預設）／大圖／超大圖（要等比較久，只有快速畫質）")
     @app_commands.choices(
         畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
-              app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
+              app_commands.Choice(name="最高畫質（約10分鐘）", value="high"), app_commands.Choice(name="無限制 Chroma（無安全過濾，約1分鐘）", value="chroma")],
         形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
               app_commands.Choice(name="直式", value="portrait")],
         大小=[app_commands.Choice(name="一般（預設）", value="normal"), app_commands.Choice(name="大圖（約1900像素）", value="large"), app_commands.Choice(name="超大圖（長邊2048像素）", value="huge")])
@@ -28,7 +28,7 @@ def register(client):
             await interaction.response.send_message("畫圖功能目前沒開。", ephemeral=True)
             return
         await interaction.response.defer(thinking=True)
-        res = await imagegen.submit(client.http_session, {"prompt": 內容, "quality": 畫質, "shape": 形狀, "scale": 大小},
+        res = await imagegen.submit(client.http_session, {"prompt": 內容, "quality": 畫質, "shape": 形狀, "scale": 大小, "human": True},
                                     interaction.user.id, imagegen.say_for_interaction(interaction), 內容)
         await interaction.followup.send(res)
 
@@ -38,7 +38,7 @@ def register(client):
                            提示詞語言="擴寫出來的提示詞用英文（預設）還是中文", 大小="一般（預設）／大圖／超大圖（要等比較久，只有快速畫質）")
     @app_commands.choices(
         畫質=[app_commands.Choice(name="快速（約30秒）", value="fast"), app_commands.Choice(name="構圖與文字較乾淨（約100秒）", value="clean"),
-              app_commands.Choice(name="最高畫質（約10分鐘）", value="high")],
+              app_commands.Choice(name="最高畫質（約10分鐘）", value="high"), app_commands.Choice(name="無限制 Chroma（無安全過濾，約1分鐘）", value="chroma")],
         形狀=[app_commands.Choice(name="正方形", value="square"), app_commands.Choice(name="橫式", value="landscape"),
               app_commands.Choice(name="直式", value="portrait")],
         提示詞語言=[app_commands.Choice(name="英文（預設）", value="en"), app_commands.Choice(name="中文", value="zh")],
@@ -64,7 +64,7 @@ def register(client):
             note = f"📝 原句：{內容[:300]}\n（提示詞擴寫失敗，這張直接用你的原句畫）\n"
             prompt = 內容
         log.info("智慧畫圖 user=%s 原句=%s 擴寫=%s", interaction.user.id, 內容[:80], (expanded or "失敗")[:200])
-        res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀, "scale": 大小},
+        res = await imagegen.submit(client.http_session, {"prompt": prompt, "quality": 畫質, "shape": 形狀, "scale": 大小, "human": True},
                                     interaction.user.id, imagegen.say_for_interaction(interaction), 內容, extra=f"\n📝 原句：{內容[:300]}")
         await interaction.followup.send(note + res)
 

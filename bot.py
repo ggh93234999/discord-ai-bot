@@ -534,7 +534,7 @@ def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
         out.append({"prompt": prompt,
                     "shape": a.get("shape") if a.get("shape") in imagegen.SIZES else "square",
                     "scale": a.get("scale") if a.get("scale") in imagegen.BIG_SIZES else "normal",
-                    "quality": a.get("quality") if a.get("quality") in imagegen.QUALITY else "fast"})
+                    "quality": a.get("quality") if a.get("quality") in imagegen.QUALITY and a.get("quality") not in imagegen.HUMAN_ONLY else "fast"})
     return out
 
 

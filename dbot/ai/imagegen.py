@@ -39,8 +39,10 @@ QUALITY = {
     "fast": ("IMAGE_MODEL_FAST", "draw-klein", 30, 900),
     "clean": ("IMAGE_MODEL_CLEAN", "draw-qwen-fast", 100, 900),
     "high": ("IMAGE_MODEL_HIGH", "draw-flux", 600, 1800),
+    "chroma": ("IMAGE_MODEL_CHROMA", "draw-chroma", 60, 900),      # 沒有安全對齊的模型：只給人在 /畫圖、/智慧畫圖 手動選，AI 不會呼叫
 }
-QUALITY_NAMES = {"fast": "快速", "clean": "構圖與文字較乾淨", "high": "最高畫質"}
+HUMAN_ONLY = {"chroma"}            # 不給 AI 工具用的畫質（AI 傳來也會被改回 fast）
+QUALITY_NAMES = {"fast": "快速", "clean": "構圖與文字較乾淨", "high": "最高畫質", "chroma": "無限制 Chroma"}
 DISCORD_LIMIT = 7_800_000          # 一般伺服器單檔 8MB 上限，留一點空間
 
 TOOL = {
@@ -289,6 +291,8 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
         log.info("畫圖被擋：%s｜%s", why, prompt[:80])
         return why + "（這張沒有畫）"
     quality = args.get("quality") if args.get("quality") in QUALITY else "fast"
+    if quality in HUMAN_ONLY and not args.get("human"):       # 只有斜線指令（人）會帶 human=True
+        quality = "fast"
     shape = args.get("shape") if args.get("shape") in SIZES else "square"
     env_name, default_model, eta, timeout = QUALITY[quality]
     model = os.getenv(env_name, default_model).strip() or default_model
