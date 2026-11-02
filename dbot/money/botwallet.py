@@ -97,9 +97,6 @@ def run_pay(msg, args: dict) -> str:
     if target.bot:
         return "不能轉給機器人，沒有轉。"
     gid, now = msg.guild.id, time.time()
-    owed = economy.debt_of(gid, target.id)
-    if owed:                      # 還欠著大笨bot 的錢：一律不給（要先還清）
-        return f"{target.display_name} 還欠大笨bot {economy.fmt(owed)}，沒還清前不能給錢，沒有轉。叫他先還錢（/還錢，或在聊天說要還）。"
     log = _load_log()
     recent = [x for x in log["items"] if now - x["t"] < 86400 and x["gid"] == gid]
     if sum(x["amount"] for x in recent) + amount > PAY_ALL_DAY:
