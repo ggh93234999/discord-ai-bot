@@ -26,7 +26,18 @@ const BIG = {
   large: { square: "1280x1280", landscape: "1920x1088", portrait: "1088x1920" },
   huge: { square: "2048x2048", landscape: "2048x1152", portrait: "1152x2048" },
 };
-const MODELS = { fast: ENV.IMAGE_MODEL_FAST || "draw-klein", clean: ENV.IMAGE_MODEL_CLEAN || "draw-qwen-fast" };
+// 畫圖模型來自專案根目錄的 image_models.json（沒有就用 image_models.example.json），和機器人共用同一份設定
+const IMG_CFG = (() => {
+  for (const f of ["image_models.json", "image_models.example.json"]) {
+    try { return JSON.parse(fs.readFileSync(fileURLToPath(new URL("../../../" + f, import.meta.url)), "utf8")); } catch {}
+  }
+  return {};
+})();
+const MODELS = {};
+for (const k of (IMG_CFG.gallery || ["fast", "clean"])) { const e = (IMG_CFG.generate || {})[k]; if (e && e.model && !e.human_only) MODELS[k] = e.model; }
+if (!Object.keys(MODELS).length) MODELS.fast = "draw-klein";
+const DEFQ = Object.keys(MODELS)[0];
+const PROMPT_WRITER = IMG_CFG.prompt_writer || "prompt-writer";
 
 // 內容限制（和 imagegen.py 的 check_prompt 相同）：只擋「性內容 + 未成年人」的組合
 const SEX = /裸|露點|露奶|乳頭|乳暈|胸部走光|陰莖|陰道|陰部|生殖器|性交|做愛|交配|口交|自慰|強暴|性愛|性感內衣|情趣|色情|成人向|限制級|18禁|nsfw|nude|naked|topless|porn|hentai|erotic|sex|genital|nipple|penis|vagina|lingerie|fetish|bdsm|explicit|lewd|ecchi|cum\b|orgasm/i;
@@ -94,7 +105,7 @@ async function pump() {
       const ex = await expand(job.prompt, job.lang);
       if (ex) { orig = job.prompt; prompt = ex; }
     }
-    const model = MODELS[job.quality] || MODELS.fast;
+    const model = MODELS[job.quality] || MODELS[DEFQ];
     const size = job.scale !== "normal" && BIG[job.scale] ? BIG[job.scale][job.shape] : SIZES[job.shape];
     const raw = await generate(model, prompt, size);
     const g = guildOf(job.gid);
@@ -159,7 +170,7 @@ async function expand(idea, lang) {
   try {
     const r = await fetch(llmBase() + "/chat/completions", {
       method: "POST", headers: llmHeaders(), signal: AbortSignal.timeout(180_000),
-      body: JSON.stringify({ model: ENV.IMAGE_PROMPT_MODEL || "prompt-writer", max_tokens: 500,
+      body: JSON.stringify({ model: PROMPT_WRITER, max_tokens: 500,
         messages: [{ role: "user", content: idea + (lang === "zh" ? "\n\n（請用繁體中文寫出完整的畫圖提示詞，不要用英文。）" : "") }] }),
     });
     const d = await r.json();
@@ -298,7 +309,7 @@ function jobOf(gid, cat, u, prompt, m, via) {
     gid, cat: cat.id, uid: u.uid, name: u.name, prompt, via,
     shape: SIZES[m.shape] ? m.shape : "square",
     scale: BIG[m.scale] ? m.scale : "normal",
-    quality: BIG[m.scale] ? "fast" : (MODELS[m.quality] ? m.quality : "fast"),     // 大尺寸只有快速畫質支援
+    quality: BIG[m.scale] ? DEFQ : (MODELS[m.quality] ? m.quality : DEFQ),     // 大尺寸一律用預設（第一個）畫質
     smart: via ? false : !!m.smart, lang: m.lang === "zh" ? "zh" : "en",
   };
 }

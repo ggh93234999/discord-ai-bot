@@ -449,7 +449,7 @@ GALLERY_TOOL = {
                 "prompt": {"type": "string", "description": "畫面描述（英文）"},
                 "shape": {"type": "string", "enum": ["square", "landscape", "portrait"], "description": "預設 square；風景桌布用 landscape，手機桌布／人物全身用 portrait"},
                 "scale": {"type": "string", "enum": ["normal", "large", "huge"]},
-                "quality": {"type": "string", "enum": ["fast", "clean"], "description": "預設 fast；要清楚的文字（招牌、海報字）才用 clean"},
+                "quality": {"type": "string", "enum": imagegen.GALLERY_QUALITIES, "description": "預設 " + imagegen.GALLERY_QUALITIES[0] + "；" + "；".join(f"{k}＝{imagegen.GEN[k]['hint'] or imagegen.GEN[k]['label']}" for k in imagegen.GALLERY_QUALITIES[1:])},
             },
             "required": ["prompt"],
         },
@@ -534,7 +534,7 @@ def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
         out.append({"prompt": prompt,
                     "shape": a.get("shape") if a.get("shape") in imagegen.SIZES else "square",
                     "scale": a.get("scale") if a.get("scale") in imagegen.BIG_SIZES else "normal",
-                    "quality": a.get("quality") if a.get("quality") in imagegen.QUALITY and a.get("quality") not in imagegen.HUMAN_ONLY else "fast"})
+                    "quality": a.get("quality") if a.get("quality") in imagegen.GALLERY_QUALITIES else imagegen.GALLERY_QUALITIES[0]})
     return out
 
 

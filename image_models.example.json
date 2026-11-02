@@ -1,0 +1,62 @@
+{
+  "_說明": "畫圖／改圖用的模型設定。複製這個檔成 image_models.json 再改（image_models.json 不會上傳 git）；沒有 image_models.json 時就用這份。改完要重開機器人（Activity 的圖創區也要重開）。model 是你的 LiteLLM（或其他 OpenAI 相容圖片 API）上的模型名稱。",
+  "_欄位": "model 模型名；label 顯示名稱；eta 預估秒數；timeout 逾時秒數；big_sizes 支援大圖／超大圖；human_only 只給人在斜線指令選、AI 不會呼叫；prompt_lang 提示詞要用 en 或 zh；hint 告訴 AI 什麼時候該選它；note 補充說明（顯示在選單上）。選單順序就是這裡的順序，第一個是預設。",
+  "generate": {
+    "fast": {
+      "model": "draw-klein",
+      "label": "快速",
+      "eta": 30,
+      "timeout": 900,
+      "big_sizes": true,
+      "prompt_lang": "en",
+      "hint": "預設用這個，大部分情況夠用"
+    },
+    "clean": {
+      "model": "draw-qwen-fast",
+      "label": "構圖與文字較乾淨",
+      "eta": 100,
+      "timeout": 900,
+      "prompt_lang": "zh",
+      "hint": "畫面裡要有清楚的文字（招牌、標語、海報字）或複雜構圖時用"
+    },
+    "high": {
+      "model": "draw-flux",
+      "label": "最高畫質",
+      "eta": 600,
+      "timeout": 1800,
+      "prompt_lang": "en",
+      "hint": "只有使用者明確說要「高畫質」「最高畫質」「畫質最好」才用，很久"
+    },
+    "chroma": {
+      "model": "draw-chroma",
+      "label": "無限制 Chroma",
+      "eta": 60,
+      "timeout": 900,
+      "big_sizes": true,
+      "human_only": true,
+      "prompt_lang": "en",
+      "note": "無安全過濾，提示詞只認英文"
+    }
+  },
+  "edit": {
+    "fast": {
+      "model": "draw-klein",
+      "label": "快速",
+      "eta": 25,
+      "timeout": 900,
+      "hint": "預設"
+    },
+    "clean": {
+      "model": "edit-qwen-4",
+      "label": "文字與構圖較乾淨",
+      "eta": 100,
+      "timeout": 900,
+      "hint": "圖要加字或改字（招牌、標語、海報字、對話框文字），或使用者要求高品質、精修時用"
+    }
+  },
+  "prompt_writer": "prompt-writer",
+  "gallery": [
+    "fast",
+    "clean"
+  ]
+}

@@ -7,7 +7,7 @@
 - 那台沒有內容過濾，過濾在這裡做（check_prompt）。
 - 對方在打遊戲等暫停服務時連不上或回錯誤：直接回「畫圖服務目前暫停中」，不重試。
 設定（.env，都可省略）：IMAGE_GEN=on|off、IMAGE_BASE_URL、IMAGE_API_KEY（預設沿用 LLM_BASE_URL / LLM_API_KEY）、
-IMAGE_MODEL_FAST / IMAGE_MODEL_CLEAN / IMAGE_MODEL_HIGH、IMAGE_MAX_QUEUE（最多排幾張，預設 4）。
+IMAGE_MAX_QUEUE（最多排幾張，預設 4）。畫圖／改圖用哪些模型寫在專案根目錄的 image_models.json（見 imagemodels.py）。
 """
 import asyncio
 import base64
@@ -22,6 +22,8 @@ import aiohttp
 import discord
 from PIL import Image
 
+from dbot.ai import imagemodels
+
 log = logging.getLogger("bot")
 
 PAUSED_REPLY = "🎨 畫圖服務目前暫停中，晚點再試。"
@@ -34,15 +36,61 @@ BIG_SIZES = {
 }
 SCALE_NAMES = {"normal": "一般", "large": "大圖", "huge": "超大圖"}
 SCALE_EXTRA_ETA = {"normal": 0, "large": 20, "huge": 70}      # 比一般多等幾秒（實測 2048×2048 約 60 秒）
-# 畫質 → (環境變數名, 預設模型, 預估秒數, HTTP 逾時秒數)
-QUALITY = {
-    "fast": ("IMAGE_MODEL_FAST", "draw-klein", 30, 900),
-    "clean": ("IMAGE_MODEL_CLEAN", "draw-qwen-fast", 100, 900),
-    "high": ("IMAGE_MODEL_HIGH", "draw-flux", 600, 1800),
-    "chroma": ("IMAGE_MODEL_CHROMA", "draw-chroma", 60, 900),      # 沒有安全對齊的模型：只給人在 /畫圖、/智慧畫圖 手動選，AI 不會呼叫
-}
-HUMAN_ONLY = {"chroma"}            # 不給 AI 工具用的畫質（AI 傳來也會被改回 fast）
-QUALITY_NAMES = {"fast": "快速", "clean": "構圖與文字較乾淨", "high": "最高畫質", "chroma": "無限制 Chroma"}
+# 畫質／模型清單來自 image_models.json（選單順序＝檔案順序，第一個是預設）
+_CFG = imagemodels.load()
+GEN = _CFG["generate"]
+EDITS = _CFG["edit"]
+QUALITY = GEN
+QUALITY_NAMES = {k: v["label"] for k, v in GEN.items()}
+HUMAN_ONLY = {k for k, v in GEN.items() if v["human_only"]}      # 只給人在斜線指令選，AI 工具不會用（AI 傳來也會被改回預設）
+AI_QUALITIES = [k for k in GEN if k not in HUMAN_ONLY] or list(GEN)
+AI_DEFAULT = AI_QUALITIES[0]
+DEFAULT_EDIT = next(iter(EDITS))
+GALLERY_QUALITIES = _CFG["gallery"]
+
+
+def _eta_text(eta: int) -> str:
+    return f"{round(eta / 60)} 分鐘" if eta >= 300 else f"{eta} 秒"
+
+
+def gen_choices() -> list[tuple[str, str]]:
+    """/畫圖、/智慧畫圖 的畫質選單：[(顯示名稱, 值)]。"""
+    return [(f"{v['label']}（約{_eta_text(v['eta']).replace(' ', '')}" + (f"，{v['note']}" if v["note"] else "") + "）", k) for k, v in GEN.items()]
+
+
+def edit_choices() -> list[tuple[str, str]]:
+    return [(f"{v['label']}（約{_eta_text(v['eta']).replace(' ', '')}" + (f"，{v['note']}" if v["note"] else "") + "）", k) for k, v in EDITS.items()]
+
+
+def edit_key(q) -> str:
+    return q if q in EDITS else DEFAULT_EDIT
+
+
+def _big_quality() -> str | None:
+    """支援大圖的畫質（優先 AI 預設那個）。"""
+    if GEN[AI_DEFAULT]["big_sizes"]:
+        return AI_DEFAULT
+    return next((k for k in AI_QUALITIES if GEN[k]["big_sizes"]), None)
+
+
+def _gen_tool_text() -> str:
+    en = [k for k in AI_QUALITIES if GEN[k]["prompt_lang"] != "zh"]
+    zh = [k for k in AI_QUALITIES if GEN[k]["prompt_lang"] == "zh"]
+    s = "prompt 寫畫面描述：主體、動作、場景、風格、光線、構圖；"
+    if en:
+        s += f"quality 為 {'、'.join(en)} 時 prompt 請用英文寫（先把使用者的意思翻成英文再描述得具體一點）"
+    if zh:
+        s += ("；" if en else "") + f"quality 為 {'、'.join(zh)} 時可以直接用中文"
+    s += "。quality：預設用 " + AI_DEFAULT + "；" + "；".join(
+        f"{k}（{GEN[k]['label']}，約 {_eta_text(GEN[k]['eta'])}）" + (f"：{GEN[k]['hint']}" if GEN[k]["hint"] else "") for k in AI_QUALITIES) + "。"
+    return s
+
+
+def _edit_tool_text() -> str:
+    return "edit_quality：" + "；".join(
+        f"{k}（{EDITS[k]['label']}，約 {_eta_text(EDITS[k]['eta'])}）" + (f"：{EDITS[k]['hint']}" if EDITS[k]["hint"] else "") for k in EDITS) + f"。預設 {DEFAULT_EDIT}。"
+
+
 DISCORD_LIMIT = 7_800_000          # 一般伺服器單檔 8MB 上限，留一點空間
 
 TOOL = {
@@ -53,16 +101,13 @@ TOOL = {
             "用畫圖模型畫一張圖（插畫、風景、物品、卡通角色、概念圖等）。使用者說「畫一張…」「幫我畫…」「生一張圖」時呼叫。"
             "畫一張要等 30 秒到幾分鐘，畫好後程式會自動貼出來，你呼叫後只要簡短回一句「在畫了」就好，不要說已經畫好、不要描述圖的內容。"
             "【只能在年齡限制（NSFW）頻道使用，在其他頻道呼叫會被程式擋下並回覆說明，你照轉述即可】【不能畫】涉及未成年人的性暗示或色情內容（一律拒絕，不要呼叫工具、也不要偷偷改成類似的東西）；其他都可以畫（任何膚色、種族、國籍、外貌、性別、文化的人物都可以，不要自己加限制或拒絕）。"
-            "prompt 寫畫面描述：主體、動作、場景、風格、光線、構圖；quality 為 fast 或 high 時 prompt 請用英文寫（先把使用者的意思翻成英文再描述得具體一點），"
-            "quality 為 clean 時可以直接用中文。"
-            "quality：預設用 fast（約 30 秒）；畫面裡要有清楚的文字（招牌、標語、海報字）或複雜構圖用 clean（約 100 秒）；"
-            "只有使用者明確說要「高畫質」「最高畫質」「畫質最好」才用 high（draw-flux，最細緻，約 10 分鐘，很久）。"
+            + _gen_tool_text()
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "prompt": {"type": "string", "description": "要畫的畫面描述"},
-                "quality": {"type": "string", "enum": ["fast", "clean", "high"], "description": "畫質／速度，預設 fast"},
+                "quality": {"type": "string", "enum": AI_QUALITIES, "description": f"畫質／速度，預設 {AI_DEFAULT}"},
                 "scale": {"type": "string", "enum": ["normal", "large", "huge"], "description": "圖片大小，預設 normal。只有使用者特別提到要大張／高解析度／高清／2K／4K／壁紙級時才用：large（長邊約 1900 像素）或 huge（長邊 2048 像素，API 上限），會比較久，而且只支援 fast 畫質"},
                 "shape": {"type": "string", "enum": ["square", "landscape", "portrait"], "description": "square 正方形（預設）、landscape 橫式（風景、桌布）、portrait 直式（手機桌布、人物全身）"},
             },
@@ -226,17 +271,18 @@ def say_for_interaction(interaction: discord.Interaction):
 
 def tool_status(args: dict) -> str:
     if "quality" not in args and "shape" not in args:
-        return "🎨 排進改圖佇列（約 100 秒）" if args.get("edit_quality") == "clean" else "🎨 排進改圖佇列（約 20 秒）"
-    q = args.get("quality") if args.get("quality") in QUALITY else "fast"
+        return f"🎨 排進改圖佇列（約 {EDITS[edit_key(args.get('edit_quality'))]['eta']} 秒）"
+    q = args.get("quality") if args.get("quality") in GEN and args.get("quality") not in HUMAN_ONLY else AI_DEFAULT
     sc = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
-    if q == "high" and sc == "normal":
-        return "🎨 排進畫圖佇列（最高畫質，約 10 分鐘）"
-    return f"🎨 排進畫圖佇列（約 {QUALITY['fast' if sc != 'normal' else q][2] + SCALE_EXTRA_ETA[sc]} 秒）"
+    if sc != "normal" and not GEN[q]["big_sizes"]:
+        q = _big_quality() or q
+    eta = GEN[q]["eta"] + (SCALE_EXTRA_ETA[sc] if GEN[q]["big_sizes"] else 0)
+    return f"🎨 排進畫圖佇列（{GEN[q]['label']}，約 {_eta_text(eta)}）" if eta >= 300 else f"🎨 排進畫圖佇列（約 {eta} 秒）"
 
 
 def prompt_model() -> str:
-    """擴寫提示詞用的模型：預設是 LiteLLM 上的 prompt-writer（本機小模型，已內建系統提示詞，跑在 CPU 約 10～30 秒）；.env 的 IMAGE_PROMPT_MODEL 可換。"""
-    return (os.getenv("IMAGE_PROMPT_MODEL") or "prompt-writer").strip()
+    """擴寫提示詞用的模型：預設是 LiteLLM 上的 prompt-writer（本機小模型，已內建系統提示詞，跑在 CPU 約 10～30 秒）；image_models.json 的 prompt_writer 可換。"""
+    return _CFG["prompt_writer"]
 
 
 async def expand_prompt(session: aiohttp.ClientSession, idea: str, quality: str = "fast", fallback_model: str = "", lang: str = "en") -> str | None:
@@ -290,17 +336,19 @@ async def submit(session: aiohttp.ClientSession, args: dict, user_id: int, say, 
     if why:
         log.info("畫圖被擋：%s｜%s", why, prompt[:80])
         return why + "（這張沒有畫）"
-    quality = args.get("quality") if args.get("quality") in QUALITY else "fast"
+    quality = args.get("quality") if args.get("quality") in GEN else AI_DEFAULT
     if quality in HUMAN_ONLY and not args.get("human"):       # 只有斜線指令（人）會帶 human=True
-        quality = "fast"
+        quality = AI_DEFAULT
     shape = args.get("shape") if args.get("shape") in SIZES else "square"
-    env_name, default_model, eta, timeout = QUALITY[quality]
-    model = os.getenv(env_name, default_model).strip() or default_model
     scale = args.get("scale") if args.get("scale") in BIG_SIZES else "normal"
-    if scale != "normal" and quality not in ("fast", "chroma"):      # 大尺寸只有快速畫質和 Chroma 支援
-        quality = "fast"
-        env_name, default_model, eta, timeout = QUALITY[quality]
-        model = os.getenv(env_name, default_model).strip() or default_model
+    if scale != "normal" and not GEN[quality]["big_sizes"]:      # 這個模型不支援大尺寸：換成支援的畫質，都沒有就用一般大小
+        alt = _big_quality()
+        if alt:
+            quality = alt
+        else:
+            scale = "normal"
+    cfg = GEN[quality]
+    model, eta, timeout = cfg["model"], cfg["eta"], cfg["timeout"]
     size = BIG_SIZES[scale][shape] if scale != "normal" else SIZES[shape]
     eta += SCALE_EXTRA_ETA[scale]
     big = "" if scale == "normal" else f"，{SCALE_NAMES[scale]}"
@@ -317,13 +365,13 @@ EDIT_TOOL = {
             "要改的圖由程式自動從這則訊息（或被回覆的訊息）的附件取得，你不用處理圖片。畫好要等約 20 秒，你呼叫後只要簡短回一句「在改了」就好。"
             "如果要改的是剛才用 web_image 上網找到的圖（不是使用者傳的附件），use_found 設 true。"
             "prompt 寫「改什麼」，中英文都可以：使用者用中文講就直接用中文（不用翻譯），英文通常更穩定；可加上 \"Keep everything else the same.\"（其他部分維持不變）。" 
-            "圖中要加字或改字（招牌、標語、海報字）時，快速模式容易亂碼，這種情況請用 edit_quality=clean（Qwen-Image-Edit，文字處理比較好，和畫圖的 clean 是同一系列）；即使用 clean 也不要保證每個字都完全正確。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫。"
+            "圖中要加字或改字（招牌、標語、海報字）時，快速模式容易亂碼，這種情況請依 edit_quality 的說明選適合文字的那一種；即使如此也不要保證每個字都完全正確。涉及未成年人的性暗示或色情內容一律拒絕、不呼叫。"
         ),
         "parameters": {
             "type": "object",
             "properties": {"prompt": {"type": "string", "description": "修改指令（中英文皆可）"},
                            "use_found": {"type": "boolean", "description": "true＝改剛才用 web_image 找到的圖，而不是這則訊息的附件"},
-                           "edit_quality": {"type": "string", "enum": ["fast", "clean"], "description": "fast（預設，約 20 秒，FLUX.2 klein）；clean＝文字與構圖處理較好、品質較好但較慢（約 70～100 秒，Qwen-Image-Edit 2511，對應畫圖的 clean）。圖要加字或改字（招牌、標語、海報字、對話框文字）、或使用者要求高品質／細緻／精修時用 clean"}},
+                           "edit_quality": {"type": "string", "enum": list(EDITS), "description": _edit_tool_text()}},
             "required": ["prompt"],
         },
     },
@@ -395,13 +443,14 @@ async def submit_edit(session, prompt: str, images: list, user_id: int, say, sou
     if why:
         log.info("改圖被擋：%s｜%s", why, prompt[:80])
         return why + "（這張沒有改）"
-    clean = quality == "clean"
-    model = (os.getenv("IMAGE_MODEL_EDIT_CLEAN", "edit-qwen-4").strip() or "edit-qwen-4") if clean else (os.getenv("IMAGE_MODEL_EDIT", "draw-klein").strip() or "draw-klein")
-    label = "改圖・文字與構圖較乾淨" if clean else "改圖"
+    quality = edit_key(quality)
+    cfg = EDITS[quality]
+    model = cfg["model"]
+    label = "改圖" if quality == DEFAULT_EDIT else f"改圖・{cfg['label']}"
     ref = f"{len(images)} 張參考圖" if len(images) > 1 else ""
-    note = "、".join(x for x in (ref, "文字與構圖較乾淨，比較慢" if clean else "") if x)
+    note = "、".join(x for x in (ref, cfg["label"] if quality != DEFAULT_EDIT else "") if x)
     return _enqueue(session, user_id, lambda: edit(session, model, prompt, images), label,
-                    f"排進改圖了（{note}）" if note else "排進改圖了", 100 if clean else 25, say)
+                    f"排進改圖了（{note}）" if note else "排進改圖了", cfg["eta"], say)
 
 
 async def _job(user_id, make, label, say, extra=""):

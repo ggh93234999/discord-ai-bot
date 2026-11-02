@@ -204,7 +204,7 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
                 return "這裡不能畫圖。"
             if not imagegen.channel_ok(msg.channel):
                 return imagegen.NSFW_ONLY_REPLY
-            return await imagegen.submit(runtime.client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "", "clean" if args.get("edit_quality") == "clean" else "fast")
+            return await imagegen.submit(runtime.client.http_session, args, msg.author.id, imagegen.say_for_message(msg), msg.content or "", imagegen.edit_key(args.get("edit_quality")))
         if name == "make_video":
             if msg is None:
                 return "這裡不能做影片。"
@@ -227,7 +227,7 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             if args.get("use_found") and not images:
                 return "最近沒有上網找到的圖（超過 30 分鐘會清掉），請先用 web_image 找圖，或把圖片傳上來。"
             return await imagegen.submit_edit(runtime.client.http_session, args.get("prompt", ""), images, msg.author.id, imagegen.say_for_message(msg), msg.content or "",
-                                            "clean" if args.get("edit_quality") == "clean" else "fast")
+                                            imagegen.edit_key(args.get("edit_quality")))
         if name == "web_image":
             if msg is None:
                 return "這裡不能抓圖。"

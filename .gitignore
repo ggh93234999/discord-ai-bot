@@ -1,5 +1,6 @@
 # 金鑰與執行時資料（絕對不要上傳）
 .env
+image_models.json
 *.tmp
 __pycache__/
 *.pyc
