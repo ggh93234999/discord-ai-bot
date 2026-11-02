@@ -25,6 +25,7 @@ import yt_dlp
 from discord import app_commands
 
 import vstatus
+import paths
 
 log = logging.getLogger("discord-ai-bot.music")
 
@@ -39,9 +40,9 @@ FFMPEG_BEFORE = "-reconnect 1 -reconnect_streamed 1 -reconnect_on_network_error 
 URL_RE = re.compile(r"https?://", re.I)
 YT_ID_RE = re.compile(r"(?:v=|youtu\.be/|shorts/)([\w-]{11})")
 
-HISTORY_FILE = Path(__file__).parent / "play_history.json"
-SETTINGS_FILE = Path(__file__).parent / "music_settings.json"
-STATE_FILE = Path(__file__).parent / "music_state.json"   # 正在播的歌與佇列（機器人重啟後靠它接回去）
+HISTORY_FILE = paths.logfile("play_history.json")
+SETTINGS_FILE = paths.record("music_settings.json")
+STATE_FILE = paths.record("music_state.json")   # 正在播的歌與佇列（機器人重啟後靠它接回去）
 RESUME_MAX_AGE = 30 * 60   # 重啟時，超過這麼久之前的紀錄就不接了
 DEFAULT_VOLUME = 100       # 百分比
 MAX_VOLUME = 150           # 超過 100 可能破音

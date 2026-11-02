@@ -1,6 +1,7 @@
 """大笨bot 自己的代幣：被問到「你有多少錢／代幣」時才查帳（見 bot.py 的 MONEY_RE），平常不帶進對話。
 帳戶規則在 economy.py：Activity 裡玩家輸的錢進它的口袋，贏的從它的口袋出。"""
 import economy
+import paths
 
 TOOL = {
     "type": "function",
@@ -33,7 +34,7 @@ from pathlib import Path
 PAY_MAX = 100_000          # 單次上限
 PAY_PER_USER_DAY = 500_000  # 每個人 24 小時內最多收這麼多（和全日上限一樣，等於不另外限制個人）
 PAY_ALL_DAY = 500_000      # 大笨bot 24 小時內最多給出這麼多
-LOG_FILE = Path(__file__).parent / "bot_pay_log.json"
+LOG_FILE = paths.logfile("bot_pay_log.json")
 
 PAY_TOOL = {
     "type": "function",

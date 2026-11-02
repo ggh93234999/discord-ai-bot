@@ -4,6 +4,7 @@
 // 從零一路成功到 100 階，鍛造費總共剛好 100 萬。
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { arec } from "./paths.js";
 
 export const FORGE_MAX = 100;
 const RTP = 0.95, BOOST = Number(process.env.FBOOST || 1.03), TOTAL_COST = 1_000_000;     // TOTAL_COST：從零一路成功鍛到 100 階，總共要花的鍛造費
@@ -45,7 +46,7 @@ export const REAL_SELL_MAX = Infinity;         // 賭注模式單把劍賣出沒
 export const FORGE_PRACTICE_START = 100_000;  // 鍛造的練習幣起始金額（一般賭場遊戲只有 1000，不夠鍛）
 
 // ---- 存檔：每個身分一把劍。key：p:<id>（練習幣）、r:<uid>（真代幣，練習和真代幣的劍分開）
-const FFILE = fileURLToPath(new URL("./forge.json", import.meta.url));
+const FFILE = arec("forge.json");
 let db = { sw: {}, best: {}, xp: {}, nm: {} };
 try { db = { sw: {}, best: {}, xp: {}, nm: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
 let saveT = 0;

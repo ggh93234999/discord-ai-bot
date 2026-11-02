@@ -11,6 +11,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botInfo } from "./bet.js";
+import { arec } from "./paths.js";
 
 export const CROPS = [
   { id: "radish", icon: "🥕", name: "蘿蔔", seed: 10, min: 3, y: 20 },
@@ -43,7 +44,7 @@ const STEAL_GRACE = 5 * 60_000, STEAL_PER_PLOT = 1, LOG_MAX = 20;
 const ripeAt = (p) => p.at + CROP[p.c].min * 60_000;
 
 // ---- 存檔
-const FFILE = fileURLToPath(new URL("./farm.json", import.meta.url));
+const FFILE = arec("farm.json");
 let db = { farms: {}, pend: {} };
 try { db = { farms: {}, pend: {}, ...JSON.parse(fs.readFileSync(FFILE, "utf8")) }; } catch {}
 let saveT = 0;

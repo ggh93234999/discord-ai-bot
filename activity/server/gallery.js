@@ -9,9 +9,10 @@ import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { ENV, botGalleryChat } from "./bet.js";
+import { arecDir } from "./paths.js";
 
 const dir = fileURLToPath(new URL(".", import.meta.url));
-const DATA = ENV.GALLERY_DIR || path.join(dir, "gallery_data");
+const DATA = ENV.GALLERY_DIR || arecDir("gallery_data");
 const DBFILE = path.join(DATA, "gallery.json");
 const PY = ENV.OPENCC_PYTHON || "/home/ggh93234999/.venvs/discord-bot/bin/python";
 const THUMB_PY = path.join(dir, "gallery_thumb.py");

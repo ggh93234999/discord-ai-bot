@@ -5,10 +5,11 @@
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botInfo, betLimit } from "./bet.js";
+import { arec } from "./paths.js";
 
 export const WAGERS = [10, 50, 100, 500];
 export const GRACE_MS = 30000;      // 賭注比賽中斷線，給 30 秒回來，沒回來就算輸
-const FILE = fileURLToPath(new URL("./escrow.json", import.meta.url));
+const FILE = arec("escrow.json");
 
 let escrow = {};
 let seq = 0;

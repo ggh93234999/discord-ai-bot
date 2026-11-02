@@ -14,13 +14,14 @@ import os
 import random
 import time
 from pathlib import Path
+import paths
 
 import discord
 from discord import app_commands
 
 log = logging.getLogger("discord-ai-bot.economy")
 
-WALLET_FILE = Path(__file__).parent / "wallet.json"
+WALLET_FILE = paths.record("wallet.json")
 EARN_AMOUNT = 10          # 每次賺多少
 EARN_INTERVAL = 60        # 至少間隔幾秒才能再賺一次
 START_COINS = 200         # 新玩家起始代幣
@@ -125,7 +126,7 @@ def house_add(gid: int, delta: int) -> int | None:
 
 
 # ---------------------------------------------------------------- 轉帳紀錄（大笨bot 查帳用）
-LEDGER_FILE = Path(__file__).parent / "transfers.json"
+LEDGER_FILE = paths.logfile("transfers.json")
 LEDGER_KEEP = 12000
 NO_HOUSE_WHY = ("鍛造", "種菜", "抽卡")      # 不是賭博的玩法：錢不經過大笨bot 的帳戶，也不記帳本
 GAME_KINDS = ("遊戲結算", "遊戲派彩")      # 機器人當莊家的輸贏；查帳預設不列，避免蓋掉真正的轉帳
@@ -173,7 +174,7 @@ def _post_ledger(gid: int, kind: str, frm: tuple, to: tuple, amount: int, note: 
 
 
 GAME_DIGEST_EVERY = 10 * 60            # 賭博類每隔多久彙整一次發到帳本頻道
-GAME_DIGEST_FILE = Path(__file__).parent / "game_digest.json"
+GAME_DIGEST_FILE = paths.record("game_digest.json")
 
 
 def _digest_state() -> dict:
@@ -330,7 +331,7 @@ DEBT_CUT = 0.5                    # 有欠債時，賺到的錢（掛語音、�
 DEBT_ROLE = "欠債人"               # 只要有欠債就掛，還清就拿掉
 DEBT_REMIND_HOUR = 20             # 每天幾點（台北時間）在帳本頻道催債
 QUIET_KINDS = GAME_KINDS + ("自動還款",)      # 這些不逐筆發帳本頻道（自動還款改成每日催債時一起報）
-DEBT_REMIND_FILE = Path(__file__).parent / "debt_remind.json"
+DEBT_REMIND_FILE = paths.record("debt_remind.json")
 
 
 def deduct_debt(gid: int, uid: int, income: int) -> int:
@@ -604,7 +605,7 @@ class BlackjackView(discord.ui.View):
 
 # ---------------------------------------------------------------- 賽馬
 
-HORSES_FILE = Path(__file__).parent / "horses.json"
+HORSES_FILE = paths.record("horses.json")
 HORSE_POOL = ["赤兔", "烏騅", "的盧", "絕影", "爪黃飛電", "踏雪", "照夜玉獅子", "追風", "驊騮", "飛黃"]
 # 賭博類斜線指令暫時下架：程式都還在，把 GAMBLING_ENABLED 改成 True 再重啟機器人就會回來
 GAMBLING_ENABLED = False

@@ -13,23 +13,14 @@ public/resources/
 # 本機 OAuth 密鑰備份
 server/.dc_oauth.txt
 server/internal.key
-server/escrow.json
 
 # 小朋友齊打交（LF2）：原版素材與相關程式不上傳
 src/lf2.js
 LF2_HEADLESS_API.md
 
 # 賭場真代幣押注暫存
-server/casino_escrow.json
-server/casino_state.json
-server/horses.json
-server/forge.json
-server/casino_log.json
-server/farm.json
-server/gacha.json
 
 # 圖創區：使用者畫的圖與紀錄
-server/gallery_data
 
 # 世界賽運彩（整個功能在 lolbet/）：金鑰、額度計數與隊徽圖片不上傳
 lolbet/lolbet.env

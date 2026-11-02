@@ -14,6 +14,7 @@ import fs from "node:fs";
 import { randomInt, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botPay, botRole, botInfo, betLimit } from "./bet.js";
+import { arec, alog, botRecord } from "./paths.js";
 import { FORGE_MAX, V as FV, C as FC, P as FP, REAL_SELL_MAX, SC, SCROLL_MIN, FORGE_PRACTICE_START, FORGE_SLOTS, swordTiers, roleSig, getRoleSig, setRoleSig, realKeys, getSword, setSword, noteBest, addXp, noteName, forgeBoard, forgeSave, forgeView } from "./forge.js";
 
 const MAX_PRACTICE = 1_000_000;
@@ -25,7 +26,7 @@ const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(
 const out = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 
 // ---- 賽馬場次：每個房間（Activity）各自累計，房間清空、伺服器重啟都不歸零
-const SFILE = fileURLToPath(new URL("./casino_state.json", import.meta.url));
+const SFILE = arec("casino_state.json");
 let raceNos = {};
 try { raceNos = JSON.parse(fs.readFileSync(SFILE, "utf8")).raceNos || {}; } catch {}
 function nextRaceNo(roomId) {
@@ -36,7 +37,7 @@ function nextRaceNo(roomId) {
 }
 
 // ---- 真代幣託管
-const EFILE = fileURLToPath(new URL("./casino_escrow.json", import.meta.url));
+const EFILE = arec("casino_escrow.json");
 let escrow = {};
 const esave = () => { try { fs.writeFileSync(EFILE, JSON.stringify(escrow)); } catch (e) { console.log("casino escrow 寫入失敗", e.message); } };
 const eadd = (key, v) => { escrow[key] = v; esave(); };
@@ -98,7 +99,7 @@ function whoList(room) {
 }
 function pushWho(room) { const m = { t: "cwho", list: whoList(room), watchers: [...room.members].filter((w) => w.cspec).length }; for (const w of room.members) out(w, m); }
 // ---- 賭博紀錄：每把結束記一筆。賭注模式（真代幣）依 Discord 身分存檔，換裝置也看得到；練習模式只回傳給當事人，由前端存在自己的瀏覽器
-const LFILE = fileURLToPath(new URL("./casino_log.json", import.meta.url));
+const LFILE = alog("casino_log.json");
 let blog = {};
 try { blog = JSON.parse(fs.readFileSync(LFILE, "utf8")); } catch {}
 let lsaveT = 0;
@@ -227,11 +228,11 @@ const FORM_W = [10, 30, 35, 18, 7];
 function pickWeighted(w) { let r = Math.random() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; } return w.length - 1; }
 // ---- 馬匹的固定能力值與戰績：第一次出場前定下，之後不變；戰績每場累計並存檔（伺服器重啟不歸零）。
 // 能力值第一次會沿用機器人 /賽馬 的 horses.json（同一匹馬同樣的強弱），戰績則是活動這邊自己的。
-const HFILE = fileURLToPath(new URL("./horses.json", import.meta.url));
+const HFILE = arec("horses.json");
 const horses = (() => {
   let d = {};
   try { d = JSON.parse(fs.readFileSync(HFILE, "utf8")); } catch {
-    try { const bot = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../../horses.json", import.meta.url)), "utf8")); for (const n of HORSE_POOL) if (bot[n]) d[n] = { spd: bot[n].spd, sta: bot[n].sta, bst: bot[n].bst }; } catch {}
+    try { const bot = JSON.parse(fs.readFileSync(botRecord("horses.json"), "utf8")); for (const n of HORSE_POOL) if (bot[n]) d[n] = { spd: bot[n].spd, sta: bot[n].sta, bst: bot[n].bst }; } catch {}
   }
   for (const n of HORSE_POOL) d[n] = { spd: 55 + rnd(41), sta: 55 + rnd(41), bst: 55 + rnd(41), races: 0, wins: 0, top3: 0, last: [], ...(d[n] || {}) };
   try { fs.writeFileSync(HFILE, JSON.stringify(d, null, 1)); } catch {}

@@ -38,6 +38,7 @@ import imagegen
 import sfxgen
 import videogen
 import memberstatus
+import paths
 import webimg
 import divination
 import actstatus
@@ -89,7 +90,7 @@ MAX_TOOL_ROUNDS = int(os.getenv("MAX_TOOL_ROUNDS", "5"))
 TZ = ZoneInfo(os.getenv("TZ_NAME", "Asia/Taipei"))
 
 SYSTEM_PROMPT_FILE = BASE_DIR / "system_prompt.txt"
-STATE_FILE = BASE_DIR / "state.json"
+STATE_FILE = paths.record("state.json")
 DEFAULT_SYSTEM_PROMPT = (
     "你是 Discord 伺服器裡的一位成員，用繁體中文跟大家自然聊天。"
     "回覆要簡短口語，像朋友在聊天，不要用條列或標題。"
@@ -174,7 +175,7 @@ def save_state() -> None:
 state = load_state()
 
 # 機器人每則回覆背後真正呼叫過的動作工具（訊息 ID → [{name, arguments, result}]）
-ACTION_LOG_FILE = BASE_DIR / "action_log.json"
+ACTION_LOG_FILE = paths.logfile("action_log.json")
 try:
     action_log: dict = json.loads(ACTION_LOG_FILE.read_text(encoding="utf-8"))
 except (FileNotFoundError, json.JSONDecodeError):

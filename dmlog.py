@@ -15,9 +15,10 @@ import discord
 from discord import app_commands
 
 import models
+import paths
 
 log = logging.getLogger("discord-ai-bot.dmlog")
-FILE = Path(__file__).resolve().parent / "dm_users.json"
+FILE = paths.record("dm_users.json")
 TZ = ZoneInfo("Asia/Taipei")
 try:
     users: dict = json.loads(FILE.read_text(encoding="utf-8"))

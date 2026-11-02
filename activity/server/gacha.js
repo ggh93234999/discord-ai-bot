@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { botSettle, botInfo, ENV } from "./bet.js";
+import { arec } from "./paths.js";
 
 const REAL_ON = ENV.GACHA_REAL === "on";      // 真代幣抽卡預設關閉（.env 設 GACHA_REAL=on 才開）
 
@@ -55,7 +56,7 @@ function calcTeam(u, ids, mid) {
 const busyIds = (u) => (u.slots || []).flatMap((s) => (s ? s.ids : []));
 
 // ---- 存檔
-const GFILE = fileURLToPath(new URL("./gacha.json", import.meta.url));
+const GFILE = arec("gacha.json");
 let db = { users: {} };
 try { db = { users: {}, ...JSON.parse(fs.readFileSync(GFILE, "utf8")) }; } catch {}
 let saveT = 0;
