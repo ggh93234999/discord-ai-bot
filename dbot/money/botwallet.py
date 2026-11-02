@@ -44,7 +44,7 @@ PAY_TOOL = {
             "從大笨bot 自己的代幣帳戶轉錢給伺服器成員（等同 /pay）。不要亂給、不當提款機，但不用太吝嗇："
             "對方有個像樣的小理由、講話有禮貌或有趣、或你心情不錯時，可以小額給（幾百～幾千），偶爾可以多一點。"
             "純討錢、耍賴、威脅、哭窮卻沒說要幹嘛、一直纏著你，直接婉拒、不要呼叫。"
-            "不能轉給機器人，單次有上限，每人每天有上限，你的餘額不夠也不能轉。"
+            "第一次呼叫時工具不會轉帳，只會回傳你和對方的帳（你的餘額、對方的錢和欠債、今天已給他多少），看完再決定要不要再呼叫一次真的轉。不能轉給機器人，單次有上限，每人每天有上限，你的餘額不夠也不能轉。"
         ),
         "parameters": {
             "type": "object",
@@ -75,6 +75,9 @@ def _save_log(d: dict) -> None:
         pass
 
 
+_pay_seen: dict = {}      # (gid, 對方 id) -> 上次看過帳的時間；給錢前一定要先看過雙方的帳
+
+
 def run_pay(msg, args: dict) -> str:
     if msg is None or not msg.guild:
         return "只能在伺服器頻道裡轉帳。"
@@ -99,6 +102,15 @@ def run_pay(msg, args: dict) -> str:
     gid, now = msg.guild.id, time.time()
     log = _load_log()
     recent = [x for x in log["items"] if now - x["t"] < 86400 and x["gid"] == gid]
+    if now - _pay_seen.get((gid, target.id), 0) > 300:       # 還沒看過帳：這次先不轉，把雙方的帳給你看，看完再決定
+        _pay_seen[(gid, target.id)] = now
+        mine = economy.house_balance(gid) or 0
+        theirs = economy.balance(gid, target.id)
+        owed = economy.debt_of(gid, target.id)
+        got = sum(x["amount"] for x in recent if x["uid"] == target.id)
+        return (f"【先看帳，這次還沒轉】你（大笨bot）現在有 {economy.fmt(mine)}；{target.display_name} 手上有 {economy.fmt(theirs)}，"
+                f"{'還欠你 ' + economy.fmt(owed) if owed else '沒欠你錢'}，今天已經從你這拿過 {economy.fmt(got)}。"
+                f"你想給 {economy.fmt(amount)}。看完這些帳再決定：還是要給就再呼叫一次 bot_pay（同樣金額或你調整後的金額）；不給就直接用你的口氣婉拒。")
     if sum(x["amount"] for x in recent) + amount > PAY_ALL_DAY:
         return "今天給出去的已經夠多了，不能再轉。"
     if sum(x["amount"] for x in recent if x["uid"] == target.id) + amount > PAY_PER_USER_DAY:
