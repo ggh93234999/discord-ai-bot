@@ -5,6 +5,7 @@
 """
 import asyncio
 import logging
+import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -38,7 +39,7 @@ TOOL = {
                 "channel": {"type": "string", "description": "要發到哪個文字頻道（名稱）；省略就是目前這個頻道"},
                 "title": {"type": "string", "description": "公告標題（可省略）"},
                 "content": {"type": "string", "description": "公告內容，照使用者的原話"},
-                "mention": {"type": "string", "description": "要提及誰：none（預設）、everyone、here，或身分組名稱"},
+                "mention": {"type": "string", "description": "要提及誰：none（預設）、everyone、here、身分組名稱、成員名稱（或使用者訊息裡的 <@ID>）；可以多個，用逗號隔開，例如「小明, 小華, 管理組」"},
                 "when": {"type": "string", "description": "排程時間，台北時間，格式 YYYY-MM-DD HH:MM；不排程就省略"},
                 "delay_minutes": {"type": "integer", "description": "幾分鐘後發（和 when 擇一）"},
                 "id": {"type": "string", "description": "cancel 用：排程的 id"},
@@ -82,25 +83,44 @@ def _role(guild: discord.Guild, name: str):
     return next((r for r in guild.roles if r.name.lower() == n), None) or next((r for r in guild.roles if n and n in r.name.lower()), None)
 
 
+def _member(guild: discord.Guild, name: str):
+    n = name.strip().lstrip("@")
+    digits = "".join(ch for ch in n if ch.isdigit())
+    if digits and (n.startswith("<") or n.isdigit()):
+        return guild.get_member(int(digits))
+    low = n.lower()
+    for m in guild.members:
+        if low in (m.display_name.lower(), m.name.lower(), (m.global_name or "").lower()):
+            return m
+    return next((m for m in guild.members if low and low in m.display_name.lower()), None)
+
+
 def _mention_parts(guild: discord.Guild, mention: str | None):
-    """回傳 (文字, AllowedMentions, 錯誤)"""
-    m = (mention or "none").strip().lower()
-    if m in ("", "none", "無", "不用", "不提及"):
+    """mention 可以是多個，用逗號或頓號隔開：everyone、here、身分組名稱、成員名稱／@成員／ID。回傳 (文字, AllowedMentions, 錯誤)"""
+    items = [x.strip() for x in re.split(r"[,，、;；\n]+", mention or "") if x.strip()]
+    items = [x for x in items if x.lower() not in ("none", "無", "不用", "不提及")]
+    if not items:
         return "", discord.AllowedMentions.none(), None
-    if m in ("everyone", "@everyone", "全體", "所有人"):
-        if not guild.me.guild_permissions.mention_everyone:
-            return "", None, "我沒有「提及 @everyone、@here 和所有身分組」權限，請到 伺服器設定 → 身分組 → 大笨bot 打開。"
-        return "@everyone", discord.AllowedMentions(everyone=True), None
-    if m in ("here", "@here"):
-        if not guild.me.guild_permissions.mention_everyone:
-            return "", None, "我沒有「提及 @everyone、@here 和所有身分組」權限，請到 伺服器設定 → 身分組 → 大笨bot 打開。"
-        return "@here", discord.AllowedMentions(everyone=True), None
-    r = _role(guild, mention or "")
-    if r is None:
-        return "", None, f"找不到叫「{mention}」的身分組。"
-    if not (r.mentionable or guild.me.guild_permissions.mention_everyone):
-        return "", None, f"身分組「{r.name}」不允許被提及，我也沒有「提及全部身分組」的權限。"
-    return r.mention, discord.AllowedMentions(roles=[r]), None
+    texts, roles, users, every = [], [], [], False
+    need_everyone = "我沒有「提及 @everyone、@here 和所有身分組」權限，請到 伺服器設定 → 身分組 → 大笨bot 打開。"
+    for it in items:
+        low = it.lower().lstrip("@")
+        if low in ("everyone", "全體", "所有人", "here"):
+            if not guild.me.guild_permissions.mention_everyone:
+                return "", None, need_everyone
+            texts.append("@here" if low == "here" else "@everyone"); every = True
+            continue
+        r = _role(guild, it)
+        if r is not None:
+            if not (r.mentionable or guild.me.guild_permissions.mention_everyone):
+                return "", None, f"身分組「{r.name}」不允許被提及，我也沒有「提及全部身分組」的權限。"
+            texts.append(r.mention); roles.append(r)
+            continue
+        m = _member(guild, it)
+        if m is None:
+            return "", None, f"找不到叫「{it}」的身分組或成員。"
+        texts.append(m.mention); users.append(m)
+    return " ".join(texts), discord.AllowedMentions(everyone=every, roles=roles, users=users), None
 
 
 async def _post(guild: discord.Guild, ch, title: str, content: str, mention: str, by: str) -> str | None:
