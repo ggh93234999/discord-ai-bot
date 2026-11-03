@@ -243,6 +243,8 @@ function lpApply(f) {                                           // 用 Liquipedi
   return true;
 }
 
+// 淘汰賽（八強起）全是 Bo5，但 Liquipedia 只抓瑞士輪頁面、標不到賽制：開賽時間在這之後而且沒抓到賽制的場次一律標 Bo5。
+const KO_FROM = Date.UTC(2026, 10, 3);
 let settling = false;
 export const lolSettle = () => settleAll();
 async function settleAll() {
@@ -304,7 +306,7 @@ function fview(f, uid) {
   else if (f.start - LOCK_MS <= now) state = "live";
   else if (hasLine && !f.suspended && f.hasOdds) state = "open";
   const mine = uid ? st.bets.filter((b) => b.uid === uid && b.fixtureId === f.id).map((b) => ({ id: b.id, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) : [];
-  return { id: f.id, home: f.home, away: f.away, start: f.start, bo: f.bo || null, state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine,
+  return { id: f.id, home: f.home, away: f.away, start: f.start, bo: f.bo || (f.start >= KO_FROM ? 5 : null), state, oh: hasLine ? f.oh : null, oa: hasLine ? f.oa : null, score: f.score || (st.results[f.id] && st.results[f.id].score) || null, mine,
     all: st.bets.filter((b) => b.fixtureId === f.id && b.uid !== uid).map((b) => ({ name: b.name, side: b.side, amount: b.amount, odds: b.odds, status: b.status, payout: b.payout || 0 })) };   // 別人下的注（公開）
 }
 function viewFor(ws) {
