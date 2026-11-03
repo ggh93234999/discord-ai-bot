@@ -38,7 +38,7 @@ export function mountGallery(root, { env, back }) {
   $(".back").addEventListener("click", () => { destroy(); back(); });
 
   let ws = null, closed = false, retry = 0, session = env.session || null, wantLogin = false;
-  let me = null, isAdmin = false, gmodel = null, gmodels = null, cats = [], cat = null, imgs = [], more = false, chat = [], tab = "lib", queue = { jobs: [], total: 0 }, joined = false;
+  let me = null, quals = [{ k: "fast", label: "快速" }], defq = "fast", isAdmin = false, gmodel = null, gmodels = null, cats = [], cat = null, imgs = [], more = false, chat = [], tab = "lib", queue = { jobs: [], total: 0 }, joined = false;
   const gidOf = () => (env.guildId ? String(env.guildId) : "");
   const imgUrl = (x, thumb) => { const f = `${x.id}${thumb ? "_t.jpg" : "." + x.ext}`; const p = `api/gallery/img/${gidOf()}/${f}`; return env.inDiscord ? `/.proxy/${p}` : new URL(p, location.href).pathname; };
   const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "gl", ...o }));
@@ -95,7 +95,7 @@ export function mountGallery(root, { env, back }) {
       return say(m.error === "text" ? m.text : (ERR[m.error] || "發生錯誤，再試一次"));
     }
     if (m.a === "state") {
-      joined = true; me = m.me; cats = m.cats; queue = m; isAdmin = !!m.admin; gmodel = m.model || null;
+      joined = true; me = m.me; cats = m.cats; queue = m; isAdmin = !!m.admin; gmodel = m.model || null; if (m.quals) { quals = m.quals; defq = m.defq || quals[0].k; }
       loginEl.hidden = true; mainEl.hidden = false; say("");
       const saved = LS.get("gl_cat_" + gidOf());
       cat = (cats.find((c) => c.id === saved) || cats[0] || {}).id;
@@ -178,16 +178,16 @@ export function mountGallery(root, { env, back }) {
         <div class="gl-opts">
           <label>形狀<select class="o-shape"><option value="square">正方形</option><option value="landscape">橫式</option><option value="portrait">直式</option></select></label>
           <label>大小<select class="o-scale"><option value="normal">一般</option><option value="large">大圖</option><option value="huge">超大圖（長邊 2048）</option></select></label>
-          <label>畫質<select class="o-q"><option value="fast">快速</option><option value="clean">構圖與文字較乾淨</option></select></label>
+          <label>畫質<select class="o-q">${quals.map((x) => `<option value="${x.k}">${esc(x.label)}</option>`).join("")}</select></label>
         </div>
         <label class="gl-smart"><input type="checkbox" class="o-smart"> 智慧擴寫（先把一句話擴成完整提示詞，多等 10～30 秒）</label>
         <label class="gl-lang">擴寫語言<select class="o-lang"><option value="en">英文</option><option value="zh">中文</option></select></label>
         <button class="gl-draw">🎨 畫</button>
-        <p class="gl-hint">大圖和超大圖只有「快速」畫質支援，一張約 40 秒～1 分半。一次只畫一張，每人同時只能排一張。</p>
+        <p class="gl-hint">大圖和超大圖只有第一個畫質支援，一張約 40 秒～1 分半。一次只畫一張，每人同時只能排一張。</p>
       </div>`;
     const f = panes.new, scale = f.querySelector(".o-scale"), q = f.querySelector(".o-q");
-    scale.addEventListener("change", () => { if (scale.value !== "normal") q.value = "fast"; });
-    q.addEventListener("change", () => { if (q.value !== "fast" && scale.value !== "normal") scale.value = "normal"; });
+    scale.addEventListener("change", () => { if (scale.value !== "normal") q.value = defq; });
+    q.addEventListener("change", () => { if (q.value !== defq && scale.value !== "normal") scale.value = "normal"; });
     f.querySelector(".gl-draw").addEventListener("click", () => {
       const prompt = f.querySelector(".gl-prompt").value.trim();
       if (!prompt) { say("先寫要畫什麼"); return; }

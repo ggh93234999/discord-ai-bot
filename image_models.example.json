@@ -58,6 +58,7 @@
   "prompt_writer": "prompt-writer",
   "gallery": [
     "fast",
-    "clean"
+    "clean",
+    "high"
   ]
 }

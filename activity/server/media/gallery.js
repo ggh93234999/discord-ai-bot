@@ -37,6 +37,7 @@ const MODELS = {};
 for (const k of (IMG_CFG.gallery || ["fast", "clean"])) { const e = (IMG_CFG.generate || {})[k]; if (e && e.model && !e.human_only) MODELS[k] = e.model; }
 if (!Object.keys(MODELS).length) MODELS.fast = "draw-klein";
 const DEFQ = Object.keys(MODELS)[0];
+const QUALS = Object.keys(MODELS).map((k) => ({ k, label: ((IMG_CFG.generate || {})[k] || {}).label || k }));
 const PROMPT_WRITER = IMG_CFG.prompt_writer || "prompt-writer";
 
 // 內容限制（和 imagegen.py 的 check_prompt 相同）：只擋「性內容 + 未成年人」的組合
@@ -231,7 +232,7 @@ export async function handleGallery(ws, m) {
     if (!subs.has(gid)) subs.set(gid, new Set());
     subs.get(gid).add(ws);
     const g = guildOf(gid);
-    out(ws, { a: "state", me: u.uid, cats: catsView(g), admin: isAdminOf(u, gid), model: g.model || null, ...queueView(gid) });
+    out(ws, { a: "state", me: u.uid, cats: catsView(g), admin: isAdminOf(u, gid), model: g.model || null, quals: QUALS, defq: DEFQ, ...queueView(gid) });
     return;
   }
   const gid = ws.glGid;
