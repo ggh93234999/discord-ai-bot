@@ -6,6 +6,7 @@ from dbot.ai import extras
 from dbot.ai import fortune
 from dbot.ai import imagegen
 from dbot.ai import selfhelp
+from dbot.ai import announce
 from dbot.ai import sfxgen
 from dbot.ai import videogen
 from dbot.ai import webimg
@@ -178,6 +179,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return almanac.run(args)
         if name == "bot_help":
             return selfhelp.run(args)
+        if name == "announce":
+            return await announce.run(msg, args)
         if name == "transfer_log":
             return botwallet.run_log(msg.guild.id if msg is not None and msg.guild else None, args)
         if name == "bot_pay":
@@ -294,6 +297,8 @@ def tool_status(name: str, args_json: str) -> str:
         return "💰 收還款"
     if name == "bot_help":
         return "📖 翻自己的功能說明"
+    if name == "announce":
+        return "📢 處理公告"
     if name == "transfer_log":
         return "📒 翻轉帳紀錄"
     if name == "activity_status":
