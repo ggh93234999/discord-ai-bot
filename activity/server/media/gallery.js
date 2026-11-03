@@ -8,7 +8,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { ENV, botGalleryChat } from "../bet.js";
+import { ENV, botGalleryChat, botGalleryModels } from "../bet.js";
 import { arecDir } from "../paths.js";
 
 const dir = fileURLToPath(new URL(".", import.meta.url));
@@ -208,6 +208,15 @@ export function serveGallery(req, res) {
 
 // ---- WebSocket
 const lastChat = new Map();
+const isAdminOf = (u, gid) => Array.isArray(u.adminGuilds) && u.adminGuilds.includes(gid);     // 這個人在這個伺服器是不是管理員（登入時 Discord 回報的權限）
+let modelCache = { t: 0, list: [], def: "" };
+async function chatModels() {
+  if (Date.now() - modelCache.t < 60_000 && modelCache.list.length) return modelCache;
+  const r = await botGalleryModels();
+  if (!r || !r.ok) throw new Error("models_failed");
+  modelCache = { t: Date.now(), list: r.models, def: r.default };
+  return modelCache;
+}
 export async function handleGallery(ws, m) {
   const a = m.a, u = ws.user;
   const err = (error) => out(ws, { a: "err", error });
@@ -222,7 +231,7 @@ export async function handleGallery(ws, m) {
     if (!subs.has(gid)) subs.set(gid, new Set());
     subs.get(gid).add(ws);
     const g = guildOf(gid);
-    out(ws, { a: "state", me: u.uid, cats: catsView(g), ...queueView(gid) });
+    out(ws, { a: "state", me: u.uid, cats: catsView(g), admin: isAdminOf(u, gid), model: g.model || null, ...queueView(gid) });
     return;
   }
   const gid = ws.glGid;
@@ -272,6 +281,29 @@ export async function handleGallery(ws, m) {
     out(ws, { a: "queued", ahead: r.ahead });
     return;
   }
+  if (a === "models") {                                     // 管理員打開模型選單：給清單
+    if (!isAdminOf(u, gid)) return err("not_admin");
+    try { const c = await chatModels(); out(ws, { a: "models", list: c.list, def: c.def, model: g.model || null }); } catch { err("models_failed"); }
+    return;
+  }
+  if (a === "setmodel") {                                   // 只有這個伺服器的管理員能指定圖創區用哪個模型；空字串＝跟全域一樣
+    if (!isAdminOf(u, gid)) return err("not_admin");
+    const want = String(m.model || "").trim();
+    if (want) {
+      try { if (!(await chatModels()).list.some((x) => x.id === want)) return err("bad_model"); } catch { return err("models_failed"); }
+      g.model = want;
+    } else delete g.model;
+    save();
+    broadcast(gid, { a: "model", model: g.model || null, by: u.name });
+    return;
+  }
+  if (a === "chatclear") {                                  // 大家都能清除這個分類的大笨bot 對話
+    if (!cat) return err("bad_cat");
+    g.chat[cat.id] = [];
+    save();
+    broadcast(gid, { a: "chatclear", cat: cat.id, by: u.name });
+    return;
+  }
   if (a === "chat") {
     if (!cat) return err("bad_cat");
     const text = String(m.text || "").trim().slice(0, 500);
@@ -285,7 +317,7 @@ export async function handleGallery(ws, m) {
     if (blocked(text)) { add({ bot: true, name: "大笨bot", text: "這個我不能畫（涉及未成年人的不當內容）。" }); save(); return; }
     try {
       const hist = log.slice(-13, -1).map((x) => ({ name: x.name, text: x.text, bot: !!x.bot }));
-      const r = await botGalleryChat(gid, u.uid, u.name, cat.name, text, hist);
+      const r = await botGalleryChat(gid, u.uid, u.name, cat.name, text, hist, g.model || "");
       if (!r || !r.ok) { add({ bot: true, name: "大笨bot", text: "我現在連不上，等一下再說一次～" }); save(); return; }
       let reply = String(r.reply || "").slice(0, 900);
       const draws = Array.isArray(r.draws) ? r.draws.slice(0, 1) : [];

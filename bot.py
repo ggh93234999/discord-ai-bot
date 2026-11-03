@@ -487,10 +487,12 @@ async def loan_judge(name: str, amount: int, coins: int, bot_coins: int, reason:
     return ok, say
 
 
-async def gallery_chat(gid: int, uid: int, name: str, cat: str, text: str, history: list) -> dict:
+async def gallery_chat(gid: int, uid: int, name: str, cat: str, text: str, history: list, model: str = "") -> dict:
     """Activity 圖創區裡跟大笨bot說話：回一段話，並可能附上要畫的圖（由 Activity 後端畫、顯示在網頁，不傳到 Discord）。"""
     if not imagegen.enabled():
         return {"reply": "畫圖功能目前沒開。", "draws": []}
+    if model and model in await models.chat_models():       # 這個伺服器的管理員替圖創區指定了模型
+        models.OVERRIDE.set(model)
     system = (load_system_prompt(None) + "\n\n【現在的場合】你在 Discord Activity 的「圖創區」網頁裡，大家在這裡用 AI 畫圖、互相看圖。"
               f"目前這一頁的分類是「{cat or '未分類'}」。使用者要你畫圖就呼叫 gallery_draw（圖會顯示在這個網頁，不會傳到 Discord）；"
               "沒有要畫圖的話就正常聊天、給畫圖點子、幫忙把想法寫成畫面描述。回覆保持簡短。"

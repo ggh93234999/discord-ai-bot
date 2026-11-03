@@ -58,10 +58,14 @@ async function bot(path, body) {
   return r.json();
 }
 // 圖創區：問機器人這句話要怎麼回、要不要畫圖（語言模型可能要想一陣子）
-export async function botGalleryChat(gid, uid, name, cat, text, history) {
+export async function botGalleryModels() {
+  const r = await fetch(BOT_API + "/gallery/models", { method: "POST", headers: { "X-Key": loadKey(), "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(15_000) });
+  return r.json();
+}
+export async function botGalleryChat(gid, uid, name, cat, text, history, model = "") {
   const r = await fetch(BOT_API + "/gallery/chat", {
     method: "POST", headers: { "X-Key": loadKey(), "Content-Type": "application/json" },
-    body: JSON.stringify({ gid, uid, name, cat, text, history }), signal: AbortSignal.timeout(160_000),
+    body: JSON.stringify({ gid, uid, name, cat, text, history, model }), signal: AbortSignal.timeout(160_000),
   });
   return r.json();
 }
@@ -123,8 +127,13 @@ export async function handleApi(req, res) {
       const tok = await tr.json();
       if (!tr.ok || !tok.access_token) { console.log("OAuth 換 token 失敗：", tr.status, tok.error || ""); return json(res, 401, { error: "oauth_failed" }); }
       const me = await discord("/users/@me", tok.access_token);
-      let member = false, guilds = [];
-      try { guilds = (await discord("/users/@me/guilds", tok.access_token)).map((g) => String(g.id)); member = guilds.includes(wantGid || GUILD_ID); } catch {}
+      let member = false, guilds = [], adminGuilds = [];
+      try {
+        const gl = await discord("/users/@me/guilds", tok.access_token);
+        guilds = gl.map((g) => String(g.id)); member = guilds.includes(wantGid || GUILD_ID);
+        // 伺服器管理員：擁有者，或有「管理員」(0x8) 或「管理伺服器」(0x20) 權限（圖創區的模型設定用）
+        adminGuilds = gl.filter((g) => g.owner || (BigInt(g.permissions || 0) & 0x28n) !== 0n).map((g) => String(g.id));
+      } catch {}
       // 用完就撤銷，不留著 access token
       fetch("https://discord.com/api/v10/oauth2/token/revoke", {
         method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -135,7 +144,7 @@ export async function handleApi(req, res) {
       const token = randomBytes(24).toString("hex");
       const gid = wantGid || GUILD_ID;
       userGid.set(String(me.id), gid);
-      sessions.set(token, { uid: me.id, name, guilds, gid, exp: Date.now() + SESSION_MS });
+      sessions.set(token, { uid: me.id, name, guilds, adminGuilds, gid, exp: Date.now() + SESSION_MS });
       return json(res, 200, { token, name });
     } catch (e) {
       console.log("OAuth 流程錯誤：", e.message);

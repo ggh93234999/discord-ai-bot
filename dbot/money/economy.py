@@ -331,13 +331,24 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
                 return web.json_response({"ok": False, "error": "not_ready"})
             try:
                 hist = [h for h in (d.get("history") or []) if isinstance(h, dict)][-14:]
-                res = await asyncio.wait_for(gallery_chat(gid, uid, str(d.get("name") or uid)[:40], str(d.get("cat") or "")[:30], str(d.get("text") or "")[:600], hist), 150)
+                res = await asyncio.wait_for(gallery_chat(gid, uid, str(d.get("name") or uid)[:40], str(d.get("cat") or "")[:30], str(d.get("text") or "")[:600], hist, str(d.get("model") or "")[:80]), 150)
                 return web.json_response({"ok": True, **res})
             except Exception as e:
                 log.warning("圖創區對話失敗：%r", e)
                 return web.json_response({"ok": False, "error": "chat_failed"})
 
+        async def gallery_models_route(request):
+            # 圖創區管理員選模型用：回傳能拿來聊天的模型清單（不含畫圖／改圖那些）和全域目前用哪個
+            from dbot.core import models
+            try:
+                names = await models.chat_models()
+                return web.json_response({"ok": True, "models": [{"id": n, "local": n in models.LOCAL} for n in names], "default": models.state.get("model") or models.DEFAULT})
+            except Exception as e:
+                log.warning("取得圖創區模型清單失敗：%r", e)
+                return web.json_response({"ok": False, "error": "models_failed"})
+
         app = web.Application(middlewares=[auth])
+        app.router.add_post("/gallery/models", gallery_models_route)
         app.router.add_post("/gallery/chat", gallery_route)
         app.router.add_post("/wallet/info", info)
         app.router.add_post("/wallet/settle", settle)

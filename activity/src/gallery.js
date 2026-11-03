@@ -38,7 +38,7 @@ export function mountGallery(root, { env, back }) {
   $(".back").addEventListener("click", () => { destroy(); back(); });
 
   let ws = null, closed = false, retry = 0, session = env.session || null, wantLogin = false;
-  let me = null, cats = [], cat = null, imgs = [], more = false, chat = [], tab = "lib", queue = { jobs: [], total: 0 }, joined = false;
+  let me = null, isAdmin = false, gmodel = null, gmodels = null, cats = [], cat = null, imgs = [], more = false, chat = [], tab = "lib", queue = { jobs: [], total: 0 }, joined = false;
   const gidOf = () => (env.guildId ? String(env.guildId) : "");
   const imgUrl = (x, thumb) => { const f = `${x.id}${thumb ? "_t.jpg" : "." + x.ext}`; const p = `api/gallery/img/${gidOf()}/${f}`; return env.inDiscord ? `/.proxy/${p}` : new URL(p, location.href).pathname; };
   const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: "gl", ...o }));
@@ -95,12 +95,15 @@ export function mountGallery(root, { env, back }) {
       return say(m.error === "text" ? m.text : (ERR[m.error] || "發生錯誤，再試一次"));
     }
     if (m.a === "state") {
-      joined = true; me = m.me; cats = m.cats; queue = m;
+      joined = true; me = m.me; cats = m.cats; queue = m; isAdmin = !!m.admin; gmodel = m.model || null;
       loginEl.hidden = true; mainEl.hidden = false; say("");
       const saved = LS.get("gl_cat_" + gidOf());
       cat = (cats.find((c) => c.id === saved) || cats[0] || {}).id;
       drawCats(); drawQueue(); drawAll(); loadCat(); return;
     }
+    if (m.a === "models") { gmodels = m; gmodel = m.model; fillModelSel(); return; }
+    if (m.a === "model") { gmodel = m.model; fillModelSel(); say("🤖 " + (m.by || "管理員") + " 把圖創區的大笨bot 模型改成 " + (m.model || "跟全域一樣")); return; }
+    if (m.a === "chatclear") { if (m.cat === cat) { chat = []; const log = panes.chat.querySelector(".gl-log"); if (log) log.innerHTML = ""; } say("🧹 " + (m.by || "有人") + " 清除了這個分類的對話"); return; }
     if (m.a === "queue") { queue = m; drawQueue(); return; }
     if (m.a === "queued") { say(m.ahead ? `排進去了，前面還有 ${m.ahead} 張` : "開始畫了，約 30 秒～1 分鐘"); return; }
     if (m.a === "fail") { if (m.uid === me) say("❌ " + m.error); return; }
@@ -195,13 +198,25 @@ export function mountGallery(root, { env, back }) {
   function drawNewHint() { const h = panes.new.querySelector(".gl-newhint"); const c = cats.find((x) => x.id === cat); if (h) h.textContent = c ? `畫好的圖會放進「${c.name}」分類，這個伺服器的成員都看得到。` : ""; }
 
   function drawChat() {
-    panes.chat.innerHTML = `<div class="gl-log"></div><div class="gl-say"><input class="gl-in" maxlength="500" placeholder="跟大笨bot說話，或叫它畫圖：幫我畫一隻戴帽子的柴犬"><button class="gl-sendbtn">送出</button></div>
+    panes.chat.innerHTML = `<div class="gl-ctl"><button class="gl-clr" type="button">🧹 清除對話</button>${isAdmin ? '<label class="gl-msel">🤖 模型<select class="gl-modelsel"><option value="">（跟全域一樣）</option></select></label>' : ""}</div><div class="gl-log"></div><div class="gl-say"><input class="gl-in" maxlength="500" placeholder="跟大笨bot說話，或叫它畫圖：幫我畫一隻戴帽子的柴犬"><button class="gl-sendbtn">送出</button></div>
       <p class="gl-hint">大笨bot畫的圖會放進目前的分類，不會傳到 Discord。這裡的對話是這個分類裡的人共用的。</p>`;
     const log = panes.chat.querySelector(".gl-log"); log.innerHTML = chat.map(lineHtml).join(""); log.scrollTop = log.scrollHeight;
+    const clr = panes.chat.querySelector(".gl-clr"); let clrT = 0;
+    clr.addEventListener("click", () => {                       // 按兩下才清（第一下變成確認），3 秒沒按就還原
+      if (!clrT) { clr.textContent = "確定清除？再按一次"; clr.classList.add("sure"); clrT = setTimeout(() => { clrT = 0; clr.textContent = "🧹 清除對話"; clr.classList.remove("sure"); }, 3000); return; }
+      clearTimeout(clrT); clrT = 0; clr.textContent = "🧹 清除對話"; clr.classList.remove("sure"); send({ a: "chatclear", cat });
+    });
+    const msel = panes.chat.querySelector(".gl-modelsel");
+    if (msel) { msel.addEventListener("change", () => send({ a: "setmodel", model: msel.value })); if (gmodels) fillModelSel(); else send({ a: "models" }); }
     const inp = panes.chat.querySelector(".gl-in");
     const go = () => { const t = inp.value.trim(); if (!t) return; send({ a: "chat", cat, text: t }); inp.value = ""; };
     panes.chat.querySelector(".gl-sendbtn").addEventListener("click", go);
     inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) go(); });
+  }
+  function fillModelSel() {
+    const sel = panes.chat.querySelector(".gl-modelsel"); if (!sel || !gmodels) return;
+    sel.innerHTML = `<option value="">（跟全域一樣：${esc(gmodels.def || "")}）</option>` + gmodels.list.map((x) => `<option value="${esc(x.id)}">${esc(x.id)}${x.local ? "（本機）" : "（線上，計費）"}</option>`).join("");
+    sel.value = gmodel && gmodels.list.some((x) => x.id === gmodel) ? gmodel : "";
   }
   const lineHtml = (x) => `<div class="gl-line${x.bot ? " bot" : x.uid === me ? " mine" : ""}"><b>${esc(x.name)}</b><span>${esc(x.text)}</span><small>${when(x.ts)}</small></div>`;
   function addChatLine(x) { const log = panes.chat.querySelector(".gl-log"); if (!log) return; log.insertAdjacentHTML("beforeend", lineHtml(x)); log.scrollTop = log.scrollHeight; }

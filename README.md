@@ -218,6 +218,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 - 預設 6 個分類（風景、人物、動物、奇幻、迷因、隨便畫），任何人都能用「＋」新增（最多 24 個）；空的分類可以刪。
 - 三個分頁：🖼️ 圖庫（縮圖、點開看大圖與提示詞、能刪自己畫的、「用這個提示詞畫」）、✏️ 畫圖（形狀、大小、畫質、智慧擴寫與語言）、💬 大笨bot（在這個分類裡跟它說話，它會回話，也可以請它畫圖，畫好放進目前的分類）。
 - 規則：一次畫一張、每人同時一張、全部最多排 `IMAGE_MAX_QUEUE`（預設 4）張；內容只擋「性內容 + 未成年人」；每個伺服器最多留 400 張（`GALLERY_MAX_IMAGES`），超過刪最舊的。圖片與縮圖存在 `activity/server/gallery_data/`（`GALLERY_DIR` 可改，已加入 `.gitignore`）。這個頁面不受「畫圖只能在 NSFW 頻道」的限制，因為它不是 Discord 頻道。
+- 對話頁有「🧹 清除對話」（任何人都能清，兩段確認，清的是這個分類共用的對話）。伺服器管理員（登入時 Discord 回報是擁有者，或有「管理員」「管理伺服器」權限）會多一個「🤖 模型」選單，為這個伺服器的圖創區指定大笨bot 聊天用的模型（存在這個伺服器的圖創區資料裡的 `model`；清單來自機器人內部 API `/gallery/models`，不含畫圖／改圖／音效／影片模型；選「跟全域一樣」就用 `/模型` 的設定）。權限是登入時記下的，管理員剛被加上權限要重新登入／授權才生效。
 - 後端 `activity/server/media/gallery.js`，大笨bot說話走機器人內部 API `POST /gallery/chat`（`bot.py` 的 `gallery_chat`）；縮圖用 `gallery_thumb.py`（Pillow）。
 
 ### 鍛造（Activity 版）

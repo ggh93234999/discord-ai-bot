@@ -33,6 +33,7 @@ ADMINS: set[int] = set()
 TZ = ZoneInfo("Asia/Taipei")
 KEEP_DAYS = 30
 
+OVERRIDE: ContextVar[str | None] = ContextVar("model_override", default=None)   # 明確指定這次呼叫用哪個模型（圖創區的伺服器設定）
 CHANNEL: ContextVar[tuple] = ContextVar("model_channel_ids", default=())   # 目前這則訊息／指令所在的頻道（討論串會連上層頻道一起放）
 _client: discord.Client | None = None
 _owner_ids: set[int] | None = None
@@ -113,7 +114,15 @@ def channel_model(channel_id: int | None = None) -> str | None:
 
 
 def current() -> str:
-    return channel_model() or state.get("model") or DEFAULT
+    return OVERRIDE.get() or channel_model() or state.get("model") or DEFAULT
+
+
+CHAT_EXCLUDE = ("draw-", "edit-")       # 清單裡不是聊天用的模型（畫圖、改圖、擴寫提示詞、音效、影片）
+CHAT_EXCLUDE_EXACT = {"prompt-writer", "sfx", "video"}
+
+
+async def chat_models() -> list[str]:
+    return [n for n in await list_models() if not n.startswith(CHAT_EXCLUDE) and n not in CHAT_EXCLUDE_EXACT]
 
 
 def is_local(model: str | None = None) -> bool:
