@@ -162,44 +162,100 @@ def ImageColor_get(c):
 
 
 # ---------------------------------------------------------------- 擲筊
-def _block(img, cx, cy, flat_up: bool, scale=1.0):
-    """畫一個筊杯（半月形）：平面朝上是淺色平面，凸面朝上是深紅色、有反光"""
-    w, h = int(150 * scale), int(80 * scale)
-    layer = Image.new("RGBA", (w + 20, h + 20), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    box = [10, 10 - h, 10 + w, 10 + h]                       # 下半個橢圓 = 半月形
-    if flat_up:
-        d.pieslice(box, 0, 180, fill="#e8574a", outline="#7a1410", width=3)
-        d.pieslice([30, 10 - h + 18, w - 10, 10 + h - 18], 0, 180, fill="#f28b7e")
-        d.line([(10, 10), (10 + w, 10)], fill="#7a1410", width=4)
-    else:
-        d.pieslice(box, 0, 180, fill="#b3221a", outline="#5c0a07", width=3)
-        d.arc([40, 10 - h + 30, w - 20, 10 + h - 22], 20, 80, fill="#ff9e8f", width=6)   # 反光
-    img.paste(layer, (int(cx - w / 2 - 10), int(cy - h / 2)), layer)
+def _vgrad(size, top, bottom):
+    return Image.composite(Image.new("RGB", size, bottom), Image.new("RGB", size, top), Image.linear_gradient("L").resize(size))
+
+
+def _block(img, cx, cy, flat_up: bool, scale=1.0, tilt=0):
+    """畫一個筊杯（半月形，邊緣有深色邊線和立體陰影）：平面朝上是淺橘紅、帶木紋；凸面朝上是深紅、有反光。tilt 是傾斜角度，讓每個看起來是隨手擲出的"""
+    from PIL import ImageChops, ImageFilter
+    S = 4                                                       # 先放大 4 倍畫再縮回來，邊緣才平滑
+    w, h, pad = int(176 * scale), int(94 * scale), 34
+    LW, LH = (w + 2 * pad) * S, (h + 2 * pad) * S
+    x0, y0 = pad * S, pad * S
+    mask = Image.new("L", (LW, LH), 0)
+    md = ImageDraw.Draw(mask)
+    md.pieslice([x0, y0 - h * S, x0 + w * S, y0 + h * S], 0, 180, fill=255)         # 下半個橢圓 = 半月形
+    md.ellipse([x0 + int(w * .10) * S, y0 - int(h * .34) * S, x0 + int(w * .90) * S, y0 + int(h * .10) * S], fill=0)   # 平面那側微微內凹，像真的筊杯
+    mask = mask.filter(ImageFilter.GaussianBlur(S * 1.2)).point(lambda v: 255 if v > 127 else 0).filter(ImageFilter.GaussianBlur(S * .6))   # 兩端磨圓
+    top, bot = ((244, 164, 146), (214, 92, 76)) if flat_up else ((226, 78, 62), (122, 16, 12))
+    body = _vgrad((LW, LH), top, bot)
+    bd = ImageDraw.Draw(body)
+    if flat_up:                                                 # 木紋
+        for k in range(7):
+            yy = y0 + int((10 + k * 11) * scale) * S
+            bd.arc([x0 + int(w * .05) * S, yy - 40 * S, x0 + int(w * .95) * S, yy + 40 * S], 200, 340, fill=(200, 80, 66), width=S)
+        gl = Image.new("L", (LW, LH), 0)
+        ImageDraw.Draw(gl).ellipse([x0 + int(w * .18) * S, y0 + int(h * .12) * S, x0 + int(w * .62) * S, y0 + int(h * .34) * S], fill=70)
+    else:                                                       # 凸面反光
+        gl = Image.new("L", (LW, LH), 0)
+        ImageDraw.Draw(gl).ellipse([x0 + int(w * .16) * S, y0 + int(h * .14) * S, x0 + int(w * .58) * S, y0 + int(h * .42) * S], fill=150)
+    gl = gl.filter(ImageFilter.GaussianBlur(S * 7))
+    body = Image.composite(Image.new("RGB", (LW, LH), (255, 240, 230)), body, gl)
+    edge = ImageChops.subtract(mask, mask.filter(ImageFilter.MinFilter(2 * S * 2 + 1)))           # 邊線
+    body = Image.composite(Image.new("RGB", (LW, LH), (70, 8, 6)), body, edge)
+    layer = Image.new("RGBA", (LW, LH), (0, 0, 0, 0))
+    sh = Image.new("RGBA", (LW, LH), (0, 0, 0, 0))
+    sh.paste((0, 0, 0, 130), (0, 12 * S), mask.filter(ImageFilter.GaussianBlur(S * 6)))        # 投影
+    layer = Image.alpha_composite(layer, sh)
+    obj = body.convert("RGBA"); obj.putalpha(mask)
+    layer = Image.alpha_composite(layer, obj)
+    layer = layer.resize((LW // S, LH // S), Image.LANCZOS).rotate(tilt, resample=Image.BICUBIC, expand=True)
+    img.paste(layer, (int(cx - layer.width / 2), int(cy - layer.height / 2 + h * .25)), layer)
 
 
 def jiaobei_img(results: list[int], question: str) -> str:
     """results：每次的結果，0 聖筊、1 笑筊、2 陰筊"""
+    from PIL import ImageFilter
     names = ["聖筊", "笑筊", "陰筊"]
-    colors = ["#ffd54f", "#9be7a8", "#90a4ae"]
+    cols = [("#ffd54f", "#4a3a0c", "#c9a227"), ("#9be7a8", "#10321a", "#4f9a62"), ("#b8c4cc", "#1f272c", "#6a7a85")]      # 字色、底色、邊色
+    tilts = [(-16, 12), (13, -18), (-10, 17), (15, -9)]
     n = len(results)
-    W, H = max(520, 300 * n + 60), 400
-    img, d = _paper(W, H)
-    _center(d, (W // 2, 42), "擲筊" + (f"｜{question}" if question else ""), _font(30), "#f3d98b")
+    PW, PH, GAP = 330, 330, 22
+    W = max(640, n * PW + (n + 1) * GAP + 40)
+    qlines = []
+    if question:
+        qf = _font(24, weight="Medium")
+        _d = ImageDraw.Draw(Image.new("RGB", (4, 4)))
+        qlines = _wrap(_d, question, qf, W - 160)[:2]
+        if len(_wrap(_d, question, qf, W - 160)) > 2:
+            qlines[1] = qlines[1][:-1] + "…"
+    top = 128 + 34 * len(qlines)
+    H = top + PH + 118
+    img, d = _paper(W, H, "#4a1010", "#170505")
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))              # 上方一圈暖光，像神桌上的燭火
+    ImageDraw.Draw(glow).ellipse([W // 2 - 340, -230, W // 2 + 340, 190], fill=(255, 170, 70, 70))
+    img.paste(glow.filter(ImageFilter.GaussianBlur(70)), (0, 0), glow.filter(ImageFilter.GaussianBlur(70)))
+    d = ImageDraw.Draw(img)
+    d.rectangle([14, 14, W - 15, H - 15], outline="#b8893c", width=2)                  # 金色雙線框
+    d.rectangle([22, 22, W - 23, H - 23], outline="#6d4a1f", width=1)
+    _center(d, (W // 2, 74), "擲　筊", _font(46, serif=True), "#f3d98b")
+    for i, ln in enumerate(qlines):
+        _center(d, (W // 2, 126 + 34 * i), ln if i or len(qlines) == 1 else ln, _font(24, weight="Medium"), "#e8dcc2")
+    x_start = (W - (n * PW + (n - 1) * GAP)) // 2
     for k, r in enumerate(results):
-        cx = 30 + 300 * k + 150 + (W - 60 - 300 * n) // 2
-        d.rounded_rectangle([cx - 135, 90, cx + 135, 330], 18, fill="#2a0b0b", outline="#6d2a1c", width=2)
-        _center(d, (cx, 118), f"第 {k + 1} 擲", _font(22, weight="Medium"), "#d9c7a6")
+        px = x_start + k * (PW + GAP)
+        d.rounded_rectangle([px, top, px + PW, top + PH], 20, fill="#260a0a", outline="#7a4a22", width=2)
+        cx = px + PW // 2
+        _center(d, (cx, top + 34), f"第 {k + 1} 擲", _font(22, weight="Medium"), "#d9c7a6")
         a_flat, b_flat = (True, False) if r == 0 else (True, True) if r == 1 else (False, False)
-        _block(img, cx - 62, 200, a_flat, 0.75)
-        _block(img, cx + 62, 200, b_flat, 0.75)
+        ta, tb = tilts[k % len(tilts)]
+        if r == 0:                                              # 聖筊：背後一圈金光
+            g2 = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            ImageDraw.Draw(g2).ellipse([cx - 120, top + 70, cx + 120, top + 210], fill=(255, 205, 80, 90))
+            g2 = g2.filter(ImageFilter.GaussianBlur(26)); img.paste(g2, (0, 0), g2); d = ImageDraw.Draw(img)
+        _block(img, cx - 82, top + 140, a_flat, 0.7, ta)
+        _block(img, cx + 82, top + 140, b_flat, 0.7, tb)
         d = ImageDraw.Draw(img)
-        _center(d, (cx - 62, 262), "平" if a_flat else "凸", _font(18, weight="Regular"), "#bfa98a")
-        _center(d, (cx + 62, 262), "平" if b_flat else "凸", _font(18, weight="Regular"), "#bfa98a")
-        _center(d, (cx, 302), names[r], _font(32), colors[r])
+        _center(d, (cx - 82, top + 222), "平面" if a_flat else "凸面", _font(17, weight="Regular"), "#a8926f")
+        _center(d, (cx + 82, top + 222), "平面" if b_flat else "凸面", _font(17, weight="Regular"), "#a8926f")
+        fg, bgc, ed = cols[r]
+        d.rounded_rectangle([cx - 76, top + 252, cx + 76, top + 306], 27, fill=bgc, outline=ed, width=3)
+        _center(d, (cx, top + 279), names[r], _font(32), fg)
     sheng = results.count(0)
-    verdict = "三聖筊，神明明確同意" if n == 3 and sheng == 3 else f"{sheng} 個聖筊"
-    _center(d, (W // 2, 366), verdict, _font(26), "#ffd54f" if n == 3 and sheng == 3 else "#e8e0cc")
+    full = n == 3 and sheng == 3
+    verdict = "三聖筊，神明明確同意" if full else f"{sheng} 個聖筊"
+    _center(d, (W // 2, H - 58), verdict, _font(30), "#ffd54f" if full else "#e8e0cc")
     out = _tmp("jiao_")
     img.save(out, optimize=True)
     return out
