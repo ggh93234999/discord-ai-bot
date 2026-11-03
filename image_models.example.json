@@ -33,9 +33,10 @@
       "eta": 60,
       "timeout": 900,
       "big_sizes": true,
-      "human_only": true,
+      "human_only": false,
       "prompt_lang": "en",
-      "note": "無安全過濾，提示詞只認英文"
+      "note": "無安全過濾，提示詞只認英文",
+      "hint": "使用者明確要「無限制」「不過濾」的畫風，或內容一般畫圖模型會拒絕、畫不出來時才用；提示詞只認英文"
     }
   },
   "edit": {
