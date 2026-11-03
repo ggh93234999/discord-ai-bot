@@ -37,6 +37,16 @@
       "prompt_lang": "en",
       "note": "無安全過濾，提示詞只認英文",
       "hint": "使用者明確要「無限制」「不過濾」的畫風，或內容一般畫圖模型會拒絕、畫不出來時才用；提示詞只認英文"
+    },
+    "hidream": {
+      "model": "draw-hidream",
+      "label": "無限制 HiDream（較慢、畫質更好）",
+      "eta": 170,
+      "timeout": 1200,
+      "human_only": false,
+      "prompt_lang": "en",
+      "note": "無安全過濾，是 Chroma 的慢速版，畫質通常更好；提示詞只認英文",
+      "hint": "使用者要「無限制」「不過濾」的畫風，而且明確要更好的畫質、願意等久一點時才用；提示詞只認英文"
     }
   },
   "edit": {
