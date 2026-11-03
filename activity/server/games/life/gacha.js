@@ -26,7 +26,7 @@ const DUP_STAR = { 1: 1, 2: 1, 3: 2, 4: 3 };                      // 用重複�
 const SWAP = { N: 100, R: 300, SR: 1200, SSR: 4000 };              // 用墨點直接兌換還沒有的卡
 const MILESTONES = [[10, 1], [25, 2], [50, 3], [100, 5], [150, 8], [200, 10], [250, 12], [300, 20]];     // 收集到幾張不同的卡 → 一次性送幾張抽卡券
 const SETBONUS = { east: 20, west: 20, orig: 10, whim: 10 };       // 集滿一個卡組 → 抽卡券
-const DAILY_TICKETS = 1, START_TICKETS = 30;                       // 每日簽到送 1 抽；每個人第一次開局送 30 抽（真代幣模式）
+const DAILY_TICKETS = 10, START_TICKETS = 30;                      // 每日簽到送 10 抽；每個人第一次開局送 30 抽（真代幣模式）
 const PRACTICE_COIN = 100000, PRACTICE_TICKETS = 10;               // 練習模式：每次進入都清空收藏，重新給 10 萬練習幣和 10 抽
 const starCost = (r, star) => STAR_BASE[r] * star;
 

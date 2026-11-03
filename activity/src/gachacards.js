@@ -102,9 +102,9 @@ export function mountGachaCards(root, { env, back }) {
           <button class="gc-t1"${st.tickets >= 1 ? "" : " disabled"}>用券抽 1 次<small>${I.tix} ×1</small></button>
           <button class="gc-t10"${st.tickets >= 10 ? "" : " disabled"}>用券十連<small>${I.tix} ×10</small></button>
         </div>
-        <button class="gc-sign"${st.canSign ? "" : " disabled"}>${st.canSign ? "每日簽到，領 1 張抽卡券" : "今天已經簽到過了"}</button>
+        <button class="gc-sign"${st.canSign ? "" : " disabled"}>${st.canSign ? "每日簽到，領 10 張抽卡券" : "今天已經簽到過了"}</button>
         <details class="gc-rules"><summary>機率與規則</summary>
-          <p>機率：SSR ${st.rate.SSR / 10}%、SR ${st.rate.SR / 10}%、R ${st.rate.R / 10}%、N ${st.rate.N / 10}%，每抽都是獨立機率，沒有保底。每天簽到送 1 抽。</p>
+          <p>機率：SSR ${st.rate.SSR / 10}%、SR ${st.rate.SR / 10}%、R ${st.rate.R / 10}%、N ${st.rate.N / 10}%，每抽都是獨立機率，沒有保底。每天簽到送 10 抽。</p>
           <p>抽到重複的卡會留在收藏裡，到圖鑑可以自己決定要不要分解成墨點（每張：N ${st.dupInk.N}、R ${st.dupInk.R}、SR ${st.dupInk.SR}、SSR ${st.dupInk.SSR}）。墨點可以在圖鑑裡替卡升星（最高 ${st.maxStar} 星），或直接兌換還沒有的卡（N ${st.swap.N}、R ${st.swap.R}、SR ${st.swap.SR}、SSR ${money(st.swap.SSR)}）。</p>
           <p>練習模式和真代幣模式的收藏是分開的；<b>每次進入練習模式，收藏都會清空重來</b>（重新給 10 萬練習幣和 10 抽）。獎勵只發抽卡券和墨點，不會直接發代幣。</p>
         </details>
