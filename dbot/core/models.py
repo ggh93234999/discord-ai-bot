@@ -85,13 +85,13 @@ def setup(client: discord.Client, tree: app_commands.CommandTree, st: dict, save
 
     @cmd_model.autocomplete("模型")
     async def ac_model(interaction: discord.Interaction, current: str):
-        names = await list_models()
+        names = await chat_models()
         return [app_commands.Choice(name=n + ("（本機）" if n in LOCAL else "（線上，計費）"), value=n)
                 for n in names if current.lower() in n.lower()][:25]
 
     @cmd_channel_model.autocomplete("模型")
     async def ac_channel_model(interaction: discord.Interaction, current: str):
-        names = await list_models()
+        names = await chat_models()
         opts = [app_commands.Choice(name="預設（跟全域一樣）", value="預設")] + [
             app_commands.Choice(name=n + ("（本機）" if n in LOCAL else "（線上，計費）"), value=n) for n in names]
         return [o for o in opts if current.lower() in o.value.lower() or current in o.name][:25]
@@ -185,7 +185,7 @@ async def test_model(model: str) -> tuple[bool, str]:
 
 
 async def switch(model: str, who: str) -> str:
-    names = await list_models()
+    names = await chat_models()
     if model not in names:
         return f"沒有 `{model}` 這個模型。可選：" + "、".join(f"`{n}`" for n in names)
     if model == current():
@@ -300,7 +300,7 @@ async def set_channel_model(channel_id: int, model: str, who: str) -> str:
         _save()
         log.info("%s 把頻道 %s 的模型改回預設", who, channel_id)
         return f"🔁 {who} 把這個頻道的模型改回跟全域一樣（**{label(state.get('model') or DEFAULT)}**）。"
-    names = await list_models()
+    names = await chat_models()
     if model not in names:
         return f"沒有 `{model}` 這個模型。可選：" + "、".join(f"`{n}`" for n in names)
     if table.get(str(channel_id)) == model:
@@ -316,6 +316,6 @@ async def set_channel_model(channel_id: int, model: str, who: str) -> str:
 
 
 async def describe() -> str:
-    names = await list_models()
+    names = await chat_models()
     return (f"目前使用：**{label()}**\n可選：" + "、".join(f"`{n}`" + ("" if n in LOCAL else "💰") for n in names) +
             "\n（💰 = 線上模型，會計費；用 `/模型 模型名稱` 切換，只有擁有者能切）")
