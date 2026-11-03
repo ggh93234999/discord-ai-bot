@@ -2,6 +2,8 @@
 模型切換與用量統計。
 
 - /模型：只有機器人擁有者（或 .env 的 ADMIN_USER_IDS）能切換，切之前會先試打一次確認模型真的能用；選擇存在 state.json，重開後還在
+- /頻道模型：只有擁有者能設，讓某個頻道（含討論串）固定用另一個模型，沒設的頻道用全域模型；存在 state.json 的 channel_models。
+  目前頻道靠 contextvar（set_channel）傳進 current()，所以 call_model 不用改參數
 - 用量：每次呼叫模型都記一筆（次數、輸入/輸出 token），按日期存在 state.json，/狀態 會顯示今天和近 7 天
 - 本機模型（LOCAL_MODELS，預設只有 .env 的 LLM_MODEL）才會送 reasoning_effort / keep_alive 這類 Ollama 專用參數，
   線上模型（例如 deepseek）不送，避免被拒絕
@@ -11,6 +13,7 @@ import asyncio
 import logging
 import os
 import time
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -30,6 +33,7 @@ ADMINS: set[int] = set()
 TZ = ZoneInfo("Asia/Taipei")
 KEEP_DAYS = 30
 
+CHANNEL: ContextVar[tuple] = ContextVar("model_channel_ids", default=())   # 目前這則訊息／指令所在的頻道（討論串會連上層頻道一起放）
 _client: discord.Client | None = None
 _owner_ids: set[int] | None = None
 _models_cache: tuple[float, list[str]] = (0.0, [])
@@ -47,13 +51,28 @@ def setup(client: discord.Client, tree: app_commands.CommandTree, st: dict, save
     @app_commands.describe(模型="要切換成哪個；不填就只是看現在用哪個")
     async def cmd_model(interaction: discord.Interaction, 模型: str = None):
         if not 模型:
-            await interaction.response.send_message(await describe(), ephemeral=True)
+            here = channel_model(interaction.channel_id)
+            note = f"\n這個頻道固定用：**{label(here)}**（用 `/頻道模型` 管理）" if here else ""
+            await interaction.response.send_message(await describe() + note, ephemeral=True)
             return
         if not await is_admin(interaction.user.id):
             await interaction.response.send_message("只有機器人擁有者可以切換模型。", ephemeral=True)
             return
         await interaction.response.defer()
         await interaction.followup.send(await switch(模型.strip(), interaction.user.display_name))
+
+    @tree.command(name="頻道模型", description="（機器人擁有者專用）設定這個頻道固定用哪個 AI 模型；填「預設」就改回跟全域一樣")
+    @app_commands.describe(模型="要用哪個模型；填「預設」＝這個頻道跟全域設定一樣；不填就只是看這個頻道和所有有設定的頻道")
+    async def cmd_channel_model(interaction: discord.Interaction, 模型: str = None):
+        if not await is_admin(interaction.user.id):
+            await interaction.response.send_message("只有機器人擁有者可以設定頻道的模型。", ephemeral=True)
+            return
+        cid = interaction.channel_id
+        if not 模型:
+            await interaction.response.send_message(channel_report(cid), ephemeral=True)
+            return
+        await interaction.response.defer()
+        await interaction.followup.send(await set_channel_model(cid, 模型.strip(), interaction.user.display_name))
 
     @tree.command(name="餘額", description="查 DeepSeek 帳戶還剩多少錢（只有機器人擁有者能查，結果大家看得到）")
     async def cmd_balance(interaction: discord.Interaction):
@@ -69,11 +88,32 @@ def setup(client: discord.Client, tree: app_commands.CommandTree, st: dict, save
         return [app_commands.Choice(name=n + ("（本機）" if n in LOCAL else "（線上，計費）"), value=n)
                 for n in names if current.lower() in n.lower()][:25]
 
+    @cmd_channel_model.autocomplete("模型")
+    async def ac_channel_model(interaction: discord.Interaction, current: str):
+        names = await list_models()
+        opts = [app_commands.Choice(name="預設（跟全域一樣）", value="預設")] + [
+            app_commands.Choice(name=n + ("（本機）" if n in LOCAL else "（線上，計費）"), value=n) for n in names]
+        return [o for o in opts if current.lower() in o.value.lower() or current in o.name][:25]
+
 
 # ---------------------------------------------------------------- 目前模型
 
+def set_channel(channel_id: int | None, parent_id: int | None = None) -> None:
+    """告訴後面的 call_model「現在是在哪個頻道」（每則訊息／每個指令開頭呼叫一次）。"""
+    CHANNEL.set(tuple(i for i in (channel_id, parent_id) if i))
+
+
+def channel_model(channel_id: int | None = None) -> str | None:
+    """這個頻道有沒有指定模型（沒指定回 None）；不給 channel_id 就看目前上下文的頻道。"""
+    table = state.get("channel_models") or {}
+    for cid in ((channel_id,) if channel_id else CHANNEL.get()):
+        if str(cid) in table:
+            return table[str(cid)]
+    return None
+
+
 def current() -> str:
-    return state.get("model") or DEFAULT
+    return channel_model() or state.get("model") or DEFAULT
 
 
 def is_local(model: str | None = None) -> bool:
@@ -230,6 +270,40 @@ def usage_text() -> str:
     today = now.strftime("%Y-%m-%d")
     week = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
     return f"**今天**\n{_fmt(_sum([today]))}\n**近 7 天**\n{_fmt(_sum(week))}"
+
+
+def channel_report(channel_id: int | None) -> str:
+    table = state.get("channel_models") or {}
+    here = table.get(str(channel_id))
+    lines = ["這個頻道：" + (f"固定用 **{label(here)}**" if here else f"沒有指定，跟全域一樣（**{label(state.get('model') or DEFAULT)}**）")]
+    others = [(k, v) for k, v in table.items() if k != str(channel_id)]
+    if others:
+        lines.append("其他有指定模型的頻道：\n" + "\n".join(f"<#{k}> → {label(v)}" for k, v in others))
+    lines.append("用 `/頻道模型 模型名稱` 設定這個頻道，`/頻道模型 預設` 改回全域。")
+    return "\n".join(lines)
+
+
+async def set_channel_model(channel_id: int, model: str, who: str) -> str:
+    table = state.setdefault("channel_models", {})
+    if model in ("預設", "default", "clear", "清除"):
+        if table.pop(str(channel_id), None) is None:
+            return "這個頻道本來就沒有指定模型，跟全域一樣。"
+        _save()
+        log.info("%s 把頻道 %s 的模型改回預設", who, channel_id)
+        return f"🔁 {who} 把這個頻道的模型改回跟全域一樣（**{label(state.get('model') or DEFAULT)}**）。"
+    names = await list_models()
+    if model not in names:
+        return f"沒有 `{model}` 這個模型。可選：" + "、".join(f"`{n}`" for n in names)
+    if table.get(str(channel_id)) == model:
+        return f"這個頻道本來就固定用 {label(model)}。"
+    ok, detail = await test_model(model)
+    if not ok:
+        return f"❌ 沒有設定：`{model}` 試打失敗（{detail}）。"
+    table[str(channel_id)] = model
+    _save()
+    log.info("%s 把頻道 %s 的模型設成 %s", who, channel_id, model)
+    note = "" if model in LOCAL else "\n⚠️ 這是線上模型，這個頻道的聊天內容會送到對方伺服器，而且會計費。"
+    return f"🔁 {who} 把這個頻道固定用 **{label(model)}**（試打 {detail}）。其他頻道不受影響。{note}"
 
 
 async def describe() -> str:

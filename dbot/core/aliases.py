@@ -71,6 +71,8 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "狀態": ("status", "Is the bot OK? Model connection, latency, music state and usage", {}),
     "模型": ("model", "See or switch the AI model (bot owner only)",
            {"模型": ("model", "Which model to switch to; leave empty just to see the current one")}),
+    "頻道模型": ("channelmodel", "Set which AI model this channel always uses (bot owner only); 'default' goes back to the global one",
+             {"模型": ("model", "Model name, or '預設' to follow the global model; leave empty just to look")}),
     "餘額": ("balance", "Check the remaining DeepSeek balance (bot owner only; everyone sees the result)", {}),
     "總結": ("summarize", "Summarize the recent conversation in this channel",
            {"則數": ("count", "How many recent messages (default 100, max 500)"),

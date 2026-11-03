@@ -211,12 +211,19 @@ intents.members = True       # 查成員公開狀態（member_status）要用；
 intents.presences = True     # 同上：Presence Intent 也要開
 
 
+class _Tree(app_commands.CommandTree):
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        ch = interaction.channel
+        models.set_channel(interaction.channel_id, getattr(ch, "parent_id", None))     # 讓 call_model 知道在哪個頻道（/頻道模型）
+        return True
+
+
 class Bot(discord.Client):
     def __init__(self):
         # 模型講的話不會真的去 @ 人（避免 @everyone 之類的意外）
         super().__init__(intents=intents, allowed_mentions=discord.AllowedMentions.none(),
                          enable_debug_events=True)  # 為了收到語音頻道狀態的原始事件
-        self.tree = app_commands.CommandTree(self)
+        self.tree = _Tree(self)
         self.http_session: aiohttp.ClientSession | None = None
 
     async def setup_hook(self):
@@ -683,6 +690,7 @@ async def on_ready():
 
 @client.event
 async def on_message(msg: discord.Message):
+    models.set_channel(msg.channel.id, getattr(msg.channel, "parent_id", None))     # /頻道模型：這則訊息用哪個頻道的模型設定
     economy.on_message(msg)
     dmlog.record(msg)
     if msg.author.id == client.user.id or not should_reply(msg):
