@@ -17,6 +17,9 @@ def flatten_for_remote(messages: list[dict]) -> list[dict]:
     return out
 
 
+NO_REASONING_PARAM: set[str] = set()      # 不接受 reasoning_effort 的模型（被拒絕過就記下來）
+
+
 async def call_model(messages: list[dict], use_tools: bool | list = False, max_tokens: int | None = None) -> dict:
     model = models.current()
     local = models.is_local(model)
@@ -25,21 +28,28 @@ async def call_model(messages: list[dict], use_tools: bool | list = False, max_t
     # 思考模式：qwen 和 deepseek 都靠 reasoning_effort 控制。DeepSeek 不帶參數預設會思考，
     # 思考的 token 也計費（實測約多 3~4 倍），所以線上模型也要送，預設 none。
     effort = REASONING_EFFORT if local else REMOTE_REASONING_EFFORT
-    if effort:
+    if effort and model not in NO_REASONING_PARAM:
         body["reasoning_effort"] = effort
     if local and LLM_KEEP_ALIVE:
         body["keep_alive"] = LLM_KEEP_ALIVE  # 叫 Ollama 別太快把模型卸載（重新載入要一兩分鐘）
     if use_tools:
         body["tools"] = use_tools if isinstance(use_tools, list) else TOOLS
     headers = {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
-    async with runtime.client.http_session.post(
-        f"{LLM_BASE_URL}/chat/completions",
-        json=body,
-        headers=headers,
-        timeout=aiohttp.ClientTimeout(total=LLM_TIMEOUT),
-    ) as resp:
-        data = await resp.json(content_type=None)
-        if resp.status != 200:
+    for attempt in range(2):
+        async with runtime.client.http_session.post(
+            f"{LLM_BASE_URL}/chat/completions",
+            json=body,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=LLM_TIMEOUT),
+        ) as resp:
+            data = await resp.json(content_type=None)
+            if resp.status == 200:
+                break
+            # 有些模型（例如永遠在思考的 GLM）不接受「關閉思考」的參數：記下來，這個模型之後不再送，並馬上重試一次
+            if attempt == 0 and resp.status == 400 and "reasoning_effort" in body and "reasoning" in str(data).lower():
+                NO_REASONING_PARAM.add(model)
+                body.pop("reasoning_effort", None)
+                continue
             raise RuntimeError(f"模型回 HTTP {resp.status}：{str(data)[:300]}")
     models.record(model, data.get("usage"))
     return data["choices"][0]["message"]
