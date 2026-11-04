@@ -35,6 +35,7 @@ from dbot.ai import extras
 from dbot.ai import imagegen
 from dbot.ai import selfhelp
 from dbot.ai import announce
+from dbot.core import gamelog
 ANNOUNCE_RE = re.compile(r"公告|announce|通知大家|排程", re.I)
 from dbot.ai import sfxgen
 from dbot.ai import videogen
@@ -277,6 +278,14 @@ if not economy.GAMBLING_ENABLED:      # 賭博類指令暫時下架（英文別�
 @client.event
 async def on_socket_raw_receive(msg):
     vstatus.on_socket_raw(msg)
+
+
+@client.event
+async def on_presence_update(before, after):
+    try:
+        gamelog.on_presence(after)
+    except Exception:
+        log.exception("遊戲紀錄處理失敗")
 
 
 @client.event
@@ -676,6 +685,7 @@ def should_reply(msg: discord.Message) -> bool:
 async def on_ready():
     await channels.cleanup_on_ready()
     announce.start()
+    gamelog.start(client)
     try:
         await music.start_resume(client)   # 重啟前在播的歌接回去（只做一次）
     except Exception:
