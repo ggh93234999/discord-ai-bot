@@ -24,6 +24,7 @@ import { mountForgeBoard } from "./forgeboard.js";
 import { mountGachaCards } from "./gachacards.js";
 import { mountCardBoard } from "./cardboard.js";
 import { mountDown } from "./stairs.js";
+import { mountTetris } from "./tetris.js";
 import { mountFarm } from "./farm.js";
 import { mountGallery } from "./gallery.js";
 import { iconHtml } from "./iconart.js";
@@ -100,6 +101,7 @@ const GAMES = [
   { id: "chess", cat: "board", icon: "♞", name: "西洋棋", players: "2 人", desc: "完整規則：王車易位、吃過路兵、升變", mount: mountBoard("chess") },
   { id: "xq", cat: "board", icon: "帥", name: "象棋", players: "2 人", desc: "楚河漢界，將死或困斃對方", mount: mountBoard("xq") },
   { id: "down", cat: "action", icon: "🪜", name: "小朋友下樓梯", players: "1–4 人", desc: "往下踩樓梯別被刺扎到", mount: mountDown },
+  { id: "tetris", cat: "action", icon: "🧱", name: "俄羅斯方塊對戰", players: "2 人（其他人旁觀）", desc: "參考 Tetris Battle：消行把垃圾行丟給對手，T-Spin、連擊、B2B 都有加成，先頂到頂的輸", mount: mountTetris },
   { id: "pinball", cat: "action", icon: "🎱", name: "彈珠台", players: "1 人", desc: "左右擋板接球，撞彈跳器拿分，3 顆球", mount: mountPinball },
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },

@@ -1432,3 +1432,19 @@ body.tv-fs{overflow:hidden}
 .gl-clr.sure{border-color:#b3261e;background:#b3261e;color:#fff}
 .gl-msel{display:flex;align-items:center;gap:6px;font-size:13px;margin-left:auto}
 .gl-modelsel{max-width:220px;padding:5px 8px;border-radius:8px;border:1px solid #8a7a55;background:rgba(255,255,255,.1);color:inherit;font:inherit;font-size:13px}
+
+/* 俄羅斯方塊對戰 */
+.tetris { align-items:center; }
+.tetris .twrap { position:relative; }
+.tetris canvas { display:block; background:#10131b; border-radius:8px; touch-action:none; }
+.tetris .overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; background:rgba(8,10,16,.82); border-radius:8px; text-align:center; padding:14px; color:#e8ecf7; }
+.tetris .overlay[hidden] { display:none; }
+.tetris .overlay h3 { margin:0; font-size:24px; } .tetris .overlay p { margin:0; } .tetris .overlay small { opacity:.7; }
+.tetris .tscore { font-size:16px; } .tetris .tscore b { font-size:22px; color:#ffd54f; }
+.tetris .tbtn { padding:10px 22px; font-size:17px; border-radius:10px; border:0; background:#3d8bff; color:#fff; cursor:pointer; }
+.tetris .tpad { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; width:min(100%,420px); user-select:none; -webkit-user-select:none; }
+.tetris .tpad button { padding:14px 4px; font-size:20px; border-radius:12px; border:1px solid #3a4256; background:#1d2230; color:#e8ecf7; touch-action:none; -webkit-touch-callout:none; }
+.tetris .tpad button:active { background:#2c3550; }
+.tetris .tpad button[data-k="hard"] { grid-column:span 2; background:#27406b; }
+.tetris .thint { margin:0; font-size:12px; opacity:.6; text-align:center; }
+@media (pointer:coarse) { .tetris .thint { display:none; } }

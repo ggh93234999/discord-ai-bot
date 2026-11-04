@@ -22,6 +22,7 @@ import { handleBigtwo, bigtwoClose } from "./games/table/bigtwo.js";
 import { handleSevens, sevensClose } from "./games/table/sevens.js";
 import { handleUno, unoClose } from "./games/table/uno.js";
 import { handleAvalon, avalonClose } from "./games/table/avalon.js";
+import { handleTetris, tetrisClose, tickTetris } from "./games/action/tetris.js";
 import { handleLol, lolClose } from "../lolbet/server.js";
 import { handleTheater, theaterClose, serveVideo, serveSub } from "./media/theater.js";
 import { createPika, stepPika, snapshotPika } from "./pika.js";
@@ -355,6 +356,7 @@ wss.on("connection", (ws, req) => {
     if (typeof m.t === "string" && /^(lolget|lolbet|lolhist)$/.test(m.t)) { handleLol(ws, m).catch((e) => console.log("世界賽運彩錯誤", e && e.message)); return; }
     if (typeof m.t === "string" && /^(avjoin|avsit|avstart|avstand|avaddbot|avdelbot|avact|avname|avcfg|avlobby|avchat)$/.test(m.t)) { handleAvalon(ws, m); return; }
     if (typeof m.t === "string" && /^(btjoin|btsit|btstart|btstand|btaddbot|btdelbot|btact|btname|btcfg)$/.test(m.t)) { handleBigtwo(ws, m); return; }
+    if (typeof m.t === "string" && /^tt(join|name|start|b|clear|lock|dead|again)$/.test(m.t)) { handleTetris(ws, m); return; }
     if (typeof m.t === "string" && /^(unjoin|unsit|unstart|unstand|unaddbot|undelbot|unact|unname|uncfg)$/.test(m.t)) { handleUno(ws, m); return; }
     if (typeof m.t === "string" && /^(svjoin|svsit|svstart|svstand|svaddbot|svdelbot|svact|svname|svcfg)$/.test(m.t)) { handleSevens(ws, m); return; }
     if (typeof m.t === "string" && /^(brjoin|brsit|brstart|brstand|braddbot|brdelbot|bract|brname|brcfg)$/.test(m.t)) { handleBridge(ws, m); return; }
@@ -463,6 +465,7 @@ wss.on("connection", (ws, req) => {
     sevensClose(ws);
     unoClose(ws);
     avalonClose(ws);
+    tetrisClose(ws);
     lolClose(ws);
     theaterClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
@@ -513,6 +516,7 @@ setInterval(() => {
 
 // 小朋友上下樓梯：60 tick/秒
 setInterval(tickMulti, 1000 / 60);
+setInterval(tickTetris, 60000);
 
 // 心跳：斷線的連線清掉；沒人的房間 10 分鐘後刪除
 setInterval(() => {
