@@ -186,7 +186,7 @@ async function getScore(f) {
 // 頁面請求有間隔限制（每次至少隔 8 分鐘，且只有「有人在看或有人下注」時才抓）。抓不到（例如淘汰賽頁面格式不同）再退回 OddsPapi。
 const execFileP = promisify(execFile);
 const LP_ON = ENV.LOLBET_LP !== "0";
-const LP_PAGES = (ENV.LOLBET_LP_PAGES || "World Championship/2026/Swiss Stage").split(",").map((x) => x.trim()).filter(Boolean);
+const LP_PAGES = (ENV.LOLBET_LP_PAGES || "World Championship/2026/Swiss Stage,World Championship/2026/Knockout Stage").split(",").map((x) => x.trim()).filter(Boolean);
 const LP_UA = "discord-activity-lolbet/1.0 (personal hobby bot)";
 const LP_ALIAS = { lyon: "lyongaming", secretwhales: "teamsecretwhales" };
 const norm = (n) => { const k = String(n || "").toLowerCase().replace(/[^a-z0-9]/g, ""); return LP_ALIAS[k] || k; };
@@ -209,6 +209,23 @@ function parseMatchlists(html) {
   }
   return out;
 }
+// 淘汰賽頁面是對戰樹（brkts-match），不是瑞士輪的列表：每場兩個 brkts-opponent-entry，隊名在 aria-label，比分在 brkts-opponent-score-inner，賽制在「(Bo5)」。
+function parseBrackets(html) {
+  const out = [];
+  for (const chunk of html.split('class="brkts-match ').slice(1)) {
+    const head = chunk.split("brkts-popup brkts-popup-container")[0];
+    const ents = head.split(/class="brkts-opponent-entry(?=[\s"])/).slice(1, 3);
+    if (ents.length < 2) continue;
+    const teams = ents.map((e) => { const m = e.match(/aria-label="([^"]+)"/); return m ? m[1].replace(/&#0?39;|&apos;/g, "'").replace(/&amp;/g, "&") : ""; });
+    if (!teams[0] || !teams[1] || /^tbd$/i.test(teams[0]) || /^tbd$/i.test(teams[1])) continue;
+    const scores = ents.map((e) => { const m = e.match(/brkts-opponent-score-inner">([\s\S]*?)<\/div>/); const s = m ? m[1].replace(/<[^>]*>/g, "").trim() : ""; return /^\d+$/.test(s) ? s : ""; });
+    const ts = chunk.match(/data-timestamp="(\d+)"/), bm = chunk.match(/\(Bo(\d)\)/), bo = bm ? Number(bm[1]) : 0;
+    const sa = Number(scores[0] || 0), sb = Number(scores[1] || 0);
+    const done = scores[0] !== "" && scores[1] !== "" && sa !== sb && (!bo || Math.max(sa, sb) >= (bo + 1) / 2);
+    out.push({ a: teams[0], b: teams[1], sa, sb, ts: ts ? Number(ts[1]) * 1000 : 0, bo, done });
+  }
+  return out;
+}
 async function lpFetch(now, force) {
   if (!LP_ON || !LP_PAGES.length) return;
   if (!force && now - lp.at < 8 * 60e3) return;
@@ -218,7 +235,7 @@ async function lpFetch(now, force) {
     const u = "https://liquipedia.net/leagueoflegends/api.php?" + new URLSearchParams({ action: "parse", page, prop: "text", format: "json", disablelimitreport: "1", disableeditsection: "1" }).toString();
     try {                                                       // 用 curl：這台伺服器上 node 的 fetch 連 Liquipedia 會逾時（curl 正常），而且對方要求 gzip
       const { stdout } = await execFileP("curl", ["-sS", "--compressed", "-m", "40", "-A", LP_UA, u], { maxBuffer: 32 * 1024 * 1024 });
-      const j = JSON.parse(stdout); list.push(...parseMatchlists(String(j?.parse?.text?.["*"] || "")));
+      const j = JSON.parse(stdout); const html = String(j?.parse?.text?.["*"] || ""); list.push(...parseMatchlists(html), ...parseBrackets(html));
     } catch (e) { console.log("世界賽運彩 Liquipedia 抓取失敗：", page, String(e && e.message || e).slice(0, 120)); }
     await new Promise((ok) => setTimeout(ok, 2500));
   }
