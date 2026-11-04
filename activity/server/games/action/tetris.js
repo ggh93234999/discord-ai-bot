@@ -9,14 +9,14 @@ const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); }
 const cleanName = (s) => String(s || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 12);
 
 function getRoom(id) {
-  if (!rooms.has(id)) rooms.set(id, { id, state: "lobby", seats: [null, null], clients: new Set(), seed: 0, t0: 0, pending: [0, 0], wins: [0, 0], winner: -1, reason: "", emptySince: null });
+  if (!rooms.has(id)) rooms.set(id, { id, state: "lobby", seats: [null, null], clients: new Set(), seed: 0, t0: 0, pending: [0, 0], wins: [0, 0], winner: -1, reason: "", solo: false, emptySince: null });
   return rooms.get(id);
 }
 const seatOf = (r, ws) => r.seats.indexOf(ws);
 const nameOf = (ws) => (ws && ws.ttName) || "玩家";
 
 function broadcast(r) {
-  const base = { t: "ttstate", state: r.state, names: r.seats.map((s) => (s ? nameOf(s) : "")), seed: r.seed, t0: r.t0, pending: r.pending, wins: r.wins, winner: r.winner, reason: r.reason, watchers: r.clients.size - r.seats.filter(Boolean).length };
+  const base = { t: "ttstate", state: r.state, names: r.seats.map((s) => (s ? nameOf(s) : "")), seed: r.seed, t0: r.t0, pending: r.pending, wins: r.wins, winner: r.winner, reason: r.reason, solo: r.solo, watchers: r.clients.size - r.seats.filter(Boolean).length };
   for (const ws of r.clients) send(ws, { ...base, you: seatOf(r, ws), now: Date.now() });
 }
 const toAll = (r, o, except) => { for (const ws of r.clients) if (ws !== except) send(ws, o); };
@@ -38,7 +38,7 @@ export function tetrisClose(ws) {
   const i = r.seats.indexOf(ws);
   if (i >= 0) {
     r.seats[i] = null;
-    if (r.state === "play") finish(r, 1 - i, "對手離開了");
+    if (r.state === "play") finish(r, r.solo ? -1 : 1 - i, r.solo ? "離開了" : "對手離開了");
     if (r.state !== "play") { r.wins = [0, 0].map((_, k) => (r.seats[k] ? r.wins[k] : 0)); fillSeats(r); }
   }
   if (!r.clients.size) r.emptySince = Date.now();
@@ -59,7 +59,8 @@ export function handleTetris(ws, m) {
   const seat = seatOf(r, ws);
   if (m.t === "ttname") { ws.ttName = cleanName(m.name) || ws.ttName; broadcast(r); }
   else if (m.t === "ttstart") {
-    if (seat < 0 || !r.seats[0] || !r.seats[1] || r.state === "play") return;
+    if (seat < 0 || r.state === "play") return;
+    r.solo = !(r.seats[0] && r.seats[1]);                                      // 只有一個人：單人練習；兩個人：對戰
     r.state = "play"; r.seed = (Math.random() * 4294967296) >>> 0; r.t0 = Date.now() + 3500;       // 3.5 秒倒數後同時開始
     r.pending = [0, 0]; r.winner = -1; r.reason = "";
     broadcast(r);
@@ -69,6 +70,7 @@ export function handleTetris(ws, m) {
   } else if (m.t === "ttclear") {                                              // 我消行了，攻擊 atk 行
     if (seat < 0 || r.state !== "play") return;
     const atk = Math.max(0, Math.min(30, Number(m.atk) | 0));
+    if (r.solo) { toAll(r, { t: "ttfx", seat, atk: 0, cancel: 0, label: String(m.label || "").slice(0, 20), combo: Number(m.combo) | 0, b2b: !!m.b2b }); return; }
     const cancel = Math.min(r.pending[seat], atk);
     r.pending[seat] -= cancel;
     r.pending[1 - seat] += atk - cancel;
@@ -82,10 +84,10 @@ export function handleTetris(ws, m) {
     toAll(r, { t: "ttpend", pending: r.pending });
   } else if (m.t === "ttdead") {
     if (seat < 0) return;
-    finish(r, 1 - seat, "對手頂到頂了");
+    if (r.solo) finish(r, -1, "頂到頂了"); else finish(r, 1 - seat, "對手頂到頂了");
   } else if (m.t === "ttagain") {
     if (seat < 0 || r.state !== "over") return;
-    r.state = "lobby"; r.winner = -1; r.reason = ""; r.pending = [0, 0];
+    r.state = "lobby"; r.winner = -1; r.reason = ""; r.pending = [0, 0]; r.solo = false;
     fillSeats(r);
     broadcast(r);
   }

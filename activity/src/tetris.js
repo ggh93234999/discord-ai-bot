@@ -33,6 +33,9 @@ function bagMaker(seed) {
   return () => { if (!bag.length) { bag = [...NAMES]; for (let i = 6; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; } } return bag.pop(); };
 }
 const UI_FONT = "'Noto Sans CJK TC','Noto Sans TC','Microsoft JhengHei',sans-serif";
+const fmtTime = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+const getBest = () => { try { return Number(localStorage.getItem("tetrisbest")) || 0; } catch { return 0; } };
+const saveBest = (sc) => { const b = Math.max(getBest(), sc); try { localStorage.setItem("tetrisbest", String(b)); } catch {} return b; };
 const lsName = () => { try { return localStorage.getItem("pokername") || ""; } catch { return ""; } };
 
 export function mountTetris(root, { env, back }) {
@@ -135,7 +138,7 @@ export function mountTetris(root, { env, back }) {
   function nextPiece(s) { spawn(s, s.queue.shift()); s.queue.push(s.nextType()); s.canHold = true; }
   const level = (s) => Math.max(0, Math.floor((srvNow() - s.t0) / 20000));
   const gravMs = (s) => Math.max(45, 800 * Math.pow(0.85, level(s)));
-  function die(s) { if (s.dead) return; s.dead = true; send({ t: "ttdead" }); pushBoard(true); }
+  function die(s) { if (s.dead) return; s.dead = true; s.endMs = Math.max(0, srvNow() - s.t0); send({ t: "ttdead" }); pushBoard(true); }
 
   const grounded = (s) => !fits(s.board, { ...s.cur, y: s.cur.y + 1 });
   function touch(s) { if (grounded(s)) { if (s.lockResets < LOCK_RESETS) { s.lockAt = performance.now() + LOCK_MS; s.lockResets++; } } else s.lockAt = 0; }
@@ -158,7 +161,7 @@ export function mountTetris(root, { env, back }) {
     return false;
   }
   const dropY = (s) => { let y = s.cur.y; while (fits(s.board, { ...s.cur, y: y + 1 })) y++; return y; };
-  function hardDrop(s) { s.cur.y = dropY(s); lock(s); }
+  function hardDrop(s) { const y = dropY(s); s.score += 2 * (y - s.cur.y); s.cur.y = y; lock(s); }
   function doHold(s) {
     if (!s.canHold) return;
     const t = s.cur.t, h = s.hold; s.hold = t; SFX.hold();
@@ -347,15 +350,23 @@ export function mountTetris(root, { env, back }) {
     }
     // 右欄：對手小盤面、暫存、下一個
     const ms = c * .4, ow = COLS * ms, oh = (ROWS - HID) * ms;
-    const oname = sv && sv.names[oppSeat] ? sv.names[oppSeat] : "對手";
     ctx.fillStyle = "#cfd8ee"; ctx.font = `${Math.max(10, c * .52)}px ${UI_FONT}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-    ctx.fillText(oname.slice(0, 6), rx, by + c * .5);
-    drawStrBoard(opp[oppSeat] && opp[oppSeat].b, rx, by + c * .8, ms);
-    const oPend = sv ? pendingIn[oppSeat] : 0;
-    if (oPend) { ctx.fillStyle = "#ff8a3b"; ctx.fillRect(rx + ow + 3, by + c * .8 + oh - Math.min(20, oPend) * ms, 3, Math.min(20, oPend) * ms); }
-    let yy = by + c * .8 + oh + c * .45;
-    ctx.fillStyle = "#9fb0d0"; ctx.fillText(`${opp[oppSeat] ? opp[oppSeat].s : 0} 分`, rx, yy + c * .4);
-    yy += c * 1.0;
+    let yy;
+    if (sv && sv.solo) {                                              // 單人練習：右邊上方改顯示成績
+      const el = s && s.started ? (s.dead ? s.endMs || 0 : Math.max(0, srvNow() - s.t0)) : 0;
+      const lines = [["單人練習", "#ffd54f"], [`${s ? s.score | 0 : 0} 分`, "#fff"], [`${s ? s.lines : 0} 行`, "#cfd8ee"], [`等級 ${s ? level(s) + 1 : 1}`, "#cfd8ee"], [fmtTime(el), "#cfd8ee"], [`最高 ${Math.max(getBest(), s ? s.score | 0 : 0)}`, "#9fb0d0"]];
+      lines.forEach(([tx, col], i) => { ctx.fillStyle = col; ctx.fillText(tx, rx, by + c * (.8 + i * 1.2)); });
+      yy = by + c * 8.2;
+    } else {
+      const oname = sv && sv.names[oppSeat] ? sv.names[oppSeat] : "對手";
+      ctx.fillText(oname.slice(0, 6), rx, by + c * .5);
+      drawStrBoard(opp[oppSeat] && opp[oppSeat].b, rx, by + c * .8, ms);
+      const oPend = sv ? pendingIn[oppSeat] : 0;
+      if (oPend) { ctx.fillStyle = "#ff8a3b"; ctx.fillRect(rx + ow + 3, by + c * .8 + oh - Math.min(20, oPend) * ms, 3, Math.min(20, oPend) * ms); }
+      yy = by + c * .8 + oh + c * .45;
+      ctx.fillStyle = "#9fb0d0"; ctx.fillText(`${opp[oppSeat] ? opp[oppSeat].s : 0} 分`, rx, yy + c * .4);
+      yy += c * 1.0;
+    }
     if (you >= 0 && s) {
       ctx.fillStyle = "#9fb0d0"; ctx.fillText("暫存", rx, yy + c * .4);
       frame(rx, yy + c * .6, c * 3.4, c * 2.0); miniPiece(s.hold, rx + c * .2, yy + c * .8, c * .55);
@@ -364,7 +375,7 @@ export function mountTetris(root, { env, back }) {
       ctx.fillStyle = "#9fb0d0"; ctx.fillText("下一個", rx, yy + c * .4);
       for (let i = 0; i < 3; i++) { frame(rx, yy + c * .6 + i * c * 1.55, c * 3.4, c * 1.4); miniPiece(s.queue[i], rx + c * .2, yy + c * .72 + i * c * 1.55, c * .45); }
       yy += c * 5.5;
-      ctx.fillStyle = "#cfd8ee"; ctx.fillText(`${s.score | 0} 分　${s.lines} 行`, rx, Math.min(yy + c * .3, CH - c * .2));
+      if (!(sv && sv.solo)) { ctx.fillStyle = "#cfd8ee"; ctx.fillText(`${s.score | 0} 分　${s.lines} 行`, rx, Math.min(yy + c * .3, CH - c * .2)); }
     }
     // 攻擊文字
     const now = performance.now();
@@ -392,16 +403,21 @@ export function mountTetris(root, { env, back }) {
     if (sv.state === "lobby") {
       const ready = sv.names[0] && sv.names[1];
       if (sv.you >= 0 && ready) html = `${wins}<p>兩位玩家到齊了</p><button class="tbtn tstart">開始對戰</button>`;
-      else if (sv.you >= 0) html = `<p>等另一位玩家進來…</p><small>同一個 Activity 的人進來就會自動入座</small>`;
+      else if (sv.you >= 0) html = `<p>一個人可以先單人練習</p><button class="tbtn tstart">單人練習</button><small>同一個 Activity 的人進來會自動入座，到齊後就能對戰（練習中進來的人先旁觀）</small>`;
       else html = `<p>房間等待中，你是旁觀</p>${wins}`;
     } else if (sv.state === "over") {
-      const me = sv.you >= 0 ? (sv.winner === sv.you ? "🏆 你贏了！" : "💀 你輸了") : `${nm(sv.winner)} 獲勝`;
-      html = `<h3>${me}</h3><p>${sv.reason || ""}</p>${wins}${sv.you >= 0 ? `<button class="tbtn tagain">再來一局</button>` : ""}`;
+      if (sv.solo) {
+        const best = saveBest(g ? g.score | 0 : 0);
+        html = `<h3>挑戰結束</h3><p>${g ? `${g.score | 0} 分　${g.lines} 行　撐了 ${fmtTime(g.endMs || 0)}` : ""}</p><p>最高紀錄 ${best} 分</p>${sv.you >= 0 ? `<button class="tbtn tagain">再來一局</button>` : ""}`;
+      } else {
+        const me = sv.you >= 0 ? (sv.winner === sv.you ? "🏆 你贏了！" : "💀 你輸了") : `${nm(sv.winner)} 獲勝`;
+        html = `<h3>${me}</h3><p>${sv.reason || ""}</p>${wins}${sv.you >= 0 ? `<button class="tbtn tagain">再來一局</button>` : ""}`;
+      }
     }
     overlay.hidden = !html; overlay.innerHTML = html;
     const st = overlay.querySelector(".tstart"); if (st) st.addEventListener("click", () => send({ t: "ttstart" }));
     const ag = overlay.querySelector(".tagain"); if (ag) ag.addEventListener("click", () => send({ t: "ttagain" }));
-    statusEl.textContent = sv.state === "play" ? (sv.you >= 0 ? "對戰中：消行會把垃圾行丟給對手" : "旁觀中") : sv.state === "over" ? "這局結束了" : "準備中";
+    statusEl.textContent = sv.state === "play" ? (sv.you >= 0 ? (sv.solo ? "單人練習：越玩越快，撐越久越好" : "對戰中：消行會把垃圾行丟給對手") : "旁觀中") : sv.state === "over" ? "這局結束了" : "準備中";
   }
 
   let lastT = 0;
