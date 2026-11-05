@@ -68,3 +68,14 @@
 .pcb-keep { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; }
 .pcb-keep input { width:auto; }
 .pcb-load { display:flex; gap:8px; margin-top:10px; } .pcb-load input { flex:1; text-transform:uppercase; letter-spacing:2px; }
+
+.tbox.order { width:min(100%, 460px); }
+.otitle { font-size:18px; font-weight:800; margin-bottom:10px; display:flex; align-items:baseline; gap:8px; } .otitle small { font-size:12px; font-weight:400; opacity:.65; }
+.ostore { border:1px solid #2c2f37; border-radius:10px; margin-bottom:10px; overflow:hidden; }
+.ostore .oh { display:flex; justify-content:space-between; align-items:baseline; background:#232731; padding:7px 10px; font-size:13px; } .ostore .oh b { font-size:15px; }
+.orow { display:grid; grid-template-columns:26px 1fr auto; gap:2px 8px; padding:8px 10px; border-top:1px solid #23262d; align-items:center; font-size:13px; line-height:1.35; }
+.orow .oi { grid-row:1 / span 2; font-size:18px; text-align:center; } .orow .on { word-break:break-all; } .orow .on small { display:block; opacity:.55; font-size:11px; }
+.orow b { color:#ffd24a; font-size:15px; } .orow em { grid-column:3; font-style:normal; font-size:11px; opacity:.55; text-align:right; } .orow em.only { opacity:.4; }
+.ototal { display:flex; justify-content:space-between; align-items:baseline; padding:8px 4px; font-size:15px; border-top:2px solid #3a3d46; } .ototal b { font-size:24px; color:#ffd24a; }
+.ocode { font-size:13px; margin:8px 0; } .ocode b { letter-spacing:2px; }
+.otext { margin-top:8px; }

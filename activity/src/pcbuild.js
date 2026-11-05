@@ -102,7 +102,7 @@ export function mountPcBuild(root, { env, back }) {
       <div class="big">${MODES[mode]}：<b>${money(used)}</b></div>
       ${need ? `<div class="watt">預估耗電約 ${estWatts(sel)}W，建議電源 ${need}W 以上</div>` : ""}
       <ul class="chk">${bad.map((x) => `<li class="err">❌ ${esc(x.msg)}</li>`).join("")}${warn.map((x) => `<li class="warn">⚠️ ${esc(x.msg)}</li>`).join("")}${ok.map((x) => `<li class="ok">✅ ${esc(x.msg)}</li>`).join("")}</ul>
-      <div class="acts"><button class="copy">複製清單</button><button class="share">產生配單代碼</button><button class="clear">全部清空</button></div>
+      <div class="acts"><button class="order">📋 看估價單</button><button class="clear">全部清空</button></div>
       <p class="note">價格取自原價屋線上估價與欣亞商品頁，每 4 小時更新；相容性是依型號文字判斷，下單前仍請自行確認（尤其是顯卡長度、散熱器高度）。</p>` : `<p class="note">還沒選任何零件：上面輸入預算按「幫我配」，或從各分類自己選。</p>`;
   }
 
@@ -211,8 +211,7 @@ export function mountPcBuild(root, { env, back }) {
     if (!t) return;
     if (t.classList.contains("mode")) { mode = t.dataset.m; ls.set("pcb_mode", mode); renderSum(); }
     else if (t.classList.contains("clear")) { sel = {}; auto.clear(); saveSel(); render(); }
-    else if (t.classList.contains("copy")) copyList();
-    else if (t.classList.contains("share")) shareCode();
+    else if (t.classList.contains("order")) openOrder();
   });
   $(".pcb-go").addEventListener("click", () => {
     const budget = Math.round(Number($(".pcb-budget").value));
@@ -242,31 +241,64 @@ export function mountPcBuild(root, { env, back }) {
       $(".pcb-sum").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch { $(".pcb-code").placeholder = "載入失敗，晚點再試"; }
   }
-  async function shareCode() {
-    try {
-      const r = await fetch(url("api/pc/share?ids=" + encodeURIComponent(JSON.stringify(Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id]))))));
-      const j = await r.json();
-      const b = $(".share"); if (b && j.code) b.textContent = "代碼 " + j.code + "（30 天內有效）";
-    } catch {}
-  }
   $(".pcb-loadbtn").addEventListener("click", () => loadCode($(".pcb-code").value));
   $(".pcb-code").addEventListener("keydown", (e) => { if (e.key === "Enter") loadCode(e.target.value); });
 
-  function copyList() {
-    const t = totals(sel);
-    const lines = CAT_LIST.filter((c) => sel[c]).map((c) => `${CAT_NAME[c]}：${sel[c].name}　原價屋 ${money(sel[c].c && sel[c].c.p)} / 欣亞 ${money(sel[c].s && sel[c].s.p)}`);
-    lines.push(`合計：混搭最省 ${money(t.min)}，原價屋全買 ${money(t.c)}，欣亞全買 ${money(t.s)}`);
-    const text = lines.join("\n");
-    const fallback = () => {
-      const box = document.createElement("div");
-      box.className = "pcb-trend";
-      box.innerHTML = `<div class="tbox"><button class="tclose">✕</button><b>長按全選後複製</b><textarea readonly rows="10"></textarea></div>`;
-      box.querySelector("textarea").value = text;
-      box.addEventListener("click", (e) => { if (e.target === box || e.target.closest(".tclose")) box.remove(); });
-      root.querySelector(".pcb").appendChild(box);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => { const b = $(".copy"); if (b) { b.textContent = "已複製 ✓"; setTimeout(() => (b.textContent = "複製清單"), 1500); } }, fallback);
-    else fallback();
+  // ---------- 估價單 ----------
+  const SN = { c: "原價屋", s: "欣亞" };
+  const short = (t, n = 30) => { t = String(t).replace(/\s+/g, " "); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+  // 每個零件在目前的買法下要去哪家買
+  function storeOf(p) {
+    if (mode === "c") return p.c ? "c" : "s";
+    if (mode === "s") return p.s ? "s" : "c";
+    if (p.c && p.s) return p.c.p <= p.s.p ? "c" : "s";
+    return p.c ? "c" : "s";
+  }
+  function orderData() {
+    const g = { c: [], s: [] };
+    for (const cat of CAT_LIST) { const p = sel[cat]; if (!p) continue; const st = storeOf(p); g[st].push({ cat, p, price: p[st].p, other: st === "c" ? p.s : p.c }); }
+    const sum = (a) => a.reduce((x, r) => x + r.price, 0);
+    return { g, sub: { c: sum(g.c), s: sum(g.s) }, total: sum(g.c) + sum(g.s) };
+  }
+  function orderText(code) {
+    const o = orderData(), d = new Date(Math.min(data.cool || 1e12, data.sinya || 1e12) * 1000);
+    const stamp = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const out = [`**🖥️ 電腦配單　${money(o.total)}**　（${MODES[mode]}，${stamp} 的價格）`];
+    for (const st of ["c", "s"]) {
+      if (!o.g[st].length) continue;
+      out.push("", `**${SN[st]}　${money(o.sub[st])}**`);
+      for (const r of o.g[st]) out.push(`${ICON[r.cat]} ${CAT_NAME[r.cat]}｜${short(r.p.name, 34)}｜${money(r.price)}`);
+    }
+    const miss = CAT_LIST.filter((c) => !sel[c]).map((c) => CAT_NAME[c]);
+    if (miss.length) out.push("", `還沒選：${miss.join("、")}`);
+    const bad = check(sel).filter((x) => x.lv === "err");
+    if (bad.length) out.push("", ...bad.map((x) => "❌ " + x.msg));
+    if (code) out.push("", `配單代碼 \`${code}\`（在 Activity「配電腦」輸入可載入）`);
+    return out.join("\n");
+  }
+  function openOrder() {
+    if (!Object.keys(sel).length) return;
+    const o = orderData(), box = document.createElement("div");
+    box.className = "pcb-trend";
+    const rows = (st) => o.g[st].map((r) => `<div class="orow"><span class="oi">${ICON[r.cat]}</span><div class="on"><small>${CAT_NAME[r.cat]}</small>${esc(r.p.name)}</div><b>${money(r.price)}</b>${r.other ? `<em>另一家 ${money(r.other.p)}</em>` : `<em class="only">只有這家有</em>`}</div>`).join("");
+    const blocks = ["c", "s"].filter((st) => o.g[st].length).map((st) => `<div class="ostore"><div class="oh"><b>${SN[st]}</b><span>${o.g[st].length} 項　${money(o.sub[st])}</span></div>${rows(st)}</div>`).join("");
+    const issues = check(sel).filter((x) => x.lv !== "ok");
+    box.innerHTML = `<div class="tbox order"><button class="tclose">✕</button><div class="otitle">估價單<small>${MODES[mode]}</small></div>${blocks}
+      <div class="ototal"><span>合計</span><b>${money(o.total)}</b></div>
+      ${issues.length ? `<ul class="chk">${issues.map((x) => `<li class="${x.lv}">${x.lv === "err" ? "❌" : "⚠️"} ${esc(x.msg)}</li>`).join("")}</ul>` : ""}
+      <div class="ocode">配單代碼：<b class="ocv">產生中…</b></div>
+      <div class="acts"><button class="ocopy">複製（貼到 Discord）</button></div>
+      <textarea class="otext" readonly rows="8" hidden></textarea></div>`;
+    root.querySelector(".pcb").appendChild(box);
+    let code = "";
+    box.addEventListener("click", (e) => { if (e.target === box || e.target.closest(".tclose")) box.remove(); });
+    fetch(url("api/pc/share?ids=" + encodeURIComponent(JSON.stringify(Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id])))))).then((r) => r.json()).then((j) => { code = j.code || ""; box.querySelector(".ocv").textContent = code ? code + "（30 天內有效）" : "（無法產生）"; }).catch(() => { box.querySelector(".ocv").textContent = "（無法產生）"; });
+    box.querySelector(".ocopy").addEventListener("click", () => {
+      const text = orderText(code), ta = box.querySelector(".otext"), b = box.querySelector(".ocopy");
+      const show = () => { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); b.textContent = "長按文字框全選後複製"; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => { b.textContent = "已複製 ✓"; setTimeout(() => (b.textContent = "複製（貼到 Discord）"), 1500); }, show);
+      else show();
+    });
   }
 
   load();
