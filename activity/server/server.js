@@ -12,6 +12,7 @@ import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./ga
 import { handleFarm, recoverFarmPending } from "./games/life/farm.js";
 import { handleGacha, handleGachaBoard } from "./games/life/gacha.js";
 import { handleGallery, serveGallery } from "./media/gallery.js";
+import { handlePc, startPc } from "./pcbuild/pcbuild.js";
 import { listRooms, handleCasino, casinoClose, casinoFeed, casinoReclaim, recoverCasinoEscrow, noteReal } from "./games/casino/casino.js";
 import * as chessEng from "./games/board/chess.js";
 import * as xqEng from "./games/board/xq.js";
@@ -271,6 +272,7 @@ function servePresence(req, res) {
 }
 const httpServer = http.createServer((req, res) => {
   if (req.url.startsWith("/api/internal/presence")) return servePresence(req, res);
+  if (req.url.startsWith("/api/pc/") && handlePc(req, res)) return;
   if (req.url.startsWith("/api/gallery/img/") && serveGallery(req, res)) return;
   if (req.url.startsWith("/api/tv/sub/")) return void serveSub(req, res).then((ok) => { if (!ok) { res.writeHead(404); res.end(); } });
   if (req.url.startsWith("/api/tv/") && serveVideo(req, res)) return;
@@ -282,6 +284,7 @@ recoverEscrow().catch((e) => console.log("escrow 還原失敗", e.message));
 recoverFarmPending().catch((e) => console.log("農場補發失敗", e.message));
 recoverCasinoEscrow().catch((e) => console.log("賭場 escrow 還原失敗", e.message));
 httpServer.listen(PORT, "127.0.0.1");
+startPc();
 
 wss.on("connection", (ws, req) => {
   ws.ua = String((req && req.headers["user-agent"]) || "").replace(/.*discord\/([\d.]+).*/, "discord/$1").slice(0, 40); ws.mtypes = [];

@@ -25,6 +25,7 @@ import { mountGachaCards } from "./gachacards.js";
 import { mountCardBoard } from "./cardboard.js";
 import { mountDown } from "./stairs.js";
 import { mountTetris } from "./tetris.js";
+import { mountPcBuild } from "./pcbuild.js";
 import { mountFarm } from "./farm.js";
 import { mountGallery } from "./gallery.js";
 import { iconHtml } from "./iconart.js";
@@ -93,6 +94,7 @@ const CATS = [
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
   { id: "action", icon: "🎮", name: "動作", note: "即時對戰／闖關" },
   { id: "media", icon: "🎬", name: "影音創作", note: "一起看影片、AI 畫圖" },
+  { id: "tool", icon: "🧰", name: "實用工具", note: "配電腦等" },
 ];
 const GAMES = [
   { id: "gomoku", cat: "board", icon: "⚫", name: "五子棋", players: "2 人", desc: "先連五子獲勝", mount: mountGomoku },
@@ -117,6 +119,7 @@ const GAMES = [
   { id: "avalon", cat: "table", icon: "🗡️", name: "阿瓦隆", players: "5–10 人（可補電腦）", desc: "好人與壞人的推理：組隊、投票、出任務，沒有計時，按「下一步」才繼續", mount: mountAvalon() },
   { id: "stone", cat: "casino", icon: "💎", name: "賭石", players: "1 人", desc: "買整顆原石、一塊塊切開看裡面，每塊各自賣給收購商", mount: mountCasino("stone") },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
+  { id: "pcbuild", cat: "tool", wide: true, icon: "🖥️", name: "配電腦", players: "不限（個人配單）", desc: "原價屋＋欣亞價格對照、相容性檢查、輸入預算自動配單、看價格走勢；也可以直接叫大笨bot幫你配", mount: mountPcBuild },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "gallery", cat: "media", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
   { id: "gachacards", cat: "life", wide: true, icon: "🎴", name: "水墨卡冊", players: "1 人（個人收藏）", desc: "300 張水墨風卡牌：東方 100、西方 100、原創虛構 50、異想天開 50（幻獸、人物、器物、風景），可以抽卡、收集、升星，也能派卡片出去探險賺墨點", mount: mountGachaCards },
