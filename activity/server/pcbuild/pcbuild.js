@@ -216,7 +216,7 @@ function makeShare(ids) {
 }
 const cleanIds = (o) => { const out = {}; for (const c of CATS) if (o && typeof o[c] === "string" && /^[cs][\w]{1,20}$/.test(o[c])) out[c] = o[c]; return out; };
 
-const brief = (p) => ({ id: p.id, cat: p.cat, name: p.name, 原價屋: p.c ? p.c.p : null, 欣亞: p.s ? p.s.p : null, 較便宜: p.c && p.s ? (p.c.p === p.s.p ? "一樣" : p.c.p < p.s.p ? "原價屋" : "欣亞") : p.c ? "只有原價屋" : "只有欣亞" });
+const brief = (p) => ({ id: p.id, cat: p.cat, name: p.name, 規格: (p.spec || "").slice(0, 90), 原價屋: p.c ? p.c.p : null, 欣亞: p.s ? p.s.p : null, 較便宜: p.c && p.s ? (p.c.p === p.s.p ? "一樣" : p.c.p < p.s.p ? "原價屋" : "欣亞") : p.c ? "只有原價屋" : "只有欣亞" });
 function json(res, o, code = 200) { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(o)); return true; }
 function buildReply(sel, mode, extra, notes) {
   const t = totals(sel);

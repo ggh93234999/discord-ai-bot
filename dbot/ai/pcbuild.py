@@ -2,6 +2,7 @@
 只在使用者提到配電腦、組裝、預算、零件、原價屋、欣亞等字時才放進工具清單（見 bot.py 的 PC_RE）。"""
 import json
 import os
+import time
 
 import aiohttp
 
@@ -44,6 +45,12 @@ _LAST: dict = {}          # 每個使用者最近一份配單代碼：說「幫�
 _MODE = {"both": "min", "coolpc": "c", "sinya": "s"}
 
 
+def has_recent(key, hours: float = 3) -> bool:
+    """這個使用者最近幾小時內配過單 → 之後的對話（例如「換一下」「改一下單」）就算沒提到電腦字眼也要有這個工具。"""
+    e = _LAST.get(key)
+    return bool(e) and time.time() - e[1] < hours * 3600
+
+
 async def run(args: dict, key=None) -> str:
     action = args.get("action") or "recommend"
     if action == "recommend":
@@ -63,7 +70,7 @@ async def run(args: dict, key=None) -> str:
         params = {"q": args["query"], "cat": args.get("category") or ""}
         path = "search"
     elif action == "edit":
-        code = (args.get("code") or "").strip() or _LAST.get(key, "")
+        code = (args.get("code") or "").strip() or (_LAST.get(key) or ("", 0))[0]
         if not code:
             return "要改哪一份配單？請給配單代碼（上一次配好的結果裡有）。"
         params = {"code": code, "set": args.get("set") or "", "drop": args.get("drop") or "", "mode": _MODE.get(args.get("store") or "both", "min")}
@@ -85,7 +92,7 @@ async def run(args: dict, key=None) -> str:
                     return f"配電腦資料暫時不能用：{text[:200]}"
                 if r.status == 200 and path in ("rec", "edit"):
                     try:
-                        _LAST[key] = json.loads(text).get("配單代碼") or _LAST.get(key, "")
+                        _LAST[key] = (json.loads(text).get("配單代碼") or (_LAST.get(key) or ("", 0))[0], time.time())
                     except Exception:  # noqa: BLE001
                         pass
                 return text[:6000]
