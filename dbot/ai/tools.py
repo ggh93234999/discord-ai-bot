@@ -183,7 +183,7 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
         if name == "announce":
             return await announce.run(msg, args)
         if name == "pc_build":
-            return await pcbuild.run(args)
+            return await pcbuild.run(args, msg.author.id if msg is not None else None)
         if name == "transfer_log":
             return botwallet.run_log(msg.guild.id if msg is not None and msg.guild else None, args)
         if name == "bot_pay":
@@ -303,7 +303,7 @@ def tool_status(name: str, args_json: str) -> str:
     if name == "announce":
         return "📢 處理公告"
     if name == "pc_build":
-        return {"recommend": "🖥️ 配電腦中…", "search": "🔎 查零件價格…", "trend": "📈 翻價格走勢…"}.get(args.get("action") or "recommend", "🖥️ 配電腦中…")
+        return {"recommend": "🖥️ 配電腦中…", "edit": "🔧 改配單中…", "search": "🔎 查零件價格…", "trend": "📈 翻價格走勢…"}.get(args.get("action") or "recommend", "🖥️ 配電腦中…")
     if name == "transfer_log":
         return "📒 翻轉帳紀錄"
     if name == "activity_status":

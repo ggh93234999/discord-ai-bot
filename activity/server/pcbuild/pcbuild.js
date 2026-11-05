@@ -218,6 +218,17 @@ const cleanIds = (o) => { const out = {}; for (const c of CATS) if (o && typeof 
 
 const brief = (p) => ({ id: p.id, cat: p.cat, name: p.name, 原價屋: p.c ? p.c.p : null, 欣亞: p.s ? p.s.p : null, 較便宜: p.c && p.s ? (p.c.p === p.s.p ? "一樣" : p.c.p < p.s.p ? "原價屋" : "欣亞") : p.c ? "只有原價屋" : "只有欣亞" });
 function json(res, o, code = 200) { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(o)); return true; }
+function buildReply(sel, mode, extra, notes) {
+  const t = totals(sel);
+  const ids = {}; for (const c of CAT_LIST) if (sel[c]) ids[c] = sel[c].id;
+  return {
+    配單代碼: makeShare(ids), ...extra, 更新時間: state.ts,
+    零件: CAT_LIST.filter((c) => sel[c]).map((c) => ({ 類別: CAT_NAME[c], ...brief(sel[c]), 取價: priceOf(sel[c], mode) })),
+    尚未選的類別: CAT_LIST.filter((c) => !sel[c]).map((c) => CAT_NAME[c]),
+    合計: { 混搭最省: t.min, 原價屋全買: t.c, 欣亞全買: t.s, 原價屋缺貨零件: t.missC.map((c) => CAT_NAME[c]), 欣亞缺貨零件: t.missS.map((c) => CAT_NAME[c]) },
+    相容性: check(sel).map((x) => `${x.lv === "err" ? "❌" : x.lv === "warn" ? "⚠️" : "✅"} ${x.msg}`), 備註: notes || [],
+  };
+}
 function handleTools(u, res) {
   if (!state.json) return json(res, { err: "價格資料還在載入，請稍後再試" }, 503);
   if (u.pathname === "/api/pc/rec") {
@@ -229,14 +240,28 @@ function handleTools(u, res) {
       for (const c of CATS) { const p = (state.parts[c] || []).find((x) => x.id === id); if (p) { locked[c] = p; break; } }
     }
     const r = recommend(state.parts, budget, use, mode, locked);
-    const t = totals(r.sel);
-    const ids = {}; for (const c of CAT_LIST) if (r.sel[c]) ids[c] = r.sel[c].id;
-    return json(res, {
-      配單代碼: makeShare(ids), 預算: budget, 用途: USE_NAME[use], 更新時間: state.ts,
-      零件: CAT_LIST.filter((c) => r.sel[c]).map((c) => ({ 類別: CAT_NAME[c], ...brief(r.sel[c]), 取價: priceOf(r.sel[c], mode) })),
-      合計: { 混搭最省: t.min, 原價屋全買: t.c, 欣亞全買: t.s, 原價屋缺貨零件: t.missC.map((c) => CAT_NAME[c]), 欣亞缺貨零件: t.missS.map((c) => CAT_NAME[c]) },
-      相容性: check(r.sel).map((x) => `${x.lv === "err" ? "❌" : x.lv === "warn" ? "⚠️" : "✅"} ${x.msg}`), 備註: r.notes,
-    });
+    return json(res, buildReply(r.sel, mode, { 預算: budget, 用途: USE_NAME[use] }, r.notes));
+  }
+  if (u.pathname === "/api/pc/edit") {
+    const e = loadShares()[String(u.searchParams.get("code") || "").toUpperCase().trim()];
+    if (!e) return json(res, { err: "找不到這個配單代碼（可能打錯或已過期）" }, 404);
+    const mode = ["c", "s", "min"].includes(u.searchParams.get("mode")) ? u.searchParams.get("mode") : "min";
+    const find = (id) => { for (const c of CATS) { const p = (state.parts[c] || []).find((x) => x.id === id); if (p) return p; } return null; };
+    const sel = {}; const notes = [];
+    for (const c of CAT_LIST) if (e.ids[c]) { const p = find(e.ids[c]); if (p) sel[c] = p; else notes.push(`${CAT_NAME[c]}原本的零件已經下架或找不到，已移除`); }
+    for (const pair of (u.searchParams.get("set") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8)) {
+      const id = pair.includes(":") ? pair.split(":")[1] : pair, p = find(id);
+      if (p) sel[p.cat] = p; else notes.push(`找不到零件 ${id}`);
+    }
+    for (const c of (u.searchParams.get("drop") || "").split(",").map((x) => x.trim()).filter(Boolean)) delete sel[c];
+    const budget = +u.searchParams.get("budget") || 0;
+    let extra = {};
+    if (u.searchParams.get("fill") === "1" && budget >= 8000) {
+      const use = ["game", "office", "create"].includes(u.searchParams.get("use")) ? u.searchParams.get("use") : "game";
+      const r = recommend(state.parts, Math.min(500000, budget), use, mode, sel);
+      Object.assign(sel, r.sel); notes.push(...r.notes); extra = { 預算: budget, 用途: USE_NAME[use] };
+    }
+    return json(res, buildReply(sel, mode, extra, notes));
   }
   if (u.pathname === "/api/pc/share") {
     let ids = {};
@@ -273,7 +298,7 @@ function handleTools(u, res) {
 
 export function handlePc(req, res) {
   const u = new URL(req.url, "http://x");
-  if (/^\/api\/pc\/(rec|search|trend|share|load)$/.test(u.pathname)) return handleTools(u, res);
+  if (/^\/api\/pc\/(rec|search|trend|share|load|edit)$/.test(u.pathname)) return handleTools(u, res);
   if (u.pathname === "/api/pc/data") {
     if (!state.gz) { res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "30" }); res.end('{"err":"loading"}'); return true; }
     const ae = String(req.headers["accept-encoding"] || "");
