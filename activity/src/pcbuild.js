@@ -24,7 +24,10 @@ export function mountPcBuild(root, { env, back }) {
             <label>預算 <input class="pcb-budget" type="number" inputmode="numeric" min="10000" step="1000" placeholder="例如 40000"></label>
             <label>用途 <select class="pcb-use"><option value="game">遊戲</option><option value="office">文書／上網</option><option value="create">剪片／繪圖</option></select></label>
           </div>
+          <label class="pcb-keep"><input type="checkbox" class="pcb-keepcb" checked> 保留我自己選的零件，只配其他的</label>
           <button class="pcb-go">幫我配</button>
+          <div class="pcb-load"><input class="pcb-code" maxlength="6" placeholder="配單代碼（bot 給的）" autocapitalize="characters"><button class="pcb-loadbtn">載入</button></div>
+          <p class="note">做法：先把預算扣掉你選好的零件，剩下的依用途分配（遊戲偏顯卡、文書偏 CPU 與硬碟），每類挑預算內最好的，並確保腳位、DDR、機殼、電源互相相容；剩的錢再拿去升級顯卡（文書機升級 CPU）。標「自動配」的零件下次按會重配，你自己選的會留著。</p>
         </section>
         <section class="pcb-slots" hidden></section>
         <section class="pcb-sum" hidden></section>
@@ -33,11 +36,11 @@ export function mountPcBuild(root, { env, back }) {
     </div>`;
   const $ = (s) => root.querySelector(s);
   $(".back").addEventListener("click", back);
-  const url = (p) => (env.inDiscord ? `/.proxy/${p}` : new URL(p, location.href).pathname);
+  const url = (p) => { if (env.inDiscord) return `/.proxy/${p}`; const u = new URL(p, location.href); return u.pathname + u.search; };
 
-  let data = null, sel = {}, mode = ls.get("pcb_mode", "min");
+  let data = null, sel = {}, auto = new Set(ls.get("pcb_auto", [])), mode = ls.get("pcb_mode", "min");
   if (!MODES[mode]) mode = "min";
-  const saveSel = () => ls.set("pcb_sel", Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id])));
+  const saveSel = () => { for (const c of [...auto]) if (!sel[c]) auto.delete(c); ls.set("pcb_auto", [...auto]); ls.set("pcb_sel", Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id]))); };
   const findPart = (cat, id) => (data.parts[cat] || []).find((p) => p.id === id);
 
   async function load() {
@@ -56,6 +59,8 @@ export function mountPcBuild(root, { env, back }) {
     const d = new Date(Math.min(data.cool || 1e12, data.sinya || 1e12) * 1000);
     $(".pcb-ts").textContent = `價格 ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     render();
+    const qc = new URLSearchParams(location.search).get("pc");
+    if (qc) loadCode(qc);
   }
 
   const priceCell = (p) => {
@@ -71,7 +76,7 @@ export function mountPcBuild(root, { env, back }) {
       if (!p) return `<div class="slot empty" data-cat="${cat}"><span class="si">${ICON[cat]}</span><span class="sn">${CAT_NAME[cat]}</span><button class="pick" data-cat="${cat}">選擇</button></div>`;
       const w = p.c && p.s && p.c.p !== p.s.p ? `（差 ${money(Math.abs(p.c.p - p.s.p))}）` : "";
       return `<div class="slot" data-cat="${cat}"><span class="si">${ICON[cat]}</span>
-        <div class="sb"><div class="sc">${CAT_NAME[cat]}${p.c && p.s ? `<em class="both">兩家都有${w}</em>` : p.c ? "<em>只有原價屋</em>" : "<em>只有欣亞</em>"}</div>
+        <div class="sb"><div class="sc">${CAT_NAME[cat]}${auto.has(cat) ? "<em class=\"auto\">自動配</em>" : ""}${p.c && p.s ? `<em class="both">兩家都有${w}</em>` : p.c ? "<em>只有原價屋</em>" : "<em>只有欣亞</em>"}</div>
         <div class="sname">${esc(p.name)}</div><div class="prices">${priceCell(p)}</div></div>
         <div class="sact"><button class="pick" data-cat="${cat}">換</button><button class="trend" data-id="${p.id}" data-cat="${cat}" title="價格走勢">📈</button><button class="del" data-cat="${cat}" title="移除">✕</button></div></div>`;
     }).join("");
@@ -97,7 +102,7 @@ export function mountPcBuild(root, { env, back }) {
       <div class="big">${MODES[mode]}：<b>${money(used)}</b></div>
       ${need ? `<div class="watt">預估耗電約 ${estWatts(sel)}W，建議電源 ${need}W 以上</div>` : ""}
       <ul class="chk">${bad.map((x) => `<li class="err">❌ ${esc(x.msg)}</li>`).join("")}${warn.map((x) => `<li class="warn">⚠️ ${esc(x.msg)}</li>`).join("")}${ok.map((x) => `<li class="ok">✅ ${esc(x.msg)}</li>`).join("")}</ul>
-      <div class="acts"><button class="copy">複製清單</button><button class="clear">全部清空</button></div>
+      <div class="acts"><button class="copy">複製清單</button><button class="share">產生配單代碼</button><button class="clear">全部清空</button></div>
       <p class="note">價格取自原價屋線上估價與欣亞商品頁，每 4 小時更新；相容性是依型號文字判斷，下單前仍請自行確認（尤其是顯卡長度、散熱器高度）。</p>` : `<p class="note">還沒選任何零件：上面輸入預算按「幫我配」，或從各分類自己選。</p>`;
   }
 
@@ -154,7 +159,7 @@ export function mountPcBuild(root, { env, back }) {
     const tr = t.closest(".trend");
     if (tr) { showTrend(tr.dataset.cat, tr.dataset.id); return; }
     const row = t.closest(".prow");
-    if (row && pk) { const p = findPart(pk.cat, row.dataset.id); if (p) { sel[pk.cat] = p; saveSel(); pickEl.hidden = true; pk = null; render(); } }
+    if (row && pk) { const p = findPart(pk.cat, row.dataset.id); if (p) { sel[pk.cat] = p; auto.delete(pk.cat); saveSel(); pickEl.hidden = true; pk = null; render(); } }
   });
 
   // ---------- 價格走勢 ----------
@@ -199,25 +204,53 @@ export function mountPcBuild(root, { env, back }) {
     if (!t) return;
     if (t.classList.contains("pick")) openPick(t.dataset.cat);
     else if (t.classList.contains("trend")) showTrend(t.dataset.cat, t.dataset.id);
-    else if (t.classList.contains("del")) { delete sel[t.dataset.cat]; saveSel(); render(); }
+    else if (t.classList.contains("del")) { delete sel[t.dataset.cat]; auto.delete(t.dataset.cat); saveSel(); render(); }
   });
   root.querySelector(".pcb-sum").addEventListener("click", (e) => {
     const t = e.target.closest("button");
     if (!t) return;
     if (t.classList.contains("mode")) { mode = t.dataset.m; ls.set("pcb_mode", mode); renderSum(); }
-    else if (t.classList.contains("clear")) { sel = {}; saveSel(); render(); }
+    else if (t.classList.contains("clear")) { sel = {}; auto.clear(); saveSel(); render(); }
     else if (t.classList.contains("copy")) copyList();
+    else if (t.classList.contains("share")) shareCode();
   });
   $(".pcb-go").addEventListener("click", () => {
     const budget = Math.round(Number($(".pcb-budget").value));
     if (!(budget >= 10000)) { $(".pcb-budget").focus(); return; }
     const use = $(".pcb-use").value;
     ls.set("pcb_budget", budget); ls.set("pcb_use", use);
-    const r = recommend(data.parts, budget, use, mode);
-    sel = r.sel; saveSel(); render();
+    const keep = $(".pcb-keepcb").checked;
+    const locked = keep ? Object.fromEntries(Object.entries(sel).filter(([c]) => !auto.has(c))) : {};
+    const r = recommend(data.parts, budget, use, mode, locked);
+    sel = { ...locked, ...r.sel };
+    auto = new Set(Object.keys(sel).filter((c) => !locked[c]));
+    saveSel(); render();
     if (r.notes.length) $(".pcb-sum").insertAdjacentHTML("afterbegin", `<p class="warn">${esc(r.notes.join("；"))}</p>`);
     $(".pcb-sum").scrollIntoView({ behavior: "smooth", block: "start" });
   });
+
+  async function loadCode(code) {
+    code = String(code || "").trim().toUpperCase();
+    if (!code) return;
+    try {
+      const r = await fetch(url("api/pc/load?code=" + encodeURIComponent(code)));
+      const j = await r.json();
+      if (!r.ok) { $(".pcb-code").value = ""; $(".pcb-code").placeholder = j.err || "載入失敗"; return; }
+      sel = {}; auto = new Set();
+      for (const c of CAT_LIST) if (j.ids[c]) { const p = findPart(c, j.ids[c]); if (p) sel[c] = p; }
+      saveSel(); render();
+      $(".pcb-sum").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch { $(".pcb-code").placeholder = "載入失敗，晚點再試"; }
+  }
+  async function shareCode() {
+    try {
+      const r = await fetch(url("api/pc/share?ids=" + encodeURIComponent(JSON.stringify(Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id]))))));
+      const j = await r.json();
+      const b = $(".share"); if (b && j.code) b.textContent = "代碼 " + j.code + "（30 天內有效）";
+    } catch {}
+  }
+  $(".pcb-loadbtn").addEventListener("click", () => loadCode($(".pcb-code").value));
+  $(".pcb-code").addEventListener("keydown", (e) => { if (e.key === "Enter") loadCode(e.target.value); });
 
   function copyList() {
     const t = totals(sel);

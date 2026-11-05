@@ -64,3 +64,7 @@
 .tleg { display:flex; flex-direction:column; gap:3px; font-size:12px; margin-top:8px; } .tleg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
 /* 手機版 Discord：頂端有一條列蓋在 Activity 上面，全螢幕的選單與彈窗要讓開 */
 .dcm .pcb-pick, .dcm .pcb-trend { padding-top:58px; }
+.slot .sc em.auto { background:#2a3a66; color:#b6c8ff; }
+.pcb-keep { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; }
+.pcb-keep input { width:auto; }
+.pcb-load { display:flex; gap:8px; margin-top:10px; } .pcb-load input { flex:1; text-transform:uppercase; letter-spacing:2px; }

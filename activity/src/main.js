@@ -26,6 +26,7 @@ import { mountCardBoard } from "./cardboard.js";
 import { mountDown } from "./stairs.js";
 import { mountTetris } from "./tetris.js";
 import { mountPcBuild } from "./pcbuild.js";
+import { mountAirflow } from "./airflow.js";
 import { mountFarm } from "./farm.js";
 import { mountGallery } from "./gallery.js";
 import { iconHtml } from "./iconart.js";
@@ -120,6 +121,7 @@ const GAMES = [
   { id: "stone", cat: "casino", icon: "💎", name: "賭石", players: "1 人", desc: "買整顆原石、一塊塊切開看裡面，每塊各自賣給收購商", mount: mountCasino("stone") },
   { id: "bj", cat: "casino", icon: "🃏", name: "21 點", players: "1 人", desc: "跟莊家比點數，Blackjack 賠 2.5 倍", mount: mountCasino("bj") },
   { id: "pcbuild", cat: "tool", wide: true, icon: "🖥️", name: "配電腦", players: "不限（個人配單）", desc: "原價屋＋欣亞價格對照、相容性檢查、輸入預算自動配單、看價格走勢；也可以直接叫大笨bot幫你配", mount: mountPcBuild },
+  { id: "airflow", cat: "tool", wide: true, icon: "🌬️", name: "機箱風道熱像", players: "不限（個人實驗）", desc: "3D 即時模擬機殼裡的氣流與溫度：點風扇切換進排風、換散熱器與側板，看 CPU／GPU 溫度怎麼變", mount: mountAirflow },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "gallery", cat: "media", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
   { id: "gachacards", cat: "life", wide: true, icon: "🎴", name: "水墨卡冊", players: "1 人（個人收藏）", desc: "300 張水墨風卡牌：東方 100、西方 100、原創虛構 50、異想天開 50（幻獸、人物、器物、風景），可以抽卡、收集、升星，也能派卡片出去探險賺墨點", mount: mountGachaCards },

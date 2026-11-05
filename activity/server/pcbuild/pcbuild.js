@@ -195,6 +195,27 @@ export function startPc() {
 }
 
 
+// ---------- 配單代碼：bot 配好的單、或自己的單，用 6 碼代碼在 Activity 載入 ----------
+let shares = null;
+function loadShares() {
+  if (shares) return shares;
+  try { shares = JSON.parse(fs.readFileSync(arec("pcshares.json"), "utf8")); } catch { shares = {}; }
+  return shares;
+}
+function makeShare(ids) {
+  const sh = loadShares(), now = Date.now();
+  for (const [k, v] of Object.entries(sh)) if (now - v.ts > 30 * 86400e3) delete sh[k];
+  const keys = Object.keys(sh);
+  if (keys.length > 800) for (const k of keys.sort((a, b) => sh[a].ts - sh[b].ts).slice(0, keys.length - 800)) delete sh[k];
+  const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let code;
+  do { code = Array.from(crypto.randomBytes(6), (b) => A[b % A.length]).join(""); } while (sh[code]);
+  sh[code] = { ts: now, ids };
+  try { fs.writeFileSync(arec("pcshares.json"), JSON.stringify(sh)); } catch {}
+  return code;
+}
+const cleanIds = (o) => { const out = {}; for (const c of CATS) if (o && typeof o[c] === "string" && /^[cs][\w]{1,20}$/.test(o[c])) out[c] = o[c]; return out; };
+
 const brief = (p) => ({ id: p.id, cat: p.cat, name: p.name, 原價屋: p.c ? p.c.p : null, 欣亞: p.s ? p.s.p : null, 較便宜: p.c && p.s ? (p.c.p === p.s.p ? "一樣" : p.c.p < p.s.p ? "原價屋" : "欣亞") : p.c ? "只有原價屋" : "只有欣亞" });
 function json(res, o, code = 200) { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(o)); return true; }
 function handleTools(u, res) {
@@ -203,14 +224,29 @@ function handleTools(u, res) {
     const budget = Math.max(8000, Math.min(500000, +u.searchParams.get("budget") || 0));
     const use = ["game", "office", "create"].includes(u.searchParams.get("use")) ? u.searchParams.get("use") : "game";
     const mode = ["c", "s", "min"].includes(u.searchParams.get("mode")) ? u.searchParams.get("mode") : "min";
-    const r = recommend(state.parts, budget, use, mode);
+    const locked = {};
+    for (const id of (u.searchParams.get("keep") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8)) {
+      for (const c of CATS) { const p = (state.parts[c] || []).find((x) => x.id === id); if (p) { locked[c] = p; break; } }
+    }
+    const r = recommend(state.parts, budget, use, mode, locked);
     const t = totals(r.sel);
+    const ids = {}; for (const c of CAT_LIST) if (r.sel[c]) ids[c] = r.sel[c].id;
     return json(res, {
-      預算: budget, 用途: USE_NAME[use], 更新時間: state.ts,
+      配單代碼: makeShare(ids), 預算: budget, 用途: USE_NAME[use], 更新時間: state.ts,
       零件: CAT_LIST.filter((c) => r.sel[c]).map((c) => ({ 類別: CAT_NAME[c], ...brief(r.sel[c]), 取價: priceOf(r.sel[c], mode) })),
       合計: { 混搭最省: t.min, 原價屋全買: t.c, 欣亞全買: t.s, 原價屋缺貨零件: t.missC.map((c) => CAT_NAME[c]), 欣亞缺貨零件: t.missS.map((c) => CAT_NAME[c]) },
       相容性: check(r.sel).map((x) => `${x.lv === "err" ? "❌" : x.lv === "warn" ? "⚠️" : "✅"} ${x.msg}`), 備註: r.notes,
     });
+  }
+  if (u.pathname === "/api/pc/share") {
+    let ids = {};
+    try { ids = cleanIds(JSON.parse(u.searchParams.get("ids") || "{}")); } catch {}
+    if (!Object.keys(ids).length) return json(res, { err: "沒有零件" }, 400);
+    return json(res, { code: makeShare(ids) });
+  }
+  if (u.pathname === "/api/pc/load") {
+    const e = loadShares()[String(u.searchParams.get("code") || "").toUpperCase().trim()];
+    return e ? json(res, { ids: e.ids }) : json(res, { err: "找不到這個代碼（可能打錯或已過期）" }, 404);
   }
   if (u.pathname === "/api/pc/search") {
     const cat = u.searchParams.get("cat") || "", q = (u.searchParams.get("q") || "").toUpperCase().split(/\s+/).filter(Boolean);
@@ -237,7 +273,7 @@ function handleTools(u, res) {
 
 export function handlePc(req, res) {
   const u = new URL(req.url, "http://x");
-  if (/^\/api\/pc\/(rec|search|trend)$/.test(u.pathname)) return handleTools(u, res);
+  if (/^\/api\/pc\/(rec|search|trend|share|load)$/.test(u.pathname)) return handleTools(u, res);
   if (u.pathname === "/api/pc/data") {
     if (!state.gz) { res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "30" }); res.end('{"err":"loading"}'); return true; }
     const ae = String(req.headers["accept-encoding"] || "");

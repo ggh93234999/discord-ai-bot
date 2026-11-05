@@ -98,8 +98,9 @@ function usable(cat, p, use, budget) {
 }
 
 // 回傳 { sel, total, notes[] }；mode: "c" 只買原價屋、"s" 只買欣亞、"min" 混搭最省
-export function recommend(parts, budget, use = "game", mode = "min") {
-  const ratio = RATIO[use] || RATIO.game;
+export function recommend(parts, budget, use = "game", mode = "min", locked = {}) {
+  const ratio = { ...(RATIO[use] || RATIO.game) };
+  if (use === "office" && locked.cpu && !locked.cpu.sp.igpu && !locked.gpu) ratio.gpu = 0.2;   // 鎖定的 CPU 沒內顯 → 一定要配顯卡
   const pool = {};
   for (const cat of CAT_LIST) {
     pool[cat] = (parts[cat] || []).filter((p) => priceOf(p, mode) != null && usable(cat, p, use, budget)).sort((a, b) => priceOf(a, mode) - priceOf(b, mode));
@@ -107,6 +108,12 @@ export function recommend(parts, budget, use = "game", mode = "min") {
   const notes = [];
   const sel = {};
   let spent = 0;
+  for (const [c, p] of Object.entries(locked)) if (p) { sel[c] = p; spent += priceOf(p, mode) ?? priceOf(p); }
+  const free = (c) => !locked[c];
+  // 沒鎖的分類平分剩下的預算（比例照用途）
+  const freeSum = CAT_LIST.filter((c) => free(c) && ratio[c]).reduce((a, c) => a + ratio[c], 0) || 1;
+  const avail = budget - spent;
+  const share = (c) => (avail * ratio[c]) / freeSum;
   const price = (p) => priceOf(p, mode);
   const minOf = (cat) => (pool[cat][0] ? price(pool[cat][0]) : 0);
   const order = ["cpu", "gpu", "psu", "mb", "ram", "ssd", "case", "cooler"];
@@ -115,11 +122,11 @@ export function recommend(parts, budget, use = "game", mode = "min") {
     pool.cpu = pool.cpu.filter((p) => p.sp.igpu);
   }
   const gscore = (p) => p.sp.perf * 100 + Math.min(p.sp.vram, 24);
-  const rest = (i) => order.slice(i + 1).reduce((s, c) => s + (c === "gpu" && !ratio.gpu ? 0 : minOf(c)), 0);
+  const rest = (i) => order.slice(i + 1).reduce((s, c) => s + (!free(c) || (c === "gpu" && !ratio.gpu) ? 0 : minOf(c)), 0);
   let carry = 0;
   order.forEach((cat, i) => {
-    if (cat === "gpu" && !ratio.gpu) return;
-    let cap = Math.min(budget * ratio[cat] + carry, budget - spent - rest(i));
+    if (!free(cat) || (cat === "gpu" && !ratio.gpu)) return;
+    let cap = Math.min(share(cat) + carry, budget - spent - rest(i));
     let cands = pool[cat].filter((p) => fits(sel, p));
     if (cat === "psu") {
       const need = needWatts(sel);
@@ -147,8 +154,8 @@ export function recommend(parts, budget, use = "game", mode = "min") {
   });
   // 剩下的錢：優先升級顯卡（文書機升級 CPU）
   for (let guard = 0; guard < 20; guard++) {
-    const cat = ratio.gpu ? "gpu" : "cpu";
-    if (!sel[cat]) break;
+    const cat = ratio.gpu && free("gpu") ? "gpu" : free("cpu") ? "cpu" : "";
+    if (!cat || !sel[cat]) break;
     const cur = sel[cat], left = budget - spent;
     const score = (p) => (cat === "gpu" ? gscore(p) : price(p));
     const ups = pool[cat].filter((p) => score(p) > score(cur) && price(p) - price(cur) <= left && fits({ ...sel }, p)).sort((a, b) => score(a) - score(b));
@@ -156,6 +163,7 @@ export function recommend(parts, budget, use = "game", mode = "min") {
     const next = ups[0];
     const t = { ...sel, [cat]: next };
     if (cat === "gpu" && sel.psu && sel.psu.sp.watts < needWatts(t)) {
+      if (!free("psu")) break;
       const p2 = pool.psu.filter((p) => p.sp.watts >= needWatts(t)).sort((a, b) => price(a) - price(b))[0];
       if (!p2 || price(next) - price(cur) + price(p2) - price(sel.psu) > left) break;
       spent += price(p2) - price(sel.psu); sel.psu = p2;

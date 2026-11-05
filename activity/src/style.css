@@ -409,6 +409,8 @@ body.pk-myturn .game.poker{background:#16296b}
 /* 種菜、鍛造：AI 畫的水墨淡彩封面（主體在右、左邊留白放文字），左側再蓋一層淡紙色讓字更清楚 */
 .card.wide[data-g="farm"], .card.wide[data-g="farm"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/farm.jpg") right center/cover no-repeat; }
 .card.wide[data-g="forge"], .card.wide[data-g="forge"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/forge.jpg") right center/cover no-repeat; }
+.card.wide[data-g="pcbuild"], .card.wide[data-g="pcbuild"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/pcbuild.jpg") right center/cover no-repeat; }
+.card.wide[data-g="airflow"], .card.wide[data-g="airflow"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/airflow.jpg") right center/cover no-repeat; }
 .card.wide[data-g="farm"]:hover, .card.wide[data-g="forge"]:hover { border-color:#b5342a; }
 .card.wide[data-g="theater"], .card.wide[data-g="theater"]:hover { background:#e9e2cf url("./theater-ink.svg") right center/cover no-repeat; }
 .card.wide[data-g="gachacards"], .card.wide[data-g="gachacards"]:hover { background:#ece6d3 url("./gacha-ui/menu-bg.jpg") right center/cover no-repeat; }
@@ -1448,3 +1450,7 @@ body.tv-fs{overflow:hidden}
 .tetris .tpad button[data-k="hard"] { grid-column:span 2; background:#27406b; }
 .tetris .thint { margin:0; font-size:12px; opacity:.6; text-align:center; }
 @media (pointer:coarse) { .tetris .thint { display:none; } }
+
+.game.airflow { height:100vh; max-width:1100px; }
+.game.airflow .afframe { flex:1; width:100%; border:0; border-radius:10px; background:#0a0d0f; min-height:0; }
+.dcm .game.airflow { height:100vh; }
