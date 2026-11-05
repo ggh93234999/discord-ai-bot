@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { arec } from "../paths.js";
 import { extract, matchCat, CATS } from "./parts.js";
-import { recommend, check, totals, priceOf, CAT_LIST, CAT_NAME, USE_NAME } from "../../shared/pcrules.js";
+import { recommend, check, fits, totals, priceOf, CAT_LIST, CAT_NAME, USE_NAME } from "../../shared/pcrules.js";
 
 const UA = "Mozilla/5.0 (X11; Linux x86_64) pc-price-viewer (low-frequency personal use)";
 const REFRESH_MS = Number(process.env.PC_REFRESH_MS || 4 * 3600 * 1000);
@@ -276,12 +276,27 @@ function handleTools(u, res) {
   if (u.pathname === "/api/pc/search") {
     const cat = u.searchParams.get("cat") || "", q = (u.searchParams.get("q") || "").toUpperCase().split(/\s+/).filter(Boolean);
     const cats = CATS.includes(cat) ? [cat] : CATS;
+    const min = +u.searchParams.get("min") || 0, max = +u.searchParams.get("max") || 0;
+    // fit=配單代碼：只留下跟那份單其他零件相容的
+    let base = null;
+    const fc = u.searchParams.get("fit");
+    if (fc) {
+      const e = loadShares()[fc.toUpperCase().trim()];
+      if (!e) return json(res, { err: "找不到這個配單代碼" }, 404);
+      base = {};
+      for (const c of CAT_LIST) if (e.ids[c]) { const p = (state.parts[c] || []).find((x) => x.id === e.ids[c]); if (p) base[c] = p; }
+    }
     const out = [];
     for (const c of cats) for (const p of state.parts[c] || []) {
       const hay = (p.name + " " + p.brand + " " + p.spec).toUpperCase();
-      if (q.every((w) => hay.includes(w))) out.push(p);
+      if (!q.every((w) => hay.includes(w))) continue;
+      const pr = priceOf(p);
+      if ((min && pr < min) || (max && pr > max)) continue;
+      if (base) { const o = { ...base }; delete o[p.cat]; if (!fits(o, p)) continue; }
+      out.push(p);
     }
-    out.sort((a, b) => (priceOf(a) || 0) - (priceOf(b) || 0));
+    const dir = u.searchParams.get("sort") === "desc" ? -1 : 1;
+    out.sort((a, b) => dir * ((priceOf(a) || 0) - (priceOf(b) || 0)));
     return json(res, { 共: out.length, 更新時間: state.ts, 結果: out.slice(0, 15).map((p) => ({ 類別: CAT_NAME[p.cat], ...brief(p) })) });
   }
   if (u.pathname === "/api/pc/trend") {
