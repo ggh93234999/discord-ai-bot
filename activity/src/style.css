@@ -1451,6 +1451,6 @@ body.tv-fs{overflow:hidden}
 .tetris .thint { margin:0; font-size:12px; opacity:.6; text-align:center; }
 @media (pointer:coarse) { .tetris .thint { display:none; } }
 
-.game.airflow { height:100vh; max-width:1100px; }
+.game.airflow { height:100vh; max-width:1400px; }
 .game.airflow .afframe { flex:1; width:100%; border:0; border-radius:10px; background:#0a0d0f; min-height:0; }
 .dcm .game.airflow { height:100vh; }

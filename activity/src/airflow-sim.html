@@ -125,6 +125,39 @@ details.specs summary { cursor: pointer; font-size: 12px; color: var(--muted); l
   .viewer { padding: 6px; }
   .stage { aspect-ratio: 3 / 3.4; }
 }
+
+/* ---- 版面改良：3D 畫面固定在上方，調風扇／功率時一邊看結果 ---- */
+.viewer { position: sticky; top: 10px; z-index: 4; }
+.stage { aspect-ratio: auto; max-height: none; height: clamp(380px, calc(100vh - 190px), 860px); }
+.status { min-height: 18px; }
+.ro .val.s-good { color: var(--good); } .ro .val.s-warn { color: var(--warn); } .ro .val.s-crit { color: var(--crit); }
+@media (max-width: 980px) {
+  :root { --roh: 53px; }
+  .readouts { position: sticky; top: 0; z-index: 6; grid-template-columns: repeat(4, minmax(0, 1fr)); box-shadow: 0 6px 12px -6px #000; }
+  .viewer { top: var(--roh); z-index: 5; }
+  .stage { height: clamp(220px, 40vh, 480px); }
+}
+@media (max-width: 560px) {
+  body { padding-block: 8px 20px; padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+  .app { gap: 8px; }
+  header.top { flex-wrap: nowrap; align-items: center; }
+  .brand h1 { font-size: 22px; }
+  .brand h1 .tag { font-size: 12px; margin-left: 5px; vertical-align: 3px; }
+  .brand p { display: none; }
+  .run .btn { padding: 4px 9px; font-size: 12px; white-space: nowrap; }
+  .readouts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ro { padding: 6px 8px 7px; gap: 0; }
+  .ro .lab { font-size: 10px; letter-spacing: 0; white-space: nowrap; overflow: hidden; }
+  .ro .lab .chip { display: none; }
+  .ro .val { font-size: 22px; }
+  .ro .val small { font-size: 11px; }
+  .ro .sub { display: none; }
+  .status { font-size: 11px; gap: 2px 12px; }
+  .viewer { padding: 4px; gap: 4px; }
+  .vhint, .legend { display: none; }
+  .views .btn { padding: 3px 8px; }
+  .stage { aspect-ratio: auto; height: clamp(210px, 36vh, 360px); }
+}
 </style>
 
 <div class="app">
