@@ -21,7 +21,7 @@ function brandOf(s) {
   return best || "";
 }
 
-const STOP = new Set(["WIFI", "WI", "FI", "GAMING", "EDITION", "BLACK", "WHITE", "THE", "AND", "WITH", "GB", "INTEL", "AMD", "NVIDIA", "GEFORCE", "RADEON", "DDR", "SSD", "PCIE", "M", "2", "X", "RGB", "ARGB", "TRAY", "BOX", "OC"]);
+const STOP = new Set(["WIFI", "WI", "FI", "GAMING", "EDITION", "BLACK", "WHITE", "THE", "AND", "WITH", "GB", "INTEL", "AMD", "NVIDIA", "GEFORCE", "RADEON", "DDR", "SSD", "PCIE", "M", "2", "X", "RGB", "ARGB", "TRAY", "BOX", "OC", "TW", "MIT"]);
 function normCap(s) { return s.replace(/(\d+)\s*GB\b/g, "$1G").replace(/(\d+)\s*TB\b/g, "$1T"); }
 function tokens(s) {
   const u = normCap(s.toUpperCase().replace(/[　-鿿｛｝（）【】，。／、]/g, " "));
@@ -78,7 +78,7 @@ export function extract(cat, it) {
     sp.tdp = w ? +w[1] : k ? 125 : 65;
     sp.peak = Math.round(sp.tdp * (/INTEL|CORE|I[3579]-/i.test(it.name) && k ? 2 : 1.4));
     sp.igpu = !(/無內顯/.test(text) || /\d{4,5}K?F\b/i.test(it.name) || /\d{3}KF\b/i.test(it.name));
-    const m = it.name.toUpperCase().match(/I([3579])-?(\d{4,5}[A-Z]{0,2})/), u = it.name.toUpperCase().match(/ULTRA\s?([3579])\s?(\d{3}[A-Z]{0,2}(?:\s?PLUS)?)/), r = it.name.toUpperCase().match(/R(?:YZEN)?\s?([3579])\s?(\d{4,5}(?:X3D|[A-Z]{0,3}))/);
+    const m = it.name.toUpperCase().match(/I([3579])-?(\d{4,5}[A-Z]{0,2})/), u = it.name.toUpperCase().match(/ULTRA\s?([3579])\s?(\d{3}[A-Z]{0,2}(?:\s?PLUS)?)/), r = it.name.toUpperCase().match(/R(?:YZEN)?\s?([3579])\s?(\d{4,5}(?:X3D2?|[A-Z]{0,3}))/);
     const model = m ? "I" + m[1] + "-" + m[2] : u ? "U" + u[1] + "-" + u[2].replace(/\s/g, "") : r ? "R" + r[1] + "-" + r[2] : "";
     sp.model = model;
     sp.tray = /散裝|TRAY/i.test(text);
@@ -137,19 +137,40 @@ export function extract(cat, it) {
 }
 
 // ---- 配對 ----
+const COLORS = [["b", /黑|BLACK|\bBK\b/i], ["w", /白|WHITE|\bWH\b|\bICE\b/i], ["p", /粉|PINK/i], ["r", /紅|RED/], ["u", /藍|BLUE/i], ["g", /綠|GREEN/i], ["s", /銀|SILVER/i], ["y", /灰|GRAY|GREY/i], ["v", /紫|PURPLE/i]];
+const SERIES = [/FURY/, /BEAST/, /RENEGADE/, /IMPACT/, /VENGEANCE/, /DOMINATOR/, /TRIDENT/, /RIPJAWS/, /KVR|VALUE ?RAM/, /LANCER/, /SPECTRIX/, /CRAS/, /BOLT/, /MANTA/, /T-?FORCE|DELTA/, /XPG/, /\bPRO\b/, /ECC|REG|RDIMM/];
 function sim(cat, a, b) {
   if (a.brand && b.brand && a.brand !== b.brand) return 0;
   if (cat === "cpu") return a.sp.key && a.sp.key === b.sp.key ? 1 : 0;
   const gc = (s) => cat !== "gpu" ? s : s.toUpperCase().replace(/-/g, " ").replace(/\b(RTX|GTX|GT|RX|ARC ?[AB])\s?(\d{3,4})\s?(TI ?SUPER|TI|SUPER|XTX|XT|GRE)?/, (m0, p, n, x) => " " + (p + n + (x || "")).replace(/\s/g, "") + " ");
   const A = tokens(gc(a.name)), B = tokens(gc(b.name));
+  if (cat !== "ram" && cat !== "ssd") {                      // 同型號的不同顏色（黑／白／粉…）不是同一個零件
+    const col = (n) => { const set = new Set(); for (const [k, re] of COLORS) if (re.test(n)) set.add(k); return set; };
+    const ca = col(a.name), cb = col(b.name);
+    if (ca.size && cb.size && ![...ca].some((k) => cb.has(k))) return 0;
+  }
+  if (cat === "mb") {                                        // 有無 WIFI 是不同型號
+    const wf = (n) => /WI-?FI|無線/i.test(n);
+    if (wf(a.name) !== wf(b.name)) return 0;
+  }
+  if (cat === "ram") {                                       // 不同系列（FURY / VALUERAM / VENGEANCE…）不能混
+    for (const re of SERIES) if (re.test(a.name.toUpperCase()) !== re.test(b.name.toUpperCase())) return 0;
+  }
   const dA = new Set(A.filter(hasDigit)), dB = new Set(B.filter(hasDigit));
   if (!dA.size || !dB.size) return 0;
   const inter = [...dA].filter((x) => dB.has(x));
   if (!inter.some((x) => x.length >= 3)) return 0;
   const cap = (s) => [...s].filter((x) => /^\d+[GT]$/.test(x)).sort().join();
   if (cap(dA) !== cap(dB) && cap(dA) && cap(dB)) return 0;
-  const jd = inter.length / Math.max(dA.size, dB.size);
-  if (jd < 0.75) return 0;
+  // 記憶體、SSD：欣亞的名稱常多帶一堆規格字（Gen4、讀速…），用「較短的那邊全部出現在另一邊」判斷；其他分類要求幾乎一樣
+  const loose = cat === "ram" || cat === "ssd";
+  const jd = inter.length / (loose ? Math.min(dA.size, dB.size) : Math.max(dA.size, dB.size));
+  if (jd < (loose ? 0.99 : 0.75) || (loose && inter.length < 2)) return 0;
+  if (!loose) {                                             // 沒有數字的型號字（TX / PX、AORUS / ELITE）也不能互相矛盾
+    const al = (L) => new Set(L.filter((t) => !hasDigit(t) && t.length >= 2));
+    const xa = al(A), xb = al(B), [sm, bg] = xa.size <= xb.size ? [xa, xb] : [xb, xa];
+    if ([...sm].some((t) => !bg.has(t))) return 0;
+  }
   const sA = new Set(A), sB = new Set(B);
   const ia = [...sA].filter((x) => sB.has(x)).length;
   const jall = ia / Math.max(sA.size, sB.size);
@@ -160,7 +181,7 @@ function sim(cat, a, b) {
   if (cat === "ram" && ((s1.cap && s2.cap && s1.cap !== s2.cap) || (s1.ddr && s2.ddr && s1.ddr !== s2.ddr))) return 0;
   if (cat === "psu" && s1.watts && s2.watts && s1.watts !== s2.watts) return 0;
   if (cat === "ssd" && s1.cap && s2.cap && s1.cap !== s2.cap) return 0;
-  return 0.5 * jd + 0.5 * jall;
+  return 0.8 * jd + 0.2 * jall;
 }
 
 export function matchCat(cat, cs, ss) {
