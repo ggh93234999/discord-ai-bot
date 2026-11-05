@@ -62,3 +62,5 @@
 .pcb-trend textarea { width:100%; background:#0f1013; color:#fff; border:1px solid #3a3d46; border-radius:8px; padding:8px; font-size:13px; -webkit-user-select:text; user-select:text; }
 .tsvg { width:100%; height:auto; background:#101216; border-radius:8px; } .tsvg text { fill:#9aa0ad; font-size:9px; } .tsvg .grid { stroke:#2a2d35; stroke-width:1; }
 .tleg { display:flex; flex-direction:column; gap:3px; font-size:12px; margin-top:8px; } .tleg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
+/* 手機版 Discord：頂端有一條列蓋在 Activity 上面，全螢幕的選單與彈窗要讓開 */
+.dcm .pcb-pick, .dcm .pcb-trend { padding-top:58px; }
