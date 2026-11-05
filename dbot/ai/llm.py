@@ -3,7 +3,7 @@
 from dbot.core import models
 from dbot.core import runtime
 import aiohttp
-from dbot.core.config import (LLM_API_KEY, LLM_BASE_URL, LLM_KEEP_ALIVE, LLM_TIMEOUT, MAX_TOKENS, REASONING_EFFORT, REMOTE_REASONING_EFFORT, THINK_RE)
+from dbot.core.config import (LLM_API_KEY, LLM_BASE_URL, LLM_KEEP_ALIVE, LLM_TIMEOUT, MAX_TOKENS, PC_REASONING_EFFORT, REASONING_EFFORT, REMOTE_REASONING_EFFORT, THINK_RE)
 from dbot.ai.tools import (TOOLS)
 
 def flatten_for_remote(messages: list[dict]) -> list[dict]:
@@ -28,6 +28,11 @@ async def call_model(messages: list[dict], use_tools: bool | list = False, max_t
     # 思考模式：qwen 和 deepseek 都靠 reasoning_effort 控制。DeepSeek 不帶參數預設會思考，
     # 思考的 token 也計費（實測約多 3~4 倍），所以線上模型也要送，預設 none。
     effort = REASONING_EFFORT if local else REMOTE_REASONING_EFFORT
+    # 配電腦要比對規格、算相容與預算，需要想一下：工具清單裡有 pc_build（= 這輪是配電腦對話）就開思考
+    if isinstance(use_tools, list) and any((t.get("function") or {}).get("name") == "pc_build" for t in use_tools) and PC_REASONING_EFFORT:
+        effort = PC_REASONING_EFFORT
+        if effort != "none":
+            body["max_tokens"] = max(body["max_tokens"], 4000)       # 思考也佔 token，配單說明又長，不然會被截斷
     if effort and model not in NO_REASONING_PARAM:
         body["reasoning_effort"] = effort
     if local and LLM_KEEP_ALIVE:

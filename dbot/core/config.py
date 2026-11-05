@@ -28,6 +28,7 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen").strip()
 REASONING_EFFORT = os.getenv("REASONING_EFFORT", "none").strip()  # none = 不思考，回得快
 REMOTE_REASONING_EFFORT = os.getenv("REMOTE_REASONING_EFFORT", "none").strip()  # 線上模型（deepseek）的思考程度，none = 不思考，省錢
+PC_REASONING_EFFORT = os.getenv("PC_REASONING_EFFORT", "medium").strip()  # 配電腦對話（工具清單裡有 pc_build）時才開思考；none = 一樣不思考
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "300"))
 SLOW_NOTICE_SECONDS = int(os.getenv("SLOW_NOTICE_SECONDS", "15"))
 LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "24h").strip()
