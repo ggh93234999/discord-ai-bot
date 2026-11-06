@@ -264,7 +264,7 @@ details.specs summary { cursor: pointer; font-size: 12px; color: var(--muted); l
       <section class="sec">
         <h2>機殼</h2>
         <div class="row2"><span>機殼型式</span>
-          <div class="seg wide" id="typeSeg"><button type="button" data-v="std">標準中塔（前進風）</button><button type="button" data-v="sea">海景房（前玻璃）</button><button type="button" data-v="old">傳統（電源在上）</button></div></div>
+          <div class="seg wide" id="typeSeg"><button type="button" data-v="std">標準中塔</button><button type="button" data-v="sea">海景房</button><button type="button" data-v="old">傳統電源上置</button></div></div>
         <div class="row2"><span>側板</span>
           <div class="seg wide" id="sideSeg"><button type="button" data-v="glass">玻璃</button><button type="button" data-v="mesh">網孔</button></div></div>
         <div class="row2"><span>開孔濾網</span>
@@ -337,6 +337,10 @@ const SLOT_DEFS = [
   { id: 'PCI', name: 'PCIe 擋板', wall: 'rear', rect: [220, 330, 15, 150], passiveOnly: true },
   { id: 'B1', name: '底 1', wall: 'bottom', a: 80, b: 105 },
   { id: 'B2', name: '底 2', wall: 'bottom', a: 240, b: 105 },
+  // 海景房的側面進風：裝在主機板這一側的牆（z = 0）靠前方，a = x、b = y
+  { id: 'S1', name: '側 1', wall: 'side0', a: 90, b: 80 },
+  { id: 'S2', name: '側 2', wall: 'side0', a: 90, b: 215 },
+  { id: 'S3', name: '側 3', wall: 'side0', a: 90, b: 350 },
 ];
 const GAPS = [
   { name: '後方 I/O', wall: 'rear', rect: [20, 170, 0, 40] },
@@ -404,6 +408,12 @@ function createCase(cfg) {
           faceIn: top ? FV(i, jy0, k) : FV(i, oy + iy, k), faceOut: top ? FV(i, jy0 - 1, k) : FV(i, oy + iy + 1, k),
           p: [cenX(i), cenZ(k)] });
       }
+    } else if (wall === 'side0') { // 主機板這一側的牆（z = 0）：x 前→後、y 上→下
+      const k = oz - 1;
+      for (let j = jy0; j < oy + iy; j++) for (let i = ox; i < ox + ix; i++) {
+        if (!inside(cenX(i), cenY(j))) continue;
+        out.push({ c: C(i, j, k), axis: 2, inDir: 1, faceIn: FW(i, j, oz), faceOut: FW(i, j, oz - 1), p: [cenX(i), cenY(j)] });
+      }
     } else { // side（z = 210）
       const k = oz + iz;
       for (let j = jy0; j < oy + iy; j++) for (let i = ox; i < ox + ix; i++) {
@@ -423,7 +433,7 @@ function createCase(cfg) {
   for (const s of cfg.slots) {
     const def = SLOT_DEFS.find(d => d.id === s.id);
     // 海景房：前面板是封死的玻璃，沒有前進風位
-    if ((cfg.caseType === 'sea' && def.wall === 'front') || (cfg.caseType === 'old' && s.id === 'T3')) { slotInfo[s.id] = { mode: 'closed' }; continue; }
+    if ((cfg.caseType === 'sea' && def.wall === 'front') || (cfg.caseType === 'old' && s.id === 'T3') || (cfg.caseType !== 'sea' && def.wall === 'side0')) { slotInfo[s.id] = { mode: 'closed' }; continue; }
     if (s.mode === 'closed') { slotInfo[s.id] = { mode: 'closed' }; continue; }
     const inSquare = def.rect
       ? (p, q) => p >= def.rect[0] && p < def.rect[1] && q >= def.rect[2] && q < def.rect[3]
@@ -1249,6 +1259,10 @@ const SLOT_DEFS = [
   { id: 'PCI', name: 'PCIe 擋板', wall: 'rear', rect: [220, 330, 15, 150], passiveOnly: true },
   { id: 'B1', name: '底 1', wall: 'bottom', a: 80, b: 105 },
   { id: 'B2', name: '底 2', wall: 'bottom', a: 240, b: 105 },
+  // 海景房的側面進風：裝在主機板這一側的牆（z = 0）靠前方，a = x、b = y
+  { id: 'S1', name: '側 1', wall: 'side0', a: 90, b: 80 },
+  { id: 'S2', name: '側 2', wall: 'side0', a: 90, b: 215 },
+  { id: 'S3', name: '側 3', wall: 'side0', a: 90, b: 350 },
 ];
 const GAPS = [
   { name: '後方 I/O', wall: 'rear', rect: [20, 170, 0, 40] },
@@ -1316,6 +1330,12 @@ function createCase(cfg) {
           faceIn: top ? FV(i, jy0, k) : FV(i, oy + iy, k), faceOut: top ? FV(i, jy0 - 1, k) : FV(i, oy + iy + 1, k),
           p: [cenX(i), cenZ(k)] });
       }
+    } else if (wall === 'side0') { // 主機板這一側的牆（z = 0）：x 前→後、y 上→下
+      const k = oz - 1;
+      for (let j = jy0; j < oy + iy; j++) for (let i = ox; i < ox + ix; i++) {
+        if (!inside(cenX(i), cenY(j))) continue;
+        out.push({ c: C(i, j, k), axis: 2, inDir: 1, faceIn: FW(i, j, oz), faceOut: FW(i, j, oz - 1), p: [cenX(i), cenY(j)] });
+      }
     } else { // side（z = 210）
       const k = oz + iz;
       for (let j = jy0; j < oy + iy; j++) for (let i = ox; i < ox + ix; i++) {
@@ -1335,7 +1355,7 @@ function createCase(cfg) {
   for (const s of cfg.slots) {
     const def = SLOT_DEFS.find(d => d.id === s.id);
     // 海景房：前面板是封死的玻璃，沒有前進風位
-    if ((cfg.caseType === 'sea' && def.wall === 'front') || (cfg.caseType === 'old' && s.id === 'T3')) { slotInfo[s.id] = { mode: 'closed' }; continue; }
+    if ((cfg.caseType === 'sea' && def.wall === 'front') || (cfg.caseType === 'old' && s.id === 'T3') || (cfg.caseType !== 'sea' && def.wall === 'side0')) { slotInfo[s.id] = { mode: 'closed' }; continue; }
     if (s.mode === 'closed') { slotInfo[s.id] = { mode: 'closed' }; continue; }
     const inSquare = def.rect
       ? (p, q) => p >= def.rect[0] && p < def.rect[1] && q >= def.rect[2] && q < def.rect[3]
@@ -1698,7 +1718,9 @@ tick();
     { id: 'back', name: '全部裝反', slots: { F1: 'out', F2: 'out', F3: 'out', R1: 'in', T3: 'in', PCI: 'vent' } },
     { id: 'none', name: '沒有機殼風扇', slots: { PCI: 'vent' } },
     { id: 'oldStd', name: '前進後上出', only: 'old', slots: { F1: 'in', F2: 'in', F3: 'in', R1: 'out', T1: 'out', PCI: 'vent' } },
-    { id: 'seaStd', name: '底進頂後出', only: 'sea', slots: { B1: 'in', B2: 'in', T1: 'out', T2: 'out', T3: 'out', R1: 'out', PCI: 'vent' } },
+    { id: 'seaStd', name: '側進頂後出', only: 'sea', slots: { S1: 'in', S2: 'in', S3: 'in', T1: 'out', T2: 'out', T3: 'out', R1: 'out', PCI: 'vent' } },
+    { id: 'seaMix', name: '側＋底進、頂後出', only: 'sea', slots: { S1: 'in', S2: 'in', S3: 'in', B1: 'in', B2: 'in', T1: 'out', T2: 'out', T3: 'out', R1: 'out', PCI: 'vent' } },
+    { id: 'seaBot', name: '底進頂後出', only: 'sea', slots: { B1: 'in', B2: 'in', T1: 'out', T2: 'out', T3: 'out', R1: 'out', PCI: 'vent' } },
     { id: 'seaTop', name: '底進頂出', only: 'sea', slots: { B1: 'in', B2: 'in', T1: 'out', T2: 'out', T3: 'out', PCI: 'vent' } },
     { id: 'seaRear', name: '底進後出', only: 'sea', slots: { B1: 'in', B2: 'in', R1: 'out', PCI: 'vent' } },
     { id: 'seaPos', name: '底部全進（正壓）', only: 'sea', slots: { B1: 'in', B2: 'in', R1: 'out', T3: 'out', PCI: 'vent' } },
@@ -1714,7 +1736,7 @@ tick();
     layers: { heat: true, flow: true, parts: true, labels: true },
     heatOp: 0.35, heatThr: 3, flowSpd: 0.3, flowN: 3000,
   };
-  const slotHidden = def => (S.caseType === 'sea' && def.wall === 'front') || (S.caseType === 'old' && def.id === 'T3');
+  const slotHidden = def => (S.caseType === 'sea' && def.wall === 'front') || (S.caseType === 'old' && def.id === 'T3') || (S.caseType !== 'sea' && def.wall === 'side0');
   let grid = null, frame = null, stats = null;
   const topY = () => grid ? -(grid.topCells || 0) * grid.hmm : 0;      // 機殼頂端的 y（傳統機殼會比 0 更高）
 
@@ -1871,6 +1893,7 @@ tick();
   }
   // 牆上的圓（風扇位）：中心與兩個切向量
   function slotFrame(def) {
+    if (def.wall === 'side0') return { c: W(def.a, def.b, 0), u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
     if (def.wall === 'front') return { c: W(0, def.a, def.b), u: [0, -1, 0], v: [0, 0, 1], n: [1, 0, 0] };
     if (def.wall === 'rear') return { c: W(450, def.a, def.b), u: [0, -1, 0], v: [0, 0, 1], n: [-1, 0, 0] };
     if (def.wall === 'top') return { c: W(def.a, topY(), def.b), u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] };
