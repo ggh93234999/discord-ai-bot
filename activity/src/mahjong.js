@@ -65,7 +65,8 @@ export function mountMahjong(rule, opts = {}) {
     let ws = null, closed = false, retry = 0, st = null, timer = 0, riichiMode = false, lastSig = "";
     // 雀魂式自動功能：自動理牌（記在瀏覽器）、自動和牌、不吃碰槓、自動摸切（這次開著才有效）
     let autoSort = true; try { autoSort = localStorage.getItem("mj_sort") !== "0"; } catch {}
-    const auto = { win: false, nocall: false, giri: false };
+    const auto = { win: false, nocall: false, giri: false, play: false };
+    let hintOn = false; try { hintOn = localStorage.getItem("mj_hint") === "1"; } catch {}
     let handOrder = null, autoSig = "", dragI = -1;
     // 自動理牌關掉時：手牌照自己排的順序，新進來的牌放最右邊
     function arranged() {
@@ -81,7 +82,10 @@ export function mountMahjong(rule, opts = {}) {
       const o = st.opts, key = autoKey();
       if (key === autoSig) return;
       let act = null;
-      if (o.kind === "turn") {
+      if (auto.play && st.hint) {                                   // 代打：照建議的打法（跟「雀神」同一套算法）
+        const hh = st.hint;
+        act = hh.a === "discard" || hh.a === "riichi" ? { a: hh.a, tile: hh.tile } : hh.a === "chi" ? { a: "chi", with: hh.with } : { a: hh.a };
+      } else if (o.kind === "turn") {
         if (o.tsumo && auto.win) act = { a: "tsumo" };
         else if (auto.giri && st.drawn != null && !o.lock && !riichiMode && !o.tsumo) act = { a: "discard", tile: st.drawn };
       } else if (o.kind === "claim") {
@@ -172,35 +176,44 @@ export function mountMahjong(rule, opts = {}) {
       const extra = rule === "jp" ? `${st.honba ? `${st.honba} 本場　` : ""}${st.sticks ? `立直棒 ${st.sticks}` : ""}` : st.lian ? `連莊 ${st.lian}` : "";
       const inRes = st.phase === "result" && st.result;
       const center = `<div class="mcenter"><div class="mround">${inRes ? st.result.label0 : st.round}</div><div class="mwall">${inRes ? "結算中" : `剩 ${st.wall ?? "-"} 張`}</div>${dora}<div class="mextra">${extra}</div><div class="mtimer"></div></div>`;
-      let hand = "", ctl = "";
+      let hand = "", ctl = "", autoBar = "";
       if (me && st.phase === "play") {
         const o = st.opts, myTurn = o && o.kind === "turn";
         const can = (t, drawn) => myTurn && (!o.lock || drawn) && (!riichiMode || o.riichi.includes(t));
-        hand = `<div class="mhand${autoSort ? "" : " manual"}">${arranged().map((t, i) => tile(t, `big${can(t) ? " can" : ""}${riichiMode && o.riichi.includes(t) ? " rok" : ""}`, `data-t="${t}" data-i="${i}"${autoSort ? "" : ` draggable="true"`}`)).join("")}${st.drawn != null ? `<span class="mgap"></span>${tile(st.drawn, `big drawn${can(st.drawn, true) ? " can" : ""}${riichiMode && o.riichi.includes(st.drawn) ? " rok" : ""}`, `data-t="${st.drawn}"`)}` : ""}</div>`;
+        const hh = hintOn && st.hint && myTurn ? st.hint : null;
+        let hintTile = hh && (hh.a === "discard" || (hh.a === "riichi" && riichiMode)) ? hh.tile : null;
+        const hcls = (t) => { if (hintTile != null && t === hintTile) { hintTile = null; return " hint"; } return ""; };
+        hand = `<div class="mhand${autoSort ? "" : " manual"}">${arranged().map((t, i) => tile(t, `big${can(t) ? " can" : ""}${riichiMode && o.riichi.includes(t) ? " rok" : ""}${hcls(t)}`, `data-t="${t}" data-i="${i}"${autoSort ? "" : ` draggable="true"`}`)).join("")}${st.drawn != null ? `<span class="mgap"></span>${tile(st.drawn, `big drawn${can(st.drawn, true) ? " can" : ""}${riichiMode && o.riichi.includes(st.drawn) ? " rok" : ""}${hcls(st.drawn)}`, `data-t="${st.drawn}"`)}` : ""}</div>`;
         const b = [];
+        const H = hintOn && st.hint ? st.hint : null;
+        const hb = (a, w) => (H && H.a === a && (a !== "chi" || (H.with || []).join() === w.join()) ? " hintb" : "");
         if (myTurn) {
-          if (o.tsumo) b.push(`<button class="mb hu" data-a="tsumo">${rule === "jp" ? "自摸" : "自摸胡"}</button>`);
-          if (o.riichi.length) b.push(`<button class="mb${riichiMode ? " on" : ""}" data-a="riichi">${riichiMode ? "取消立直" : "立直"}</button>`);
+          if (o.tsumo) b.push(`<button class="mb hu${hb("tsumo")}" data-a="tsumo">${rule === "jp" ? "自摸" : "自摸胡"}</button>`);
+          if (o.riichi.length) b.push(`<button class="mb${riichiMode ? " on" : ""}${riichiMode ? "" : hb("riichi")}" data-a="riichi">${riichiMode ? "取消立直" : "立直"}</button>`);
           for (const k of o.ankan) b.push(`<button class="mb" data-a="ankan" data-t="${k}">暗槓 ${tileName(k)}</button>`);
           for (const k of o.kakan) b.push(`<button class="mb" data-a="kakan" data-t="${k}">加槓 ${tileName(k)}</button>`);
           ctl = `<div class="mhint">${riichiMode ? "選一張打出去並立直（亮的牌可以）" : o.lock ? "立直中：自動打出摸到的牌" : "點一張牌打出去"}</div>`;
         } else if (o && o.kind === "claim") {
           ctl = `<div class="mhint">${tile(o.tile, "sm")} 要不要？</div>`;
-          if (o.ron) b.push(`<button class="mb hu" data-a="ron">${rule === "jp" ? "榮和" : "胡"}</button>`);
+          if (o.ron) b.push(`<button class="mb hu${hb("ron")}" data-a="ron">${rule === "jp" ? "榮和" : "胡"}</button>`);
           if (o.kan) b.push(`<button class="mb" data-a="kan">槓</button>`);
-          if (o.pon) b.push(`<button class="mb" data-a="pon">碰</button>`);
-          for (const w of o.chi) b.push(`<button class="mb chi" data-a="chi" data-w="${w.join(",")}">吃 ${[...w, o.tile].sort((x, y) => x - y).map((x) => tile(x, "xs")).join("")}</button>`);
-          b.push(`<button class="mb ghost" data-a="pass">過</button>`);
+          if (o.pon) b.push(`<button class="mb${hb("pon")}" data-a="pon">碰</button>`);
+          for (const w of o.chi) b.push(`<button class="mb chi${hb("chi", w)}" data-a="chi" data-w="${w.join(",")}">吃 ${[...w, o.tile].sort((x, y) => x - y).map((x) => tile(x, "xs")).join("")}</button>`);
+          b.push(`<button class="mb ghost${hb("pass")}" data-a="pass">過</button>`);
         } else ctl = `<div class="mhint">${st.stage === "claim" ? "等其他人決定…" : `輪到 ${esc(st.seats[st.turn]?.name || "")}`}</div>`;
+        if (H) {
+          const txt = H.a === "tsumo" ? "自摸" : H.a === "ron" ? "和牌" : H.a === "pass" ? "不要吃碰" : H.a === "pon" ? "碰" : H.a === "chi" ? "吃" : H.a === "riichi" ? `立直，打 ${tileName(H.tile)}` : `打 ${tileName(H.tile)}`;
+          ctl += `<div class="mhinttxt">💡 建議：${txt}</div>`;
+        }
         if (st.waits && st.waits.length) ctl += `<div class="mwaits">聽：${st.waits.map((x) => tile(x, "xs")).join("")}</div>`;
         ctl = `<div class="mctl">${ctl}<div class="mbtns">${b.join("")}</div></div>`;
         const chip = (k, on, name, tip) => `<button class="${on ? "on" : ""}" data-auto="${k}" title="${tip}">${name}</button>`;
-        hand += `<div class="mauto">${chip("sort", autoSort, "自動理牌", "關掉後手牌不自動排序，可以拖曳牌自己排")}${chip("win", auto.win, "自動和牌", "能自摸或榮和時自動和")}${chip("nocall", auto.nocall, "不吃碰槓", "別人打牌時自動跳過吃、碰、槓（能和牌時還是會問）")}${chip("giri", auto.giri, "自動摸切", "摸到牌直接打出去（能自摸時會停下來讓你決定）")}</div>`;
+        autoBar = `<div class="mauto">${chip("sort", autoSort, "自動理牌", "關掉後手牌不自動排序，可以拖曳牌自己排")}${chip("win", auto.win, "自動和牌", "能自摸或榮和時自動和")}${chip("nocall", auto.nocall, "不吃碰槓", "別人打牌時自動跳過吃、碰、槓（能和牌時還是會問）")}${chip("giri", auto.giri, "自動摸切", "摸到牌直接打出去（能自摸時會停下來讓你決定）")}${chip("hint", hintOn, "💡 推薦", "標出建議打哪張、按哪個鍵（算法跟「雀神」電腦一樣，不會偷看別人的牌）")}${chip("play", auto.play, "🤖 代打", "開著就由電腦照建議幫你打，包含吃碰、和牌。再按一次取消，隨時可以接回來")}</div>`;
       } else if (st.phase === "play") ctl = `<div class="mctl"><div class="mhint">${spectate ? "👀 旁觀中（看不到手牌）" : `還沒入座。可以點電腦的位置接手：${st.seats.map((s, i) => (s && s.bot ? `<button class="mb ghost" data-sit="${i}">接手 ${esc(s.name)}</button>` : "")).join("")}`}</div></div>`;
       const result = st.phase === "result" && st.result ? resultHTML(st.result) : "";
       const keepK = tipK;
       hideTip(true);
-      body.innerHTML = `<div class="mtable">${order.map(seatBox).join("")}${center}</div>${result}${hand}${ctl}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}`;
+      body.innerHTML = `<div class="mmain"><div class="mtable">${order.map(seatBox).join("")}${center}</div>${result}${hand}</div><div class="mside">${autoBar}${ctl}${me && !spectate ? `<div class="mfoot"><button class="mb ghost stand">離座（電腦接手）</button></div>` : ""}</div>`;
       body.querySelectorAll(".mhand .mt.can").forEach((el) => el.addEventListener("click", () => {
         const t = Number(el.dataset.t);
         if (touchOnly() && selT !== t) { selT = t; body.querySelectorAll(".mhand .mt.sel").forEach((x) => x.classList.remove("sel")); el.classList.add("sel"); showTip(el, Number(el.dataset.k)); return; }   // 手機：第一下只是選這張、看牌的狀態；再點同一張才打出去
@@ -216,7 +229,8 @@ export function mountMahjong(rule, opts = {}) {
       body.querySelectorAll("[data-sit]").forEach((el) => el.addEventListener("click", () => send({ t: "msit", seat: Number(el.dataset.sit) })));
       body.querySelectorAll("[data-auto]").forEach((el) => el.addEventListener("click", () => {
         const k = el.dataset.auto;
-        if (k === "sort") { autoSort = !autoSort; try { localStorage.setItem("mj_sort", autoSort ? "1" : "0"); } catch {} }
+        if (k === "hint") { hintOn = !hintOn; try { localStorage.setItem("mj_hint", hintOn ? "1" : "0"); } catch {} }
+        else if (k === "sort") { autoSort = !autoSort; try { localStorage.setItem("mj_sort", autoSort ? "1" : "0"); } catch {} }
         else auto[k] = !auto[k];
         autoSig = ""; render(); autoAct();
       }));
