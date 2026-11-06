@@ -1,12 +1,12 @@
 [Unit]
-Description=Play stats page (LAN only)
+Description=Play stats page (LAN only, behind Apache :3120)
 After=network.target
 
 [Service]
 User=ggh93234999
 Group=ggh93234999
 WorkingDirectory=/home/ggh93234999/discord-bot/playstats
-Environment=PLAYSTATS_PORT=3120
+Environment=PLAYSTATS_PORT=3121
 ExecStart=/usr/bin/env node --no-warnings server.js
 Restart=always
 RestartSec=5

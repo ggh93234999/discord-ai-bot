@@ -1,0 +1,17 @@
+# 遊玩帳：Apache 內網專用站台 http://192.168.0.50:3120
+# 做法跟 open-webui 一樣：只允許家裡網路和 WireGuard VPN（路由器有 DMZ，不能對外網開放）
+Listen 3120
+<VirtualHost *:3120>
+    ProxyRequests Off
+    ProxyPreserveHost On
+
+    <Location />
+        Require ip 192.168.0.0/24 10.66.0.0/24 127.0.0.1
+    </Location>
+
+    ProxyPass        / http://127.0.0.1:3121/
+    ProxyPassReverse / http://127.0.0.1:3121/
+
+    ErrorLog  ${APACHE_LOG_DIR}/playstats-error.log
+    CustomLog ${APACHE_LOG_DIR}/playstats-access.log combined
+</VirtualHost>

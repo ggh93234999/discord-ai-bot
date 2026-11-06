@@ -1,8 +1,10 @@
-// 遊玩統計網頁（獨立服務，只給內網看）：http://內網IP:3120/
+// 遊玩統計網頁（獨立服務，只給內網看）
+//   （網址：http://內網IP:3120/ ，由 Apache 轉到這裡）
 //   /              → 網頁
 //   /api/users     → 有紀錄的人
 //   /api/stats?u=ID&days=30
-// 只接受內網位址（127.x、10.x、172.16–31.x、192.168.x）；經過反向代理（有 X-Forwarded-For）的一律拒絕，所以不會被不小心放到外網。
+// 只聽 127.0.0.1，由 Apache 的內網專用站台（Listen 3120，Require ip 限內網，跟 open-webui 一樣）轉過來；
+// 自己也再擋一次：來源不是內網位址就拒絕。
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,8 +12,8 @@ import { fileURLToPath } from "node:url";
 import { summarize, listUsers } from "./stats.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PLAYSTATS_PORT || 3120);
-const HOST = process.env.PLAYSTATS_HOST || "0.0.0.0";
+const PORT = Number(process.env.PLAYSTATS_PORT || 3121);
+const HOST = process.env.PLAYSTATS_HOST || "127.0.0.1";
 
 function isPrivate(addr) {
   const a = String(addr || "").replace(/^::ffff:/, "");
@@ -23,7 +25,7 @@ function isPrivate(addr) {
 }
 
 http.createServer((req, res) => {
-  if (!isPrivate(req.socket.remoteAddress) || req.headers["x-forwarded-for"] || req.headers["forwarded"]) {
+  if (!isPrivate(req.socket.remoteAddress)) {
     res.writeHead(403, { "content-type": "text/plain; charset=utf-8" }); return void res.end("只開放內網");
   }
   const u = new URL(req.url, "http://x");
