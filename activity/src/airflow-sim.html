@@ -256,11 +256,15 @@ details.specs summary { cursor: pointer; font-size: 12px; color: var(--muted); l
           <button type="button" data-v="aio-top">水冷頂排</button>
           <button type="button" data-v="aio-front">水冷前排</button>
         </div>
+        <div class="row2"><span>水冷排大小</span>
+          <div class="seg wide" id="radSeg"><button type="button" data-v="240">240（2 風扇）</button><button type="button" data-v="360">360（3 風扇）</button></div></div>
         <div class="row2"><span>塔散風向</span>
           <div class="seg wide" id="towerSeg"><button type="button" data-v="back">往後吹</button><button type="button" data-v="front">往前吹</button><button type="button" data-v="up">往上吹</button></div></div>
       </section>
       <section class="sec">
         <h2>機殼</h2>
+        <div class="row2"><span>機殼型式</span>
+          <div class="seg wide" id="typeSeg"><button type="button" data-v="std">標準中塔（前進風）</button><button type="button" data-v="sea">海景房（前玻璃）</button></div></div>
         <div class="row2"><span>側板</span>
           <div class="seg wide" id="sideSeg"><button type="button" data-v="glass">玻璃</button><button type="button" data-v="mesh">網孔</button></div></div>
         <div class="row2"><span>開孔濾網</span>
@@ -314,7 +318,8 @@ const SPECS = {
   // Q0 是同一散熱器在模型中 100% 轉速時的鰭片風量（台架量測），Q 為當下風量（CFM）
   tower: { name: '單塔（1 風扇）', a: 0.034, b: 0.116, Q0: 37, Rmax: 0.9, finK: 4.2 },
   dual: { name: '雙塔（2 風扇）', a: 0.033, b: 0.077, Q0: 35, Rmax: 0.7, finK: 4.2 },
-  aio: { name: '240 水冷', a: 0.02, b: 0.06, Q0: 34, Rmax: 0.8, radK: 11 },
+  aio240: { name: '240 水冷', a: 0.02, b: 0.06, Q0: 34, Rmax: 0.8, radK: 11 },
+  aio360: { name: '360 水冷', a: 0.015, b: 0.045, Q0: 50, Rmax: 0.7, radK: 11 },
   cpu: { name: 'i7-13700', Rjc: 0.15, tjmax: 100 },
   gpu: { name: 'RTX 4070', a: 0.01, b: 0.085, Q0: 48, Rmax: 0.8, Rjc: 0.03, tjmax: 85, finK: 8 },
   panelU: 4.0,                  // 機殼面板熱傳係數 W/m²K
@@ -337,6 +342,8 @@ const GAPS = [
   { name: '前面板下緣', wall: 'front', rect: [440, 470, 20, 190] },
 ];
 
+// 水冷排佔用的風扇位：240 = 2 個、360 = 3 個
+const RAD_IDS = (cooler, size) => cooler === 'aio-top' ? (size === '360' ? ['T1', 'T2', 'T3'] : ['T2', 'T3']) : cooler === 'aio-front' ? (size === '360' ? ['F1', 'F2', 'F3'] : ['F1', 'F2']) : [];
 function createCase(cfg) {
   const { createSolver } = cfg.solverLib;
   const H_MM = cfg.h * 1000;
@@ -404,9 +411,12 @@ function createCase(cfg) {
 
   const fans = [];
   const slotInfo = {};
-  const radIds = cfg.cooler === 'aio-top' ? ['T2', 'T3'] : cfg.cooler === 'aio-front' ? ['F1', 'F2'] : [];
+  const radIds = RAD_IDS(cfg.cooler, cfg.radSize);
+  const radSpec = SPECS[cfg.radSize === '360' ? 'aio360' : 'aio240'];
   for (const s of cfg.slots) {
     const def = SLOT_DEFS.find(d => d.id === s.id);
+    // 海景房：前面板是封死的玻璃，沒有前進風位
+    if (cfg.caseType === 'sea' && def.wall === 'front') { slotInfo[s.id] = { mode: 'closed' }; continue; }
     if (s.mode === 'closed') { slotInfo[s.id] = { mode: 'closed' }; continue; }
     const inSquare = def.rect
       ? (p, q) => p >= def.rect[0] && p < def.rect[1] && q >= def.rect[2] && q < def.rect[3]
@@ -428,6 +438,7 @@ function createCase(cfg) {
     slotInfo[s.id] = { mode: s.mode, fan, list: ring, inDir: ring[0].inDir };
   }
   for (const g of GAPS) {
+    if (cfg.caseType === 'sea' && g.wall === 'front') { g.list = []; continue; }
     const list = wallCells(g.wall, (p, q) => p >= g.rect[0] && p < g.rect[1] && q >= g.rect[2] && q < g.rect[3]);
     openVent(list, SPECS.gapK);
     g.list = list;
@@ -438,7 +449,7 @@ function createCase(cfg) {
   }
 
   // ---- 電源倉罩與電源 ----
-  box(150, 450, 380, 395, 0, 210, solid);
+  box(cfg.caseType === 'sea' ? 290 : 150, 450, 380, 395, 0, 210, solid);      // 海景房的電源倉罩只蓋住電源，底部風扇可以直接往上吹
   box(290, 440, 395, 475, 15, 165, solid);
 
   // ---- 顯示卡 ----
@@ -534,10 +545,10 @@ function createCase(cfg) {
     }
   } else {
     // 240 水冷排：放在兩個風扇位內側，厚 30mm
-    const ids = cfg.cooler === 'aio-top' ? ['T2', 'T3'] : ['F1', 'F2'];
+    const ids = radIds;
     const defs = ids.map(id => SLOT_DEFS.find(d => d.id === id));
     cpu.rad = []; cpu.radSlots = ids;
-    const Fk = SPECS.aio.radK / 0.03;
+    const Fk = radSpec.radK / 0.03;
     const inner = [];
     if (cfg.cooler === 'aio-top') {
       const xa = Math.min(...defs.map(d => d.a)) - 60, xb = Math.max(...defs.map(d => d.a)) + 60, zc = defs[0].b;
@@ -593,7 +604,7 @@ function createCase(cfg) {
         t = sol.inletTemp(cpu.radAxis, Int32Array.from(faces), cpu.radInDir);
       } else t = sol.inletTemp(cpu.radAxis, cpu.radInner, -cpu.radInDir);
       TinCpu = isNaN(t) ? comp.cpu.Tin : t;
-      Rsa = curveR(SPECS.aio, Qcpu / CFM);
+      Rsa = curveR(radSpec, Qcpu / CFM);
     }
     // GPU
     let Qg = 0; for (const f of gpuFans) Qg += Math.max(0, f.Q);
@@ -1195,7 +1206,8 @@ const SPECS = {
   // Q0 是同一散熱器在模型中 100% 轉速時的鰭片風量（台架量測），Q 為當下風量（CFM）
   tower: { name: '單塔（1 風扇）', a: 0.034, b: 0.116, Q0: 37, Rmax: 0.9, finK: 4.2 },
   dual: { name: '雙塔（2 風扇）', a: 0.033, b: 0.077, Q0: 35, Rmax: 0.7, finK: 4.2 },
-  aio: { name: '240 水冷', a: 0.02, b: 0.06, Q0: 34, Rmax: 0.8, radK: 11 },
+  aio240: { name: '240 水冷', a: 0.02, b: 0.06, Q0: 34, Rmax: 0.8, radK: 11 },
+  aio360: { name: '360 水冷', a: 0.015, b: 0.045, Q0: 50, Rmax: 0.7, radK: 11 },
   cpu: { name: 'i7-13700', Rjc: 0.15, tjmax: 100 },
   gpu: { name: 'RTX 4070', a: 0.01, b: 0.085, Q0: 48, Rmax: 0.8, Rjc: 0.03, tjmax: 85, finK: 8 },
   panelU: 4.0,                  // 機殼面板熱傳係數 W/m²K
@@ -1218,6 +1230,8 @@ const GAPS = [
   { name: '前面板下緣', wall: 'front', rect: [440, 470, 20, 190] },
 ];
 
+// 水冷排佔用的風扇位：240 = 2 個、360 = 3 個
+const RAD_IDS = (cooler, size) => cooler === 'aio-top' ? (size === '360' ? ['T1', 'T2', 'T3'] : ['T2', 'T3']) : cooler === 'aio-front' ? (size === '360' ? ['F1', 'F2', 'F3'] : ['F1', 'F2']) : [];
 function createCase(cfg) {
   const { createSolver } = cfg.solverLib;
   const H_MM = cfg.h * 1000;
@@ -1285,9 +1299,12 @@ function createCase(cfg) {
 
   const fans = [];
   const slotInfo = {};
-  const radIds = cfg.cooler === 'aio-top' ? ['T2', 'T3'] : cfg.cooler === 'aio-front' ? ['F1', 'F2'] : [];
+  const radIds = RAD_IDS(cfg.cooler, cfg.radSize);
+  const radSpec = SPECS[cfg.radSize === '360' ? 'aio360' : 'aio240'];
   for (const s of cfg.slots) {
     const def = SLOT_DEFS.find(d => d.id === s.id);
+    // 海景房：前面板是封死的玻璃，沒有前進風位
+    if (cfg.caseType === 'sea' && def.wall === 'front') { slotInfo[s.id] = { mode: 'closed' }; continue; }
     if (s.mode === 'closed') { slotInfo[s.id] = { mode: 'closed' }; continue; }
     const inSquare = def.rect
       ? (p, q) => p >= def.rect[0] && p < def.rect[1] && q >= def.rect[2] && q < def.rect[3]
@@ -1309,6 +1326,7 @@ function createCase(cfg) {
     slotInfo[s.id] = { mode: s.mode, fan, list: ring, inDir: ring[0].inDir };
   }
   for (const g of GAPS) {
+    if (cfg.caseType === 'sea' && g.wall === 'front') { g.list = []; continue; }
     const list = wallCells(g.wall, (p, q) => p >= g.rect[0] && p < g.rect[1] && q >= g.rect[2] && q < g.rect[3]);
     openVent(list, SPECS.gapK);
     g.list = list;
@@ -1319,7 +1337,7 @@ function createCase(cfg) {
   }
 
   // ---- 電源倉罩與電源 ----
-  box(150, 450, 380, 395, 0, 210, solid);
+  box(cfg.caseType === 'sea' ? 290 : 150, 450, 380, 395, 0, 210, solid);      // 海景房的電源倉罩只蓋住電源，底部風扇可以直接往上吹
   box(290, 440, 395, 475, 15, 165, solid);
 
   // ---- 顯示卡 ----
@@ -1415,10 +1433,10 @@ function createCase(cfg) {
     }
   } else {
     // 240 水冷排：放在兩個風扇位內側，厚 30mm
-    const ids = cfg.cooler === 'aio-top' ? ['T2', 'T3'] : ['F1', 'F2'];
+    const ids = radIds;
     const defs = ids.map(id => SLOT_DEFS.find(d => d.id === id));
     cpu.rad = []; cpu.radSlots = ids;
-    const Fk = SPECS.aio.radK / 0.03;
+    const Fk = radSpec.radK / 0.03;
     const inner = [];
     if (cfg.cooler === 'aio-top') {
       const xa = Math.min(...defs.map(d => d.a)) - 60, xb = Math.max(...defs.map(d => d.a)) + 60, zc = defs[0].b;
@@ -1474,7 +1492,7 @@ function createCase(cfg) {
         t = sol.inletTemp(cpu.radAxis, Int32Array.from(faces), cpu.radInDir);
       } else t = sol.inletTemp(cpu.radAxis, cpu.radInner, -cpu.radInDir);
       TinCpu = isNaN(t) ? comp.cpu.Tin : t;
-      Rsa = curveR(SPECS.aio, Qcpu / CFM);
+      Rsa = curveR(radSpec, Qcpu / CFM);
     }
     // GPU
     let Qg = 0; for (const f of gpuFans) Qg += Math.max(0, f.Q);
@@ -1516,7 +1534,7 @@ let lastPost = 0, stepMs = 0, avgList = null, buildId = 0;
 
 function build(cfg) {
   const old = cs;
-  cs = createCase({ solverLib, h: cfg.h, ambient: cfg.ambient, slots: cfg.slots, cooler: cfg.cooler, filter: cfg.filter, side: cfg.side, outside: cfg.outside, towerDir: cfg.towerDir });
+  cs = createCase({ solverLib, h: cfg.h, ambient: cfg.ambient, slots: cfg.slots, cooler: cfg.cooler, radSize: cfg.radSize, caseType: cfg.caseType, filter: cfg.filter, side: cfg.side, outside: cfg.outside, towerDir: cfg.towerDir });
   const s = cs.sol;
   if (old && old.nx === cs.nx && old.ny === cs.ny && old.nz === cs.nz) {
     s.T.set(old.sol.T);
@@ -1631,19 +1649,23 @@ tick();
     { id: 'chim', name: '底進頂出', slots: { B1: 'in', T1: 'out', T2: 'out', T3: 'out', PCI: 'vent' } },
     { id: 'back', name: '全部裝反', slots: { F1: 'out', F2: 'out', F3: 'out', R1: 'in', T3: 'in', PCI: 'vent' } },
     { id: 'none', name: '沒有機殼風扇', slots: { PCI: 'vent' } },
+    { id: 'seaStd', name: '底進頂後出', only: 'sea', slots: { B1: 'in', B2: 'in', T1: 'out', T2: 'out', T3: 'out', R1: 'out', PCI: 'vent' } },
+    { id: 'seaTop', name: '底進頂出', only: 'sea', slots: { B1: 'in', B2: 'in', T1: 'out', T2: 'out', T3: 'out', PCI: 'vent' } },
+    { id: 'seaRear', name: '底進後出', only: 'sea', slots: { B1: 'in', B2: 'in', R1: 'out', PCI: 'vent' } },
+    { id: 'seaPos', name: '底部全進（正壓）', only: 'sea', slots: { B1: 'in', B2: 'in', R1: 'out', T3: 'out', PCI: 'vent' } },
   ];
   const LOADS = { idle: [25, 15], game: [110, 190], burn: [220, 200] };
-  const RAD_SLOTS = { 'aio-top': ['T2', 'T3'], 'aio-front': ['F1', 'F2'] };
   const CASE_DIM = { x: 450, y: 480, z: 210 };
 
   const S = {
     slots: SLOT_DEFS.map(d => ({ id: d.id, mode: 'closed' })),
-    cooler: 'tower', towerDir: 'back', outside: 'on', side: 'glass', filter: 'mesh', h: 0.015,
+    cooler: 'tower', radSize: '240', caseType: 'std', towerDir: 'back', outside: 'on', side: 'glass', filter: 'mesh', h: 0.015,
     cpuW: 110, gpuW: 190, caseFan: 0.7, cpuFan: 0.75, gpuFan: 0.55, ambient: 25,
     paused: false,
     layers: { heat: true, flow: true, parts: true, labels: true },
     heatOp: 0.35, heatThr: 3, flowSpd: 0.3, flowN: 3000,
   };
+  const slotHidden = def => S.caseType === 'sea' && def.wall === 'front';
   let grid = null, frame = null, stats = null;
 
   // ---------- 背景執行緒 ----------
@@ -1652,7 +1674,7 @@ tick();
   function sendConfig() {
     $('busy').hidden = false;
     clearTimeout(configTimer);
-    configTimer = setTimeout(() => worker.postMessage({ type: 'config', cfg: { h: S.h, ambient: S.ambient, slots: S.slots, cooler: S.cooler, towerDir: S.towerDir, outside: S.outside === 'on', filter: S.filter, side: S.side } }), 60);
+    configTimer = setTimeout(() => worker.postMessage({ type: 'config', cfg: { h: S.h, ambient: S.ambient, slots: S.slots, cooler: S.cooler, radSize: S.radSize, caseType: S.caseType, towerDir: S.towerDir, outside: S.outside === 'on', filter: S.filter, side: S.side } }), 60);
   }
   function sendParams() {
     worker.postMessage({ type: 'params', loads: { cpuW: S.cpuW, gpuW: S.gpuW }, speeds: [S.caseFan, S.cpuFan, S.gpuFan], ambient: S.ambient });
@@ -1819,7 +1841,8 @@ tick();
     if (S.layers.parts) {
       const part = [0.75, 0.8, 0.84, 0.45], fill = [0.6, 0.7, 0.78, 0.05];
       // 電源倉罩與電源
-      boxLines(L, 150, 450, 380, 395, 0, 210, faint); boxFaces(F, 150, 450, 380, 395, 0, 210, [0.4, 0.45, 0.5, 0.10]);
+      const shx = S.caseType === 'sea' ? 290 : 150;
+      boxLines(L, shx, 450, 380, 395, 0, 210, faint); boxFaces(F, shx, 450, 380, 395, 0, 210, [0.4, 0.45, 0.5, 0.10]);
       boxLines(L, 290, 440, 395, 475, 15, 165, part); boxFaces(F, 290, 440, 395, 475, 15, 165, fill);
       // 記憶體
       boxLines(L, 372, 402, 45, 185, 0, 35, part); boxFaces(F, 372, 402, 45, 185, 0, 35, fill);
@@ -1858,7 +1881,10 @@ tick();
       for (const [fx, fz] of [[30, 25], [420, 25], [30, 185], [420, 185]]) boxLines(L, fx - 12, fx + 12, 480, y1, fz - 12, fz + 12, [0.6, 0.66, 0.7, 0.35]);
     }
     // 縫隙
-    for (const g of GAPS) rectWall(L, g.wall, g.rect[0], g.rect[1], g.rect[2], g.rect[3], [0.5, 0.58, 0.62, 0.7], true);
+    for (const g of GAPS) if (!(S.caseType === 'sea' && g.wall === 'front')) rectWall(L, g.wall, g.rect[0], g.rect[1], g.rect[2], g.rect[3], [0.5, 0.58, 0.62, 0.7], true);
+    // 海景房：前面板也是玻璃
+    if (S.caseType === 'sea') { const gc = [0.6, 0.75, 0.85, 0.03];
+      F.v(W(0, 0, 0), gc); F.v(W(0, 480, 0), gc); F.v(W(0, 480, 210), gc); F.v(W(0, 0, 0), gc); F.v(W(0, 480, 210), gc); F.v(W(0, 0, 210), gc); }
     // 網孔側板
     if (S.side === 'mesh') { for (let x = 30; x < 430; x += 20) { L.v(W(x, 20, 210), faint); L.v(W(x, 460, 210), faint); } }
     else { F.v(W(0, 0, 210), [0.6, 0.75, 0.85, 0.025]); F.v(W(450, 0, 210), [0.6, 0.75, 0.85, 0.025]); F.v(W(450, 480, 210), [0.6, 0.75, 0.85, 0.025]);
@@ -1872,7 +1898,7 @@ tick();
     const out = [];
     for (const s of S.slots) {
       const def = SLOT_DEFS.find(d => d.id === s.id);
-      if (def.rect) continue;
+      if (def.rect || slotHidden(def)) continue;
       out.push({ kind: 'slot', id: s.id, mode: s.mode, f: slotFrame(def), r: 57.5, speed: S.caseFan, def });
     }
     if (grid && (grid.cooler === 'tower' || grid.cooler === 'dual')) {
@@ -2130,6 +2156,7 @@ tick();
     };
     for (const s of S.slots) {
       const def = SLOT_DEFS.find(d => d.id === s.id);
+      if (slotHidden(def)) continue;
       const f = def.rect ? { c: W(450, (def.rect[0] + def.rect[1]) / 2, (def.rect[2] + def.rect[3]) / 2), n: [-1, 0, 0] } : slotFrame(def);
       const p = add3(f.c, f.n, -28);
       const color = s.mode === 'in' ? '#4cc6f2' : s.mode === 'out' ? '#ff7240' : s.mode === 'vent' ? '#aab6bd' : 'rgba(127,144,155,0.6)';
@@ -2177,6 +2204,7 @@ tick();
     let best = null, bd = 1e9;
     for (const s of S.slots) {
       const def = SLOT_DEFS.find(d => d.id === s.id);
+      if (slotHidden(def)) continue;
       let c, rad;
       if (def.rect) { c = W(450, (def.rect[0] + def.rect[1]) / 2, (def.rect[2] + def.rect[3]) / 2); rad = 55; }
       else { c = slotFrame(def).c; rad = 57.5; }
@@ -2303,11 +2331,12 @@ tick();
     }
   }
   function syncSlotList() {
-    const rad = RAD_SLOTS[S.cooler] || [];
+    const rad = RAD_IDS(S.cooler, S.radSize);
     for (const s of S.slots) {
       const row = document.querySelector(`.slot[data-id="${s.id}"]`);
       row.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === s.mode)));
       row.querySelector('small').hidden = !rad.includes(s.id);
+      row.hidden = slotHidden(SLOT_DEFS.find(d => d.id === s.id));
     }
   }
   const syncSeg = (id, val) => document.querySelectorAll(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(val))));
@@ -2323,11 +2352,15 @@ tick();
     setSlot(id, MODE_ORDER[k]);
   }
   function enforceRad() {
-    if (S.cooler === 'aio-top') for (const id of RAD_SLOTS['aio-top']) S.slots.find(q => q.id === id).mode = 'out';
-    if (S.cooler === 'aio-front') for (const id of RAD_SLOTS['aio-front']) S.slots.find(q => q.id === id).mode = 'in';
+    for (const id of RAD_IDS(S.cooler, S.radSize)) S.slots.find(q => q.id === id).mode = S.cooler === 'aio-top' ? 'out' : 'in';
   }
   function topologyChanged() { syncSlotList(); sendConfig(); }
-  function syncTowerSeg() { const air = S.cooler === 'tower' || S.cooler === 'dual'; document.querySelectorAll('#towerSeg button').forEach(b => { b.disabled = !air; }); }
+  function syncTowerSeg() {
+    const air = S.cooler === 'tower' || S.cooler === 'dual';
+    document.querySelectorAll('#towerSeg button').forEach(b => { b.disabled = !air; });
+    document.querySelectorAll('#radSeg button').forEach(b => { b.disabled = air; });
+    document.querySelectorAll('#coolerSeg button[data-v="aio-front"]').forEach(b => { b.disabled = S.caseType === 'sea'; });
+  }
   function applyPreset(p) {
     for (const s of S.slots) s.mode = p.slots[s.id] || 'closed';
     enforceRad(); topologyChanged(); syncPresetButtons(p.id);
@@ -2336,6 +2369,7 @@ tick();
     document.querySelectorAll('#presets .btn').forEach(b => {
       const p = PRESETS.find(q => q.id === b.dataset.id);
       const match = activeId ? p.id === activeId : S.slots.every(s => (p.slots[s.id] || 'closed') === s.mode);
+      b.hidden = !!((p.only && p.only !== S.caseType) || (S.caseType === 'sea' && Object.entries(p.slots).some(([k, v]) => k[0] === 'F' && v !== 'closed')));
       b.setAttribute('aria-pressed', String(match));
     });
   }
@@ -2349,6 +2383,13 @@ tick();
     S[key] = key === 'h' ? +b.dataset.v : b.dataset.v; syncSeg(id, S[key]); if (after) after(); topologyChanged(); syncPresetButtons();
   }));
   segBind('coolerSeg', 'cooler', () => { enforceRad(); syncTowerSeg(); });
+  segBind('radSeg', 'radSize', () => { enforceRad(); });
+  segBind('typeSeg', 'caseType', () => {
+    const p = PRESETS.find(q => q.id === (S.caseType === 'sea' ? 'seaStd' : 'std'));
+    for (const s of S.slots) s.mode = p.slots[s.id] || 'closed';
+    if (S.caseType === 'sea' && S.cooler === 'aio-front') { S.cooler = 'aio-top'; syncSeg('coolerSeg', S.cooler); }
+    enforceRad(); syncTowerSeg();
+  });
   segBind('sideSeg', 'side');
   segBind('towerSeg', 'towerDir');
   segBind('outSeg', 'outside', () => { cam.target = S.outside === 'on' ? [250, -235, 120] : [225, -240, 105]; cam.dist = S.outside === 'on' ? 1250 : 1080; });
@@ -2386,7 +2427,8 @@ tick();
       ['機殼縫隙 K', `${SPECS.gapK}`],
       ['單塔熱阻（100% 轉速）', `${(SPECS.tower.a + SPECS.tower.b).toFixed(3)} °C/W`],
       ['雙塔熱阻（100% 轉速）', `${(SPECS.dual.a + SPECS.dual.b).toFixed(3)} °C/W`],
-      ['240 水冷熱阻（100% 轉速）', `${(SPECS.aio.a + SPECS.aio.b).toFixed(3)} °C/W`],
+      ['240 水冷熱阻（100% 轉速）', `${(SPECS.aio240.a + SPECS.aio240.b).toFixed(3)} °C/W`],
+      ['360 水冷熱阻（100% 轉速）', `${(SPECS.aio360.a + SPECS.aio360.b).toFixed(3)} °C/W`],
       ['CPU 核心到散熱器（i7-13700）', `${SPECS.cpu.Rjc} °C/W · 上限 ${SPECS.cpu.tjmax}°C`],
       ['GPU 散熱器熱阻（100% 轉速）', `${(SPECS.gpu.a + SPECS.gpu.b).toFixed(3)} °C/W`],
       ['GPU 核心到散熱器（RTX 4070）', `${SPECS.gpu.Rjc} °C/W · 上限 ${SPECS.gpu.tjmax}°C`],
@@ -2399,7 +2441,7 @@ tick();
 
   // ---------- 開始 ----------
   for (const s of S.slots) s.mode = PRESETS[0].slots[s.id] || 'closed';
-  syncSeg('coolerSeg', S.cooler); syncSeg('towerSeg', S.towerDir); syncSeg('outSeg', S.outside); syncSeg('sideSeg', S.side); syncTowerSeg(); syncSeg('filterSeg', S.filter); syncSeg('resSeg', S.h);
+  syncSeg('coolerSeg', S.cooler); syncSeg('radSeg', S.radSize); syncSeg('typeSeg', S.caseType); syncSeg('towerSeg', S.towerDir); syncSeg('outSeg', S.outside); syncSeg('sideSeg', S.side); syncTowerSeg(); syncSeg('filterSeg', S.filter); syncSeg('resSeg', S.h);
   setSlider('cpuW', S.cpuW); setSlider('gpuW', S.gpuW);
   setSlider('caseFan', Math.round(S.caseFan * 100)); setSlider('cpuFan', Math.round(S.cpuFan * 100)); setSlider('gpuFan', Math.round(S.gpuFan * 100));
   setSlider('amb', S.ambient);
