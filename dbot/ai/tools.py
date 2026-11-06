@@ -7,6 +7,7 @@ from dbot.ai import fortune
 from dbot.ai import imagegen
 from dbot.ai import selfhelp
 from dbot.ai import announce
+from dbot.ai import mention
 from dbot.ai import pcbuild
 from dbot.ai import sfxgen
 from dbot.ai import videogen
@@ -182,6 +183,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return selfhelp.run(args)
         if name == "announce":
             return await announce.run(msg, args)
+        if name == "mention_members":
+            return await mention.run(msg, args)
         if name == "pc_build":
             return await pcbuild.run(args, msg.author.id if msg is not None else None)
         if name == "transfer_log":
@@ -302,6 +305,8 @@ def tool_status(name: str, args_json: str) -> str:
         return "📖 翻自己的功能說明"
     if name == "announce":
         return "📢 處理公告"
+    if name == "mention_members":
+        return "🔔 找人來標記"
     if name == "pc_build":
         return {"recommend": "🖥️ 配電腦中…", "view": "👀 看配單", "edit": "🔧 改配單中…", "search": "🔎 查零件價格…", "trend": "📈 翻價格走勢…"}.get(args.get("action") or "recommend", "🖥️ 配電腦中…")
     if name == "transfer_log":

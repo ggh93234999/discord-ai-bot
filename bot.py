@@ -35,9 +35,11 @@ from dbot.ai import extras
 from dbot.ai import imagegen
 from dbot.ai import selfhelp
 from dbot.ai import announce
+from dbot.ai import mention
 from dbot.ai import pcbuild
 from dbot.core import gamelog
 PC_RE = re.compile(r"配單|改單|改一下單|SSD|Gen[345]|電源供應|機殼|散熱器|配電腦|配一台|組裝電腦|組電腦|裝機|電腦零件|顯示卡|顯卡|主機板|原價屋|欣亞|CPU|處理器|記憶體.*價|SSD.*價|預算.*(電腦|主機)|(電腦|主機).*預算|RTX|Ryzen", re.I)
+MENTION_RE = re.compile(r"標記|標一下|標他|標她|標你|艾特|@|tag|ping|點名|提及|叫.{0,8}(來|過來|出來)|喊.{0,8}(來|過來)|通知.{0,8}(他|她|你|一下)", re.I)
 ANNOUNCE_RE = re.compile(r"公告|announce|通知大家|排程", re.I)
 from dbot.ai import sfxgen
 from dbot.ai import videogen
@@ -570,7 +572,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     if msg is not None and msg.guild and is_admin(msg.author) and (PAY_RE.search(last_user_text(conversation)) or MONEY_RE.search(last_user_text(conversation))):
         sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點；有個像樣的理由就可以給小數目（幾千～三萬以內），沒理由或亂討就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
     messages = [{"role": "system", "content": sys_text}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL] if (msg is not None and msg.guild and MONEY_ANY_RE.search(recent_user_text(conversation))) or MONEY_RE.search(last_user_text(conversation)) or PAY_RE.search(last_user_text(conversation)) or LOG_RE.search(last_user_text(conversation)) or REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([announce.TOOL] if msg is not None and msg.guild and ANNOUNCE_RE.search(last_user_text(conversation)) else []) + ([pcbuild.TOOL] if PC_RE.search(recent_user_text(conversation, 6)) or (msg is not None and pcbuild.has_recent(msg.author.id)) else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL] if (msg is not None and msg.guild and MONEY_ANY_RE.search(recent_user_text(conversation))) or MONEY_RE.search(last_user_text(conversation)) or PAY_RE.search(last_user_text(conversation)) or LOG_RE.search(last_user_text(conversation)) or REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([announce.TOOL] if msg is not None and msg.guild and ANNOUNCE_RE.search(last_user_text(conversation)) else []) + ([mention.TOOL] if msg is not None and msg.guild and MENTION_RE.search(last_user_text(conversation)) else []) + ([pcbuild.TOOL] if PC_RE.search(recent_user_text(conversation, 6)) or (msg is not None and pcbuild.has_recent(msg.author.id)) else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
@@ -767,6 +769,20 @@ async def on_message(msg: discord.Message):
 
         if not reply:
             reply = "（我想不到要說什麼）"
+        ping_ids = mention.take(msg.id)   # 這一輪找到、可以真的通知的成員（只有個人）
+        mkw = {}
+        if ping_ids:
+            miss = [f"<@{i}>" for i in ping_ids if f"<@{i}>" not in reply and f"<@!{i}>" not in reply]
+            if miss:
+                reply = " ".join(miss) + " " + reply
+            mkw = {"allowed_mentions": discord.AllowedMentions(users=[discord.Object(id=i) for i in ping_ids], roles=False, everyone=False, replied_user=False)}
+            if status_msg is not None:
+                # 編輯訊息不會通知人，所以把「處理中」那則刪掉，改發一則新的
+                try:
+                    await status_msg.delete()
+                except discord.HTTPException:
+                    pass
+                status_msg = None
         chunks = split_for_discord(reply)
         first = None
         for i, chunk in enumerate(chunks):
@@ -775,9 +791,9 @@ async def on_message(msg: discord.Message):
                 await status_msg.edit(content=chunk, attachments=files)  # 把「搜尋中…」那則改成答案
                 first = status_msg
             elif i == 0:
-                first = await msg.reply(chunk, mention_author=False, files=files)
+                first = await msg.reply(chunk, mention_author=False, files=files, **mkw)
             else:
-                await msg.channel.send(chunk)
+                await msg.channel.send(chunk, **mkw)
         if actions and first is not None:
             record_actions(first.id, [{**a, "result": FILE_RE.sub("", a["result"]).strip()} for a in actions])
         for p in attach:
