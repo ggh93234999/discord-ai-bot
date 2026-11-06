@@ -1,0 +1,15 @@
+[Unit]
+Description=Play stats page (LAN only)
+After=network.target
+
+[Service]
+User=ggh93234999
+Group=ggh93234999
+WorkingDirectory=/home/ggh93234999/discord-bot/playstats
+Environment=PLAYSTATS_PORT=3120
+ExecStart=/usr/bin/env node --no-warnings server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

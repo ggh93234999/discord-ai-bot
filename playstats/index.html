@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>遊玩帳</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/lxgw-wenkai-tc@5.3.1/index.css">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #12110f; --card: #1a1815; --line: #2b2822; --fg: #e8e1cf; --muted: #8d8573;
+  --seal: #c8442f;
+  --g0: #5b9aaa; --g1: #d9a441; --g2: #78a57d; --g3: #b24f63; --g4: #a8744b; --g5: #8575ad; --gx: #5a554a;
+  --font: "LXGW WenKai TC", "Noto Serif TC", "Songti TC", "PingFang TC", "Microsoft JhengHei", serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font-family: var(--font); font-size: 15px; line-height: 1.6; padding: 20px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)); }
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 22px; }
+:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+
+header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.08em; display: flex; align-items: center; gap: 12px; }
+h1 .seal { display: inline-grid; place-items: center; width: 34px; height: 34px; background: var(--seal); color: #f4e6cc; font-size: 20px; border-radius: 3px; transform: rotate(-4deg); }
+.ctl { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+select, .seg button { font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
+select { padding: 5px 10px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 5px 14px; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: #2a2620; color: var(--fg); }
+
+.sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.sum div { background: var(--card); padding: 12px 16px; }
+.sum b { display: block; font-size: 30px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.sum b small { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+.sum span { color: var(--muted); font-size: 13px; }
+.now { color: var(--seal); font-size: 14px; min-height: 22px; }
+
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px 18px; }
+section h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; letter-spacing: 0.06em; }
+section p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+
+.heat { display: grid; grid-template-columns: 2em repeat(24, minmax(0, 1fr)); gap: 2px; align-items: center; }
+.heat .wd { color: var(--muted); font-size: 13px; }
+.heat .c { aspect-ratio: 1; min-height: 12px; border-radius: 2px; background: #221f1a; cursor: default; }
+.heat .c.peak { outline: 1.5px solid var(--fg); outline-offset: 1px; }
+.heat .hl { color: var(--muted); font-size: 11px; text-align: left; font-variant-numeric: tabular-nums; overflow: visible; white-space: nowrap; }
+
+.hours { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; height: 120px; margin: 18px 0 4px 2em; padding-left: 2px; }
+.hours .col { display: flex; flex-direction: column-reverse; height: 100%; justify-content: flex-start; }
+.hours .seg2 { width: 100%; }
+.hours .col:hover { background: #221f1a; }
+
+.bars { display: grid; gap: 12px; }
+.bar { display: grid; grid-template-columns: minmax(7em, 14em) minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; }
+.bar .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .trk { height: 14px; background: #221f1a; border-radius: 2px; overflow: hidden; }
+.bar .fill { height: 100%; }
+.bar .v { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.bar .meta { grid-column: 2 / 4; color: var(--muted); font-size: 12px; margin-top: -4px; }
+
+.daily { display: flex; align-items: flex-end; gap: 2px; height: 140px; }
+.daily .col { flex: 1 1 0; min-width: 2px; height: 100%; display: flex; flex-direction: column-reverse; }
+.daily .col:hover { background: #221f1a; }
+.dlab { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
+td.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 0; }
+td.t { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+#tip { position: fixed; z-index: 10; pointer-events: none; background: #0c0b09; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 13px; line-height: 1.5; max-width: 260px; display: none; }
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+@media (max-width: 560px) {
+  h1 { font-size: 24px; }
+  .bar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nm v" "trk trk" "meta meta"; }
+  .bar .nm { grid-area: nm; } .bar .v { grid-area: v; } .bar .trk { grid-area: trk; } .bar .meta { grid-area: meta; grid-column: auto; margin-top: 0; }
+  .sum div:last-child { grid-column: 1 / -1; }
+  section { padding: 14px 12px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="seal">玩</span>遊玩帳</h1>
+    <div class="ctl">
+      <select id="who" aria-label="誰的紀錄"></select>
+      <div class="seg" id="range" role="group" aria-label="期間">
+        <button data-d="7">7 天</button><button data-d="30">30 天</button><button data-d="90">90 天</button><button data-d="0">全部</button>
+      </div>
+    </div>
+  </header>
+  <div class="now" id="now"></div>
+  <div class="sum" id="sum"></div>
+
+  <section id="when">
+    <h2>什麼時段在玩</h2>
+    <p class="sub">顏色越深，那個星期幾、那個鐘點玩得越久。下面的長條是不分星期、一天 24 小時各玩幾小時。</p>
+    <div class="heat" id="heat"></div>
+    <div class="hours" id="hours"></div>
+    <div class="legend" id="legend" style="margin-top:12px"></div>
+  </section>
+
+  <section id="what">
+    <h2>玩了什麼遊戲</h2>
+    <p class="sub" id="whatsub"></p>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section id="trend">
+    <h2>每天玩多久</h2>
+    <p class="sub">最近每一天的遊玩時數，顏色對應遊戲。</p>
+    <div class="daily" id="daily"></div>
+    <div class="dlab"><span id="d0"></span><span id="d1"></span></div>
+  </section>
+
+  <section id="recent">
+    <h2>最近的幾場</h2>
+    <table id="rec"></table>
+  </section>
+</div>
+<div id="tip"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+const COLORS = ["var(--g0)", "var(--g1)", "var(--g2)", "var(--g3)", "var(--g4)", "var(--g5)"];
+const WD = ["一", "二", "三", "四", "五", "六", "日"];
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+let days = Number(store.get("ps_days", "30")), uid = store.get("ps_uid", "");
+let colorOf = () => "var(--gx)";
+
+function dur(sec) {
+  sec = Math.round(sec);
+  if (sec < 60) return sec + " 秒";
+  const m = Math.round(sec / 60), h = Math.floor(m / 60);
+  return h ? (m % 60 ? `${h} 小時 ${m % 60} 分` : `${h} 小時`) : `${m} 分`;
+}
+const hrs = (sec) => (sec / 3600);
+function bigHours(sec) { const h = hrs(sec); return h >= 10 ? Math.round(h) : h.toFixed(1); }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+const tip = $("tip");
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+  if (y + h > innerHeight - 8) y = e.clientY - h - 14;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+function bindTip(el, html) {
+  el.addEventListener("pointermove", (e) => showTip(e, html));
+  el.addEventListener("pointerdown", (e) => showTip(e, html));
+  el.addEventListener("pointerleave", hideTip);
+}
+addEventListener("scroll", hideTip, { passive: true });
+
+async function api(path) {
+  const r = await fetch(path, { cache: "no-store" });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+
+async function init() {
+  let users = [];
+  try { users = await api("api/users"); } catch (e) { $("sum").innerHTML = `<div class="empty">讀不到紀錄：${esc(e.message)}</div>`; return; }
+  if (!users.length) { $("sum").innerHTML = `<div class="empty">還沒有任何遊玩紀錄。</div>`; return; }
+  $("who").innerHTML = users.map((u) => `<option value="${u.id}">${esc(u.name)}（${bigHours(u.sec)} 小時）</option>`).join("");
+  if (!users.some((u) => u.id === uid)) uid = users[0].id;
+  $("who").value = uid;
+  $("who").onchange = () => { uid = $("who").value; store.set("ps_uid", uid); load(); };
+  document.querySelectorAll("#range button").forEach((b) => b.onclick = () => { days = Number(b.dataset.d); store.set("ps_days", days); load(); });
+  load();
+  setInterval(load, 60000);
+}
+
+async function load() {
+  document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.d) === days)));
+  let s;
+  try { s = await api(`api/stats?u=${uid}&days=${days}`); } catch (e) { $("sum").innerHTML = `<div class="empty">統計失敗：${esc(e.message)}</div>`; return; }
+  render(s);
+}
+
+function render(s) {
+  const top = s.games.slice(0, 6).map((g) => g.game);
+  colorOf = (g) => { const i = top.indexOf(g); return i >= 0 ? COLORS[i] : "var(--gx)"; };
+  $("now").textContent = s.nowPlaying.length ? `● 現在正在玩：${s.nowPlaying.join("、")}` : "";
+  const per = s.activeDays ? s.total / s.activeDays : 0;
+  const best = s.games[0];
+  $("sum").innerHTML = `
+    <div><b>${bigHours(s.total)}<small>小時</small></b><span>總遊玩時間</span></div>
+    <div><b>${s.activeDays}<small>天</small></b><span>有玩的天數</span></div>
+    <div><b style="font-size:22px;line-height:1.7">${per ? dur(per) : "—"}</b><span>有玩的日子平均</span></div>
+    <div><b>${s.sessions}<small>場</small></b><span>開了幾場</span></div>
+    <div><b style="font-size:20px;line-height:1.9">${best ? esc(best.game) : "—"}</b><span>玩最久的遊戲</span></div>`;
+  if (!s.total) {
+    for (const id of ["heat", "hours", "bars", "daily", "rec", "legend"]) $(id).innerHTML = "";
+    $("bars").innerHTML = `<div class="empty">這段期間沒有遊玩紀錄。</div>`;
+    return;
+  }
+  renderHeat(s); renderHours(s); renderBars(s); renderDaily(s); renderRecent(s);
+  $("legend").innerHTML = top.map((g) => `<span><i style="background:${colorOf(g)}"></i>${esc(g)}</span>`).join("") + (s.games.length > 6 ? `<span><i style="background:var(--gx)"></i>其他</span>` : "");
+}
+
+function renderHeat(s) {
+  const max = Math.max(...s.heat.flat(), 1);
+  let peak = [0, 0];
+  s.heat.forEach((r, i) => r.forEach((v, j) => { if (v > s.heat[peak[0]][peak[1]]) peak = [i, j]; }));
+  let h = `<span></span>` + Array.from({ length: 24 }, (_, i) => `<span class="hl">${i % 3 === 0 ? String(i).padStart(2, "0") : ""}</span>`).join("");
+  s.heat.forEach((r, i) => {
+    h += `<span class="wd">${WD[i]}</span>`;
+    r.forEach((v, j) => {
+      const a = v ? 0.18 + 0.82 * Math.sqrt(v / max) : 0;
+      h += `<div class="c${i === peak[0] && j === peak[1] && v ? " peak" : ""}" data-i="${i}" data-j="${j}" style="${v ? `background:rgba(200,68,47,${a.toFixed(2)})` : ""}"></div>`;
+    });
+  });
+  $("heat").innerHTML = h;
+  $("heat").querySelectorAll(".c").forEach((c) => {
+    const v = s.heat[c.dataset.i][c.dataset.j];
+    bindTip(c, `<b>週${WD[c.dataset.i]} ${String(c.dataset.j).padStart(2, "0")}:00–${String(Number(c.dataset.j) + 1).padStart(2, "0")}:00</b><br>${v ? "累計 " + dur(v) : "沒玩"}`);
+  });
+}
+
+function renderHours(s) {
+  const tot = s.byHour.map((o) => Object.values(o).reduce((a, b) => a + b, 0));
+  const max = Math.max(...tot, 1);
+  const order = s.games.map((g) => g.game);
+  $("hours").innerHTML = s.byHour.map((o, hr) => {
+    const segs = order.filter((g) => o[g]).map((g) => `<div class="seg2" style="height:${(o[g] / max * 100).toFixed(2)}%;background:${colorOf(g)}"></div>`).join("");
+    return `<div class="col" data-h="${hr}">${segs}</div>`;
+  }).join("");
+  $("hours").querySelectorAll(".col").forEach((c) => {
+    const hr = Number(c.dataset.h), o = s.byHour[hr];
+    const lines = Object.entries(o).sort((a, b) => b[1] - a[1]).map(([g, v]) => `${esc(g)}　${dur(v)}`).join("<br>");
+    bindTip(c, `<b>${String(hr).padStart(2, "0")}:00–${String(hr + 1).padStart(2, "0")}:00</b><br>${tot[hr] ? "共 " + dur(tot[hr]) + "<br>" + lines : "沒玩"}`);
+  });
+}
+
+function renderBars(s) {
+  const max = s.games[0].sec;
+  $("whatsub").textContent = `${s.days ? "最近 " + s.days + " 天" : "從 " + (s.since ? fmtTime(s.since).split(" ")[0] : "") + " 開始"}，共 ${s.games.length} 款。`;
+  $("bars").innerHTML = s.games.slice(0, 20).map((g) => `
+    <div class="bar">
+      <div class="nm" title="${esc(g.game)}">${esc(g.game)}</div>
+      <div class="trk"><div class="fill" style="width:${(g.sec / max * 100).toFixed(1)}%;background:${colorOf(g.game)}"></div></div>
+      <div class="v">${dur(g.sec)}<span style="color:var(--muted)">　${(g.sec / s.total * 100).toFixed(0)}%</span></div>
+      <div class="meta">${g.sessions} 場，最長一場 ${dur(g.longest)}，最近一次 ${fmtTime(g.last)}</div>
+    </div>`).join("");
+}
+
+function renderDaily(s) {
+  const tot = s.daily.map((x) => Object.values(x.games).reduce((a, b) => a + b, 0));
+  const max = Math.max(...tot, 3600);
+  const order = s.games.map((g) => g.game);
+  $("daily").innerHTML = s.daily.map((x, i) => {
+    const segs = order.filter((g) => x.games[g]).map((g) => `<div style="height:${(x.games[g] / max * 100).toFixed(2)}%;background:${colorOf(g)}"></div>`).join("");
+    return `<div class="col" data-i="${i}">${segs}</div>`;
+  }).join("");
+  $("daily").querySelectorAll(".col").forEach((c) => {
+    const x = s.daily[c.dataset.i], t = tot[c.dataset.i];
+    const lines = Object.entries(x.games).sort((a, b) => b[1] - a[1]).map(([g, v]) => `${esc(g)}　${dur(v)}`).join("<br>");
+    bindTip(c, `<b>${x.d}</b><br>${t ? "共 " + dur(t) + "<br>" + lines : "沒玩"}`);
+  });
+  $("d0").textContent = s.daily[0].d; $("d1").textContent = s.daily[s.daily.length - 1].d;
+}
+
+function renderRecent(s) {
+  $("rec").innerHTML = s.recent.slice(0, 20).map((r) => `<tr><td class="t">${fmtTime(r.start)}</td><td><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;background:${colorOf(r.game)}"></i>${esc(r.game)}</td><td class="r">${r.end ? dur(r.sec) : "進行中 " + dur(r.sec)}</td></tr>`).join("");
+}
+
+init();
+</script>
+</body>
+</html>
