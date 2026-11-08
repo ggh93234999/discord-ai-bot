@@ -322,6 +322,45 @@ export function handlePc(req, res) {
     else { res.writeHead(200, h); res.end(state.json); }
     return true;
   }
+  if (u.pathname === "/api/pc/moves") {
+    // 漲跌榜：這段時間內每個零件（各店各算）的價格從多少變成多少。只看目前還上架的；下架／重新上架不算漲跌
+    const days = Math.max(0, Math.min(365, Number(u.searchParams.get("days")) || 0));
+    const now = Math.floor(Date.now() / 1000), t0 = days ? now - days * 86400 : 0;
+    const meta = new Map();
+    for (const cat of CATS) for (const p of state.parts[cat] || []) {
+      if (p.c) meta.set(p.c.id, { name: p.name, brand: p.brand, u: p.c.u, st: "c" });
+      if (p.s) meta.set(p.s.id, { name: p.s.n || p.name, brand: p.brand, u: p.s.u, st: "s" });
+    }
+    const out = { ts: state.ts, days, moves: [], tracked: 0, same: 0, delisted: 0, first: 0, last: 0, cats: {} };
+    try {
+      const d = openDb();
+      const items = new Map(d.prepare("SELECT id, store, cat, name FROM item").all().map((r) => [r.id, r]));
+      const rows = d.prepare("SELECT id, ts, price FROM hist ORDER BY id, ts").all();
+      const bump = (cat, k) => { const c = (out.cats[cat] ||= { up: 0, down: 0, same: 0 }); c[k]++; };
+      let i = 0;
+      while (i < rows.length) {
+        let j = i; while (j < rows.length && rows[j].id === rows[i].id) j++;
+        const seq = rows.slice(i, j); i = j;
+        const id = seq[0].id, it = items.get(id); if (!it) continue;
+        if (!out.first || seq[0].ts < out.first) out.first = seq[0].ts;
+        const lastRow = seq[seq.length - 1];
+        if (lastRow.ts > out.last) out.last = lastRow.ts;
+        if (lastRow.price === 0) { out.delisted++; continue; }
+        const nz = seq.filter((r) => r.price > 0);
+        let start = nz[0]; for (const r of nz) if (r.ts <= t0) start = r;
+        const end = nz[nz.length - 1];
+        out.tracked++;
+        const n = nz.filter((r) => r.ts > start.ts && r.price !== start.price).length;
+        if (end.price === start.price) { out.same++; bump(it.cat, "same"); continue; }
+        bump(it.cat, end.price > start.price ? "up" : "down");
+        const m = meta.get(id) || {};
+        out.moves.push({ id, st: it.store, cat: it.cat, name: m.name || it.name, from: start.price, to: end.price, at: start.ts, to_at: end.ts, n, u: m.u || "" });
+      }
+    } catch (e) { out.err = String(e.message || e); }
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=60" });
+    res.end(JSON.stringify(out));
+    return true;
+  }
   if (u.pathname === "/api/pc/hist") {
     const ids = (u.searchParams.get("ids") || "").split(",").map((s) => s.trim()).filter((s) => /^[cs][\w]{1,20}$/.test(s)).slice(0, 8);
     const out = {};
