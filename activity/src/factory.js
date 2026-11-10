@@ -150,7 +150,8 @@ export function mountFactory(root, { env, back }) {
     tool = k; if (k !== "inspect") sel = null;
     bar.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x.dataset.k === k));
     infoKey = "";
-    if (fromUser) { const t = TOOLS.find((x) => x.k === k); say(`${t.nm}：${t.tip}`, 4200); }
+    if (fromUser && !wide() && sheet && k !== "inspect") setTab(tab, false);      // 手機：選了要蓋東西的工具就把面板收起來，讓出地圖
+    if (fromUser) { const t = TOOLS.find((x) => x.k === k); say(`${t.nm}：${t.tip.split("。")[0]}`, 3000); }
   }
   bar.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) pickTool(b.dataset.k, true); });
   const rotLabel = () => { $(".frot").innerHTML = `<span>${ARROW[rot]}</span><small>${DIRN[rot]}</small>`; };
