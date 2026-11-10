@@ -1454,3 +1454,52 @@ body.tv-fs{overflow:hidden}
 .game.airflow { height:100vh; max-width:1400px; }
 .game.airflow .afframe { flex:1; width:100%; border:0; border-radius:10px; background:#0a0d0f; min-height:0; }
 .dcm .game.airflow { height:100vh; }
+
+/* 麻將：mmain（牌桌＋手牌）和 mside（自動功能、操作按鈕）。手機沿用原本上下排列 */
+.mj .mmain,.mj .mside{display:contents}
+/* 麻將 桌面版：牌桌放左邊、操作列放右邊，尺寸跟著視窗高度縮，整桌一個畫面看完 */
+@media (min-width:900px){
+  .game.mj{max-width:1240px;padding-top:4px;padding-bottom:4px}
+  .mj{--mjw:calc((min(100vw,1240px) - 44px - 250px) / var(--mjn, 18.5));--rt:clamp(18px, min(2.6vw, 3.7vh), 34px)}
+  .mt.big{width:min(56px,var(--mjw),6.8vh);height:calc(min(56px,var(--mjw),6.8vh) * 1.38)}
+  .mt.big b{font-size:calc(min(56px,var(--mjw),6.8vh) * .5)}.mt.big i{font-size:max(8px, calc(min(56px,var(--mjw),6.8vh) * .27))}
+  .mj .mjbody:has(.mmain){display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:10px;align-items:start}
+  .mj .mmain{display:flex;flex-direction:column;gap:6px;min-width:0;align-items:center}
+  .mj .mside{display:flex;flex-direction:column;gap:10px;align-items:center;position:sticky;top:6px;padding-top:6px}
+  .mj .mside .mctl{min-height:0}
+  .mj .mside .mbtns{flex-direction:column;align-items:stretch;width:100%}
+  .mj .mside .mbtns .mb{justify-content:center}
+  .mj .mside .mauto{flex-direction:column;align-items:stretch;margin:0}
+  .mj .mtable{gap:4px;padding:4px}
+  .mj .mseat.r1,.mj .mseat.r3{min-height:clamp(150px,30vh,290px)}
+  .mj .mseat.r2,.mj .mseat.r0{min-height:clamp(70px,13vh,138px)}
+  .mj .mseat.r2 .mriver,.mj .mseat.r0 .mriver{min-height:calc(var(--rt) * 1.4)}
+  .mj .mseat.r1 .mriver,.mj .mseat.r3 .mriver{min-height:calc(var(--rt) * 3)}
+  .mj .mhand{padding-top:4px}
+  .mj .mjlog{min-height:0}
+  .mj .status{min-height:0}
+}
+
+/* 麻將：推薦與代打 */
+.mj .mt.hint{outline:3px solid #66e08a;outline-offset:1px;transform:translateY(-8px);box-shadow:0 0 12px 3px rgba(102,224,138,.8)}
+.mj .mb.hintb{box-shadow:0 0 0 3px #66e08a,0 0 12px 3px rgba(102,224,138,.8)}
+.mj .mhinttxt{font-size:13px;color:#8be9a8;text-align:center}
+
+/* 自動化工廠：訂單與升級 */
+.factory .forders,.factory .fupg{width:100%;max-width:640px;margin:8px auto 0;padding:8px 12px;border-radius:10px;background:#242b3a;text-align:left;font-size:13px;box-sizing:border-box}
+.factory .fo-h{font-weight:700;color:#fff;margin-bottom:6px}
+.factory .fo-h small{font-weight:400;color:#8c97ab;margin-left:8px;font-size:11px}
+.factory .fo-it{display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid #2f3748}
+.factory .fo-it i{width:14px;height:14px;border-radius:50%;flex:none}
+.factory .fo-m{flex:1;min-width:0}
+.factory .fo-m b{font-size:13px;color:#e6e9ef}
+.factory .fo-bar{height:5px;border-radius:3px;background:#161b26;margin-top:3px;overflow:hidden}
+.factory .fo-bar i{display:block;height:100%;border-radius:0;background:#66bb6a;transition:width .3s}
+.factory .fo-p{font-size:12px;color:#9aa3b5;min-width:42px;text-align:right}
+.factory .fo-r{font-size:13px;color:#ffd54f;font-weight:700;min-width:64px;text-align:right}
+.factory .fu-g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.factory .fu-g button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;border:1px solid #3a4358;border-radius:8px;background:#1b2130;color:#e6e9ef;cursor:pointer;text-align:left}
+.factory .fu-g button b{font-size:13px}
+.factory .fu-g button small{font-size:11px;color:#8c97ab}
+.factory .fu-g button em{font-style:normal;font-size:13px;color:#ffd54f;font-weight:700}
+.factory .fu-g button:disabled{opacity:.5;cursor:default}
