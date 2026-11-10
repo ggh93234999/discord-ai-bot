@@ -1,4 +1,5 @@
 // 自動化工廠（原型）：把礦挖出來、熔成鐵板、做成齒輪等產品，用傳送帶送去出貨口換錢。
+import "./factory.css";
 import { W, H, DX, DY, BELT_STEP, KINDS, ITEMS, RECIPES, POWER_USE, POWER_PRICE, makeOre, newGame, canPlace, place, remove, setRecipe, machineState, step, perMinute, powerRate, buyPower, serialize, load, UPGRADES, MAX_LV, upCost, upgrade, LANDS, LAND_COST, landSize, MILESTONES, buyLand, snap, restore, setFilter } from "./factory_sim.js";
 
 // AI 畫的圖示（factory-art/*.png，檔名＝機器或物品代號）。圖還沒載入或缺圖時，退回原本的色塊畫法。
@@ -31,29 +32,41 @@ const recipeText = (R) => Object.entries(R.in).map(([k, n]) => `${n} ${ITEMS[k].
 
 export function mountFactory(root, { env, back }) {
   const seen = (() => { try { return !!localStorage.getItem(SEEN_KEY); } catch { return false; } })();
+  const TABS = [["info", "🔍", "資訊"], ["task", "📋", "任務"], ["up", "🔧", "升級"], ["power", "⚡", "電力"], ["help", "❓", "說明"]];
   root.innerHTML = `
-    <div class="game gomoku factory">
-      <header><button class="back">← 選單</button><h2>自動化工廠</h2><span class="right fmoney"></span></header>
-      <div class="fwrap">
-       <div class="fleft">
-        <div class="status fstat"></div>
-        <div class="cwrap"><canvas width="${LANDS[0][0] * CELL}" height="${LANDS[0][1] * CELL}"></canvas></div>
-        <div class="fzoom"><button class="zm">－</button><span class="zv">100%</span><button class="zp">＋</button></div>
-        <div class="ftools"></div>
-        <div class="ftip"></div>
-        <div class="factions"><button class="frot"></button><button class="fundo">↶ 復原</button><button class="fspeed"></button><button class="fland"></button><button class="fcheat">🧪 無限金錢：關</button><button class="freset">清空重來</button></div>
-       </div>
-       <div class="fright">
-        <div class="finfo"></div>
-        <div class="fms"></div>
-        <div class="fpower"></div>
-        <div class="forders"></div>
-        <div class="fupg"></div>
-       </div>
+    <div class="fx">
+      <div class="fx-top">
+        <button class="fx-back" title="回選單">←</button>
+        <b class="fx-title">自動化工廠</b>
+        <span class="fx-chip fx-money"></span>
+        <button class="fx-chip fx-pw" data-go="power" title="電力（點一下儲值）"></button>
+        <span class="fx-chip fx-rate" title="最近一分鐘的出貨金額"></span>
+        <button class="fx-chip fx-bad blocked" data-bad="blocked" hidden></button>
+        <button class="fx-chip fx-bad wait" data-bad="wait" hidden></button>
+        <span class="fx-sp"></span>
+        <button class="fx-b fspeed" title="遊戲速度"></button>
+        <button class="fx-b fundo" title="復原（Ctrl+Z）">↶</button>
       </div>
-      <div class="fprice"></div>
-      <div class="fhelp">
-        <details class="fh" ${seen ? "" : "open"}><summary>快速上手（4 步）</summary>
+      <div class="fx-main">
+        <div class="fx-mw">
+          <div class="fx-map"><div class="fx-cv"><canvas width="${LANDS[0][0] * CELL}" height="${LANDS[0][1] * CELL}"></canvas></div></div>
+          <div class="fx-toast"></div>
+          <div class="fx-fab">
+            <button class="fx-zin" title="放大">＋</button>
+            <button class="fx-zout" title="縮小">－</button>
+            <button class="frot" title="轉方向（R）"></button>
+          </div>
+        </div>
+        <div class="fx-side">
+          <div class="fx-tabs">${TABS.map(([k, ic, nm]) => `<button data-tab="${k}"><span>${ic}</span><b>${nm}</b></button>`).join("")}</div>
+          <div class="fx-panes">
+            <div class="fx-pane" data-p="info"><div class="finfo"></div><div class="fprobs"></div></div>
+            <div class="fx-pane" data-p="task"><div class="fms"></div><div class="forders"></div></div>
+            <div class="fx-pane" data-p="up"><div class="fland-box"><button class="fland"></button><small>擴地後會出現更多礦點，最遠的角落有金礦。</small></div><div class="fupg"></div></div>
+            <div class="fx-pane" data-p="power"><div class="fpower"></div></div>
+            <div class="fx-pane" data-p="help">
+              <div class="fx-set"><button class="fcheat">🧪 無限金錢：關</button><button class="freset">清空重來</button></div>
+              <div class="fhelp"><details class="fh" ${seen ? "" : "open"}><summary>快速上手（4 步）</summary>
           <ol>
             <li><b>採礦機</b>放在礦點上（灰色＝鐵礦、橘色＝銅礦）。</li>
             <li>用<b>傳送帶</b>（按住拖曳）把礦送進<b>熔爐</b>，熔成鐵板或銅板。</li>
@@ -96,46 +109,72 @@ export function mountFactory(root, { env, back }) {
             <li><b>帶子迎面相對</b>：兩條帶子互相面對，東西過不去。</li>
           </ul>
         </details>
-        <p class="fnote">存檔記在這個瀏覽器裡（每 5 秒自動存），換裝置不會跟過去。</p>
+        <p class="fnote">存檔記在這個瀏覽器裡（每 5 秒自動存），換裝置不會跟過去。</p></div>
+              <div class="fprice"></div>
+            </div>
+          </div>
+        </div>
       </div>
+      <div class="fx-dock"><div class="ftools"></div></div>
     </div>`;
   const $ = (s) => root.querySelector(s);
-  const canvas = $("canvas"), ctx = canvas.getContext("2d");
+  const mapEl = $(".fx-map"), canvas = $("canvas"), ctx = canvas.getContext("2d");
   root.querySelectorAll(".fh").forEach((d) => d.addEventListener("toggle", () => { try { localStorage.setItem(SEEN_KEY, "1"); } catch {} }));
   const ore = makeOre();
   let g;
   try { g = load(JSON.parse(localStorage.getItem(SAVE_KEY) || "null")); } catch { g = newGame(); }
-  let tool = "inspect", rot = 0, msg = "", msgAt = 0, closed = false, raf = 0, acc = 0, last = performance.now(), saveAt = 0;
-  let sel = null, hover = null, drag = null, infoKey = "";
+  let tool = "inspect", rot = 0, closed = false, raf = 0, acc = 0, last = performance.now(), saveAt = 0;
+  let sel = null, hover = null, drag = null, infoKey = "", tab = "info", sheet = false, zoom = 0;
+  const wide = () => window.matchMedia("(min-width: 900px)").matches;
+  const undoStack = [];
+  const ptrs = new Map();
+  let gest = null, toastT = 0;
+
+  const say = (t, ms = 2400) => { const el = $(".fx-toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("on"), ms); };
+
+  // ---- 分頁（電腦版右邊固定顯示；手機版收成底部一排，點開往上展開）
+  function setTab(k, open = true, toggle = false) {
+    if (toggle && !wide() && tab === k && sheet) { sheet = false; } else { tab = k; sheet = open; }
+    root.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab && (sheet || wide())));
+    root.querySelectorAll(".fx-pane").forEach((p) => p.classList.toggle("on", p.dataset.p === tab));
+    $(".fx-side").classList.toggle("open", sheet || wide());
+  }
+  root.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab, true, true)));
+  root.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.go, true)));
+  window.addEventListener("resize", () => setTab(tab, sheet));
 
   // ---- 工具列
   const bar = $(".ftools");
-  bar.innerHTML = TOOLS.map((t, i) => `<button data-k="${t.k}" title="${t.tip}"><span>${artTag(t.k, 30, t.ic)}</span><b>${t.nm}</b><small>${t.k === "erase" ? "退一半" : !KINDS[t.k] ? "不花錢" : "$" + KINDS[t.k].cost}</small><em>${t.key}</em></button>`).join("");
-  function pickTool(k) {
+  bar.innerHTML = TOOLS.map((t) => `<button data-k="${t.k}" title="${t.nm}：${t.tip}"><span>${artTag(t.k, 30, t.ic)}</span><b>${t.nm}</b><small>${t.k === "erase" ? "退一半" : !KINDS[t.k] ? "免費" : "$" + KINDS[t.k].cost}</small><em>${t.key}</em></button>`).join("");
+  function pickTool(k, fromUser) {
     tool = k; if (k !== "inspect") sel = null;
     bar.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x.dataset.k === k));
-    $(".ftip").textContent = TOOLS.find((t) => t.k === k).tip; infoKey = "";
+    infoKey = "";
+    if (fromUser) { const t = TOOLS.find((x) => x.k === k); say(`${t.nm}：${t.tip}`, 4200); }
   }
-  bar.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) pickTool(b.dataset.k); });
-  const rotLabel = () => { $(".frot").textContent = `方向 ${ARROW[rot]} ${DIRN[rot]}（R）`; };
-  const rotate = () => { rot = (rot + 1) & 3; rotLabel(); };
+  bar.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) pickTool(b.dataset.k, true); });
+  const rotLabel = () => { $(".frot").innerHTML = `<span>${ARROW[rot]}</span><small>${DIRN[rot]}</small>`; };
+  function rotateSel() {
+    const c = tool === "inspect" && sel ? cellOf(sel[0], sel[1]) : null;
+    if (c && c.k !== "shipper" && c.k !== "bridge") { pushUndo(); c.dir = (c.dir + 1) & 3; infoKey = ""; say(`${KINDS[c.k].name} 出口轉向${DIRN[c.dir]}`); return; }
+    rot = (rot + 1) & 3; rotLabel();
+  }
   rotLabel(); pickTool("inspect");
-  $(".frot").addEventListener("click", rotate);
+  $(".frot").addEventListener("click", rotateSel);
   let armed = 0;
   $(".freset").addEventListener("click", (e) => {          // Activity 裡不能用 confirm()，改成按兩次
     if (!armed) { armed = setTimeout(() => { armed = 0; e.target.textContent = "清空重來"; }, 3000); e.target.textContent = "再按一次確定清空"; return; }
     clearTimeout(armed); armed = 0; e.target.textContent = "清空重來"; g = newGame(); cheat = null; $(".fcheat").textContent = "🧪 無限金錢：關"; $(".fcheat").classList.remove("on"); sel = null; undoStack.length = 0; resizeCanvas(); persist(); infoKey = "";
   });
-  $(".back").addEventListener("click", () => { cleanup(); back(); });
+  $(".fx-back").addEventListener("click", () => { cleanup(); back(); });
   const kd = (e) => {
-    if ((e.key === "r" || e.key === "R") && tool === "inspect" && sel && cellOf(sel[0], sel[1]) && !["shipper", "bridge"].includes(cellOf(sel[0], sel[1]).k)) { pushUndo(); const c = cellOf(sel[0], sel[1]); c.dir = (c.dir + 1) & 3; infoKey = ""; }
-    else if (e.key === "r" || e.key === "R") rotate();
-    else if (e.target && /input|textarea/i.test(e.target.tagName)) return;
-    else if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); undo(); }
-    else if (e.key === "+" || e.key === "=") setZoom(zoom + 0.5);
-    else if (e.key === "-" || e.key === "_") setZoom(zoom - 0.5);
+    if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); undo(); }
+    else if (e.key === "r" || e.key === "R") rotateSel();
+    else if (e.key === "+" || e.key === "=") setZoom((zoom || 1) * 1.25);
+    else if (e.key === "-" || e.key === "_") setZoom((zoom || 1) / 1.25);
     else if (e.key === "Escape") { sel = null; pickTool("inspect"); }
-    else { const t = TOOLS.find((x) => x.key === e.key.toUpperCase()); if (t) pickTool(t.k); }
+    else { const t = TOOLS.find((x) => x.key === e.key.toUpperCase()); if (t) pickTool(t.k, true); }
   };
   window.addEventListener("keydown", kd);
 
@@ -153,11 +192,13 @@ export function mountFactory(root, { env, back }) {
     const rate = powerRate(g), mins = rate > 0 ? g.power / rate : Infinity;
     pw.querySelector(".fp-v").textContent = `⚡ 剩餘 ${g.power.toFixed(g.power < 10 ? 1 : 0)} 度`;
     pw.querySelector(".fp-s").textContent = g.off ? "停電中，工廠已停工" : rate > 0 ? `每分鐘耗電 ${rate.toFixed(1)} 度，約撐 ${mins >= 100 ? "100+" : mins.toFixed(1)} 分鐘` : "還沒有機器";
-    const bar = pw.querySelector(".fp-bar i"); bar.style.width = Math.max(0, Math.min(100, mins === Infinity ? 100 : mins / 20 * 100)) + "%";
+    const b = pw.querySelector(".fp-bar i"); b.style.width = Math.max(0, Math.min(100, mins === Infinity ? 100 : mins / 20 * 100)) + "%";
     pw.classList.toggle("low", !g.off && mins < 3); pw.classList.toggle("off", g.off);
     pw.querySelector("[data-rescue]").hidden = !(g.power < 5 && g.money < 20);
+    const chip = $(".fx-pw");
+    chip.textContent = g.off ? "⚡ 停電！" : `⚡ ${g.power.toFixed(g.power < 10 ? 1 : 0)}${rate > 0 ? ` · ${mins >= 100 ? "100+" : mins.toFixed(mins < 10 ? 1 : 0)}分` : ""}`;
+    chip.classList.toggle("low", !g.off && mins < 3); chip.classList.toggle("off", g.off);
   }
-  const say = (t) => { msg = t; msgAt = performance.now(); };
   const cellAt = (e) => {
     const r = canvas.getBoundingClientRect();
     const [lw, lh] = landSize(g);
@@ -166,41 +207,53 @@ export function mountFactory(root, { env, back }) {
   const inGrid = (x, y) => { const [lw, lh] = landSize(g); return x >= 0 && y >= 0 && x < lw && y < lh; };
   const cellOf = (x, y) => (inGrid(x, y) ? g.cells[y * W + x] : null);
 
-  const apply = (x, y, first) => {
-    if (!inGrid(x, y)) return;
-    if (tool === "inspect") { if (first) { sel = [x, y]; infoKey = ""; } return; }
-    if (tool === "pan") return;
-    if (tool === "erase") { remove(g, x, y); return; }
-    let d = rot;
-    if (tool === "belt" && drag && drag.prev && (drag.prev[0] !== x || drag.prev[1] !== y)) {   // 拖曳方向決定傳送帶方向
-      const dx = x - drag.prev[0], dy = y - drag.prev[1];
-      d = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3);
-      const pc = cellOf(drag.prev[0], drag.prev[1]);
-      if (pc && pc.k === "belt") pc.dir = d;
-      rot = d; rotLabel();
-    }
-    const err = place(g, ore, x, y, tool, d);
-    if (err) say(err);
-  };
-  canvas.addEventListener("pointerdown", (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    if (tool === "pan") { const w = $(".cwrap"); drag = { pan: true, x: e.clientX, y: e.clientY, sl: w.scrollLeft, st: w.scrollTop }; return; }
-    if (tool !== "inspect") pushUndo();
-    const [x, y] = cellAt(e); hover = [x, y]; drag = { prev: null }; apply(x, y, true); drag.prev = [x, y];
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (drag && drag.pan) { const w = $(".cwrap"); w.scrollLeft = drag.sl - (e.clientX - drag.x); w.scrollTop = drag.st - (e.clientY - drag.y); return; }
-    const [x, y] = cellAt(e); hover = inGrid(x, y) ? [x, y] : null;
-    if (!drag) return;
-    if (drag.prev && drag.prev[0] === x && drag.prev[1] === y) return;
-    if (drag.prev && Math.abs(x - drag.prev[0]) + Math.abs(y - drag.prev[1]) > 1) { drag.prev = [x, y]; return; }   // 滑太快跳格就不補
-    apply(x, y, false); drag.prev = [x, y];
-  });
-  const up = () => { drag = null; };
-  canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
-  canvas.addEventListener("pointerleave", () => { if (!drag) hover = null; });
+  // ---- 地圖大小：預設剛好塞滿地圖區；縮放是在這個基礎上乘倍數（手機一開始會自動放大到格子夠大）
+  function fitCell() { const [lw, lh] = landSize(g); return Math.max(8, Math.min((mapEl.clientWidth - 8) / lw, (mapEl.clientHeight - 8) / lh)); }
+  function layout() {
+    const [lw, lh] = landSize(g), fc = fitCell();
+    if (!zoom) zoom = Math.max(1, Math.min(3, 28 / fc));
+    canvas.style.width = Math.round(lw * fc * zoom) + "px"; canvas.style.height = Math.round(lh * fc * zoom) + "px";
+  }
+  function resizeCanvas() {
+    const [lw, lh] = landSize(g);
+    if (canvas.width !== lw * CELL || canvas.height !== lh * CELL) { canvas.width = lw * CELL; canvas.height = lh * CELL; }
+    layout();
+  }
+  function setZoom(z, cx, cy) {
+    const r0 = canvas.getBoundingClientRect(), nz = Math.max(1, Math.min(4, z));
+    if (cx == null) { cx = mapEl.getBoundingClientRect().left + mapEl.clientWidth / 2; cy = mapEl.getBoundingClientRect().top + mapEl.clientHeight / 2; }
+    const fx = Math.max(0, Math.min(1, (cx - r0.left) / r0.width)), fy = Math.max(0, Math.min(1, (cy - r0.top) / r0.height));
+    zoom = nz; layout();
+    const r1 = canvas.getBoundingClientRect();
+    mapEl.scrollLeft += r1.left + fx * r1.width - cx; mapEl.scrollTop += r1.top + fy * r1.height - cy;
+  }
+  function focusCell(x, y) {
+    const r = canvas.getBoundingClientRect(), m = mapEl.getBoundingClientRect(), [lw, lh] = landSize(g);
+    mapEl.scrollLeft += r.left + ((x + 0.5) / lw) * r.width - (m.left + mapEl.clientWidth / 2);
+    mapEl.scrollTop += r.top + ((y + 0.5) / lh) * r.height - (m.top + mapEl.clientHeight / 2);
+  }
+  new ResizeObserver(() => layout()).observe(mapEl);
+  $(".fx-zin").addEventListener("click", () => setZoom((zoom || 1) * 1.3));
+  $(".fx-zout").addEventListener("click", () => setZoom((zoom || 1) / 1.3));
+  mapEl.addEventListener("wheel", (e) => { e.preventDefault(); setZoom((zoom || 1) * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY); }, { passive: false });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // 測試用：無限金錢（錢和電每個畫面都補滿）。存檔時存的是開啟前的真實數字，關掉就還原
+  // ---- 復原、速度、擴地
+  function pushUndo() { undoStack.push(snap(g)); if (undoStack.length > 40) undoStack.shift(); }
+  function undo() { const s0 = undoStack.pop(); if (!s0) { say("沒有可以復原的了"); return; } restore(g, s0); resizeCanvas(); sel = null; infoKey = ""; say("已復原"); }
+  $(".fundo").addEventListener("click", undo);
+  const SPEEDS = [[1, "1×"], [2, "2×"], [4, "4×"], [0, "⏸"]];
+  let spi = 0;
+  const speedLabel = () => { $(".fspeed").textContent = SPEEDS[spi][1]; $(".fspeed").classList.toggle("paused", SPEEDS[spi][0] === 0); };
+  $(".fspeed").addEventListener("click", () => { spi = (spi + 1) % SPEEDS.length; speedLabel(); say(SPEEDS[spi][0] ? `速度 ${SPEEDS[spi][1]}` : "已暫停（可以慢慢規劃）"); });
+  $(".fland").addEventListener("click", () => {
+    const n = (g.land || 0) + 1; if (n >= LANDS.length) return;
+    pushUndo(); const err = buyLand(g); if (err) { undoStack.pop(); say(err); return; }
+    resizeCanvas(); say(`地擴大了（${LANDS[g.land][0]}×${LANDS[g.land][1]}），新的礦點出現了`);
+  });
+  speedLabel();
+
+  // ---- 測試用：無限金錢（錢和電每個畫面都補滿）。存檔時存的是開啟前的真實數字，關掉就還原
   let cheat = null;
   $(".fcheat").addEventListener("click", () => {
     if (cheat) { g.money = cheat.m; g.power = cheat.p; cheat = null; }
@@ -215,33 +268,62 @@ export function mountFactory(root, { env, back }) {
     } catch {}
   }
 
-  // ---- 地圖大小、縮放、復原、速度、擴地
-  let zoom = (() => { try { const z = Number(localStorage.getItem("factory_zoom")); if (z >= 1 && z <= 3) return z; } catch {} return window.innerWidth < 600 ? 1.5 : 1; })();
-  const undoStack = [];
-  function pushUndo() { undoStack.push(snap(g)); if (undoStack.length > 40) undoStack.shift(); }
-  function undo() { const s0 = undoStack.pop(); if (!s0) { say("沒有可以復原的了"); return; } restore(g, s0); resizeCanvas(); sel = null; infoKey = ""; say("已復原"); }
-  function resizeCanvas() {
-    const [lw, lh] = landSize(g);
-    if (canvas.width !== lw * CELL || canvas.height !== lh * CELL) { canvas.width = lw * CELL; canvas.height = lh * CELL; }
-    canvas.style.aspectRatio = `${lw}/${lh}`;
-  }
-  function setZoom(z) {
-    zoom = Math.max(1, Math.min(3, Math.round(z * 2) / 2)); try { localStorage.setItem("factory_zoom", String(zoom)); } catch {}
-    canvas.style.width = zoom * 100 + "%"; canvas.style.maxWidth = zoom === 1 ? "" : "none";
-    $(".zv").textContent = Math.round(zoom * 100) + "%";
-  }
-  $(".zm").addEventListener("click", () => setZoom(zoom - 0.5)); $(".zp").addEventListener("click", () => setZoom(zoom + 0.5));
-  $(".fundo").addEventListener("click", undo);
-  const SPEEDS = [[1, "▶ 1 倍速"], [2, "⏩ 2 倍速"], [4, "⏩⏩ 4 倍速"], [0, "⏸ 暫停"]];
-  let spi = 0;
-  const speedLabel = () => { $(".fspeed").textContent = SPEEDS[spi][1]; };
-  $(".fspeed").addEventListener("click", () => { spi = (spi + 1) % SPEEDS.length; speedLabel(); });
-  $(".fland").addEventListener("click", () => {
-    const n = (g.land || 0) + 1; if (n >= LANDS.length) return;
-    pushUndo(); const err = buyLand(g); if (err) { undoStack.pop(); say(err); return; }
-    resizeCanvas(); say(`地擴大了（${LANDS[g.land][0]}×${LANDS[g.land][1]}），新的礦點出現了`);
+  // ---- 放東西
+  const apply = (x, y, first) => {
+    if (!inGrid(x, y)) return;
+    if (tool === "inspect") { if (first) { sel = [x, y]; infoKey = ""; if (!wide() && cellOf(x, y)) setTab("info", true); } return; }
+    if (tool === "pan") return;
+    if (tool === "erase") { remove(g, x, y); return; }
+    let d = rot;
+    if (tool === "belt" && drag && drag.prev && (drag.prev[0] !== x || drag.prev[1] !== y)) {   // 拖曳方向決定傳送帶方向
+      const dx = x - drag.prev[0], dy = y - drag.prev[1];
+      d = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3);
+      const pc = cellOf(drag.prev[0], drag.prev[1]);
+      if (pc && pc.k === "belt") pc.dir = d;
+      rot = d; rotLabel();
+    }
+    const err = place(g, ore, x, y, tool, d);
+    if (err) say(err);
+  };
+  const beginAction = (x, y) => { if (tool !== "inspect" && tool !== "pan") pushUndo(); drag = { prev: null }; apply(x, y, true); drag.prev = [x, y]; };
+  const dist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  const mid = () => { const [a, b] = [...ptrs.values()]; return [(a.x + b.x) / 2, (a.y + b.y) / 2]; };
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size >= 2) { drag = null; const m = mid(); gest = { d: dist(), mx: m[0], my: m[1], z: zoom }; return; }
+    if (e.pointerType === "mouse" && (e.button === 1 || e.button === 2)) { drag = { pan: true, x: e.clientX, y: e.clientY, sl: mapEl.scrollLeft, st: mapEl.scrollTop }; return; }
+    if (tool === "pan") { drag = { pan: true, x: e.clientX, y: e.clientY, sl: mapEl.scrollLeft, st: mapEl.scrollTop }; return; }
+    const [x, y] = cellAt(e); hover = [x, y];
+    if (e.pointerType === "touch") { drag = { pending: [x, y] }; return; }       // 觸控：先等看是點一下、單指拖曳還是雙指縮放，再決定要不要放
+    beginAction(x, y);
   });
-  resizeCanvas(); setZoom(zoom); speedLabel();
+  canvas.addEventListener("pointermove", (e) => {
+    if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gest && ptrs.size >= 2) {
+      const m = mid(), d = dist();
+      setZoom(gest.z * (d / gest.d), m[0], m[1]);
+      mapEl.scrollLeft -= m[0] - gest.mx; mapEl.scrollTop -= m[1] - gest.my; gest.mx = m[0]; gest.my = m[1];
+      return;
+    }
+    if (drag && drag.pan) { mapEl.scrollLeft = drag.sl - (e.clientX - drag.x); mapEl.scrollTop = drag.st - (e.clientY - drag.y); return; }
+    const [x, y] = cellAt(e); hover = inGrid(x, y) ? [x, y] : null;
+    if (drag && drag.pending) {
+      if (x === drag.pending[0] && y === drag.pending[1]) return;
+      const p = drag.pending; beginAction(p[0], p[1]);
+    }
+    if (!drag) return;
+    if (drag.prev && drag.prev[0] === x && drag.prev[1] === y) return;
+    if (drag.prev && Math.abs(x - drag.prev[0]) + Math.abs(y - drag.prev[1]) > 1) { drag.prev = [x, y]; return; }   // 滑太快跳格就不補
+    apply(x, y, false); drag.prev = [x, y];
+  });
+  const up = (e) => {
+    ptrs.delete(e.pointerId);
+    if (drag && drag.pending && e.type === "pointerup" && !gest) beginAction(drag.pending[0], drag.pending[1]);   // 觸控點一下
+    if (ptrs.size < 2) gest = null;
+    if (ptrs.size === 0) drag = null;
+  };
+  canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+  canvas.addEventListener("pointerleave", (e) => { if (!drag && e.pointerType === "mouse") hover = null; });
 
   // ---- 畫面：格子
   const rrect = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); };
@@ -336,23 +418,27 @@ export function mountFactory(root, { env, back }) {
   }
 
   // ---- 資訊面板（檢視工具）
-  const info = $(".finfo");
+  const info = $(".finfo"), probs = $(".fprobs");
   info.addEventListener("click", (e) => {
     const b = e.target.closest("[data-r]"); if (b && sel) { pushUndo(); if (setRecipe(g, sel[0], sel[1], +b.dataset.r)) say("已換配方"); infoKey = ""; }
     const fb = e.target.closest("[data-f]"); if (fb && sel) { pushUndo(); setFilter(g, sel[0], sel[1], fb.dataset.f); infoKey = ""; }
-    const d = e.target.closest("[data-d]"); if (d && sel) { const c = cellOf(sel[0], sel[1]); if (c && c.k !== "shipper" && c.k !== "bridge") { pushUndo(); c.dir = (c.dir + 1) & 3; infoKey = ""; } }
+    const d = e.target.closest("[data-d]"); if (d) rotateSel();
   });
   function renderInfo() {
-    if (tool !== "inspect") { if (infoKey !== "x") { info.innerHTML = ""; infoKey = "x"; } return; }
-    if (!sel) { if (infoKey !== "none") { info.innerHTML = `<div class="fi-empty">點格子上的機器，這裡會顯示它的狀態</div>`; infoKey = "none"; } return; }
+    if (tool !== "inspect") {
+      const t = TOOLS.find((x) => x.k === tool), k = "tool" + tool;
+      if (infoKey !== k) { info.innerHTML = `<div class="fi-h"><b>目前工具：${t.nm}</b></div><div class="fi-tip">${t.tip}</div>${KINDS[tool] && tool !== "shipper" && tool !== "bridge" ? `<div class="fi-tip">放之前先用右下角的 ⟳ 轉好方向（現在朝${DIRN[rot]}）。</div>` : ""}`; infoKey = k; }
+      return;
+    }
+    if (!sel) { if (infoKey !== "none") { info.innerHTML = `<div class="fi-empty">點地圖上的機器，這裡會顯示它的狀態。</div>`; infoKey = "none"; } return; }
     const c = cellOf(sel[0], sel[1]);
-    if (!c) { const o = ore.get(sel[1] * W + sel[0]); const k = "e" + sel + o; if (infoKey !== k) { info.innerHTML = `<div class="fi-empty">${o ? (o === "copper" ? "銅礦點：採礦機放這裡會挖銅礦" : "鐵礦點：採礦機放這裡會挖鐵礦") : "空地"}</div>`; infoKey = k; } return; }
+    if (!c) { const o = ore.get(sel[1] * W + sel[0]); const k = "e" + sel + o; if (infoKey !== k) { info.innerHTML = `<div class="fi-empty">${o ? (o === "copper" ? "銅礦點：採礦機放這裡會挖銅礦" : o === "gold" ? "金礦點：採礦機放這裡會挖金礦" : "鐵礦點：採礦機放這裡會挖鐵礦") : "空地"}</div>`; infoKey = k; } return; }
     const st = ["belt", "bridge", "splitter", "filter", "chest", "shipper"].includes(c.k) ? null : machineState(c);
     const inv = Object.entries(c.inv).filter(([, n]) => n > 0).map(([k, n]) => `${ITEMS[k].name} ×${n}`).join("、") || "空的";
-    let html = `<div class="fi-h"><b>${KINDS[c.k].name}</b>${c.k !== "shipper" && c.k !== "bridge" ? `<span>出口朝${DIRN[c.dir]}</span><button data-d>轉方向</button>` : ""}</div>`;
+    let html = `<div class="fi-h"><b>${KINDS[c.k].name}</b>${c.k !== "shipper" && c.k !== "bridge" ? `<span>出口朝${DIRN[c.dir]}</span><button data-d>轉方向 ⟳</button>` : ""}</div>`;
     html += `<div class="fi-p">耗電：每分鐘 ${POWER_USE[c.k]} 度</div>`;
     if (st) html += `<div class="fi-s s-${st.s}"><i></i>${st.text}</div>`;
-    if (c.k === "miner") html += `<div>挖的是${c.ore === "copper" ? "銅礦" : "鐵礦"}，約每 ${(Math.max(3, Math.round(KINDS.miner.every * 0.8 ** (g.up.miner || 0))) / 10).toFixed(1)} 秒 1 個</div>`;
+    if (c.k === "miner") html += `<div>挖的是${c.ore === "copper" ? "銅礦" : c.ore === "gold" ? "金礦" : "鐵礦"}，約每 ${(Math.max(3, Math.round(KINDS.miner.every * 0.8 ** (g.up.miner || 0))) / 10).toFixed(1)} 秒 1 個</div>`;
     if (c.k === "smelter") html += `<div>機器裡：${inv}</div>`;
     if (c.k === "assembler") {
       html += `<div>機器裡：${inv}</div><div class="fi-rec">${RECIPES.map((R, i) => `<button data-r="${i}" class="${i === c.r ? "on" : ""}">${artTag(R.make, 18, `<i style="background:${ITEMS[R.make].color}"></i>`)}${ITEMS[R.make].name}<small>${recipeText(R)}</small></button>`).join("")}</div>`;
@@ -360,12 +446,38 @@ export function mountFactory(root, { env, back }) {
     if (c.k === "belt") html += `<div>${c.item ? "帶子上有：" + ITEMS[c.item].name : "帶子上沒有東西"}</div>`;
     if (c.k === "splitter") html += `<div>${c.item ? "手上拿著：" + ITEMS[c.item].name : "沒有東西"}。輪流丟給前、右、左。</div>`;
     if (c.k === "shipper") html += `<div>什麼都收，按售價換錢。</div>`;
-    if (c.k === "bridge") html += `<div>橫向、縱向各走各的，直線穿過。${c.lane.map((L) => (L ? ITEMS[L.item].name : "")).filter(Boolean).join("、") ? "目前有：" + c.lane.map((L) => (L ? ITEMS[L.item].name : "")).filter(Boolean).join("、") : ""}</div>`;
+    if (c.k === "bridge") { const n = c.lane.map((L) => (L ? ITEMS[L.item].name : "")).filter(Boolean).join("、"); html += `<div>橫向、縱向各走各的，直線穿過。${n ? "目前有：" + n : ""}</div>`; }
     if (c.k === "filter") html += `<div>${c.f ? "只讓 <b>" + ITEMS[c.f].name + "</b> 往前走，其他的分到左右兩邊" : "還沒選：現在全部往前走"}。選一種：</div><div class="fi-rec fi-flt"><button data-f="" class="${c.f ? "" : "on"}">不過濾</button>${Object.entries(ITEMS).map(([k, it]) => `<button data-f="${k}" class="${c.f === k ? "on" : ""}">${artTag(k, 16, `<i style="background:${it.color}"></i>`)}${it.name}</button>`).join("")}</div>`;
     if (c.k === "chest") html += `<div>存貨：${inv}（最多 100 個）</div>`;
     const key = html.replace(/\s+/g, "");
     if (key !== infoKey) { info.innerHTML = html; infoKey = key; }
   }
+
+  // ---- 哪些機器卡住了：頂端的紅／黃標籤，點一下輪流定位到那台
+  let bad = { blocked: [], wait: [] }, badAt = 0, badIdx = { blocked: 0, wait: 0 }, probKey = "";
+  function scanBad() {
+    const [lw, lh] = landSize(g), r = { blocked: [], wait: [] };
+    for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) {
+      const c = g.cells[y * W + x]; if (!c || !["miner", "smelter", "assembler"].includes(c.k)) continue;
+      const s = machineState(c); if (s.s === "blocked" || s.s === "wait") r[s.s].push({ x, y, k: c.k, text: s.text });
+    }
+    bad = r;
+    const set = (k, label) => { const el = $(`.fx-bad.${k}`); el.hidden = !r[k].length || g.off; el.textContent = `${k === "blocked" ? "🔴" : "🟡"} ${r[k].length} ${label}`; };
+    set("blocked", "台堵住"); set("wait", "台缺料");
+    const pk = JSON.stringify([r.blocked.slice(0, 6).map((p) => p.x + "," + p.y), r.wait.slice(0, 6).map((p) => p.x + "," + p.y), r.blocked.length, r.wait.length]);
+    if (pk !== probKey) {
+      probKey = pk;
+      const row = (p, c) => `<button class="fprob ${c}" data-fx="${p.x},${p.y}"><b>${KINDS[p.k].name} (${p.x + 1},${p.y + 1})</b><small>${p.text}</small></button>`;
+      probs.innerHTML = r.blocked.length || r.wait.length ? `<div class="fo-h">需要注意的機器<small>點一下定位</small></div>` + r.blocked.slice(0, 6).map((p) => row(p, "blocked")).join("") + r.wait.slice(0, 6).map((p) => row(p, "wait")).join("") + (r.blocked.length + r.wait.length > 12 ? `<div class="fo-ms">還有 ${r.blocked.length + r.wait.length - 12} 台沒列出</div>` : "") : "";
+    }
+  }
+  function jumpTo(x, y) { pickTool("inspect"); sel = [x, y]; infoKey = ""; focusCell(x, y); setTab("info", true); }
+  probs.addEventListener("click", (e) => { const b = e.target.closest("[data-fx]"); if (b) { const [x, y] = b.dataset.fx.split(",").map(Number); jumpTo(x, y); } });
+  root.querySelectorAll("[data-bad]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.bad, list = bad[k]; if (!list.length) return;
+    const p = list[badIdx[k]++ % list.length]; jumpTo(p.x, p.y);
+  }));
+
   // ---- 里程碑
   const msEl = $(".fms"); let msKey = "";
   function renderMs() {
@@ -387,7 +499,7 @@ export function mountFactory(root, { env, back }) {
     const key = JSON.stringify([g.up, Object.keys(UPGRADES).map((k) => g.money >= upCost(g.up[k] || 0))]);
     if (key !== ugKey) {
       ugKey = key;
-      ug.innerHTML = `<div class="fo-h">🔧 升級<small>花錢讓機器變快；每級價格翻倍，最高 Lv${MAX_LV}</small></div><div class="fu-g">` + Object.entries(UPGRADES).map(([k, u]) => {
+      ug.innerHTML = `<div class="fo-h">🔧 機器升級<small>花錢讓機器變快；每級價格翻倍，最高 Lv${MAX_LV}</small></div><div class="fu-g">` + Object.entries(UPGRADES).map(([k, u]) => {
         const lv = g.up[k] || 0, max = lv >= MAX_LV, c = upCost(lv);
         return `<button data-up="${k}" ${max || g.money < c ? "disabled" : ""}><b>${u.name} Lv${lv}</b><small>${u.desc}</small><em>${max ? "已滿級" : "$" + c}</em></button>`;
       }).join("") + `</div>`;
@@ -396,7 +508,7 @@ export function mountFactory(root, { env, back }) {
   let btnKey = "";
   function hudButtons() {
     const n = (g.land || 0) + 1, max = n >= LANDS.length;
-    const key = [g.money >= (max ? 0 : LAND_COST[n]), g.land, undoStack.length, Math.floor(g.money / 5)].join();   // 錢的變化每 $5 才更新一次工具列的灰色
+    const key = [g.money >= (max ? 0 : LAND_COST[n]), g.land, undoStack.length, Math.floor(g.money / 5)].join();
     if (key === btnKey) return; btnKey = key;
     const lb = $(".fland");
     lb.textContent = max ? "🗺️ 地已最大" : `🗺️ 擴地 $${LAND_COST[n]}（${LANDS[n][0]}×${LANDS[n][1]}）`;
@@ -406,13 +518,12 @@ export function mountFactory(root, { env, back }) {
   }
   let priceDone = false;
   function hud() {
-    $(".fmoney").textContent = `💰 ${g.money}`;
+    $(".fx-money").textContent = `💰 ${Math.floor(g.money).toLocaleString("en-US")}`;
+    $(".fx-rate").textContent = `📦 $${perMinute(g)}/分`;
     if (!priceDone) { priceDone = true; $(".fprice").innerHTML = Object.entries(ITEMS).map(([k, it]) => `<span>${artTag(k, 18, `<i style="background:${it.color}"></i>`)}${it.name} $${it.value}</span>`).join(""); }
-    const t = performance.now() - msgAt < 2500 ? msg : "";
-    const el = $(".fstat"); el.textContent = t || `每分鐘出貨 $${perMinute(g)}　累計出貨 $${g.shipped}`; el.classList.toggle("warn", !!t);
-    renderInfo(); renderPower(); renderOrders(); renderUpg(); renderMs();
-    hudButtons();
-    if (g.note) { say(g.note); g.note = ""; }
+    renderInfo(); renderPower(); renderOrders(); renderUpg(); renderMs(); hudButtons();
+    if (performance.now() - badAt > 400) { badAt = performance.now(); scanBad(); }
+    if (g.note) { say(g.note, 4000); g.note = ""; }
   }
 
   // ---- 主迴圈：固定 10 tick/秒
@@ -426,6 +537,7 @@ export function mountFactory(root, { env, back }) {
     if (now - saveAt > 5000) { saveAt = now; persist(); }
     raf = requestAnimationFrame(frame);
   }
+  resizeCanvas(); setTab("info", false);
   raf = requestAnimationFrame(frame);
   function cleanup() { closed = true; cancelAnimationFrame(raf); window.removeEventListener("keydown", kd); persist(); }
   return cleanup;

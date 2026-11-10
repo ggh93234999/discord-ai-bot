@@ -1,0 +1,149 @@
+/* 自動化工廠：全螢幕遊戲版面。地圖佔滿中間，工具列固定在底部，資訊收進分頁（電腦在右邊、手機在底部往上展開） */
+.fx{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;background:#10151d;color:#e6e9ef;font-size:14px;line-height:1.5;user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+.fx button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+.fx button:disabled{opacity:.45;cursor:default}
+.fx .fart{vertical-align:middle;image-rendering:auto}
+
+/* 頂端列 */
+.fx-top{flex:none;display:flex;align-items:center;gap:6px;padding:6px 8px;padding-top:max(6px,env(safe-area-inset-top));background:#1b2230;border-bottom:1px solid #2c3446;overflow-x:auto;scrollbar-width:none}
+.fx-top::-webkit-scrollbar{display:none}
+.fx-back{flex:none;width:36px;height:34px;border-radius:9px;background:#2c3446 !important;font-size:18px}
+.fx-title{flex:none;font-size:15px;margin:0 4px}
+.fx-chip{flex:none;display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:#242c3d;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fx-money{color:#ffd54f;font-weight:700}
+.fx-pw{color:#ffe082}
+.fx-pw.low{background:#5a3f12;color:#ffcc80}
+.fx-pw.off{background:#6b1f1f;color:#ffb4ab;animation:fxblink 1s infinite}
+.fx-bad.blocked{background:#5b1d1d;color:#ffb4ab}
+.fx-bad.wait{background:#4f4413;color:#ffe082}
+.fx-bad[hidden]{display:none}
+.fx-sp{flex:1}
+.fx-b{flex:none;min-width:40px;height:34px;padding:0 10px;border-radius:9px;background:#2c3446 !important;font-weight:700}
+.fx-b.paused{background:#7a5a12 !important}
+@keyframes fxblink{50%{opacity:.55}}
+
+/* 中間：地圖＋側欄 */
+.fx-main{flex:1;min-height:0;display:flex;position:relative}
+.fx-mw{flex:1;min-width:0;position:relative}
+.fx-map{position:absolute;inset:0;overflow:auto;background:radial-gradient(#171e2b,#0d1118);overscroll-behavior:contain}
+.fx-cv{display:flex;min-width:100%;min-height:100%;padding:4px;box-sizing:border-box}
+.fx-cv canvas{max-width:none;margin:auto;flex:none;background:#1c2330;border-radius:8px;box-shadow:0 6px 24px #000a;touch-action:none;image-rendering:auto;display:block}
+.fx-toast{position:absolute;left:50%;top:10px;transform:translate(-50%,-8px);max-width:min(92%,560px);padding:8px 14px;border-radius:10px;background:rgba(18,24,36,.94);border:1px solid #3a4560;color:#fff;font-size:13px;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:6}
+.fx-toast.on{opacity:1;transform:translate(-50%,0)}
+.fx-fab{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:8px;z-index:6}
+.fx-fab button{width:46px;height:46px;border-radius:50%;background:rgba(36,44,61,.94) !important;border:1px solid #46526e !important;font-size:20px;box-shadow:0 3px 10px #0008;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.fx-fab .frot small{font-size:10px;opacity:.75;margin-top:1px}
+.fx-fab .frot span{font-size:19px}
+
+/* 側欄 */
+.fx-side{flex:none;display:flex;flex-direction:column;background:#1b2230;position:relative}
+.fx-tabs{flex:none;display:flex;background:#161c28;border-top:1px solid #2c3446}
+.fx-tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:0;padding:5px 2px;color:#9aa6bd;border-bottom:3px solid transparent}
+.fx-tabs button span{font-size:17px;line-height:1.1}
+.fx-tabs button b{font-size:11px;font-weight:600}
+.fx-tabs button.on{color:#fff;border-bottom-color:#ffd54f;background:#1f2736}
+.fx-panes{background:#1b2230}
+.fx-pane{display:none;padding:10px 12px 14px;overflow:auto;-webkit-overflow-scrolling:touch}
+.fx-pane.on{display:block}
+.fx-pane > * + *{margin-top:10px}
+@media (max-width:899px){
+  .fx-main{flex-direction:column}
+  .fx-side{width:100%}
+  .fx-panes{position:absolute;left:0;right:0;bottom:100%;max-height:min(52vh,420px);display:none;border-top:2px solid #3a4560;box-shadow:0 -8px 24px #000a}
+  .fx-side.open .fx-panes{display:block}
+  .fx-side:not(.open) .fx-pane{display:none}
+  .fx-title{display:none}
+}
+@media (min-width:900px){
+  .fx-main{flex-direction:row}
+  .fx-side{width:360px;border-left:1px solid #2c3446;flex-direction:column-reverse;justify-content:flex-end}
+  .fx-tabs{border-top:0;border-bottom:1px solid #2c3446}
+  .fx-panes{flex:1;min-height:0;overflow:auto;order:2}
+  .fx-side{flex-direction:column}
+  .fx-pane{max-height:none;height:100%;box-sizing:border-box}
+  .fx-panes{display:flex !important}
+  .fx-pane.on{flex:1}
+}
+
+/* 底部工具列 */
+.fx-dock{flex:none;background:#161c28;border-top:1px solid #2c3446;padding:6px 6px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
+.fx .ftools{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;justify-content:flex-start}
+.fx .ftools::-webkit-scrollbar{display:none}
+.fx .ftools button{position:relative;flex:none;min-width:62px;display:flex;flex-direction:column;align-items:center;padding:5px 6px 4px;border:2px solid transparent;border-radius:11px;background:#242c3d}
+.fx .ftools button span{font-size:20px;line-height:1.25;height:30px;display:flex;align-items:center}
+.fx .ftools button b{font-size:12px}
+.fx .ftools button small{font-size:10px;color:#9aa6bd}
+.fx .ftools button em{display:none;position:absolute;top:2px;right:5px;font-size:10px;font-style:normal;color:#66728c}
+.fx .ftools button.sel{border-color:#ffd54f;background:#2f3a52}
+.fx .ftools button.poor{opacity:.5}
+@media (hover:hover) and (min-width:900px){
+  .fx .ftools{justify-content:center;flex-wrap:wrap}
+  .fx .ftools button em{display:block}
+}
+
+/* 面板內容 */
+.fx .fo-h{font-weight:700;color:#fff;margin-bottom:6px}
+.fx .fo-h small{font-weight:400;color:#8c97ab;margin-left:8px;font-size:11px}
+.fx .fi-empty{color:#9aa6bd;text-align:center;padding:8px 0}
+.fx .fi-tip{color:#cfd8dc;font-size:13px;line-height:1.65;margin-top:4px}
+.fx .fi-h{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.fx .fi-h b{font-size:15px}.fx .fi-h span{color:#9aa6bd}
+.fx .fi-h button,.fx .fi-rec button{border-radius:8px;background:#3a4357;font-size:12px;padding:5px 10px}
+.fx .fi-s{display:flex;align-items:center;gap:6px;font-weight:700;margin:2px 0}
+.fx .fi-s i{width:10px;height:10px;border-radius:50%;background:#9aa6bd;flex:none}
+.fx .s-work{color:#81c784}.fx .s-work i{background:#66bb6a}
+.fx .s-wait{color:#ffd54f}.fx .s-wait i{background:#ffca28}
+.fx .s-blocked{color:#ef9a9a}.fx .s-blocked i{background:#ef5350}
+.fx .fi-p{color:#8c97ab;font-size:12px}
+.fx .fi-rec{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-top:6px}
+.fx .fi-rec button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;text-align:left;border:2px solid transparent;color:#fff}
+.fx .fi-rec button.on{border-color:#ffd54f;background:#2f3a52}
+.fx .fi-rec button i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.fx .fi-rec button small{font-size:11px;color:#9aa6bd}
+.fx .fi-flt{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.fx .fi-flt button{flex-direction:row;align-items:center;gap:4px;padding:6px 8px}
+.fx .fprobs:empty{display:none}
+.fx .fprob{display:block;width:100%;text-align:left;padding:7px 10px;margin-top:6px;border-radius:9px;border-left:4px solid #888;background:#242c3d}
+.fx .fprob b{display:block;font-size:13px}.fx .fprob small{color:#b7c0d3;font-size:12px}
+.fx .fprob.blocked{border-left-color:#ef5350}.fx .fprob.wait{border-left-color:#ffca28}
+.fx .fo-it{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #2f3748}
+.fx .fo-it i{width:14px;height:14px;border-radius:50%;flex:none}
+.fx .fo-m{flex:1;min-width:0}.fx .fo-m b{font-size:13px}
+.fx .fo-bar{height:5px;border-radius:3px;background:#161b26;margin-top:3px;overflow:hidden}
+.fx .fo-bar.big{height:9px}
+.fx .fo-bar i{display:block;height:100%;border-radius:0;background:#66bb6a;transition:width .3s}
+.fx .fo-p{font-size:12px;color:#9aa6bd;min-width:42px;text-align:right}
+.fx .fo-r{font-size:13px;color:#ffd54f;font-weight:700;min-width:64px;text-align:right}
+.fx .fo-ms{font-size:12px;color:#9aa6bd;text-align:right;margin-top:2px}
+.fx .fu-g{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fx .fu-g button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:9px 11px;border:1px solid #3a4358;border-radius:10px;background:#242c3d;text-align:left}
+.fx .fu-g button b{font-size:13px}.fx .fu-g button small{font-size:11px;color:#8c97ab}
+.fx .fu-g button em{font-style:normal;font-size:13px;color:#ffd54f;font-weight:700}
+.fx .fland-box{display:flex;flex-direction:column;gap:4px}
+.fx .fland{padding:11px;border-radius:10px;background:#2f6fed !important;font-weight:700;color:#fff}
+.fx .fland-box small{color:#8c97ab;font-size:12px}
+.fx .fpower .fp-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.fx .fp-v{font-weight:700;color:#ffd54f;font-size:15px}.fx .fp-s{color:#cfd8dc;font-size:13px}
+.fx .fp-bar{height:7px;border-radius:4px;background:#161b26;margin:8px 0;overflow:hidden}
+.fx .fp-bar i{display:block;height:100%;background:#ffd54f;transition:width .3s}
+.fx .fpower.low .fp-bar i{background:#ff9800}.fx .fpower.low .fp-s{color:#ffcc80}
+.fx .fpower.off .fp-bar i{background:#ef5350}.fx .fpower.off .fp-s,.fx .fpower.off .fp-v{color:#ef9a9a}
+.fx .fp-buy{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fx .fp-buy span{color:#9aa6bd;font-size:12px;width:100%}
+.fx .fp-buy button{padding:8px 12px;border-radius:9px;background:#3a4357;display:flex;flex-direction:column;align-items:center}
+.fx .fp-buy button small{font-size:10px;color:#ffd54f}
+.fx .fx-set{display:flex;gap:8px;flex-wrap:wrap}
+.fx .fx-set button{padding:8px 12px;border-radius:9px;background:#3a4357;font-size:13px}
+.fx .fcheat.on{background:#b3541e}
+.fx .fhelp{font-size:13px;line-height:1.75;color:#cfd8dc}
+.fx .fh{background:#202735;border-radius:10px;margin-bottom:8px;padding:8px 12px;user-select:text;-webkit-user-select:text}
+.fx .fh summary{cursor:pointer;font-weight:700;color:#fff}
+.fx .fh ol,.fx .fh ul{margin:6px 0 4px;padding-left:20px}
+.fx .fh p{margin:6px 0 2px;color:#9aa6bd}
+.fx .frec{display:grid;gap:6px;margin-top:6px}
+.fx .frec div{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.fx .frec i{width:10px;height:10px;border-radius:50%}
+.fx .frec span{color:#9aa6bd;flex-basis:100%;padding-left:16px}
+.fx .fnote{font-size:12px;color:#6b7589;text-align:center}
+.fx .fprice{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;font-size:12px;color:#cfd8dc}
+.fx .fprice i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
