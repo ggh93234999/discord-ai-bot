@@ -1527,3 +1527,4 @@ body.tv-fs{overflow:hidden}
   .factory .fwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;align-items:start}
   .factory .cwrap{max-height:none}
 }
+.factory .fcheat.on{background:#b3541e !important}

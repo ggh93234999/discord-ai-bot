@@ -41,7 +41,7 @@ export function mountFactory(root, { env, back }) {
         <div class="fzoom"><button class="zm">－</button><span class="zv">100%</span><button class="zp">＋</button></div>
         <div class="ftools"></div>
         <div class="ftip"></div>
-        <div class="factions"><button class="frot"></button><button class="fundo">↶ 復原</button><button class="fspeed"></button><button class="fland"></button><button class="freset">清空重來</button></div>
+        <div class="factions"><button class="frot"></button><button class="fundo">↶ 復原</button><button class="fspeed"></button><button class="fland"></button><button class="fcheat">🧪 無限金錢：關</button><button class="freset">清空重來</button></div>
        </div>
        <div class="fright">
         <div class="finfo"></div>
@@ -124,7 +124,7 @@ export function mountFactory(root, { env, back }) {
   let armed = 0;
   $(".freset").addEventListener("click", (e) => {          // Activity 裡不能用 confirm()，改成按兩次
     if (!armed) { armed = setTimeout(() => { armed = 0; e.target.textContent = "清空重來"; }, 3000); e.target.textContent = "再按一次確定清空"; return; }
-    clearTimeout(armed); armed = 0; e.target.textContent = "清空重來"; g = newGame(); sel = null; undoStack.length = 0; resizeCanvas(); persist(); infoKey = "";
+    clearTimeout(armed); armed = 0; e.target.textContent = "清空重來"; g = newGame(); cheat = null; $(".fcheat").textContent = "🧪 無限金錢：關"; $(".fcheat").classList.remove("on"); sel = null; undoStack.length = 0; resizeCanvas(); persist(); infoKey = "";
   });
   $(".back").addEventListener("click", () => { cleanup(); back(); });
   const kd = (e) => {
@@ -200,7 +200,20 @@ export function mountFactory(root, { env, back }) {
   canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
   canvas.addEventListener("pointerleave", () => { if (!drag) hover = null; });
 
-  function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize(g))); } catch {} }
+  // 測試用：無限金錢（錢和電每個畫面都補滿）。存檔時存的是開啟前的真實數字，關掉就還原
+  let cheat = null;
+  $(".fcheat").addEventListener("click", () => {
+    if (cheat) { g.money = cheat.m; g.power = cheat.p; cheat = null; }
+    else cheat = { m: g.money, p: g.power };
+    $(".fcheat").textContent = "🧪 無限金錢：" + (cheat ? "開" : "關"); $(".fcheat").classList.toggle("on", !!cheat); say(cheat ? "無限金錢已開啟（測試用）" : "已關閉，錢和電還原成開啟前的數字");
+  });
+  function persist() {
+    try {
+      const m = g.money, p = g.power; if (cheat) { g.money = cheat.m; g.power = cheat.p; }
+      localStorage.setItem(SAVE_KEY, JSON.stringify(serialize(g)));
+      g.money = m; g.power = p;
+    } catch {}
+  }
 
   // ---- 地圖大小、縮放、復原、速度、擴地
   let zoom = (() => { try { const z = Number(localStorage.getItem("factory_zoom")); if (z >= 1 && z <= 3) return z; } catch {} return window.innerWidth < 600 ? 1.5 : 1; })();
@@ -405,6 +418,7 @@ export function mountFactory(root, { env, back }) {
   // ---- 主迴圈：固定 10 tick/秒
   function frame(now) {
     if (closed) return;
+    if (cheat) { g.money = 99999999; g.power = 99999; }
     acc += Math.min(1000, now - last) * SPEEDS[spi][0]; last = now;
     for (let n = 0; acc >= 100 && n < 60; n++) { step(g); acc -= 100; }
     if (acc > 400) acc = 0;
