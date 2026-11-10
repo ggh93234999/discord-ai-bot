@@ -1,5 +1,5 @@
 // 自動化工廠（原型）：把礦挖出來、熔成鐵板、做成齒輪等產品，用傳送帶送去出貨口換錢。
-import { W, H, DX, DY, BELT_STEP, KINDS, ITEMS, RECIPES, POWER_USE, POWER_PRICE, makeOre, newGame, canPlace, place, remove, setRecipe, machineState, step, perMinute, powerRate, buyPower, serialize, load, UPGRADES, MAX_LV, upCost, upgrade } from "./factory_sim.js";
+import { W, H, DX, DY, BELT_STEP, KINDS, ITEMS, RECIPES, POWER_USE, POWER_PRICE, makeOre, newGame, canPlace, place, remove, setRecipe, machineState, step, perMinute, powerRate, buyPower, serialize, load, UPGRADES, MAX_LV, upCost, upgrade, LANDS, LAND_COST, landSize, MILESTONES, buyLand, snap, restore, setFilter } from "./factory_sim.js";
 
 // AI 畫的圖示（factory-art/*.png，檔名＝機器或物品代號）。圖還沒載入或缺圖時，退回原本的色塊畫法。
 const IMG = {};
@@ -10,19 +10,21 @@ const ready = (n) => IMG[n] && IMG[n].im.complete && IMG[n].im.naturalWidth > 0;
 const artTag = (n, px, fallback) => (IMG[n] ? `<img class="fart" src="${IMG[n].url}" width="${px}" height="${px}" alt="">` : fallback);
 const CELL = 40, SAVE_KEY = "factory_v1", SEEN_KEY = "factory_help_seen";
 const TOOLS = [
-  { k: "inspect",  ic: "👆", nm: "檢視",   tip: "點機器看它在做什麼、缺什麼；點組裝機還能直接選配方。這個工具不會放東西，也不會花錢。" },
-  { k: "belt",     ic: "➡️", nm: "傳送帶", tip: "按住拖曳來鋪：拖的方向就是帶子的方向，轉彎會自動接好。物品只往帶子的箭頭方向走。" },
-  { k: "bridge",   ic: "✚", nm: "橋",     tip: "讓兩條傳送帶交叉：橫著來的橫著走、直著來的直著走，東西只會直線穿過、不會轉彎，互不干擾。把橋放在兩條線交會的那一格就好。" },
-  { k: "splitter", ic: "🔀", nm: "分流器", tip: "收到的東西會輪流丟給「前、右、左」三個方向（箭頭是前方）；哪邊收不下就跳過那邊。拿一個出口接出貨口，多出來的東西就不會塞住。" },
-  { k: "chest",    ic: "🧰", nm: "倉庫",   tip: "什麼東西都收（最多 100 個），再一個一個從出口（黃色箭頭）放出去。產線塞住或下游比較慢時，先放個倉庫擋一下，前面的機器就不會停工。" },
-  { k: "miner",    ic: "⛏️", nm: "採礦機", tip: "只能放在礦點上（灰色是鐵礦、橘色是銅礦）。機器上的黃色小箭頭是出口，產出會推給那一格。" },
-  { k: "smelter",  ic: "🔥", nm: "熔爐",   tip: "鐵礦熔成鐵板、銅礦熔成銅板。把帶子接進來，出口那格接下一段帶子。" },
-  { k: "assembler", ic: "⚙️", nm: "組裝機", tip: "照配方把材料組裝成新東西。剛放下去預設做齒輪，用「檢視」點它可以換配方。" },
-  { k: "shipper",  ic: "📦", nm: "出貨口", tip: "什麼東西都收，按售價換成錢。可以接在任何東西的出口。" },
-  { k: "erase",    ic: "🧹", nm: "拆除",   tip: "點或拖曳經過就拆掉，退回一半的錢。" },
+  { k: "inspect",  key: "1", ic: "👆", nm: "檢視",   tip: "點機器看它在做什麼、缺什麼；點組裝機可以選配方，點過濾器可以選要放行的東西。這個工具不會放東西，也不會花錢。" },
+  { k: "belt",     key: "2", ic: "➡️", nm: "傳送帶", tip: "按住拖曳來鋪：拖的方向就是帶子的方向，轉彎會自動接好。物品只往帶子的箭頭方向走。" },
+  { k: "bridge",   key: "3", ic: "✚", nm: "橋",     tip: "讓兩條傳送帶交叉：橫著來的橫著走、直著來的直著走，東西只會直線穿過、不會轉彎，互不干擾。把橋放在兩條線交會的那一格就好。" },
+  { k: "splitter", key: "4", ic: "🔀", nm: "分流器", tip: "收到的東西會輪流丟給「前、右、左」三個方向（箭頭是前方）；哪邊收不下就跳過那邊。拿一個出口接出貨口，多出來的東西就不會塞住。" },
+  { k: "filter",   key: "5", ic: "🔻", nm: "過濾器", tip: "用「檢視」點它選一種東西：符合的往前走（箭頭方向），其他的往左右分出去。一條線混了好幾種東西時，用它把想要的挑出來。沒選時全部往前。" },
+  { k: "chest",    key: "6", ic: "🧰", nm: "倉庫",   tip: "什麼東西都收（最多 100 個），再一個一個從出口（黃色箭頭）放出去。產線塞住或下游比較慢時，先放個倉庫擋一下，前面的機器就不會停工。" },
+  { k: "miner",    key: "7", ic: "⛏️", nm: "採礦機", tip: "只能放在礦點上（灰色是鐵礦、橘色是銅礦、金黃色是金礦）。機器上的黃色小箭頭是出口，產出會推給那一格。" },
+  { k: "smelter",  key: "8", ic: "🔥", nm: "熔爐",   tip: "鐵礦熔成鐵板、銅礦熔成銅板、金礦熔成金板。把帶子接進來，出口那格接下一段帶子。" },
+  { k: "assembler", key: "9", ic: "⚙️", nm: "組裝機", tip: "照配方把材料組裝成新東西。剛放下去預設做齒輪，用「檢視」點它可以換配方。" },
+  { k: "shipper",  key: "0", ic: "📦", nm: "出貨口", tip: "什麼東西都收，按售價換成錢，也會算進訂單。可以接在任何東西的出口。" },
+  { k: "erase",    key: "X", ic: "🧹", nm: "拆除",   tip: "點或拖曳經過就拆掉，退回一半的錢。" },
+  { k: "pan",      key: "H", ic: "✋", nm: "移動",   tip: "放大畫面之後，用這個工具拖曳來移動視野（滑鼠也可以直接用捲動）。" },
 ];
-const COLOR = { miner: "#8d6e3f", smelter: "#b5532b", assembler: "#2f6fa8", shipper: "#3d8b57", splitter: "#7b5ea7", chest: "#8a6d3b" };
-const ICON = { miner: "⛏", smelter: "♨", assembler: "⚙", shipper: "▣", splitter: "⑃", chest: "▤" };
+const COLOR = { miner: "#8d6e3f", smelter: "#b5532b", assembler: "#2f6fa8", shipper: "#3d8b57", splitter: "#7b5ea7", chest: "#8a6d3b", filter: "#b5679a" };
+const ICON = { miner: "⛏", smelter: "♨", assembler: "⚙", shipper: "▣", splitter: "⑃", chest: "▤", filter: "▽" };
 const STATE_COLOR = { work: "#66bb6a", wait: "#ffca28", blocked: "#ef5350" };
 const DIRN = ["右", "下", "左", "上"], ARROW = ["➡️", "⬇️", "⬅️", "⬆️"];
 const recipeText = (R) => Object.entries(R.in).map(([k, n]) => `${n} ${ITEMS[k].name}`).join(" ＋ ") + " → " + R.n + " " + ITEMS[R.make].name;
@@ -32,15 +34,23 @@ export function mountFactory(root, { env, back }) {
   root.innerHTML = `
     <div class="game gomoku factory">
       <header><button class="back">← 選單</button><h2>自動化工廠</h2><span class="right fmoney"></span></header>
-      <div class="status fstat"></div>
-      <div class="cwrap"><canvas width="${W * CELL}" height="${H * CELL}"></canvas></div>
-      <div class="fpower"></div>
-      <div class="forders"></div>
-      <div class="fupg"></div>
-      <div class="finfo"></div>
-      <div class="ftools"></div>
-      <div class="ftip"></div>
-      <div class="factions"><button class="frot"></button><button class="freset">清空重來</button></div>
+      <div class="fwrap">
+       <div class="fleft">
+        <div class="status fstat"></div>
+        <div class="cwrap"><canvas width="${LANDS[0][0] * CELL}" height="${LANDS[0][1] * CELL}"></canvas></div>
+        <div class="fzoom"><button class="zm">－</button><span class="zv">100%</span><button class="zp">＋</button></div>
+        <div class="ftools"></div>
+        <div class="ftip"></div>
+        <div class="factions"><button class="frot"></button><button class="fundo">↶ 復原</button><button class="fspeed"></button><button class="fland"></button><button class="freset">清空重來</button></div>
+       </div>
+       <div class="fright">
+        <div class="finfo"></div>
+        <div class="fms"></div>
+        <div class="fpower"></div>
+        <div class="forders"></div>
+        <div class="fupg"></div>
+       </div>
+      </div>
       <div class="fprice"></div>
       <div class="fhelp">
         <details class="fh" ${seen ? "" : "open"}><summary>快速上手（4 步）</summary>
@@ -62,6 +72,12 @@ export function mountFactory(root, { env, back }) {
             <li><b>橋</b>：兩條傳送帶要交叉時，在交會那格放橋。橫著進來的橫著出去、直著進來的直著出去，不會轉彎，也不會混在一起。</li>
             <li><b>倉庫</b>：什麼都收（最多 100 個），再從黃色箭頭出口一個個放出去。拿來當緩衝，下游忙不過來時前面的機器不會停。</li>
             <li><b>訂單</b>：畫面上會有 3 張訂單，要你送指定的東西。用<b>出貨口</b>送進去就算進度，東西照樣賣錢；交齊拿一筆額外獎金（約售價的 1.5 倍）。累計出貨越多，訂單裡會出現越高階的東西。</li>
+            <li><b>過濾器</b>：用「檢視」點它選一種東西。符合的往前走，其他的分到左右兩邊。一條線混了好幾種東西時，拿它把想要的挑出來。</li>
+            <li><b>擴地</b>：按「擴地」花錢把地變大（最多兩次）。新的地有更多鐵礦、銅礦，最遠的角落有<b>金礦</b>：金礦熔成金板，再配電路板做成晶片，晶片＋電池＋馬達就是最貴的 AI 核心。</li>
+            <li><b>里程碑</b>：累計出貨到一定金額會自動發獎金，右邊有進度條。</li>
+            <li><b>復原</b>：按「↶ 復原」或 Ctrl+Z，最近 40 次放置、拆除、換方向、擴地都可以退回去（傳送帶上正在跑的東西不會還原）。</li>
+            <li><b>加速與暫停</b>：「倍速」按鈕可以切 1／2／4 倍速或暫停，暫停時可以慢慢規劃。</li>
+            <li><b>縮放與移動</b>：右上方的 ＋／－ 放大縮小畫面（鍵盤 +／-），放大後用「✋ 移動」工具拖曳，或直接捲動。</li>
             <li><b>升級</b>：花錢讓採礦機、熔爐、組裝機變快（每級快 20%），或讓全廠省電（每級 -10%）。每級價格翻倍，最高 Lv5。</li>
           </ul>
         </details>
@@ -94,7 +110,7 @@ export function mountFactory(root, { env, back }) {
 
   // ---- 工具列
   const bar = $(".ftools");
-  bar.innerHTML = TOOLS.map((t, i) => `<button data-k="${t.k}" title="${t.tip}"><span>${artTag(t.k, 30, t.ic)}</span><b>${t.nm}</b><small>${t.k === "erase" ? "退一半" : t.k === "inspect" ? "不花錢" : "$" + KINDS[t.k].cost}</small><em>${i < 9 ? i + 1 : 0}</em></button>`).join("");
+  bar.innerHTML = TOOLS.map((t, i) => `<button data-k="${t.k}" title="${t.tip}"><span>${artTag(t.k, 30, t.ic)}</span><b>${t.nm}</b><small>${t.k === "erase" ? "退一半" : !KINDS[t.k] ? "不花錢" : "$" + KINDS[t.k].cost}</small><em>${t.key}</em></button>`).join("");
   function pickTool(k) {
     tool = k; if (k !== "inspect") sel = null;
     bar.querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x.dataset.k === k));
@@ -108,13 +124,18 @@ export function mountFactory(root, { env, back }) {
   let armed = 0;
   $(".freset").addEventListener("click", (e) => {          // Activity 裡不能用 confirm()，改成按兩次
     if (!armed) { armed = setTimeout(() => { armed = 0; e.target.textContent = "清空重來"; }, 3000); e.target.textContent = "再按一次確定清空"; return; }
-    clearTimeout(armed); armed = 0; e.target.textContent = "清空重來"; g = newGame(); sel = null; persist(); infoKey = "";
+    clearTimeout(armed); armed = 0; e.target.textContent = "清空重來"; g = newGame(); sel = null; undoStack.length = 0; resizeCanvas(); persist(); infoKey = "";
   });
   $(".back").addEventListener("click", () => { cleanup(); back(); });
   const kd = (e) => {
-    if (e.key === "r" || e.key === "R") rotate();
-    else if (/^[0-9]$/.test(e.key) && !(e.target && /input|textarea/i.test(e.target.tagName))) pickTool(TOOLS[(+e.key + 9) % 10].k);
+    if ((e.key === "r" || e.key === "R") && tool === "inspect" && sel && cellOf(sel[0], sel[1]) && !["shipper", "bridge"].includes(cellOf(sel[0], sel[1]).k)) { pushUndo(); const c = cellOf(sel[0], sel[1]); c.dir = (c.dir + 1) & 3; infoKey = ""; }
+    else if (e.key === "r" || e.key === "R") rotate();
+    else if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+    else if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); undo(); }
+    else if (e.key === "+" || e.key === "=") setZoom(zoom + 0.5);
+    else if (e.key === "-" || e.key === "_") setZoom(zoom - 0.5);
     else if (e.key === "Escape") { sel = null; pickTool("inspect"); }
+    else { const t = TOOLS.find((x) => x.key === e.key.toUpperCase()); if (t) pickTool(t.k); }
   };
   window.addEventListener("keydown", kd);
 
@@ -139,14 +160,16 @@ export function mountFactory(root, { env, back }) {
   const say = (t) => { msg = t; msgAt = performance.now(); };
   const cellAt = (e) => {
     const r = canvas.getBoundingClientRect();
-    return [Math.floor(((e.clientX - r.left) / r.width) * W), Math.floor(((e.clientY - r.top) / r.height) * H)];
+    const [lw, lh] = landSize(g);
+    return [Math.floor(((e.clientX - r.left) / r.width) * lw), Math.floor(((e.clientY - r.top) / r.height) * lh)];
   };
-  const inGrid = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
+  const inGrid = (x, y) => { const [lw, lh] = landSize(g); return x >= 0 && y >= 0 && x < lw && y < lh; };
   const cellOf = (x, y) => (inGrid(x, y) ? g.cells[y * W + x] : null);
 
   const apply = (x, y, first) => {
     if (!inGrid(x, y)) return;
     if (tool === "inspect") { if (first) { sel = [x, y]; infoKey = ""; } return; }
+    if (tool === "pan") return;
     if (tool === "erase") { remove(g, x, y); return; }
     let d = rot;
     if (tool === "belt" && drag && drag.prev && (drag.prev[0] !== x || drag.prev[1] !== y)) {   // 拖曳方向決定傳送帶方向
@@ -161,9 +184,12 @@ export function mountFactory(root, { env, back }) {
   };
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
+    if (tool === "pan") { const w = $(".cwrap"); drag = { pan: true, x: e.clientX, y: e.clientY, sl: w.scrollLeft, st: w.scrollTop }; return; }
+    if (tool !== "inspect") pushUndo();
     const [x, y] = cellAt(e); hover = [x, y]; drag = { prev: null }; apply(x, y, true); drag.prev = [x, y];
   });
   canvas.addEventListener("pointermove", (e) => {
+    if (drag && drag.pan) { const w = $(".cwrap"); w.scrollLeft = drag.sl - (e.clientX - drag.x); w.scrollTop = drag.st - (e.clientY - drag.y); return; }
     const [x, y] = cellAt(e); hover = inGrid(x, y) ? [x, y] : null;
     if (!drag) return;
     if (drag.prev && drag.prev[0] === x && drag.prev[1] === y) return;
@@ -175,6 +201,34 @@ export function mountFactory(root, { env, back }) {
   canvas.addEventListener("pointerleave", () => { if (!drag) hover = null; });
 
   function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize(g))); } catch {} }
+
+  // ---- 地圖大小、縮放、復原、速度、擴地
+  let zoom = (() => { try { const z = Number(localStorage.getItem("factory_zoom")); if (z >= 1 && z <= 3) return z; } catch {} return window.innerWidth < 600 ? 1.5 : 1; })();
+  const undoStack = [];
+  function pushUndo() { undoStack.push(snap(g)); if (undoStack.length > 40) undoStack.shift(); }
+  function undo() { const s0 = undoStack.pop(); if (!s0) { say("沒有可以復原的了"); return; } restore(g, s0); resizeCanvas(); sel = null; infoKey = ""; say("已復原"); }
+  function resizeCanvas() {
+    const [lw, lh] = landSize(g);
+    if (canvas.width !== lw * CELL || canvas.height !== lh * CELL) { canvas.width = lw * CELL; canvas.height = lh * CELL; }
+    canvas.style.aspectRatio = `${lw}/${lh}`;
+  }
+  function setZoom(z) {
+    zoom = Math.max(1, Math.min(3, Math.round(z * 2) / 2)); try { localStorage.setItem("factory_zoom", String(zoom)); } catch {}
+    canvas.style.width = zoom * 100 + "%"; canvas.style.maxWidth = zoom === 1 ? "" : "none";
+    $(".zv").textContent = Math.round(zoom * 100) + "%";
+  }
+  $(".zm").addEventListener("click", () => setZoom(zoom - 0.5)); $(".zp").addEventListener("click", () => setZoom(zoom + 0.5));
+  $(".fundo").addEventListener("click", undo);
+  const SPEEDS = [[1, "▶ 1 倍速"], [2, "⏩ 2 倍速"], [4, "⏩⏩ 4 倍速"], [0, "⏸ 暫停"]];
+  let spi = 0;
+  const speedLabel = () => { $(".fspeed").textContent = SPEEDS[spi][1]; };
+  $(".fspeed").addEventListener("click", () => { spi = (spi + 1) % SPEEDS.length; speedLabel(); });
+  $(".fland").addEventListener("click", () => {
+    const n = (g.land || 0) + 1; if (n >= LANDS.length) return;
+    pushUndo(); const err = buyLand(g); if (err) { undoStack.pop(); say(err); return; }
+    resizeCanvas(); say(`地擴大了（${LANDS[g.land][0]}×${LANDS[g.land][1]}），新的礦點出現了`);
+  });
+  resizeCanvas(); setZoom(zoom); speedLabel();
 
   // ---- 畫面：格子
   const rrect = (x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); };
@@ -212,13 +266,13 @@ export function mountFactory(root, { env, back }) {
         drawArrow(px, py, c.dir, "#ffe082");
         const n = Object.values(c.inv).reduce((a, b) => a + b, 0);
         if (n) { ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left"; ctx.fillText(n, px + 6, py + 9); }
-        if (c.k === "assembler") {
-          const mk = RECIPES[c.r].make;
+        if (c.k === "assembler" || (c.k === "filter" && c.f)) {
+          const mk = c.k === "filter" ? c.f : RECIPES[c.r].make;
           ctx.fillStyle = "rgba(20,26,38,.85)"; ctx.beginPath(); ctx.arc(px + CELL - 9, py + 9, 8, 0, 7); ctx.fill();
           if (ready(mk)) ctx.drawImage(IMG[mk].im, px + CELL - 16, py + 2, 14, 14);
           else { ctx.fillStyle = ITEMS[mk].color; ctx.beginPath(); ctx.arc(px + CELL - 9, py + 9, 5, 0, 7); ctx.fill(); }
         }
-        if (c.k !== "splitter" && c.k !== "chest") {            // 狀態燈
+        if (c.k !== "splitter" && c.k !== "chest" && c.k !== "filter") {   // 狀態燈
           const st = machineState(c);
           if (STATE_COLOR[st.s]) { ctx.fillStyle = STATE_COLOR[st.s]; ctx.beginPath(); ctx.arc(px + 9, py + CELL - 9, 4, 0, 7); ctx.fill(); ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 1; ctx.stroke(); }
         }
@@ -240,16 +294,18 @@ export function mountFactory(root, { env, back }) {
     }
   }
   function draw() {
-    ctx.fillStyle = "#1c2330"; ctx.fillRect(0, 0, W * CELL, H * CELL);
+    const [LW, LH] = landSize(g);
+    ctx.fillStyle = "#1c2330"; ctx.fillRect(0, 0, LW * CELL, LH * CELL);
     ctx.strokeStyle = "rgba(255,255,255,.05)"; ctx.lineWidth = 1;
-    for (let x = 0; x <= W; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, H * CELL); ctx.stroke(); }
-    for (let y = 0; y <= H; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(W * CELL, y * CELL); ctx.stroke(); }
+    for (let x = 0; x <= LW; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, LH * CELL); ctx.stroke(); }
+    for (let y = 0; y <= LH; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(LW * CELL, y * CELL); ctx.stroke(); }
     for (const [i, t] of ore) {
+      if (i % W >= LW || Math.floor(i / W) >= LH) continue;
       const x = (i % W) * CELL, y = Math.floor(i / W) * CELL;
-      ctx.fillStyle = t === "copper" ? "#4a2f24" : "#3a3f4a"; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
-      ctx.fillStyle = t === "copper" ? "#d98b5f" : "#9aa7b8"; for (const [dx, dy] of [[9, 10], [24, 14], [14, 26], [28, 28]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, 3.5, 0, 7); ctx.fill(); }
+      ctx.fillStyle = t === "copper" ? "#4a2f24" : t === "gold" ? "#4d4521" : "#3a3f4a"; ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      ctx.fillStyle = t === "copper" ? "#d98b5f" : t === "gold" ? "#ffd54f" : "#9aa7b8"; for (const [dx, dy] of [[9, 10], [24, 14], [14, 26], [28, 28]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, 3.5, 0, 7); ctx.fill(); }
     }
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const c = g.cells[y * W + x]; if (c) drawCell(c, x, y); }
+    for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const c = g.cells[y * W + x]; if (c) drawCell(c, x, y); }
     // 放置預覽：綠＝可以放，紅＝不行
     if (hover && KINDS[tool]) {
       const [hx, hy] = hover, err = canPlace(g, ore, hx, hy, tool, rot), px = hx * CELL, py = hy * CELL;
@@ -259,9 +315,9 @@ export function mountFactory(root, { env, back }) {
       const px = hover[0] * CELL, py = hover[1] * CELL; ctx.strokeStyle = "#ef5350"; ctx.lineWidth = 2; ctx.strokeRect(px + 2, py + 2, CELL - 4, CELL - 4);
     }
     if (g.off) {
-      ctx.fillStyle = "rgba(10,14,22,.62)"; ctx.fillRect(0, 0, W * CELL, H * CELL);
-      ctx.fillStyle = "#ffd54f"; ctx.font = "bold 34px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("⚡ 停電了", W * CELL / 2, H * CELL / 2 - 16);
-      ctx.fillStyle = "#fff"; ctx.font = "18px sans-serif"; ctx.fillText("儲值電費後，工廠會從原地繼續", W * CELL / 2, H * CELL / 2 + 22);
+      ctx.fillStyle = "rgba(10,14,22,.62)"; ctx.fillRect(0, 0, LW * CELL, LH * CELL);
+      ctx.fillStyle = "#ffd54f"; ctx.font = "bold 34px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("⚡ 停電了", LW * CELL / 2, LH * CELL / 2 - 16);
+      ctx.fillStyle = "#fff"; ctx.font = "18px sans-serif"; ctx.fillText("儲值電費後，工廠會從原地繼續", LW * CELL / 2, LH * CELL / 2 + 22);
     }
     if (sel) { ctx.strokeStyle = "#ffd54f"; ctx.lineWidth = 3; rrect(sel[0] * CELL + 1, sel[1] * CELL + 1, CELL - 2, CELL - 2, 8); ctx.stroke(); }
   }
@@ -269,15 +325,16 @@ export function mountFactory(root, { env, back }) {
   // ---- 資訊面板（檢視工具）
   const info = $(".finfo");
   info.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-r]"); if (b && sel) { if (setRecipe(g, sel[0], sel[1], +b.dataset.r)) say("已換配方"); infoKey = ""; }
-    const d = e.target.closest("[data-d]"); if (d && sel) { const c = cellOf(sel[0], sel[1]); if (c && c.k !== "shipper") { c.dir = (c.dir + 1) & 3; infoKey = ""; } }
+    const b = e.target.closest("[data-r]"); if (b && sel) { pushUndo(); if (setRecipe(g, sel[0], sel[1], +b.dataset.r)) say("已換配方"); infoKey = ""; }
+    const fb = e.target.closest("[data-f]"); if (fb && sel) { pushUndo(); setFilter(g, sel[0], sel[1], fb.dataset.f); infoKey = ""; }
+    const d = e.target.closest("[data-d]"); if (d && sel) { const c = cellOf(sel[0], sel[1]); if (c && c.k !== "shipper" && c.k !== "bridge") { pushUndo(); c.dir = (c.dir + 1) & 3; infoKey = ""; } }
   });
   function renderInfo() {
     if (tool !== "inspect") { if (infoKey !== "x") { info.innerHTML = ""; infoKey = "x"; } return; }
     if (!sel) { if (infoKey !== "none") { info.innerHTML = `<div class="fi-empty">點格子上的機器，這裡會顯示它的狀態</div>`; infoKey = "none"; } return; }
     const c = cellOf(sel[0], sel[1]);
     if (!c) { const o = ore.get(sel[1] * W + sel[0]); const k = "e" + sel + o; if (infoKey !== k) { info.innerHTML = `<div class="fi-empty">${o ? (o === "copper" ? "銅礦點：採礦機放這裡會挖銅礦" : "鐵礦點：採礦機放這裡會挖鐵礦") : "空地"}</div>`; infoKey = k; } return; }
-    const st = c.k === "belt" || c.k === "bridge" || c.k === "splitter" || c.k === "chest" || c.k === "shipper" ? null : machineState(c);
+    const st = ["belt", "bridge", "splitter", "filter", "chest", "shipper"].includes(c.k) ? null : machineState(c);
     const inv = Object.entries(c.inv).filter(([, n]) => n > 0).map(([k, n]) => `${ITEMS[k].name} ×${n}`).join("、") || "空的";
     let html = `<div class="fi-h"><b>${KINDS[c.k].name}</b>${c.k !== "shipper" && c.k !== "bridge" ? `<span>出口朝${DIRN[c.dir]}</span><button data-d>轉方向</button>` : ""}</div>`;
     html += `<div class="fi-p">耗電：每分鐘 ${POWER_USE[c.k]} 度</div>`;
@@ -291,9 +348,17 @@ export function mountFactory(root, { env, back }) {
     if (c.k === "splitter") html += `<div>${c.item ? "手上拿著：" + ITEMS[c.item].name : "沒有東西"}。輪流丟給前、右、左。</div>`;
     if (c.k === "shipper") html += `<div>什麼都收，按售價換錢。</div>`;
     if (c.k === "bridge") html += `<div>橫向、縱向各走各的，直線穿過。${c.lane.map((L) => (L ? ITEMS[L.item].name : "")).filter(Boolean).join("、") ? "目前有：" + c.lane.map((L) => (L ? ITEMS[L.item].name : "")).filter(Boolean).join("、") : ""}</div>`;
+    if (c.k === "filter") html += `<div>${c.f ? "只讓 <b>" + ITEMS[c.f].name + "</b> 往前走，其他的分到左右兩邊" : "還沒選：現在全部往前走"}。選一種：</div><div class="fi-rec fi-flt"><button data-f="" class="${c.f ? "" : "on"}">不過濾</button>${Object.entries(ITEMS).map(([k, it]) => `<button data-f="${k}" class="${c.f === k ? "on" : ""}">${artTag(k, 16, `<i style="background:${it.color}"></i>`)}${it.name}</button>`).join("")}</div>`;
     if (c.k === "chest") html += `<div>存貨：${inv}（最多 100 個）</div>`;
     const key = html.replace(/\s+/g, "");
     if (key !== infoKey) { info.innerHTML = html; infoKey = key; }
+  }
+  // ---- 里程碑
+  const msEl = $(".fms"); let msKey = "";
+  function renderMs() {
+    const nxt = MILESTONES[g.ms], key = nxt ? g.ms + ":" + Math.floor(g.shipped / Math.max(1, nxt[0] / 50)) : "done";
+    if (key === msKey) return; msKey = key;
+    msEl.innerHTML = nxt ? `<div class="fo-h">🎯 里程碑<small>累計出貨到 $${nxt[0].toLocaleString("en-US")} 領獎金 $${nxt[1].toLocaleString("en-US")}</small></div><div class="fo-bar big"><i style="width:${Math.min(100, (g.shipped / nxt[0]) * 100)}%"></i></div><div class="fo-ms">${g.shipped.toLocaleString("en-US")} / ${nxt[0].toLocaleString("en-US")}</div>` : `<div class="fo-h">🎯 里程碑<small>全部達成，你已經是工廠大亨了</small></div>`;
   }
   // ---- 訂單與升級
   const od = $(".forders"), ug = $(".fupg"); let odKey = "", ugKey = "";
@@ -315,21 +380,34 @@ export function mountFactory(root, { env, back }) {
       }).join("") + `</div>`;
     }
   }
+  let btnKey = "";
+  function hudButtons() {
+    const n = (g.land || 0) + 1, max = n >= LANDS.length;
+    const key = [g.money >= (max ? 0 : LAND_COST[n]), g.land, undoStack.length, Math.floor(g.money / 5)].join();   // 錢的變化每 $5 才更新一次工具列的灰色
+    if (key === btnKey) return; btnKey = key;
+    const lb = $(".fland");
+    lb.textContent = max ? "🗺️ 地已最大" : `🗺️ 擴地 $${LAND_COST[n]}（${LANDS[n][0]}×${LANDS[n][1]}）`;
+    lb.disabled = max || g.money < LAND_COST[n];
+    $(".fundo").disabled = !undoStack.length;
+    bar.querySelectorAll("button").forEach((b) => { const k = KINDS[b.dataset.k]; b.classList.toggle("poor", !!k && g.money < k.cost); });
+  }
   let priceDone = false;
   function hud() {
     $(".fmoney").textContent = `💰 ${g.money}`;
     if (!priceDone) { priceDone = true; $(".fprice").innerHTML = Object.entries(ITEMS).map(([k, it]) => `<span>${artTag(k, 18, `<i style="background:${it.color}"></i>`)}${it.name} $${it.value}</span>`).join(""); }
     const t = performance.now() - msgAt < 2500 ? msg : "";
     const el = $(".fstat"); el.textContent = t || `每分鐘出貨 $${perMinute(g)}　累計出貨 $${g.shipped}`; el.classList.toggle("warn", !!t);
-    renderInfo(); renderPower(); renderOrders(); renderUpg();
+    renderInfo(); renderPower(); renderOrders(); renderUpg(); renderMs();
+    hudButtons();
     if (g.note) { say(g.note); g.note = ""; }
   }
 
   // ---- 主迴圈：固定 10 tick/秒
   function frame(now) {
     if (closed) return;
-    acc += Math.min(1000, now - last); last = now;
-    while (acc >= 100) { step(g); acc -= 100; }
+    acc += Math.min(1000, now - last) * SPEEDS[spi][0]; last = now;
+    for (let n = 0; acc >= 100 && n < 60; n++) { step(g); acc -= 100; }
+    if (acc > 400) acc = 0;
     draw(); hud();
     if (now - saveAt > 5000) { saveAt = now; persist(); }
     raf = requestAnimationFrame(frame);

@@ -1,17 +1,22 @@
 // 自動化工廠：模擬核心（純邏輯，不碰畫面，之後要搬到伺服器也可以）。
 // 格子地圖，每格最多一個東西；物品在傳送帶上一格一格移動。方向 0右 1下 2左 3上。
-export const W = 20, H = 12;
+export const W = 28, H = 16;                 // 地圖最大尺寸；一開始只開發左上角一塊，之後可以花錢擴地
+export const LANDS = [[20, 12], [24, 14], [28, 16]];
+export const LAND_COST = [0, 600, 2500];     // 擴到第 N 級要多少錢
+export const landSize = (g) => LANDS[g.land || 0];
+export const MILESTONES = [[500, 50], [2000, 150], [6000, 400], [15000, 900], [40000, 2000], [100000, 5000], [300000, 15000]];   // [累計出貨, 獎金]
 export const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
 export const BELT_STEP = 3;                 // 傳送帶每 3 個 tick 前進一格
 export const START_MONEY = 150;
 // 電費：每台機器每分鐘耗電（度）。電用完整座工廠就停工，要儲值（現在用遊戲幣買，之後可改成代幣）。
-export const POWER_USE = { belt: 0.1, bridge: 0.1, splitter: 0.5, chest: 0.3, miner: 1.5, smelter: 2.5, assembler: 3.5, shipper: 0.5 };
+export const POWER_USE = { belt: 0.1, bridge: 0.1, splitter: 0.5, filter: 0.5, chest: 0.3, miner: 1.5, smelter: 2.5, assembler: 3.5, shipper: 0.5 };
 export const POWER_PRICE = 1;               // 1 度 = $1
 export const START_POWER = 100;
 
 export const KINDS = {
   belt:      { name: "傳送帶", cost: 1 },
   bridge:    { name: "橋", cost: 12 },                                    // 兩條帶子交叉用：橫向、縱向各走各的，互不干擾（直線穿過，不轉彎）
+  filter:    { name: "過濾器", cost: 25 },                                  // 指定一種東西往前走，其他的往左右分出去（混在一條線上時用）
   chest:     { name: "倉庫", cost: 20, cap: 100 },                        // 緩衝箱：什麼都收（最多 100 個），慢慢從出口放出來；產線塞住時可以先擋一下
   splitter:  { name: "分流器", cost: 15 },                              // 把收到的東西輪流丟給前、左、右三個方向（收不下的那邊會跳過）
   miner:     { name: "採礦機", cost: 25, every: 15 },                    // 只能放在礦點上，每 1.5 秒出 1 礦
@@ -19,7 +24,8 @@ export const KINDS = {
   assembler: { name: "組裝機", cost: 90 },                               // 照配方組裝，點「配方」工具切換
   shipper:   { name: "出貨口", cost: 10 },
 };
-export const SMELT = { iron_ore: "iron_plate", copper_ore: "copper_plate" };
+export const SMELT = { iron_ore: "iron_plate", copper_ore: "copper_plate", gold_ore: "gold_plate" };
+export const ORE_ITEM = { iron: "iron_ore", copper: "copper_ore", gold: "gold_ore" };
 // 配方：in 是需要的材料（每次消耗），out 是產出數量
 export const RECIPES = [
   { id: "gear",    name: "齒輪",   in: { iron_plate: 2 },                  make: "gear",    n: 1, time: 30 },
@@ -28,7 +34,9 @@ export const RECIPES = [
   { id: "motor",   name: "馬達",   in: { gear: 2, circuit: 1, copper_plate: 2 }, make: "motor", n: 1, time: 60 },
   { id: "steel",   name: "鋼板",   in: { iron_plate: 3 },                  make: "steel",   n: 1, time: 50 },
   { id: "battery", name: "電池",   in: { steel: 1, copper_plate: 2, wire: 2 }, make: "battery", n: 1, time: 70 },
+  { id: "chip",    name: "晶片",   in: { circuit: 2, gold_plate: 1 },      make: "chip",    n: 1, time: 80 },
   { id: "robot",   name: "機器人", in: { motor: 1, circuit: 2, battery: 1 }, make: "robot", n: 1, time: 90 },
+  { id: "ai",      name: "AI 核心", in: { chip: 2, battery: 1, motor: 1 }, make: "ai_core", n: 1, time: 120 },
 ];
 export const ITEMS = {
   iron_ore:     { name: "鐵礦",   value: 2,  color: "#a1887f" },
@@ -42,6 +50,10 @@ export const ITEMS = {
   steel:        { name: "鋼板",   value: 30, color: "#90a4ae" },
   battery:      { name: "電池",   value: 110, color: "#aed581" },
   robot:        { name: "機器人", value: 700, color: "#ce93d8" },
+  gold_ore:     { name: "金礦",   value: 6,  color: "#e6c84f" },
+  gold_plate:   { name: "金板",   value: 22, color: "#ffd54f" },
+  chip:         { name: "晶片",   value: 340, color: "#26c6da" },
+  ai_core:      { name: "AI 核心", value: 1800, color: "#ff5252" },
 };
 // 升級：每級 -20% 時間（節能是 -10% 耗電）。第 L 級升到 L+1 要 150 × 2^L
 export const UPGRADES = {
@@ -60,12 +72,13 @@ export function makeOre() {
   const ore = new Map();
   const patch = (x0, y0, w, h, t) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) ore.set(y * W + x, t); };
   patch(1, 2, 4, 3, "iron"); patch(2, 8, 3, 3, "iron"); patch(14, 1, 3, 3, "copper"); patch(15, 8, 4, 3, "copper");
+  patch(20, 4, 3, 3, "iron"); patch(21, 9, 3, 3, "copper"); patch(25, 12, 3, 3, "gold");   // 擴地之後才會用到的礦
   return ore;
 }
 
-const newCell = (k, dir, ore) => ({ k, dir, item: null, out: [], inv: {}, prog: 0, ago: 99, rr: 0, r: 0, ore: ore || null, cur: null, stall: 0, lane: [null, null] });
+const newCell = (k, dir, ore) => ({ k, dir, item: null, out: [], inv: {}, prog: 0, ago: 99, rr: 0, r: 0, ore: ore || null, cur: null, stall: 0, lane: [null, null], f: "" });
 export function newGame() {
-  const g = { cells: new Array(W * H).fill(null), money: START_MONEY, power: START_POWER, off: false, tick: 0, shipped: 0, log: [], up: { miner: 0, smelter: 0, assembler: 0, power: 0 }, orders: [], oid: 0, done: 0, sold: {}, note: "" };
+  const g = { land: 0, ms: 0, cells: new Array(W * H).fill(null), money: START_MONEY, power: START_POWER, off: false, tick: 0, shipped: 0, log: [], up: { miner: 0, smelter: 0, assembler: 0, power: 0 }, orders: [], oid: 0, done: 0, sold: {}, note: "" };
   fillOrders(g); return g;
 }
 // ---- 訂單：隨機要幾個東西，用出貨口送進去就算（東西照樣按售價賣錢），交齊了再拿一筆額外獎金
@@ -74,6 +87,9 @@ export function fillOrders(g) {
   if (p >= 200) pool.push(["circuit", 3, 6]);
   if (p >= 400) pool.push(["steel", 5, 10]);
   if (p >= 1200) pool.push(["motor", 2, 4], ["battery", 3, 5]);
+  if (p >= 2500) pool.push(["gold_plate", 5, 10]);
+  if (p >= 8000) pool.push(["chip", 2, 4]);
+  if (p >= 25000) pool.push(["ai_core", 1, 2]);
   if (p >= 4000) pool.push(["robot", 1, 2]);
   while (g.orders.length < 3) {
     const free = pool.filter(([k]) => !g.orders.some((o) => o.item === k)); if (!free.length) break;
@@ -96,7 +112,7 @@ function accepts(c, item, srcDir, pend) {
   pend = pend || 0;
   if (c.k === "belt") return c.dir !== (srcDir + 2) % 4 && !c.item;
   if (c.k === "shipper") return true;
-  if (c.k === "splitter") return !c.item && !pend;
+  if (c.k === "splitter" || c.k === "filter") return !c.item && !pend;
   if (c.k === "bridge") return !c.lane[srcDir & 1] && !pend;
   if (c.k === "chest") return invN(c) + pend < KINDS.chest.cap;
   if (c.k === "smelter") return !!SMELT[item] && (!c.cur || c.cur === item) && invN(c) + pend < KINDS.smelter.cap;
@@ -106,7 +122,8 @@ function accepts(c, item, srcDir, pend) {
 
 // 這格能不能放這種東西（不改任何東西）；回傳錯誤說明，空字串代表可以
 export function canPlace(g, ore, x, y, k, dir) {
-  if (x < 0 || y < 0 || x >= W || y >= H) return "出界";
+  const [lw, lh] = landSize(g);
+  if (x < 0 || y < 0 || x >= lw || y >= lh) return "這裡還沒開發（可以花錢擴地）";
   const i = y * W + x, cur = g.cells[i];
   if (cur && cur.k === k) return cur.dir !== dir ? "" : "這格已經有了";
   if (cur) return "這格有東西，先拆掉";
@@ -145,6 +162,16 @@ export function machineState(c) {
   return { s: "idle", text: "" };
 }
 
+// 擴地
+export function buyLand(g) {
+  const n = (g.land || 0) + 1; if (n >= LANDS.length) return "已經是最大的地";
+  if (g.money < LAND_COST[n]) return "錢不夠";
+  g.money -= LAND_COST[n]; g.land = n; return "";
+}
+// 復原：只還原機器與錢（傳送帶上的東西不還原）
+export const snap = (g) => ({ m: g.money, land: g.land || 0, c: structuredClone(g.cells) });
+export function restore(g, s) { g.money = s.m; g.land = s.land; g.cells = structuredClone(s.c); }
+export function setFilter(g, x, y, item) { const c = at(g, x, y); if (!c || c.k !== "filter") return false; c.f = item || ""; c.item = null; return true; }
 // 全廠每分鐘耗電（度）
 export function powerRate(g) { let r = 0; for (const c of g.cells) if (c) r += POWER_USE[c.k]; return r * 0.9 ** (g.up.power || 0); }
 export function buyPower(g, units) {
@@ -170,19 +197,21 @@ export function step(g) {
       }
       continue;
     }
-    if (c.k === "splitter") {
+    if (c.k === "splitter" || c.k === "filter") {
       if (c.item) {
-        for (let n = 0; n < 3; n++) {
-          const d = (c.dir + [0, 1, 3][(c.rr + n) % 3]) & 3;      // 前、右、左 輪流
+        // 分流器：前、右、左輪流。過濾器：符合的往前，不符合的往右、左輪流（沒設定時全部往前）
+        const outs = c.k === "splitter" ? [0, 1, 3] : !c.f || c.item === c.f ? [0] : [1, 3];
+        for (let n = 0; n < outs.length; n++) {
+          const d = (c.dir + outs[(c.rr + n) % outs.length]) & 3;
           const t = at(g, x + DX[d], y + DY[d]);
-          if (accepts(t, c.item, d)) { give(g, t, c.item, d); c.item = null; c.rr = (c.rr + n + 1) % 3; break; }
+          if (accepts(t, c.item, d)) { give(g, t, c.item, d); c.item = null; c.rr = (c.rr + n + 1) % outs.length; break; }
         }
       }
       continue;
     }
     if (c.k === "miner") {
       c.prog++;
-      if (c.out.length < 1 && c.prog >= Math.max(3, Math.round(KINDS.miner.every * mulT(g, "miner")))) { c.out.push(c.ore === "copper" ? "copper_ore" : "iron_ore"); c.prog = 0; }
+      if (c.out.length < 1 && c.prog >= Math.max(3, Math.round(KINDS.miner.every * mulT(g, "miner")))) { c.out.push(ORE_ITEM[c.ore] || "iron_ore"); c.prog = 0; }
     } else if (c.k === "chest") {
       if (!c.out.length) { const it = Object.keys(c.inv).find((k) => c.inv[k] > 0); if (it) { c.inv[it]--; c.out.push(it); } }
     } else if (c.k === "smelter") {
@@ -234,10 +263,11 @@ export function step(g) {
 function give(g, t, item, dir) {
   if (t.k === "belt") { t.item = item; t.ago = 0; }
   else if (t.k === "bridge") { t.lane[dir & 1] = { item, d: dir }; }
-  else if (t.k === "splitter") { t.item = item; }
+  else if (t.k === "splitter" || t.k === "filter") { t.item = item; }
   else if (t.k === "shipper") {
     const v = VALUE[item] || 0; g.money += v; g.shipped += v; g.log.push([g.tick, v]); if (g.log.length > 400) g.log.shift();
     g.sold[item] = (g.sold[item] || 0) + 1;
+    while (g.ms < MILESTONES.length && g.shipped >= MILESTONES[g.ms][0]) { const [at, rw] = MILESTONES[g.ms++]; g.money += rw; g.note = `里程碑：累計出貨 $${at.toLocaleString("en-US")}，獎金 $${rw}`; }
     const o = g.orders.find((x) => x.item === item && x.got < x.need);
     if (o && ++o.got >= o.need) {
       g.money += o.reward; g.shipped += o.reward; g.done++; g.note = `訂單完成：${ITEMS[o.item].name} ×${o.need}，額外獎金 $${o.reward}`;
@@ -252,7 +282,8 @@ function give(g, t, item, dir) {
 export function perMinute(g) { const from = g.tick - 600; return g.log.filter(([t]) => t > from).reduce((s, [, v]) => s + v, 0); }
 
 export function serialize(g) {
-  return { v: 4, up: g.up, o: g.orders, oid: g.oid, dn: g.done, sd: g.sold, m: g.money, p: Math.round(g.power * 100) / 100, s: g.shipped, c: g.cells.map((c, i) => (c ? [i, c.k, c.dir, c.r || 0, c.ore || ""] : null)).filter(Boolean) };
+  return { v: 5, land: g.land || 0, ms: g.ms || 0, up: g.up, o: g.orders, oid: g.oid, dn: g.done, sd: g.sold, m: g.money, p: Math.round(g.power * 100) / 100, s: g.shipped,
+    c: g.cells.map((c, i) => (c ? [i % W, Math.floor(i / W), c.k, c.dir, c.r || 0, c.ore || "", c.f || ""] : null)).filter(Boolean) };
 }
 export function load(o) {
   const g = newGame();
@@ -260,8 +291,15 @@ export function load(o) {
     if (o.up) for (const k of Object.keys(g.up)) g.up[k] = Math.max(0, Math.min(MAX_LV, o.up[k] | 0));
     if (Array.isArray(o.o)) g.orders = o.o.filter((x) => ITEMS[x.item] && x.need > 0).slice(0, 3).map((x) => ({ id: x.id | 0, item: x.item, need: x.need | 0, got: Math.min(x.got | 0, x.need | 0), reward: x.reward | 0 }));
     g.oid = o.oid | 0; g.done = o.dn | 0; g.sold = o.sd && typeof o.sd === "object" ? o.sd : {};
+    g.land = Math.max(0, Math.min(LANDS.length - 1, o.land | 0)); g.ms = Math.max(0, Math.min(MILESTONES.length, o.ms | 0));
     g.money = Number(o.m) || 0; g.shipped = Number(o.s) || 0; g.power = typeof o.p === "number" ? o.p : 150;   // 舊存檔送 150 度
-    for (const [i, k, dir, r, ore] of o.c) if (KINDS[k] && i >= 0 && i < W * H) { const c = newCell(k, dir & 3, ore || null); c.r = (r | 0) % RECIPES.length; g.cells[i] = c; }
+    if (!o.v || o.v < 5) { g.ms = MILESTONES.filter(([a]) => g.shipped >= a).length; }   // 舊存檔：不補發之前的里程碑獎金
+    const [lw, lh] = landSize(g);
+    for (const e of o.c) {
+      let x, y, k, dir, r, ore, f;
+      if (o.v >= 5) [x, y, k, dir, r, ore, f] = e; else { const i = e[0]; x = i % 20; y = Math.floor(i / 20); [, k, dir, r, ore] = e; }   // v4 以前地圖寬 20，存的是一維索引
+      if (KINDS[k] && x >= 0 && y >= 0 && x < lw && y < lh) { const c = newCell(k, dir & 3, ore || null); c.r = (r | 0) % RECIPES.length; c.f = ITEMS[f] ? f : ""; g.cells[y * W + x] = c; }
+    }
   }
   fillOrders(g);
   return g;

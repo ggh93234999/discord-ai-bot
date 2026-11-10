@@ -1503,3 +1503,27 @@ body.tv-fs{overflow:hidden}
 .factory .fu-g button small{font-size:11px;color:#8c97ab}
 .factory .fu-g button em{font-style:normal;font-size:13px;color:#ffd54f;font-weight:700}
 .factory .fu-g button:disabled{opacity:.5;cursor:default}
+
+/* 自動化工廠：兩欄版面、縮放、新按鈕 */
+.game.factory{max-width:1280px;width:100%;align-items:stretch}
+.factory .fwrap{display:flex;flex-direction:column;gap:10px;width:100%}
+.factory .fleft,.factory .fright{display:flex;flex-direction:column;min-width:0}
+.factory .fright > *{width:100% !important;max-width:none !important;margin:8px 0 0 !important}
+.factory .cwrap{overflow:auto;max-width:100%;max-height:78vh;justify-content:flex-start}
+.factory .cwrap canvas{max-width:none;flex:none}
+.factory .fzoom{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin:4px 0 0;font-size:12px;color:#9aa3b5}
+.factory .fzoom button{width:32px;height:28px;border:0;border-radius:8px;background:#3a4357;color:#fff;cursor:pointer}
+.factory .factions{flex-wrap:wrap}
+.factory .factions button{padding:8px 12px;font-size:13px}
+.factory .factions button:disabled{opacity:.45;cursor:default}
+.factory .ftools button.poor{opacity:.5}
+.factory .fo-bar.big{height:8px}
+.factory .fo-ms{font-size:12px;color:#9aa3b5;text-align:right;margin-top:2px}
+.factory .fms{padding:8px 12px;border-radius:10px;background:#242b3a;font-size:13px;box-sizing:border-box}
+.factory .fi-flt{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.factory .fi-flt button{flex-direction:row;align-items:center;gap:4px;padding:5px 8px}
+.factory .fi-flt button .fart{flex:none}
+@media (min-width:1000px){
+  .factory .fwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+  .factory .cwrap{max-height:none}
+}
