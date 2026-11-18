@@ -9,7 +9,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { summarize, listUsers } from "./stats.js";
+import { summarize, listUsers, meta, query, dayLine, rangeLine, dayStartMs } from "./stats.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PLAYSTATS_PORT || 3121);
@@ -32,6 +32,22 @@ http.createServer((req, res) => {
   const json = (code, obj) => { res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(JSON.stringify(obj)); };
   try {
     if (u.pathname === "/api/users") return json(200, listUsers());
+    if (u.pathname === "/api/meta") return json(200, meta());
+    if (u.pathname === "/api/query" || u.pathname === "/api/day" || u.pathname === "/api/days") {
+      // 篩選條件：u=玩家ID（可重複）、g=遊戲名稱（可重複）、from/to=日期 YYYY-MM-DD（含）、h=時段 "22-2"、wd=星期 "0,1,2"（一=0）
+      const us = u.searchParams.getAll("u").filter((x) => /^\d{5,25}$/.test(x)), gs = u.searchParams.getAll("g").map((x) => x.slice(0, 120)).filter(Boolean);
+      const f = { users: us.length ? new Set(us) : null, games: gs.length ? new Set(gs) : null, from: null, to: null, h1: null, h2: null, wd: null };
+      const from = dayStartMs(u.searchParams.get("from")), to = dayStartMs(u.searchParams.get("to"));
+      if (from != null) f.from = from;
+      if (to != null) f.to = to + 24 * 3600 * 1000;
+      const h = /^(\d{1,2})-(\d{1,2})$/.exec(u.searchParams.get("h") || "");
+      if (h && +h[1] <= 24 && +h[2] <= 24) { f.h1 = +h[1] % 24; f.h2 = +h[2] % 24; }
+      const wd = (u.searchParams.get("wd") || "").split(",").filter((x) => x.trim() !== "").map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+      if (wd.length && wd.length < 7) f.wd = new Set(wd);
+      if (u.pathname === "/api/days") { const r = rangeLine(f); return json(r.error ? 400 : 200, r); }
+      if (u.pathname === "/api/day") { const r = dayLine(f, u.searchParams.get("d") || ""); return json(r.error ? 400 : 200, r); }
+      return json(200, query(f));
+    }
     if (u.pathname === "/api/stats") {
       const id = u.searchParams.get("u") || "";
       if (!/^\d{5,25}$/.test(id)) return json(400, { error: "缺少使用者" });
