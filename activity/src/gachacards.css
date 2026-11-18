@@ -2,7 +2,7 @@
    選擇器一律加 G 前綴（.game.gcards.slots），蓋過全域 .slots 的深色樣式。 */
 .game.gcards.slots{--paper:#e8e1cf;--paper2:#f1ecdd;--ink:#16140f;--ink2:#4d493f;--ink3:#8a8576;--seal:#b5342a;--dai:#40605a;--gold:#a8832a;
   --serif:"LXGW WenKai TC","Noto Serif TC","Source Han Serif TC","Songti TC","STSong","PMingLiU",serif;
-  display:block;width:100%;box-sizing:border-box;min-height:100vh;padding:0 0 28px;color:var(--ink);font-family:var(--serif);
+  display:block;width:100%;box-sizing:border-box;min-height:var(--vh);padding:0 0 28px;color:var(--ink);font-family:var(--serif);
   background:var(--paper) url("./gacha-ui/paper.jpg") center top/cover no-repeat;}
 html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots *{box-sizing:border-box}
@@ -247,8 +247,3 @@ html body:has(.gcards){background:#d9d1bb}
 .game.gcards.slots .gc-tm.on img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .game.gcards.slots .gc-tm .gc-star{position:absolute;left:0;right:0;bottom:1px;text-align:center;font-size:9px;color:#e0b94a;text-shadow:0 0 2px #000}
 
-/* 手機版 Discord：頂端有一條約 45px 的列蓋在 Activity 上面（.dcm 由 main.js 在手機 Discord 內加上）。
-   水墨畫風版面自己設了頂端間距，沒吃到全站的 58px 規則，「← 選單」被蓋住點不到；彈窗也是貼齊畫面頂端，同樣要讓開。 */
-.dcm .game.gcards.slots .gc-head{height:244px;padding-top:58px}
-.dcm .gc-modal,.dcm .gc-zoom,.dcm .gc-result,.dcm .gc-lb{padding-top:58px}
-.dcm .game.gcards.slots .gc-picker{max-height:calc(100vh - 62px)}

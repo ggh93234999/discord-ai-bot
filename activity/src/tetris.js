@@ -291,7 +291,7 @@ export function mountTetris(root, { env, back }) {
   // ---------- 畫面
   let c = 20, CW = 320, CH = 420;
   function layout() {
-    const w = Math.min(root.clientWidth || window.innerWidth, 640), h = window.innerHeight;
+    const w = Math.min(root.clientWidth || window.innerWidth, 640), dw = document.getElementById("dcwrap"), h = dw ? dw.clientHeight : window.innerHeight;
     c = Math.max(12, Math.min(32, Math.floor((w - 16) / 16), Math.floor((h - 300) / 20)));
     CW = Math.round(c * 15.8); CH = Math.round(c * 20.4);
     const dpr = Math.min(3, window.devicePixelRatio || 1);

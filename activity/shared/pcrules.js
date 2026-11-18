@@ -2,6 +2,11 @@
 // part = { id, cat, brand, name, sp:{...}, c:{p,..}|null, s:{p,..}|null }；sel = { cpu: part, mb: part, ... }
 export const CAT_LIST = ["cpu", "mb", "gpu", "ram", "ssd", "psu", "case", "cooler"];
 export const CAT_NAME = { cpu: "處理器", mb: "主機板", gpu: "顯示卡", ram: "記憶體", ssd: "固態硬碟", psu: "電源供應器", case: "機殼", cooler: "散熱器" };
+// 硬碟可以多顆：額外的槽用 ssd2、ssd3、ssd4（選的零件還是「固態硬碟」類別，slotCat 取回類別）
+export const EXTRA_SSD = ["ssd2", "ssd3", "ssd4"];
+export const SLOT_LIST = [...CAT_LIST, ...EXTRA_SSD];
+export const slotCat = (k) => String(k).replace(/\d+$/, "");
+EXTRA_SSD.forEach((k, i) => { CAT_NAME[k] = `固態硬碟 ${i + 2}`; });
 const FORM = ["ITX", "M-ATX", "ATX", "E-ATX"];
 
 export function priceOf(p, mode = "min") {
@@ -177,7 +182,7 @@ export function recommend(parts, budget, use = "game", mode = "min", locked = {}
 
 export function totals(sel) {
   const t = { c: 0, s: 0, min: 0, missC: [], missS: [] };
-  for (const cat of CAT_LIST) {
+  for (const cat of SLOT_LIST) {
     const p = sel[cat];
     if (!p) continue;
     if (p.c) t.c += p.c.p; else t.missC.push(cat);

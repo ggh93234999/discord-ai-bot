@@ -1,9 +1,10 @@
 // 配電腦：原價屋＋欣亞價格對照、相容性檢查、依預算自動推薦、價格歷史。
 // 資料來自伺服器 /api/pc/data（定時抓取，同款已配對）；規則共用 shared/pcrules.js。
 import "./pcbuild.css";
-import { CAT_LIST, CAT_NAME, USE_NAME, priceOf, cheaper, check, fits, needWatts, estWatts, recommend, totals } from "../shared/pcrules.js";
+import { pim, wirePim } from "./pcimg.js";
+import { CAT_LIST, SLOT_LIST, EXTRA_SSD, slotCat, CAT_NAME, USE_NAME, priceOf, cheaper, check, fits, needWatts, estWatts, recommend, totals } from "../shared/pcrules.js";
 
-const ICON = { cpu: "🧠", mb: "🔌", gpu: "🎮", ram: "💾", ssd: "💿", psu: "⚡", case: "🗄️", cooler: "❄️" };
+const ICON = { cpu: "🧠", mb: "🔌", gpu: "🎮", ram: "💾", ssd: "💿", ssd2: "💿", ssd3: "💿", ssd4: "💿", psu: "⚡", case: "🗄️", cooler: "❄️" };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const money = (n) => (n == null ? "—" : "$" + Math.round(n).toLocaleString("en-US"));
 const ls = {
@@ -26,6 +27,7 @@ export function mountPcBuild(root, { env, back }) {
           </div>
           <label class="pcb-keep"><input type="checkbox" class="pcb-keepcb" checked> 保留我自己選的零件，只配其他的</label>
           <button class="pcb-go">幫我配</button>
+          <div class="pcb-saved"><button class="pcb-savedbtn">📋 最近的配單（點一下直接載入）</button><div class="pcb-savedlist" hidden></div></div>
           <div class="pcb-load"><input class="pcb-code" maxlength="6" placeholder="配單代碼（bot 給的）" autocapitalize="characters"><button class="pcb-loadbtn">載入</button></div>
           <p class="note">做法：先把預算扣掉你選好的零件，剩下的依用途分配（遊戲偏顯卡、文書偏 CPU 與硬碟），每類挑預算內最好的，並確保腳位、DDR、機殼、電源互相相容；剩的錢再拿去升級顯卡（文書機升級 CPU）。標「自動配」的零件下次按會重配，你自己選的會留著。</p>
         </section>
@@ -42,6 +44,8 @@ export function mountPcBuild(root, { env, back }) {
   if (!MODES[mode]) mode = "min";
   const saveSel = () => { for (const c of [...auto]) if (!sel[c]) auto.delete(c); ls.set("pcb_auto", [...auto]); ls.set("pcb_sel", Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id]))); };
   const findPart = (cat, id) => (data.parts[cat] || []).find((p) => p.id === id);
+  const partImg = (p, cls = "") => pim(url, [p.s && p.s.id, p.c && p.c.id], p.name, cls);
+  wirePim(root, url);
 
   async function load() {
     try {
@@ -51,7 +55,7 @@ export function mountPcBuild(root, { env, back }) {
       data = await r.json();
     } catch { $(".pcb-status").textContent = "價格資料載入失敗，晚點再試"; return; }
     const saved = ls.get("pcb_sel", {});
-    for (const cat of CAT_LIST) if (saved[cat]) { const p = findPart(cat, saved[cat]); if (p) sel[cat] = p; }
+    for (const cat of SLOT_LIST) if (saved[cat]) { const p = findPart(slotCat(cat), saved[cat]); if (p) sel[cat] = p; }
     $(".pcb-status").hidden = true;
     for (const s of ["pcb-rec", "pcb-slots", "pcb-sum"]) $("." + s).hidden = false;
     $(".pcb-budget").value = ls.get("pcb_budget", "");
@@ -70,29 +74,45 @@ export function mountPcBuild(root, { env, back }) {
     return c + s;
   };
 
+  // 儲存配單：把目前選的存成配單編號（內容一樣的不會重複存）；改了零件後按鈕會變回「儲存配單」
+  let savedKey = "", savedCode = "";
+  const curKey = () => JSON.stringify(Object.entries(sel).map(([k, v]) => [k, v.id]).sort());
+  async function saveOrder(btn) {
+    if (!Object.keys(sel).length) return;
+    btn.disabled = true; btn.textContent = "儲存中…";
+    try {
+      const j = await (await fetch(url("api/pc/share?ids=" + encodeURIComponent(JSON.stringify(Object.fromEntries(Object.entries(sel).map(([k, v]) => [k, v.id]))))))).json();
+      if (!j.code) throw new Error(j.err || "fail");
+      savedKey = curKey(); savedCode = j.code;
+    } catch { btn.textContent = "儲存失敗，再試一次"; btn.disabled = false; return; }
+    renderSum();
+  }
+  const addRow = (k) => `<div class="slot empty addssd" data-cat="${k}"><span class="si">💿</span><span class="sn">＋ 再加一顆硬碟</span><button class="pick" data-cat="${k}">選擇</button></div>`;
   function render() {
-    const slots = CAT_LIST.map((cat) => {
+    const slotKeys = CAT_LIST.flatMap((c) => (c === "ssd" ? ["ssd", ...EXTRA_SSD.filter((k) => sel[k])] : [c]));
+    const addSsd = sel.ssd ? EXTRA_SSD.find((k) => !sel[k]) : null;       // 還能再加一顆硬碟
+    const slots = slotKeys.map((cat) => {
       const p = sel[cat];
       if (!p) return `<div class="slot empty" data-cat="${cat}"><span class="si">${ICON[cat]}</span><span class="sn">${CAT_NAME[cat]}</span><button class="pick" data-cat="${cat}">選擇</button></div>`;
       const w = p.c && p.s && p.c.p !== p.s.p ? `（差 ${money(Math.abs(p.c.p - p.s.p))}）` : "";
-      return `<div class="slot" data-cat="${cat}"><span class="si">${ICON[cat]}</span>
+      return `<div class="slot" data-cat="${cat}"><span class="si">${ICON[cat]}</span>${partImg(p, "sl")}
         <div class="sb"><div class="sc">${CAT_NAME[cat]}${auto.has(cat) ? "<em class=\"auto\">自動配</em>" : ""}${p.c && p.s ? `<em class="both">兩家都有${w}</em>` : p.c ? "<em>只有原價屋</em>" : "<em>只有欣亞</em>"}</div>
         <div class="sname">${esc(p.name)}</div><div class="prices">${priceCell(p)}</div></div>
         <div class="sact"><button class="pick" data-cat="${cat}">換</button><button class="trend" data-id="${p.id}" data-cat="${cat}" title="價格走勢">📈</button><button class="del" data-cat="${cat}" title="移除">✕</button></div></div>`;
-    }).join("");
+    }).map((h, i) => (slotKeys[i] === "ssd" || EXTRA_SSD.includes(slotKeys[i])) && slotKeys[i + 1] !== undefined && !EXTRA_SSD.includes(slotKeys[i + 1]) && addSsd && h ? h + addRow(addSsd) : h).join("");
     $(".pcb-slots").innerHTML = slots;
     renderSum();
   }
 
   function renderSum() {
-    const t = totals(sel), n = Object.keys(sel).length;
+    const isSaved = !!savedCode && savedKey === curKey(), t = totals(sel), n = Object.keys(sel).length, nTotal = CAT_LIST.length + EXTRA_SSD.filter((k) => sel[k]).length;
     const issues = check(sel);
     const need = sel.cpu || sel.gpu ? needWatts(sel) : 0;
     const used = { c: t.c, s: t.s, min: t.min }[mode];
     const bad = issues.filter((x) => x.lv === "err"), warn = issues.filter((x) => x.lv === "warn"), ok = issues.filter((x) => x.lv === "ok");
     const miss = (arr) => (arr.length ? `<small>缺：${arr.map((c) => CAT_NAME[c]).join("、")}</small>` : "");
     $(".pcb-sum").innerHTML = n ? `
-      <h3>目前組合（${n}/${CAT_LIST.length} 項）</h3>
+      <h3>目前組合（${n}/${nTotal} 項）</h3>
       <div class="modes">${Object.entries(MODES).map(([k, v]) => `<button class="mode ${k === mode ? "on" : ""}" data-m="${k}">${v}</button>`).join("")}</div>
       <div class="tot">
         <div class="trow ${mode === "min" ? "cur" : ""}"><span>混搭最省</span><b>${money(t.min)}</b></div>
@@ -102,17 +122,19 @@ export function mountPcBuild(root, { env, back }) {
       <div class="big">${MODES[mode]}：<b>${money(used)}</b></div>
       ${need ? `<div class="watt">預估耗電約 ${estWatts(sel)}W，建議電源 ${need}W 以上</div>` : ""}
       <ul class="chk">${bad.map((x) => `<li class="err">❌ ${esc(x.msg)}</li>`).join("")}${warn.map((x) => `<li class="warn">⚠️ ${esc(x.msg)}</li>`).join("")}${ok.map((x) => `<li class="ok">✅ ${esc(x.msg)}</li>`).join("")}</ul>
-      <div class="acts"><button class="order">📋 看估價單</button><button class="clear">全部清空</button></div>
+      <div class="acts"><button class="save ${isSaved ? "done" : ""}">${isSaved ? "✓ 已儲存 " + savedCode : "💾 儲存配單"}</button><button class="order">📋 看估價單</button><button class="clear">全部清空</button></div>
+      ${isSaved ? `<p class="note savemsg">已儲存，配單編號 <b>${savedCode}</b>：大家都可以在「最近的配單」點選，或輸入這個編號載入（30 天內有效）。你再改零件後要再按一次儲存。</p>` : ""}
       <p class="note">價格取自原價屋線上估價與欣亞商品頁，每 4 小時更新；相容性是依型號文字判斷，下單前仍請自行確認（尤其是顯卡長度、散熱器高度）。</p>` : `<p class="note">還沒選任何零件：上面輸入預算按「幫我配」，或從各分類自己選。</p>`;
   }
 
   // ---------- 選零件 ----------
   const pickEl = $(".pcb-pick");
   let pk = null;
-  function openPick(cat) {
-    pk = { cat, q: "", compat: true, both: false, sort: "asc", shown: 60, brand: "" };
+  function openPick(slot) {
+    const cat = slotCat(slot);
+    pk = { slot, cat, q: "", compat: true, both: false, sort: "asc", shown: 60, brand: "" };
     pickEl.hidden = false;
-    pickEl.innerHTML = `<div class="ph"><button class="pclose">✕</button><b>${ICON[cat]} 選${CAT_NAME[cat]}</b><span class="pcount"></span></div>
+    pickEl.innerHTML = `<div class="ph"><button class="pclose">✕</button><b>${ICON[slot]} 選${CAT_NAME[slot]}</b><span class="pcount"></span></div>
       <div class="pf"><input class="pq" type="search" placeholder="搜尋型號、品牌…"><select class="pbrand"></select><select class="psort"><option value="asc">價格低→高</option><option value="desc">價格高→低</option></select></div>
       <div class="pf2"><label><input type="checkbox" class="pcompat" checked> 只顯示相容</label><label><input type="checkbox" class="pboth"> 只看兩家都有</label></div>
       <div class="plist"></div>`;
@@ -121,7 +143,7 @@ export function mountPcBuild(root, { env, back }) {
     drawPick();
   }
   function drawPick() {
-    const { cat } = pk, other = { ...sel }; delete other[cat];
+    const { cat, slot } = pk, other = { ...sel }; delete other[slot];
     const q = pk.q.trim().toUpperCase().split(/\s+/).filter(Boolean);
     let list = (data.parts[cat] || []).filter((p) => {
       if (pk.brand && p.brand !== pk.brand) return false;
@@ -133,8 +155,8 @@ export function mountPcBuild(root, { env, back }) {
     list.sort((a, b) => (pk.sort === "asc" ? 1 : -1) * ((priceOf(a, mode) ?? priceOf(a)) - (priceOf(b, mode) ?? priceOf(b))));
     pickEl.querySelector(".pcount").textContent = `${list.length} 項`;
     const rows = list.slice(0, pk.shown).map((p) => {
-      const on = sel[cat] && sel[cat].id === p.id;
-      return `<div class="prow ${on ? "on" : ""}" data-id="${p.id}"><div class="pn">${esc(p.name)}${p.spec ? `<small>${esc(p.spec.slice(0, 90))}</small>` : ""}</div><div class="prices">${priceCell(p)}</div><button class="trend" data-id="${p.id}" data-cat="${cat}">📈</button></div>`;
+      const on = sel[slot] && sel[slot].id === p.id;
+      return `<div class="prow ${on ? "on" : ""}" data-id="${p.id}"><div class="pn">${partImg(p, "pr")}<div>${esc(p.name)}${p.spec ? `<small>${esc(p.spec.slice(0, 90))}</small>` : ""}</div></div><div class="prices">${priceCell(p)}</div><button class="trend" data-id="${p.id}" data-cat="${cat}">📈</button></div>`;
     }).join("");
     pickEl.querySelector(".plist").innerHTML = (rows || `<p class="note">沒有符合的零件${pk.compat ? "（可以取消「只顯示相容」看看）" : ""}</p>`) + (list.length > pk.shown ? `<button class="more">再顯示 ${Math.min(60, list.length - pk.shown)} 項</button>` : "");
   }
@@ -159,7 +181,7 @@ export function mountPcBuild(root, { env, back }) {
     const tr = t.closest(".trend");
     if (tr) { showTrend(tr.dataset.cat, tr.dataset.id); return; }
     const row = t.closest(".prow");
-    if (row && pk) { const p = findPart(pk.cat, row.dataset.id); if (p) { sel[pk.cat] = p; auto.delete(pk.cat); saveSel(); pickEl.hidden = true; pk = null; render(); } }
+    if (row && pk) { const p = findPart(pk.cat, row.dataset.id); if (p) { sel[pk.slot] = p; auto.delete(pk.slot); saveSel(); pickEl.hidden = true; pk = null; render(); } }
   });
 
   // ---------- 價格走勢 ----------
@@ -168,7 +190,7 @@ export function mountPcBuild(root, { env, back }) {
     if (!p) return;
     const box = document.createElement("div");
     box.className = "pcb-trend";
-    box.innerHTML = `<div class="tbox"><button class="tclose">✕</button><b>${esc(p.name)}</b><div class="tbody">讀取中…</div></div>`;
+    box.innerHTML = `<div class="tbox"><button class="tclose">✕</button><div class="thd">${partImg(p, "tr")}<b>${esc(p.name)}</b></div><div class="tbody">讀取中…</div></div>`;
     root.querySelector(".pcb").appendChild(box);
     box.addEventListener("click", (e) => { if (e.target === box || e.target.closest(".tclose")) box.remove(); });
     const ids = [p.c && p.c.id, p.s && p.s.id].filter(Boolean);
@@ -203,7 +225,7 @@ export function mountPcBuild(root, { env, back }) {
     const t = e.target.closest("button");
     if (!t) return;
     if (t.classList.contains("pick")) openPick(t.dataset.cat);
-    else if (t.classList.contains("trend")) showTrend(t.dataset.cat, t.dataset.id);
+    else if (t.classList.contains("trend")) showTrend(slotCat(t.dataset.cat), t.dataset.id);
     else if (t.classList.contains("del")) { delete sel[t.dataset.cat]; auto.delete(t.dataset.cat); saveSel(); render(); }
   });
   root.querySelector(".pcb-sum").addEventListener("click", (e) => {
@@ -211,6 +233,7 @@ export function mountPcBuild(root, { env, back }) {
     if (!t) return;
     if (t.classList.contains("mode")) { mode = t.dataset.m; ls.set("pcb_mode", mode); renderSum(); }
     else if (t.classList.contains("clear")) { sel = {}; auto.clear(); saveSel(); render(); }
+    else if (t.classList.contains("save")) saveOrder(t);
     else if (t.classList.contains("order")) openOrder();
   });
   $(".pcb-go").addEventListener("click", () => {
@@ -220,7 +243,8 @@ export function mountPcBuild(root, { env, back }) {
     ls.set("pcb_budget", budget); ls.set("pcb_use", use);
     const keep = $(".pcb-keepcb").checked;
     const locked = keep ? Object.fromEntries(Object.entries(sel).filter(([c]) => !auto.has(c))) : {};
-    const r = recommend(data.parts, budget, use, mode, locked);
+    const extraCost = EXTRA_SSD.reduce((a, k) => a + (locked[k] ? priceOf(locked[k], mode) || 0 : 0), 0);   // 額外的硬碟要先從預算扣掉
+    const r = recommend(data.parts, budget - extraCost, use, mode, locked);
     sel = { ...locked, ...r.sel };
     auto = new Set(Object.keys(sel).filter((c) => !locked[c]));
     saveSel(); render();
@@ -236,11 +260,53 @@ export function mountPcBuild(root, { env, back }) {
       const j = await r.json();
       if (!r.ok) { $(".pcb-code").value = ""; $(".pcb-code").placeholder = j.err || "載入失敗"; return; }
       sel = {}; auto = new Set();
-      for (const c of CAT_LIST) if (j.ids[c]) { const p = findPart(c, j.ids[c]); if (p) sel[c] = p; }
-      saveSel(); render();
+      for (const c of SLOT_LIST) if (j.ids[c]) { const p = findPart(slotCat(c), j.ids[c]); if (p) sel[c] = p; }
+      saveSel(); savedKey = curKey(); savedCode = code; render();
       $(".pcb-sum").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch { $(".pcb-code").placeholder = "載入失敗，晚點再試"; }
   }
+  // 最近的配單：列出編號、時間、總價和主要零件，點一張就載入
+  const ago = (ts) => { const sec = ts > 1e11 ? ts / 1000 : ts, m = Math.max(0, Math.round((Date.now() / 1000 - sec) / 60)); return m < 1 ? "剛剛" : m < 60 ? m + " 分鐘前" : m < 1440 ? Math.round(m / 60) + " 小時前" : Math.round(m / 1440) + " 天前"; };
+  async function showSaved() {
+    const box = $(".pcb-savedlist");
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false; box.innerHTML = `<p class="note">讀取中…</p>`;
+    let list = [];
+    try { list = (await (await fetch(url("api/pc/shares?n=40"))).json()).list || []; } catch { box.innerHTML = `<p class="note">讀取失敗，晚點再試</p>`; return; }
+    const seen = new Set(), rows = [];
+    for (const e of list) {
+      const s2 = {}; let miss = 0;
+      for (const c of SLOT_LIST) if (e.ids[c]) { const p = findPart(slotCat(c), e.ids[c]); if (p) s2[c] = p; else miss++; }
+      const n = Object.keys(s2).length;
+      if (!n) continue;
+      const key = SLOT_LIST.map((c) => s2[c] ? s2[c].id : "").join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const t = totals(s2);
+      const main = ["cpu", "gpu"].map((c) => s2[c] ? short(s2[c].name, 18) : "").filter(Boolean).join("　");
+      rows.push(`<div class="pcb-svrow" data-code="${e.code}"><button class="pcb-sv" data-code="${e.code}"><span class="svc">${e.code}</span><span class="svp">${money(t.min)}</span><span class="svm">${esc(main || n + " 項零件")}</span><span class="svt">${n} 項${miss ? "（" + miss + " 項已下架）" : ""}・${ago(e.ts)}</span></button><button class="pcb-svdel" data-code="${e.code}" title="刪除這張配單">🗑</button></div>`);
+    }
+    box.innerHTML = rows.length ? rows.join("") : `<p class="note">目前沒有存過的配單</p>`;
+    box.querySelectorAll(".pcb-sv").forEach((b) => b.addEventListener("click", () => { loadCode(b.dataset.code); box.hidden = true; }));
+    // 刪除：第一下變成「確定刪？」，3 秒內再按一次才真的刪（誰都能刪，所以要確認）
+    box.querySelectorAll(".pcb-svdel").forEach((b) => b.addEventListener("click", async () => {
+      if (!b.classList.contains("armed")) {
+        b.classList.add("armed"); b.textContent = "確定刪？";
+        setTimeout(() => { if (b.isConnected && b.classList.contains("armed")) { b.classList.remove("armed"); b.textContent = "🗑"; } }, 3000);
+        return;
+      }
+      b.disabled = true; b.textContent = "…";
+      try {
+        const r = await fetch(url("api/pc/unshare?code=" + encodeURIComponent(b.dataset.code)), { method: "POST" });
+        const j = await r.json();
+        if (!r.ok && r.status !== 404) throw new Error(j.err || "fail");
+        if (b.dataset.code === savedCode) { savedCode = ""; savedKey = ""; renderSum(); }
+        b.closest(".pcb-svrow").remove();
+        if (!box.querySelector(".pcb-svrow")) box.innerHTML = `<p class="note">目前沒有存過的配單</p>`;
+      } catch { b.disabled = false; b.classList.remove("armed"); b.textContent = "刪除失敗"; }
+    }));
+  }
+  $(".pcb-savedbtn").addEventListener("click", showSaved);
   $(".pcb-loadbtn").addEventListener("click", () => loadCode($(".pcb-code").value));
   $(".pcb-code").addEventListener("keydown", (e) => { if (e.key === "Enter") loadCode(e.target.value); });
 
@@ -256,7 +322,7 @@ export function mountPcBuild(root, { env, back }) {
   }
   function orderData() {
     const g = { c: [], s: [] };
-    for (const cat of CAT_LIST) { const p = sel[cat]; if (!p) continue; const st = storeOf(p); g[st].push({ cat, p, price: p[st].p, other: st === "c" ? p.s : p.c }); }
+    for (const cat of CAT_LIST.flatMap((c) => (c === "ssd" ? ["ssd", ...EXTRA_SSD] : [c]))) { const p = sel[cat]; if (!p) continue; const st = storeOf(p); g[st].push({ cat, p, price: p[st].p, other: st === "c" ? p.s : p.c }); }
     const sum = (a) => a.reduce((x, r) => x + r.price, 0);
     return { g, sub: { c: sum(g.c), s: sum(g.s) }, total: sum(g.c) + sum(g.s) };
   }

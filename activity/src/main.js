@@ -19,7 +19,6 @@ import { mountUno } from "./uno.js";
 import { mountAvalon } from "./avalon.js";
 import { mountTheater } from "./theater.js";
 import { mountSpectateLobby } from "./spectate.js";
-import { mountLolBet } from "../lolbet/client.js";
 import { mountForgeBoard } from "./forgeboard.js";
 import { mountGachaCards } from "./gachacards.js";
 import { mountCardBoard } from "./cardboard.js";
@@ -67,6 +66,8 @@ if (inDiscord && clientId) {
 }
 
 const app = document.getElementById("app");
+// Discord 手機版：把 #app 包進 #dcwrap（固定在 Discord 標題列下面），所有畫面和彈窗就都不會被標題列擋到。樣式與說明在 style.css 最後一段
+if (document.documentElement.classList.contains("dcm")) { const w = document.createElement("div"); w.id = "dcwrap"; app.parentNode.insertBefore(w, app); w.appendChild(app); }
 
 // 回報「我現在在玩哪個遊戲」（給大笨bot 回答「大家在玩什麼」；只傳伺服器 id、遊戲代號和名稱）
 let presWs = null, presGame = "menu", presTimer = 0;
@@ -109,7 +110,6 @@ const GAMES = [
   { id: "pinball", cat: "action", icon: "🎱", name: "彈珠台", players: "1 人", desc: "左右擋板接球，撞彈跳器拿分，3 顆球", mount: mountPinball },
   { id: "pika2", cat: "action", icon: "⚡", name: "皮卡丘排球 2P", players: "2 人", desc: "連線對戰", mount: mountPikachuOnline },
   { id: "lf2", cat: "action", icon: "🥋", name: "小朋友齊打交", players: "最多 8 人", desc: "連線對戰／闖關", mount: mountLf2 },
-  { id: "lolbet", cat: "casino", wide: true, cls: "lolcard", icon: "🏆", name: "世界賽運彩", players: "全服共用", desc: "英雄聯盟世界賽單場勝負，賠率同步真實盤口", mount: mountLolBet },
   { id: "slots", cat: "casino", icon: "🎰", name: "老虎機", players: "1 人", desc: "3 格／3×3／4×4 拉霸", mount: mountSlots },
   { id: "poker", cat: "table", icon: "♠️", name: "德州撲克", players: "2–6 人", desc: "練習籌碼，可加電腦玩家，其他人可旁觀", mount: mountPoker() },
   { id: "mjtw", cat: "table", icon: "🀄", name: "台灣麻將", players: "4 人（可補電腦）", desc: "16 張、花牌、台數計分，練習點數", mount: mountMahjong("tw") },
@@ -167,7 +167,7 @@ function start(id) {
   presence(id); document.body.dataset.game = id;
   app.innerHTML = "";
   cleanup = g.mount(app, { env, back: () => { if (cleanup) cleanup(); cleanup = null; showMenu(); } }) || null;
-  window.scrollTo(0, 0); document.body.scrollTop = 0; document.documentElement.scrollTop = 0;     // 從滑到一半的選單點進來，遊戲畫面要從頂端開始（否則標題列會被捲掉）
+  window.scrollTo(0, 0); document.body.scrollTop = 0; document.documentElement.scrollTop = 0; app.scrollTop = 0;     // 從滑到一半的選單點進來，遊戲畫面要從頂端開始（否則標題列會被捲掉）
 }
 
 // 網址帶 ?g=遊戲代號 就直接開那個遊戲（例如「一起看影片」的「在瀏覽器開啟」）

@@ -37,7 +37,7 @@ h1 { margin:0; font-size:26px; letter-spacing:4px; }
 .card { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 10px; border:2px solid var(--line); border-radius:14px; background:#1d1d1f; color:#fff; cursor:pointer; font-size:16px; }
 .card:hover { border-color:#565758; background:#242427; }
 .card .icon { font-size:34px; } .card small { opacity:.7; font-size:13px; }
-.game { max-width:680px; height:100vh; margin:0 auto; padding:8px 10px 12px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.game { max-width:680px; height:var(--vh); margin:0 auto; padding:8px 10px 12px; display:flex; flex-direction:column; align-items:center; gap:10px; }
 .game header { width:100%; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:6px; }
 .game header h2 { margin:0; font-size:22px; letter-spacing:3px; }
 .back, .fs { background:none; border:1px solid var(--line); color:#fff; padding:6px 10px; border-radius:8px; cursor:pointer; }
@@ -223,7 +223,7 @@ canvas { max-width:100%; border-radius:6px; touch-action:manipulation; cursor:po
 .casino .lane{contain:layout paint}
 
 /* 內容比視窗高時往下捲動，不要互相擠壓重疊 */
-.game.slots{height:auto;min-height:100vh}
+.game.slots{height:auto;min-height:var(--vh)}
 .game.slots > *{flex-shrink:0}
 html,body{overflow-y:auto}
 
@@ -317,7 +317,7 @@ body:has(.game.realmode),#app:has(.game.realmode){background:#2a0b11}
 .betlog .bl-r{display:grid;grid-template-columns:38px 1fr auto 56px;gap:6px;align-items:center;padding:3px 0;border-top:1px solid rgba(255,255,255,.06)}
 .betlog .bl-r .g em{font-style:normal;opacity:.65;margin-left:6px;font-size:11px}
 .betlog .bl-r .b{opacity:.8;white-space:nowrap}.betlog .bl-r b{text-align:right}
-@media (min-width:900px){.betlog{position:fixed;right:14px;top:64px;width:300px;max-width:300px;margin:0;max-height:calc(100vh - 90px);overflow:auto;z-index:5}.betlog .bl-list{max-height:calc(100vh - 220px)}}
+@media (min-width:900px){.betlog{position:fixed;right:14px;top:64px;width:300px;max-width:300px;margin:0;max-height:calc(var(--vh) - 90px);overflow:auto;z-index:5}.betlog .bl-list{max-height:calc(var(--vh) - 220px)}}
 /* 馬匹介紹卡（四版型） */
 .casino .hcards{display:flex;flex-direction:column;gap:8px;width:100%}
 .casino .hcard{position:relative;width:100%;text-align:left;color:#fff;cursor:pointer;font:inherit;padding:0;border:0;background:none}
@@ -410,6 +410,7 @@ body.pk-myturn .game.poker{background:#16296b}
 .card.wide[data-g="farm"], .card.wide[data-g="farm"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/farm.jpg") right center/cover no-repeat; }
 .card.wide[data-g="forge"], .card.wide[data-g="forge"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/forge.jpg") right center/cover no-repeat; }
 .card.wide[data-g="pcbuild"], .card.wide[data-g="pcbuild"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/pcbuild.jpg") right center/cover no-repeat; }
+.card.wide[data-g="pcmoves"], .card.wide[data-g="pcmoves"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/pcmoves.jpg") right center/cover no-repeat; }
 .card.wide[data-g="airflow"], .card.wide[data-g="airflow"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/airflow.jpg") right center/cover no-repeat; }
 .card.wide[data-g="farm"]:hover, .card.wide[data-g="forge"]:hover { border-color:#b5342a; }
 .card.wide[data-g="theater"], .card.wide[data-g="theater"]:hover { background:#e9e2cf url("./theater-ink.svg") right center/cover no-repeat; }
@@ -736,7 +737,6 @@ body.tv-fs{overflow:hidden}
 .btag{display:inline-block;font-size:10px;line-height:1.4;padding:0 5px;border-radius:8px;background:rgba(255,255,255,.14);color:#ffe0a3;margin-left:3px;font-weight:400;white-space:nowrap}
 
 /* 手機版 Discord：頂端有一條蓋在 Activity 上的列（約 45px），把遊戲畫面往下推才看得到「← 選單」 */
-.dcm .game.game{padding-top:58px}
 .mj .mhand .mt.sel{transform:translateY(-12px);outline:2px solid #ffd54f;outline-offset:1px}
 
 /* ---- 種菜 ---- */
@@ -956,7 +956,6 @@ body.tv-fs{overflow:hidden}
 /* ---- 賭石版面：一頁內同時看得到石頭和操作按鈕 ---- */
 .casino.stg .cstage{max-width:none}
 .casino.stg .stslot{position:sticky;top:0;z-index:6;background:#101412;padding:4px 0;border-radius:0 0 12px 12px}
-.dcm .casino.stg .stslot{top:48px}
 .casino.stg .s3d{max-width:min(100%,34vh);min-width:190px}
 .casino.stg .cctl{position:sticky;bottom:0;z-index:6;background:rgba(14,18,16,.97);padding:6px 4px;margin:0;gap:6px;border-top:1px solid rgba(255,255,255,.12);flex-wrap:nowrap}
 .casino.stg .cctl button{padding:8px 6px;font-size:14px;flex:1 1 0;min-width:0}
@@ -999,7 +998,6 @@ body.tv-fs{overflow:hidden}
 .mtab{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:8px 13px;border:2px solid var(--line);border-radius:20px;background:#1d1d1f;color:#cfd3dc;font-size:15px;cursor:pointer;white-space:nowrap}
 .mtab i{font-style:normal;font-size:11px;background:rgba(255,255,255,.12);border-radius:9px;padding:0 6px;color:#9aa3b5}
 .mtab.on{background:#3a56b0;border-color:#6f8bff;color:#fff;font-weight:700}.mtab.on i{background:rgba(255,255,255,.25);color:#fff}
-.dcm .mtabs{top:48px}
 /* 分頁列改成自動換行（不再橫向捲動，最右邊的分頁才不會被切掉） */
 .mtabs{flex-wrap:wrap;justify-content:center;overflow:visible;position:static;padding:6px 0 10px}
 .mtab{padding:7px 12px;font-size:14px}
@@ -1058,7 +1056,7 @@ body.tv-fs{overflow:hidden}
 .factory .frec span{color:#9aa3b5;flex-basis:100%;padding-left:16px}
 .factory .fnote{font-size:12px;color:#6b7589;text-align:center}
 .factory .finfo:empty{display:none}
-.game.factory{height:auto;min-height:100vh}
+.game.factory{height:auto;min-height:var(--vh)}
 .factory > *{flex:none}
 .factory .fpower{width:100%;max-width:640px;margin:8px auto 0;padding:8px 12px;border-radius:10px;background:#242b3a;text-align:left;font-size:13px;box-sizing:border-box}
 .factory .fp-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
@@ -1426,7 +1424,6 @@ body.tv-fs{overflow:hidden}
 .un .unls label,.un .mjcfg label{white-space:nowrap}
 
 /* 手機版 Discord：選單主畫面的標題也要讓開頂端列（原本只有 .game 有讓） */
-.dcm .menu{padding-top:58px}
 
 /* 圖創區：對話頁上方的工具列（清除對話、管理員選模型） */
 .gl-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}
@@ -1451,9 +1448,8 @@ body.tv-fs{overflow:hidden}
 .tetris .thint { margin:0; font-size:12px; opacity:.6; text-align:center; }
 @media (pointer:coarse) { .tetris .thint { display:none; } }
 
-.game.airflow { height:100vh; max-width:1400px; }
+.game.airflow { height:var(--vh); max-width:1400px; }
 .game.airflow .afframe { flex:1; width:100%; border:0; border-radius:10px; background:#0a0d0f; min-height:0; }
-.dcm .game.airflow { height:100vh; }
 
 /* 麻將：mmain（牌桌＋手牌）和 mside（自動功能、操作按鈕）。手機沿用原本上下排列 */
 .mj .mmain,.mj .mside{display:contents}
@@ -1528,3 +1524,20 @@ body.tv-fs{overflow:hidden}
   .factory .cwrap{max-height:none}
 }
 .factory .fcheat.on{background:#b3541e !important}
+
+/* ===================== Discord 手機版頂端標題列：全站統一處理（不要再各畫面自己加 padding） =====================
+   Discord 手機版會在 Activity 最上面蓋一條「大笨bot／退出」的列。main.js 在這種情況下會加上 .dcm，並把 #app 包進 #dcwrap：
+   - #dcwrap 固定在標題列「下面」到畫面底，並帶 transform，所以裡面所有 position:fixed 的東西（彈窗、全螢幕畫面）
+     都改成以 #dcwrap 為準，不可能再跑到標題列底下。
+   - 捲動改在 #app 裡面發生（不是整個網頁），position:sticky 照常用 top:0。
+   寫新畫面時：高度用 var(--vh)（= 扣掉標題列後的可用高度），不要寫 100vh；不需要、也不要再寫任何 .dcm 的讓位規則。
+   改完前端請跑 tools/dcm_audit.py 檢查。 */
+:root{--dc-top:0px;--vh:100vh}
+.dcm{--dc-top:58px;--vh:calc(100vh - 58px)}
+.dcm body{overflow:hidden}
+.dcm #dcwrap{position:fixed;left:0;right:0;top:var(--dc-top);bottom:0;overflow:hidden;transform:translateZ(0)}
+.dcm #app{height:100%;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+/* 一起看影片：直播時沒有進度、速度、畫質、字幕可調，大家都看「現在」 */
+.theater.islive .play, .theater.islive .tvseek, .theater.islive .tvrate, .theater.islive .tvres, .theater.islive .tvcc { display: none; }
+.theater .golive { white-space: nowrap; font-size: 12px; }

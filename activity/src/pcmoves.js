@@ -1,6 +1,7 @@
 // 零件漲跌榜：看原價屋、欣亞哪些零件漲價、哪些降價。資料來自伺服器 /api/pc/moves（價格歷史是 /配電腦 定時抓取時記下的）。
 // 台灣習慣：紅色＝漲、綠色＝跌。
 import "./pcbuild.css";
+import { pim, wirePim } from "./pcimg.js";
 import { CAT_NAME } from "../shared/pcrules.js";
 
 const ICON = { cpu: "🧠", mb: "🔌", gpu: "🎮", ram: "💾", ssd: "💿", psu: "⚡", case: "🗄️", cooler: "❄️" };
@@ -39,6 +40,7 @@ export function mountPcMoves(root, { env, back }) {
   $(".back").addEventListener("click", back);
   const url = (p) => { if (env.inDiscord) return `/.proxy/${p}`; const u = new URL(p, location.href); return u.pathname + u.search; };
 
+  wirePim(root, url);
   let data = null, days = ls.get("pcm_days", 7), store = ls.get("pcm_store", ""), sort = ls.get("pcm_sort", "pct"), cat = "", shown = { up: 20, down: 20 };
   if (!PERIODS.some((p) => p[0] === days)) days = 7;
   const SORTS = [["pct", "幅度 %"], ["amt", "金額"]];
@@ -96,7 +98,7 @@ export function mountPcMoves(root, { env, back }) {
         <span class="half right"><i style="width:${(x.up / mx) * 100}%"></i><em>${x.up || ""}</em></span></div>`).join("")}
         <div class="pcm-bleg"><span>← 降價件數</span><span>漲價件數 →</span></div></div>`;
 
-    const row = (m) => `<div class="pcm-it ${m.d > 0 ? "up" : "down"}">
+    const row = (m) => `<div class="pcm-it ${m.d > 0 ? "up" : "down"}" data-id="${esc(m.id)}" tabindex="0" role="button">
       <div class="nm"><span class="st ${m.st}">${m.st === "c" ? "原價屋" : "欣亞"}</span><span class="cat">${ICON[m.cat] || ""}</span>${esc(m.name)}</div>
       <div class="pr"><s>${money(m.from)}</s> → <b>${money(m.to)}</b></div>
       <div class="dl"><b>${m.d > 0 ? "▲" : "▼"} ${money(Math.abs(m.d))}</b><span>${m.d > 0 ? "+" : ""}${m.pct.toFixed(1)}%</span></div>
@@ -105,10 +107,48 @@ export function mountPcMoves(root, { env, back }) {
       const box = $(`.pcm-col.${k} .pcm-list`);
       box.innerHTML = arr.length ? arr.slice(0, shown[k]).map(row).join("") + (arr.length > shown[k] ? `<button class="more" data-k="${k}">再看更多（還有 ${arr.length - shown[k]} 筆）</button>` : "") : `<p class="pcm-empty">${k === "down" ? "這段時間沒有降價的零件" : "這段時間沒有漲價的零件"}</p>`;
       box.querySelector(".more")?.addEventListener("click", () => { shown[k] += 30; render(); });
+      box.querySelectorAll(".pcm-it").forEach((el) => {
+        const open = () => detail(mv.find((m) => m.id === el.dataset.id));
+        el.addEventListener("click", open);
+        el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+      });
     }
     const days0 = data.first ? Math.max(1, Math.round((data.last - data.first) / 86400)) : 0;
     $(".pcm-note").hidden = false;
     $(".pcm-note").textContent = `價格每 4 小時抓一次，只有價格變動才會記一筆。目前累積了約 ${days0} 天的紀錄${data.first ? "（從 " + dt(data.first) + " 開始）" : ""}，所以「期間」選得再長也只看得到這麼多。下架再重新上架的不算漲跌。${oddN ? `另外有 ${oddN} 筆價格暴增暴跌 2.5 倍以上，多半是標錯價或抓錯商品，已排除。` : ""}`;
+  }
+
+  // 點開單一零件：價格走勢圖 + 每次變動的時間與價錢
+  async function detail(m) {
+    if (!m) return;
+    root.querySelector(".pcm-dlg")?.remove();
+    const dlg = document.createElement("div");
+    dlg.className = "pcm-dlg";
+    dlg.innerHTML = `<div class="pcm-card" role="dialog">
+      <button class="x" aria-label="關閉">✕</button>
+      <div class="hd">${pim(url, [m.id], m.name)}<div><span class="st ${m.st}">${m.st === "c" ? "原價屋" : "欣亞"}</span> ${ICON[m.cat] || ""} ${esc(m.name)}</div></div>
+      <div class="bd">載入中…</div></div>`;
+    root.querySelector(".pcm").appendChild(dlg);
+    const close = () => dlg.remove();
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+    dlg.querySelector(".x").addEventListener("click", close);
+    const bd = dlg.querySelector(".bd");
+    let h = [];
+    try { const r = await (await fetch(url("api/pc/hist?ids=" + encodeURIComponent(m.id)))).json(); h = r[m.id] || []; } catch {}
+    if (!h.length) { bd.textContent = "沒有這項零件的價格紀錄"; return; }
+    const ps = h.map((x) => x[1]), lo = Math.min(...ps), hi = Math.max(...ps), cur = ps[ps.length - 1];
+    const t0 = h[0][0], t1 = h[h.length - 1][0], W = 320, H = 110, pad = 6;
+    const X = (t) => pad + (t1 === t0 ? (W - 2 * pad) / 2 : ((t - t0) / (t1 - t0)) * (W - 2 * pad));
+    const Y = (p) => pad + (hi === lo ? (H - 2 * pad) / 2 : (1 - (p - lo) / (hi - lo)) * (H - 2 * pad));
+    // 階梯線：價格在下一次變動前維持不變
+    let d = `M${X(h[0][0]).toFixed(1)},${Y(h[0][1]).toFixed(1)}`;
+    for (let i = 1; i < h.length; i++) d += `H${X(h[i][0]).toFixed(1)}V${Y(h[i][1]).toFixed(1)}`;
+    d += `H${(W - pad).toFixed(1)}`;
+    const rows = h.map((x, i) => { const df = i ? x[1] - h[i - 1][1] : 0; return `<tr><td>${dt(x[0])}</td><td>${money(x[1])}</td><td class="${df > 0 ? "up" : df < 0 ? "down" : ""}">${i ? (df > 0 ? "▲ " : "▼ ") + money(Math.abs(df)) : "首次記錄"}</td></tr>`; }).reverse().join("");
+    bd.innerHTML = `<div class="pcm-stats"><div><span>目前</span><b>${money(cur)}</b></div><div><span>最低</span><b class="down">${money(lo)}</b></div><div><span>最高</span><b class="up">${money(hi)}</b></div></div>
+      <svg viewBox="0 0 ${W} ${H}" class="pcm-spark" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="#6aa8ff" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+      <div class="pcm-axis"><span>${dt(t0)}</span><span>${dt(t1)}</span></div>
+      <table class="pcm-tbl"><thead><tr><th>時間</th><th>價格</th><th>變動</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   load();
 }

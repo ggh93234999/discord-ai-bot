@@ -39,6 +39,89 @@ function notifyQual(vid, q) {
   if (st.status !== "downloading") qWatch.delete(keyOf(vid, q));
 }
 const meta = new Map();                    // vid → { title, dur }
+// ---- 直播：yt-dlp 取串流網址 → ffmpeg 轉成 HLS 小片段放在 video_cache/live_<vid>/，從 /api/tv/live/<vid>/index.m3u8 播
+// 同一場直播不管幾個房間、幾個人，只跑一個 ffmpeg；沒有房間在播、也沒人拉播放清單超過 60 秒就自動關掉
+const liveSet = new Set();                 // 已知是直播的 vid
+const lives = new Map();                   // vid → { status:"downloading"|"ready"|"error", err, proc, dir, seen, t0 }
+const LIVE_IDLE_MS = 60 * 1000;
+const liveDir = (vid) => path.join(DIR, "live_" + vid);
+function rmLive(vid) { try { fs.rmSync(liveDir(vid), { recursive: true, force: true }); } catch {} }
+function liveWanted(vid) { for (const r of rooms.values()) if (r.members.size && r.cur && r.cur.vid === vid) return true; return false; }   // 房間裡要有人才算在看
+const LIVE_FMT = "b[height<=1080][vcodec^=avc1]/b[height<=1080]/bv*[height<=1080][vcodec^=avc1]+ba/b";   // 優先挑 1080p 以下、影音在一起的 H.264 HLS（直接複製，不用重新編碼）
+async function liveUrls(vid) {
+  const txt = await run(["-g", "--no-playlist", "-f", LIVE_FMT, "https://www.youtube.com/watch?v=" + vid]);
+  const urls = txt.split("\n").map((x) => x.trim()).filter((x) => /^https?:/.test(x)).slice(0, 2);
+  if (!urls.length) throw new Error("拿不到直播串流網址");
+  return urls;
+}
+function startLive(vid) {
+  const old = lives.get(vid);
+  if (old && old.status !== "error") return;
+  const job = { status: "downloading", err: "", proc: null, dir: liveDir(vid), seen: Date.now(), t0: Date.now(), seq: 0, restarts: 0, t1: 0 };
+  lives.set(vid, job);
+  rmLive(vid); fs.mkdirSync(job.dir, { recursive: true });
+  const fail = (e) => { job.status = "error"; job.err = String(e && e.message || e).slice(0, 120); console.log("直播失敗", vid, job.err); stopLive(vid, true); pushVid(vid); };
+  liveUrls(vid).then((urls) => {
+    if (lives.get(vid) !== job) return;
+    spawnLive(vid, job, urls, fail);
+    const poll = setInterval(() => {                               // 有 2 個以上片段才算準備好
+      if (lives.get(vid) !== job || job.status !== "downloading") return clearInterval(poll);
+      let ok = false;
+      try { ok = (fs.readFileSync(path.join(job.dir, "index.m3u8"), "utf-8").match(/\.ts/g) || []).length >= 2; } catch {}
+      if (ok) { job.status = "ready"; clearInterval(poll); pushVid(vid); }
+      else if (Date.now() - job.t0 > 60000) { clearInterval(poll); fail(new Error("直播串流等太久沒有畫面")); }
+    }, 700);
+  }).catch(fail);
+}
+function spawnLive(vid, job, urls, fail) {
+  const args = ["-hide_banner", "-loglevel", "warning", "-nostdin"];
+  for (const u of urls) args.push("-rw_timeout", "20000000", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5", "-i", u);
+  if (urls.length > 1) args.push("-map", "0:v:0", "-map", "1:a:0");
+  args.push("-c", "copy", "-f", "hls", "-hls_time", "4", "-hls_list_size", "20",
+    "-hls_flags", "delete_segments+omit_endlist+independent_segments+temp_file" + (job.seq ? "+discont_start" : ""));
+  if (job.seq) args.push("-start_number", String(job.seq));        // 重連後序號接著上次，播放器才不會以為是新直播
+  args.push("-hls_segment_filename", path.join(job.dir, "s%d.ts"), path.join(job.dir, "index.m3u8"));
+  const p = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+  job.proc = p; job.t1 = Date.now();
+  let errBuf = "";
+  p.stderr.on("data", (d) => { errBuf = (errBuf + d).slice(-600); for (const l of String(d).split("\n")) if (l.trim()) console.log(`直播 ${vid} ffmpeg：${l.trim().slice(0, 160)}`); });
+  p.on("error", fail);
+  p.on("close", (code) => {
+    if (lives.get(vid) !== job) return;
+    job.proc = null;
+    if (Date.now() - job.t1 > 10 * 60000) job.restarts = 0;           // 穩定跑超過 10 分鐘就重新計次
+    if (job.status === "ready" && liveWanted(vid) && job.restarts < 6) {   // 轉流意外中斷：重新取網址接著轉，直播真的結束了這裡就會失敗
+      job.restarts++;
+      try { const t = fs.readFileSync(path.join(job.dir, "index.m3u8"), "utf-8"); job.seq = Number((t.match(/MEDIA-SEQUENCE:(\d+)/) || [])[1] || 0) + (t.match(/\.ts/g) || []).length; } catch {}
+      console.log(`直播 ${vid} 轉流中斷（結束碼 ${code}），重新連接（第 ${job.restarts} 次）`);
+      liveUrls(vid).then((urls) => { if (lives.get(vid) === job && !job.proc) spawnLive(vid, job, urls, fail); })
+        .catch(() => { if (lives.get(vid) !== job) return; job.status = "error"; job.err = "直播結束了"; pushVid(vid); });
+      return;
+    }
+    const was = job.status;
+    job.status = "error";
+    job.err = was === "ready" ? "直播結束了" : (errBuf.trim().split("\n").pop() || `ffmpeg 結束碼 ${code}`).slice(0, 120);
+    console.log("直播停止", vid, was, job.err);
+    pushVid(vid);
+  });
+}
+function stopLive(vid, keepJob) {
+  const j = lives.get(vid); if (!j) return;
+  if (j.proc) try { j.proc.kill("SIGKILL"); } catch {}
+  if (!keepJob) lives.delete(vid);
+  rmLive(vid);
+}
+setInterval(() => {
+  for (const [vid, j] of lives) {
+    if (j.status === "ready" && j.proc) {
+      try { const age = Date.now() - fs.statSync(path.join(j.dir, "index.m3u8")).mtimeMs; if (age > 40000) { console.log(`直播 ${vid} 串流停滯 ${Math.round(age / 1000)} 秒，重啟轉流`); j.proc.kill("SIGKILL"); } } catch {}
+    }
+    if (liveWanted(vid)) { j.seen = Date.now(); continue; }
+    if (Date.now() - j.seen > LIVE_IDLE_MS) { console.log("直播沒人看，關閉", vid); stopLive(vid); }
+  }
+}, 10000).unref();
+process.on("exit", () => { for (const j of lives.values()) if (j.proc) try { j.proc.kill("SIGKILL"); } catch {} });
+for (const f of fs.readdirSync(DIR)) if (f.startsWith("live_")) try { fs.rmSync(path.join(DIR, f), { recursive: true, force: true }); } catch {}   // 重啟後清掉殘留的直播片段
 const jobs = new Map();                    // vid → { status, pct, err, waiters:Set<room> }
 
 function run(args, onLine) {
@@ -85,7 +168,8 @@ async function lookup(target) {
   let j = JSON.parse(txt);
   if (j._type === "playlist") j = (j.entries || [])[0];
   if (!j || !j.id) throw new Error("找不到影片");
-  if (j.is_live || j.live_status === "is_live" || j.live_status === "is_upcoming") throw new Error("直播或還沒開始的影片不能播");
+  if (j.live_status === "is_upcoming") throw new Error("這場直播還沒開始");
+  let live = !!(j.is_live || j.live_status === "is_live");
   let dur = Number(j.duration) || 0;
   let title = j.title || j.id;
   let subs = pickSubs(j);
@@ -94,6 +178,14 @@ async function lookup(target) {
     const d = JSON.parse(await run(["-J", "--no-playlist", "https://www.youtube.com/watch?v=" + j.id]));
     j2 = d;
     dur = Number(d.duration) || dur; title = d.title || title; subs = pickSubs(d);
+    if (d.live_status === "is_upcoming") throw new Error("這場直播還沒開始");
+    if (d.is_live || d.live_status === "is_live") live = true;
+  }
+  if (live) {                                                           // 直播：沒有長度、沒有字幕、固定 1080p（沒有就往下）
+    if (!j.title && !title) title = j.id;
+    liveSet.add(j.id);
+    meta.set(j.id, { title, dur: 0, subs: [], quals: [720], q: 720, live: true });
+    return { vid: j.id, title, dur: 0, subs: [], quals: [720], q: 720, live: true };
   }
   if (dur > MAX_DUR) throw new Error(`影片太長（上限 ${MAX_DUR / 3600} 小時）`);
   const quals = qualsOf(target.search ? j2 || j : j);
@@ -102,6 +194,7 @@ async function lookup(target) {
   return { vid: j.id, title, dur, subs, quals, q };
 }
 function download(vid, q = 720) {
+  if (liveSet.has(vid)) { if (liveWanted(vid)) startLive(vid); return; }
   const key = keyOf(vid, q);
   if (fs.existsSync(files(vid, q))) { touch(vid, q); return; }
   if (jobs.has(key) && jobs.get(key).status === "downloading") return;
@@ -137,7 +230,7 @@ function download(vid, q = 720) {
 }
 const mainQ = (it) => (it && it.q) || 720;
 function isMain(vid, q) { for (const r of rooms.values()) for (const it of [r.cur, ...r.queue]) if (it && it.vid === vid && mainQ(it) === q) return true; return false; }
-const statusOf = (vid, q = 720) => { if (fs.existsSync(files(vid, q))) return { status: "ready", pct: 100 }; const j = jobs.get(keyOf(vid, q)); return j ? { status: j.status, pct: Math.round(j.pct), err: j.err } : { status: "queued", pct: 0 }; };
+const statusOf = (vid, q = 720) => { if (liveSet.has(vid)) { const j = lives.get(vid); return j ? { status: j.status, pct: j.status === "ready" ? 100 : Math.min(95, Math.round((Date.now() - j.t0) / 400)), err: j.err } : { status: "queued", pct: 0 }; } if (fs.existsSync(files(vid, q))) return { status: "ready", pct: 100 }; const j = jobs.get(keyOf(vid, q)); return j ? { status: j.status, pct: Math.round(j.pct), err: j.err } : { status: "queued", pct: 0 }; };
 function touch(vid, q = 720) { const f = files(vid, q); try { const t = new Date(); fs.utimesSync(f, t, t); } catch {} }
 function cleanCache() {
   const inUse = new Set();
@@ -159,8 +252,8 @@ function view(r) {
   const c = r.cur;
   return {
     t: "tstate", now: Date.now(), log: r.log,
-    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], quals: c.quals || [720], q: mainQ(c), ...statusOf(c.vid, mainQ(c)) } : null,
-    queue: r.queue.map((q) => ({ key: q.key, vid: q.vid, title: q.title, dur: q.dur, by: q.by, ...statusOf(q.vid, mainQ(q)) })),
+    cur: c ? { key: c.key, vid: c.vid, title: c.title, dur: c.dur, by: c.by, playing: c.playing, pos: posOf(c), rate: c.rate || 1, subs: c.subs || [], quals: c.quals || [720], q: mainQ(c), live: liveSet.has(c.vid), ...statusOf(c.vid, mainQ(c)) } : null,
+    queue: r.queue.map((q) => ({ key: q.key, vid: q.vid, title: q.title, dur: q.dur, by: q.by, live: liveSet.has(q.vid), ...statusOf(q.vid, mainQ(q)) })),
     viewers: [...r.members].map(nameOf),
   };
 }
@@ -174,11 +267,17 @@ function advance(r) {
     r.cur = { ...q, playing: false, pos: 0, at: Date.now(), rate: 1, waitReady: true };
     download(q.vid, mainQ(q));
   }
+  if (r.cur && liveSet.has(r.cur.vid) && !lives.has(r.cur.vid) && r.members.size) startLive(r.cur.vid);   // 大家離開後直播被關掉了，有人回來就重新連
   if (r.cur && r.cur.waitReady && statusOf(r.cur.vid, mainQ(r.cur)).status === "ready") {   // 下載好了才開始播
     r.cur.waitReady = false; r.cur.playing = true; r.cur.pos = 0; r.cur.at = Date.now() + 1500;   // 留 1.5 秒讓大家載入
-    r.log = `開始播放《${r.cur.title}》`;
+    r.log = liveSet.has(r.cur.vid) ? `開始看直播《${r.cur.title}》` : `開始播放《${r.cur.title}》`;
   }
-  if (r.cur && statusOf(r.cur.vid, mainQ(r.cur)).status === "error") { r.log = `《${r.cur.title}》下載失敗：${statusOf(r.cur.vid, mainQ(r.cur)).err}`; r.cur = null; advance(r); }
+  if (r.cur && statusOf(r.cur.vid, mainQ(r.cur)).status === "error") {
+    const live = liveSet.has(r.cur.vid), er = statusOf(r.cur.vid, mainQ(r.cur)).err;
+    r.log = live ? `《${r.cur.title}》${er === "直播結束了" ? "直播結束了" : "直播連不上：" + er}` : `《${r.cur.title}》下載失敗：${er}`;
+    if (live) lives.delete(r.cur.vid);
+    r.cur = null; advance(r);
+  }
   // 清單裡接下來兩部先下載
   for (const q of r.queue.slice(0, 2)) download(q.vid, mainQ(q));
 }
@@ -205,6 +304,11 @@ export async function handleTheater(ws, m) {
     const r = roomOf(String(m.room || "default").slice(0, 80));
     if (cleanName(m.name)) ws.tname = cleanName(m.name);
     ws.troom = r; r.members.add(ws); push(r); return true;
+  }
+  if (m.t === "tdiag") {                    // 播放器回報的直播狀況（只寫日誌，方便查「為什麼卡」）
+    const n = (x) => (typeof x === "number" && Number.isFinite(x) ? x : "-");
+    console.log(`直播診斷 ${nameOf(ws)} buf=${n(m.buf)}s lat=${n(m.lat)}s bw=${n(m.bw)}kbps frag=${n(m.ms)}ms/${n(m.kb)}KB(max ${n(m.max)}ms) 卡頓=${n(m.stalls)} 等待=${n(m.waits)} 網路錯誤=${n(m.neterr)} ${m.paused ? "暫停 " : ""}${String(m.mode || "").slice(0, 10)} ${String(m.ua || "").slice(0, 70)}`);
+    return true;
   }
   const r = ws.troom; if (!r) return true;
   const who = nameOf(ws);
@@ -238,6 +342,7 @@ export async function handleTheater(ws, m) {
     return true;
   }
   const c = r.cur;
+  if (c && liveSet.has(c.vid) && /^(tplay|tpause|tseek|tspeed)$/.test(m.t)) return true;
   if (m.t === "tplay" && c && !c.waitReady) { if (!c.playing) { c.pos = Math.max(0, posOf(c)); c.at = Date.now(); c.playing = true; r.log = `${who} 按了播放`; } }
   else if (m.t === "tpause" && c && !c.waitReady) { if (c.playing) { c.pos = Math.max(0, posOf(c)); c.at = Date.now(); c.playing = false; r.log = `${who} 按了暫停`; } }
   else if (m.t === "tseek" && c && !c.waitReady) {
@@ -303,6 +408,19 @@ export async function serveSub(req, res) {
 
 // ---------------------------------------------------------------- 影片檔（/api/tv/<id>.mp4，支援 Range）
 export function serveVideo(req, res) {
+  const lm = new URL(req.url, "http://x").pathname.match(/^\/api\/tv\/live\/([A-Za-z0-9_-]{11})\/(index\.m3u8|s\d+\.ts)$/);
+  if (lm) {
+    const j = lives.get(lm[1]);
+    if (!j || j.status !== "ready") { res.writeHead(404, { "Cache-Control": "no-store" }); res.end(); return true; }
+    j.seen = Date.now();
+    const isList = lm[2] === "index.m3u8";
+    let buf;
+    try { buf = fs.readFileSync(path.join(j.dir, lm[2])); } catch { res.writeHead(404, { "Cache-Control": "no-store" }); res.end(); return true; }
+    res.writeHead(200, { "Content-Type": isList ? "application/vnd.apple.mpegurl" : "video/mp2t", "Cache-Control": isList ? "no-store" : "public, max-age=60", "Content-Length": buf.length });
+    if (req.method === "HEAD") return res.end(), true;
+    res.end(buf);
+    return true;
+  }
   const m = new URL(req.url, "http://x").pathname.match(/^\/api\/tv\/([A-Za-z0-9_-]{11})(?:\.q(\d{3,4}))?\.mp4$/);
   if (!m) return false;
   const q = m[2] ? Number(m[2]) : 720;

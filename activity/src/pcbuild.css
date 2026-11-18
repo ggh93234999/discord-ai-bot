@@ -1,4 +1,4 @@
-.game.pcb { height:auto; min-height:100vh; max-width:560px; align-items:stretch; }
+.game.pcb { height:auto; min-height:var(--vh); max-width:560px; align-items:stretch; }
 .game.pcb > * { flex-shrink:0; }
 .pcb-ts { font-size:12px; opacity:.65; }
 .pcb-body { display:flex; flex-direction:column; gap:12px; width:100%; }
@@ -63,7 +63,6 @@
 .tsvg { width:100%; height:auto; background:#101216; border-radius:8px; } .tsvg text { fill:#9aa0ad; font-size:9px; } .tsvg .grid { stroke:#2a2d35; stroke-width:1; }
 .tleg { display:flex; flex-direction:column; gap:3px; font-size:12px; margin-top:8px; } .tleg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
 /* 手機版 Discord：頂端有一條列蓋在 Activity 上面，全螢幕的選單與彈窗要讓開 */
-.dcm .pcb-pick, .dcm .pcb-trend { padding-top:58px; }
 .slot .sc em.auto { background:#2a3a66; color:#b6c8ff; }
 .pcb-keep { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; }
 .pcb-keep input { width:auto; }
@@ -120,3 +119,47 @@
 .pcm-list .more { width:100%; }
 .pcm-empty { opacity:.6; font-size:13px; text-align:center; padding:14px 0; margin:0; }
 .pcm .pcm-note { font-size:12px; opacity:.6; }
+
+.pcm-it { cursor:pointer; } .pcm-it:active { background:#1b1e24; }
+.pcm-dlg { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+@media (min-width:760px) { .pcm-dlg { align-items:center; } }
+.pcm-card { position:relative; background:#1a1c22; border:1px solid #2c2f37; border-radius:14px 14px 0 0; width:100%; max-width:520px; max-height:85%; overflow:auto; padding:14px; box-sizing:border-box; }
+@media (min-width:760px) { .pcm-card { border-radius:14px; } }
+.pcm-card .x { position:absolute; top:8px; right:8px; padding:4px 10px !important; }
+.pcm-card .hd { font-size:14px; line-height:1.4; padding-right:40px; word-break:break-all; margin-bottom:10px; }
+.pcm-card .hd .st { font-size:11px; padding:0 5px; border-radius:6px; }
+.pcm-card .hd .st.c { background:#5a3d14; color:#f5c06a; } .pcm-card .hd .st.s { background:#173a5c; color:#8ec8ff; }
+.pcm-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px; text-align:center; }
+.pcm-stats span { display:block; font-size:12px; opacity:.7; } .pcm-stats b { font-size:17px; }
+.pcm-card .up { color:#ff6b6b; } .pcm-card .down { color:#4cd48a; }
+.pcm-spark { width:100%; height:110px; background:#14161a; border-radius:8px; }
+.pcm-axis { display:flex; justify-content:space-between; font-size:11px; opacity:.55; margin:2px 0 10px; }
+.pcm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.pcm-tbl th { text-align:left; font-weight:normal; opacity:.6; font-size:12px; padding:3px 4px; }
+.pcm-tbl td { padding:4px; border-top:1px solid #2c2f37; }
+.pcm-card .hd { display:flex; gap:10px; align-items:flex-start; }
+.pcm-card .hd .pim { width:84px; height:84px; object-fit:contain; background:#fff; border-radius:8px; flex-shrink:0; }
+.pim { background:#fff; border-radius:8px; object-fit:contain; cursor:zoom-in; flex-shrink:0; }
+.slot .pim.sl { width:52px; height:52px; }
+.prow .pn { display:flex; gap:8px; align-items:flex-start; } .prow .pn > div { min-width:0; }
+.pim.pr { width:48px; height:48px; }
+.pcb-trend .thd { display:flex; gap:10px; align-items:flex-start; padding-right:36px; } .pim.tr { width:72px; height:72px; }
+.pim-zoom { position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.88); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:14px; box-sizing:border-box; }
+.pim-zoom img { max-width:100%; max-height:calc(100% - 50px); object-fit:contain; background:#fff; border-radius:10px; }
+.pim-zoom span { font-size:13px; opacity:.8; text-align:center; max-width:90%; }
+.pim-zoom button { position:absolute; top:12px; right:12px; padding:6px 12px !important; }
+.pcb-saved { margin-top:8px; }
+.pcb-savedbtn { width:100%; }
+.pcb-savedlist { display:flex; flex-direction:column; gap:6px; margin-top:6px; max-height:46vh; overflow:auto; }
+.pcb-svrow { display:flex; gap:6px; align-items:stretch; }
+.pcb-svrow .pcb-sv { flex:1; min-width:0; }
+.pcb-svdel { flex-shrink:0; min-width:44px; padding:0 8px !important; font-size:15px; }
+.pcb-svdel.armed { background:#8a2a2a !important; border-color:#c04848 !important; font-size:12px; }
+.pcb-sv { display:grid !important; grid-template-columns:auto 1fr; gap:2px 10px; text-align:left; padding:8px 10px !important; align-items:center; }
+.pcb-sv .svc { font-family:monospace; font-weight:700; letter-spacing:2px; color:#9cc1ff; }
+.pcb-sv .svp { justify-self:end; font-weight:700; color:#ffd36a; }
+.pcb-sv .svm { grid-column:1 / 3; font-size:13px; }
+.pcb-sv .svt { grid-column:1 / 3; font-size:11px; opacity:.6; }
+.pcb .acts .save { background:#1f4a35 !important; border-color:#2f7a55 !important; }
+.pcb .acts .save.done { background:#2a2d36 !important; border-color:#3a3d46 !important; color:#9be8bb; }
+.pcb .savemsg { color:#9be8bb; }

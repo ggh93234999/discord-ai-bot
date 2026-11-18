@@ -454,8 +454,8 @@ function expertEval(t, i) {
   }
   return res.sort((a, b) => b.score - a.score);
 }
-function evalDiscards(t, i) {
-  const h = t.h, p = h.p[i], need = needOf(t, p), jp = t.rule === "jp", P = mjPersona(t.seats[i]);
+function evalDiscards(t, i, forceP) {
+  const h = t.h, p = h.p[i], need = needOf(t, p), jp = t.rule === "jp", P = forceP || mjPersona(t.seats[i]);
   if (P.expert) return expertEval(t, i);
   const c = toCounts(p.hand), vis = visibleCounts(t, i);
   // 危險的人：日麻是立直的人；謹慎型的電腦在台麻也會提防已經副露 3 組以上的人
@@ -492,7 +492,7 @@ function hasYakuhaiMeld(t, i) {
   const p = t.h.p[i], sw = 27 + seatW(t, i), rw = 27 + (t.g.round % 4);
   return p.melds.some((m) => { const k = kindOf(m.tiles[0]); return m.k !== "chi" && (isDragon(k) || k === sw || k === rw); });
 }
-function botClaim(t, i, o) {
+function botClaim(t, i, o, forceP) {
   if (o.ron) return { a: "ron" };
   const h = t.h, p = h.p[i], jp = t.rule === "jp", tile = kindOf(o.tile);
   const c = toCounts(p.hand), need = needOf(t, p);
@@ -504,7 +504,7 @@ function botClaim(t, i, o) {
   };
   const sw = 27 + seatW(t, i), rw = 27 + (t.g.round % 4);
   const yakuhai = isDragon(tile) || tile === sw || tile === rw;
-  const P = mjPersona(t.seats[i]);
+  const P = forceP || mjPersona(t.seats[i]);
   if (P.claim <= 0) return { a: "pass" };                           // 門清派：只胡不叫
   if (P.expert && threatsOf(t, i).some((x) => x.w >= 1)) {          // 高手：有人立直、叫完還沒聽牌就不叫
     const pAfter = o.pon ? after([tile, tile]) : 99;
@@ -520,6 +520,23 @@ function botClaim(t, i, o) {
     for (const w of o.chi) if (better(after(w))) return { a: "chi", with: w };
   }
   return { a: "pass" };
+}
+
+// 給真人玩家的建議：用「雀神」那套算法（不亂打、不看別人手牌），畫面上顯示推薦，也給「代打」用
+const HINT_P = { tag: "建議", claim: 1, defThr: 1, riichi: 1, color: 0, noise: 0, expert: true };
+function hintFor(t, i) {
+  const h = t.h, o = h.stage === "turn" && h.turn === i ? h.opts : h.stage === "claim" ? h.claim.opts[i] : null;
+  if (!o) return null;
+  if (h.stage === "turn") {
+    if (o.tsumo) return { a: "tsumo" };
+    if (o.lock) return h.drawn != null ? { a: "discard", tile: h.drawn } : null;
+    const best = evalDiscards(t, i, HINT_P)[0];
+    if (!best) return null;
+    if (o.riichi.includes(best.k) && best.sh === 0) return { a: "riichi", tile: best.k };
+    return { a: "discard", tile: best.k };
+  }
+  if (h.claim.resp[i]) return null;
+  return botClaim(t, i, o, HINT_P);
 }
 
 // ---------------------------------------------------------------- 畫面資料
@@ -542,6 +559,7 @@ function view(t, ws) {
       const hand = p.hand.slice(); let drawn = null;
       if (h.stage === "turn" && h.turn === you && h.drawn != null) { const k = hand.lastIndexOf(h.drawn); if (k >= 0) { hand.splice(k, 1); drawn = h.drawn; } }
       v.hand = sortTiles(hand); v.drawn = drawn;
+      if (!ws.mspec) { try { v.hint = hintFor(t, you); } catch { v.hint = null; } }
       if (h.stage === "turn" && h.turn === you) { const { kind, tsumo, ankan, kakan, riichi, lock } = h.opts; v.opts = { kind, tsumo, ankan, kakan, riichi, lock }; }
       if (h.stage === "claim" && h.claim.opts[you] && !h.claim.resp[you]) { const o = h.claim.opts[you]; v.opts = { kind: "claim", tile: o.tile, ron: o.ron, pon: o.pon, kan: o.kan, chi: o.chi }; }
       if (t.rule === "jp" && !(h.stage === "turn" && h.turn === you)) v.waits = waitsOf(toCounts(p.hand), needOf(t, p), true);

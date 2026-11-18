@@ -25,6 +25,7 @@
     "@pixi/sprite-animated": "^6.5.10",
     "@pixi/spritesheet": "^6.5.10",
     "@pixi/ticker": "^6.5.10",
+    "hls.js": "^1.5.17",
     "three": "^0.160.1"
   },
   "devDependencies": {

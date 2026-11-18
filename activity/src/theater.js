@@ -15,7 +15,7 @@ export function mountTheater() {
         <div class="tvstage">
         <div class="tvwrap">
           <video class="tv" playsinline preload="auto"></video>
-          <div class="tvempty">貼上 YouTube 連結或打關鍵字，加入清單後大家會一起看</div>
+          <div class="tvempty">貼上 YouTube 影片或直播連結、或打關鍵字，加入清單後大家會一起看</div>
           <button class="tvunmute" hidden>🔊 點一下開始播放<small>（瀏覽器規定要先按一下才能放聲音）</small></button>
           <div class="tvload" hidden></div>
         </div>
@@ -23,6 +23,7 @@ export function mountTheater() {
           <input class="tvseek" type="range" min="0" max="1000" value="0" step="1">
           <button class="tb play" title="播放／暫停">▶</button>
           <button class="tb skip" title="跳過這部">⏭</button>
+          <button class="tb golive" title="跳到直播最新的畫面" hidden>🔴 回到最新</button>
           <button class="tb mute" title="靜音">🔊</button>
           <input class="tvvol" type="range" min="0" max="100" step="1" value="${lsGet("tvvol2", "60")}" title="音量 ${lsGet("tvvol2", "60")}%">
           <span class="tvtime">0:00 / 0:00</span>
@@ -59,6 +60,46 @@ export function mountTheater() {
       if (e === mainOf(c) || qReady.has(k) || qAsked === k) return;
       qAsked = k; send({ t: "tqual", vid: c.vid, q: e });
     }
+    // ---- 直播（HLS）：iPhone／新版 Chrome 原生可播，其他瀏覽器用 hls.js
+    let hls = null, hlsSeq = 0, lastDiag = 0;
+    const diag = { stalls: 0, waits: 0, neterr: 0, ms: 0, kb: 0, max: 0 };
+    video.addEventListener("waiting", () => { if (st && st.cur && st.cur.live) diag.waits++; });
+    function sendDiag() {
+      const c = st && st.cur; if (!c || !c.live) return;
+      let buf = 0;
+      try { if (video.buffered.length) buf = video.buffered.end(video.buffered.length - 1) - video.currentTime; } catch {}
+      send({ t: "tdiag", buf: Math.round(buf * 10) / 10, lat: hls && Number.isFinite(hls.latency) ? Math.round(hls.latency * 10) / 10 : null,
+        bw: hls ? Math.round((hls.bandwidthEstimate || 0) / 1000) : null, ...diag, paused: video.paused, mode: hls ? "hls.js" : "native", ua: navigator.userAgent.replace(/^Mozilla\/5\.0 /, "") });
+      diag.max = 0;
+    }
+    const liveSrc = (c) => (env.inDiscord ? `/.proxy/api/tv/live/${c.vid}/index.m3u8` : new URL(`api/tv/live/${c.vid}/index.m3u8`, location.href).pathname);
+    function detach() { hlsSeq++; if (hls) { try { hls.destroy(); } catch {} hls = null; } }
+    async function attachLive(src) {
+      detach(); const my = hlsSeq;
+      // 只有蘋果的瀏覽器（iPhone／iPad／Safari）用原生播放；新版 Chrome 雖然說自己能播 HLS，實際上常常播不起來，所以其他一律用 hls.js
+      const ua = navigator.userAgent, apple = /iP(hone|ad|od)/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Android/.test(ua));
+      if (apple && video.canPlayType("application/vnd.apple.mpegurl")) { video.src = src; video.load(); return; }
+      try {
+        const { default: Hls } = await import("hls.js");
+        if (my !== hlsSeq) return;
+        if (!Hls.isSupported()) {
+          if (video.canPlayType("application/vnd.apple.mpegurl")) { video.src = src; video.load(); return; }
+          msgEl.className = "tvmsg err"; msgEl.textContent = "⚠️ 這個瀏覽器不支援直播播放"; return;
+        }
+        const h = new Hls({ liveSyncDurationCount: 4, liveMaxLatencyDurationCount: 9, maxBufferLength: 30, backBufferLength: 30 });
+        hls = h;
+        h.on(Hls.Events.FRAG_LOADED, (_e, d) => { try { const x = d.frag.stats, ms = x.loading.end - x.loading.start; diag.ms = Math.round(ms); diag.kb = Math.round(x.total / 1024); diag.max = Math.max(diag.max, Math.round(ms)); } catch {} });
+        h.on(Hls.Events.ERROR, (_e, d) => {
+          if (d.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) diag.stalls++;
+          else if (d.type === Hls.ErrorTypes.NETWORK_ERROR) diag.neterr++;
+          if (!d.fatal || hls !== h) return;
+          if (d.type === Hls.ErrorTypes.NETWORK_ERROR) h.startLoad();
+          else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) h.recoverMediaError();
+          else { msgEl.className = "tvmsg err"; msgEl.textContent = "⚠️ 直播播放出錯，請重新加入"; }
+        });
+        h.loadSource(src); h.attachMedia(video);
+      } catch { msgEl.className = "tvmsg err"; msgEl.textContent = "⚠️ 直播播放程式載入失敗"; }
+    }
     const volOf = (v) => Math.pow(Math.max(0, Math.min(100, Number(v) || 0)) / 100, 3);
     video.volume = volOf(lsGet("tvvol2", "60"));
     video.muted = lsGet("tvmute") === "1";
@@ -89,18 +130,20 @@ export function mountTheater() {
       clearTimeout(startTimer);
       if (!c || c.status !== "ready") {
         if (!video.paused) video.pause();
-        if (!c && curSrc) { video.removeAttribute("src"); video.load(); curSrc = ""; }
+        if (!c && curSrc) { detach(); video.removeAttribute("src"); video.load(); curSrc = ""; }
         return;
       }
-      const src = srcOf(c);
+      const src = c.live ? liveSrc(c) : srcOf(c);
       if (curSrc !== src) {
         const sameVid = curVid === c.vid;
-        curSrc = src; curVid = c.vid; video.src = src; video.load();
+        curSrc = src; curVid = c.vid;
+        if (c.live) attachLive(src); else { detach(); video.src = src; video.load(); }
         if (!sameVid) ccFor = "";                                      // 換畫質時字幕不用重抓
       }
-      if (video.playbackRate !== (c.rate || 1)) video.playbackRate = c.rate || 1;
+      if (!c.live && video.playbackRate !== (c.rate || 1)) video.playbackRate = c.rate || 1;
       setupCC(c); setupRes(c); askQual(c);
       const go = () => {
+        if (c.live) { if (video.paused) video.play().then(() => { blocked = false; unmute.hidden = true; }).catch(() => { blocked = true; unmute.hidden = false; }); return; }
         const tg = target();
         if (tg < 0) { if (!video.paused) video.pause(); video.currentTime = 0; startTimer = setTimeout(sync, -tg * 1000); return; }   // 還沒到開始時間
         if (video.readyState >= 1 && Math.abs(video.currentTime - tg) > 1.0) video.currentTime = Math.min(tg, (c.dur || tg) - 0.2);
@@ -108,7 +151,7 @@ export function mountTheater() {
           video.play().then(() => { blocked = false; unmute.hidden = true; }).catch(() => { blocked = true; unmute.hidden = false; });
         } else if (!c.playing && !video.paused) video.pause();
       };
-      if (video.readyState >= 1) go(); else video.addEventListener("loadedmetadata", go, { once: true });
+      if (c.live || video.readyState >= 1) go(); else video.addEventListener("loadedmetadata", go, { once: true });
     }
     unmute.addEventListener("click", () => { unmute.hidden = true; blocked = false; sync(); });
     video.addEventListener("waiting", () => { loadEl.hidden = false; loadEl.textContent = "緩衝中…"; });
@@ -179,13 +222,15 @@ export function mountTheater() {
       if (c && document.activeElement !== rateSel) rateSel.value = String(c.rate || 1);
       watchEl.textContent = st.viewers.length ? `👥 ${st.viewers.length}` : "";
       emptyEl.hidden = !!c;
-      if (c && c.status !== "ready") { loadEl.hidden = false; loadEl.textContent = c.status === "error" ? "下載失敗" : `伺服器下載中… ${c.pct || 0}%`; }
+      root.querySelector(".theater").classList.toggle("islive", !!(c && c.live));
+      $(".golive").hidden = !(c && c.live);
+      if (c && c.status !== "ready") { loadEl.hidden = false; loadEl.textContent = c.live ? (c.status === "error" ? "直播連不上" : "連接直播中…") : c.status === "error" ? "下載失敗" : `伺服器下載中… ${c.pct || 0}%`; }
       else if (c && !video.paused) loadEl.hidden = true;
       if (!c) loadEl.hidden = true;
-      nowEl.innerHTML = c ? `▶ <b>${esc(c.title)}</b><small>（${esc(c.by)} 點的）</small>` : (st.log ? `<small>${esc(st.log)}</small>` : "");
+      nowEl.innerHTML = c ? `${c.live ? "🔴" : "▶"} <b>${esc(c.title)}</b><small>（${esc(c.by)} 點的）</small>` : (st.log ? `<small>${esc(st.log)}</small>` : "");
       playBtn.textContent = c && c.playing ? "⏸" : "▶";
       queueEl.innerHTML = st.queue.length ? `<div class="tvqh">接下來（${st.queue.length}）</div>` + st.queue.map((q, i) => `
-        <div class="tvqi"><span class="n">${i + 1}</span><span class="tt">${esc(q.title)}<small>${fmt(q.dur)}・${esc(q.by)}${q.status === "downloading" ? `・下載 ${q.pct}%` : q.status === "ready" ? "・✅ 已就緒" : q.status === "error" ? "・❌ 失敗" : ""}</small></span>
+        <div class="tvqi"><span class="n">${i + 1}</span><span class="tt">${esc(q.title)}<small>${q.live ? "🔴 直播" : fmt(q.dur)}・${esc(q.by)}${q.status === "downloading" ? `・下載 ${q.pct}%` : q.status === "ready" ? "・✅ 已就緒" : q.status === "error" ? "・❌ 失敗" : ""}</small></span>
         ${i ? `<button class="tb up" data-k="${q.key}" title="移到下一部">⤒</button>` : ""}<button class="tb rm" data-k="${q.key}" title="移除">✕</button></div>`).join("") : "";
       queueEl.querySelectorAll(".rm").forEach((b) => b.addEventListener("click", () => send({ t: "tremove", key: b.dataset.k })));
       queueEl.querySelectorAll(".up").forEach((b) => b.addEventListener("click", () => send({ t: "tup", key: b.dataset.k })));
@@ -193,6 +238,8 @@ export function mountTheater() {
     }
     function tick() {
       const c = st && st.cur;
+      if (c && c.live && Date.now() - lastDiag > 10000) { lastDiag = Date.now(); sendDiag(); }
+      if (c && c.live) { timeEl.textContent = hls && Number.isFinite(hls.latency) && hls.latency > 0 ? `🔴 直播（延遲 ${Math.round(hls.latency)} 秒）` : "🔴 直播"; seek.value = 0; return; }
       const dur = c ? c.dur || video.duration || 0 : 0;
       const pos = c ? (c.status === "ready" && video.readyState >= 1 ? video.currentTime : Math.max(0, target())) : 0;
       timeEl.textContent = `${fmt(pos)} / ${fmt(dur)}`;
@@ -201,6 +248,7 @@ export function mountTheater() {
       if (c && c.playing && c.status === "ready" && !video.paused && video.readyState >= 2 && target() > 0 && Math.abs(video.currentTime - target()) > 1.5) video.currentTime = target();
     }
     playBtn.addEventListener("click", () => { const c = st && st.cur; if (!c) return; if (blocked) { unmute.click(); } send({ t: c.playing ? "tpause" : "tplay" }); });
+    $(".golive").addEventListener("click", () => { if (hls && hls.liveSyncPosition) video.currentTime = hls.liveSyncPosition; else if (video.seekable && video.seekable.length) video.currentTime = video.seekable.end(video.seekable.length - 1) - 1; if (video.paused) video.play().catch(() => {}); });
     $(".skip").addEventListener("click", () => { if (st && st.cur) send({ t: "tskip" }); });
     seek.addEventListener("input", () => { seeking = true; });
     seek.addEventListener("change", () => { seeking = false; const c = st && st.cur; if (c && c.dur) send({ t: "tseek", pos: (Number(seek.value) / 1000) * c.dur }); });
@@ -242,7 +290,7 @@ export function mountTheater() {
     const onKey = (e) => { if (e.key === "Escape" && isFs()) exitFs(); };
     document.addEventListener("keydown", onKey);
     $(".tvadd").addEventListener("submit", (e) => { e.preventDefault(); const q = $(".tvq").value.trim(); if (!q) return; send({ t: "tadd", q }); $(".tvq").value = ""; msgEl.className = "tvmsg"; });
-    function cleanup() { document.removeEventListener("fullscreenchange", onFsChange); document.removeEventListener("keydown", onKey); document.body.classList.remove("tv-fs"); closed = true; clearInterval(timer); clearTimeout(startTimer); try { video.pause(); video.removeAttribute("src"); video.load(); } catch {} try { ws && ws.close(); } catch {} }
+    function cleanup() { document.removeEventListener("fullscreenchange", onFsChange); document.removeEventListener("keydown", onKey); document.body.classList.remove("tv-fs"); closed = true; detach(); clearInterval(timer); clearTimeout(startTimer); try { video.pause(); video.removeAttribute("src"); video.load(); } catch {} try { ws && ws.close(); } catch {} }
     $(".back").addEventListener("click", () => { cleanup(); back(); });
     timer = setInterval(tick, 500);
     connect();
