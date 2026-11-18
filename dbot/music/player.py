@@ -76,6 +76,13 @@ class GuildPlayer:
                 await self.restore_status()
                 await self.vc.move_to(channel)
         else:
+            stale = self.guild.voice_client          # 重連卡住時會留下「沒連上但還佔著位置」的殘骸，不清掉就永遠 Already connected
+            if stale is not None:
+                log.warning("清掉殘留的語音連線再重連")
+                try:
+                    await asyncio.wait_for(stale.disconnect(force=True), timeout=10)
+                except Exception:
+                    log.exception("清殘留語音連線失敗")
             await channel.connect(self_deaf=False)   # 不自己拒聽：被當成閒置而移到不活躍頻道的機率較低
 
     def ensure_loop(self):

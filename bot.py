@@ -33,6 +33,8 @@ from dbot.core import channels
 from dbot.money import economy
 from dbot.ai import extras
 from dbot.ai import imagegen
+from dbot.ai import chantools
+from dbot.ai import voicechat
 from dbot.ai import selfhelp
 from dbot.ai import announce
 from dbot.ai import mention
@@ -210,6 +212,15 @@ def load_system_prompt(guild=None) -> str:
     return base + extra
 
 
+def voice_persona() -> str:
+    """語音對話用的人設：只拿 system_prompt.txt 的內容，不帶工具說明（語音對話沒有工具）。"""
+    try:
+        base = SYSTEM_PROMPT_FILE.read_text(encoding="utf-8-sig").strip() or DEFAULT_SYSTEM_PROMPT
+    except FileNotFoundError:
+        base = DEFAULT_SYSTEM_PROMPT
+    return base + f"\n\n現在時間：{datetime.now(TZ).strftime('%Y-%m-%d %A %H:%M')}（台灣時間）。"
+
+
 # ---------------------------------------------------------------- Discord 用戶端
 
 intents = discord.Intents.default()
@@ -271,6 +282,8 @@ music.setup(client, client.tree)
 channels.setup(client, client.tree, state, save_state)
 announce.setup(client, state, save_state)
 models.setup(client, client.tree, state, save_state, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, TZ)
+chantools.setup(client, client.tree, state, save_state, lambda: all_tools(), lambda: datetime.now(TZ).strftime("%Y-%m-%d %A %H:%M"))
+voicechat.setup(client, client.tree, call_model, lambda: voice_persona())
 extras.setup(client, client.tree, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)
 economy.setup(client, client.tree)
 dmlog.setup(client, client.tree)
@@ -563,6 +576,20 @@ def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
     return out
 
 
+def all_tools() -> dict:
+    """機器人目前實際可用的全部工具（名稱 → 定義），給 /頻道工具 挑。有些工具沒開（沒設定畫圖、關掉上網…）就不會出現。"""
+    lst = ([*TOOLS, webimg.TOOL] if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL, actstatus.TOOL, almanac.TOOL,
+           botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL, announce.TOOL, mention.TOOL, pcbuild.TOOL,
+           memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL]
+    if imagegen.enabled():
+        lst += [imagegen.TOOL, imagegen.EDIT_TOOL]
+    if sfxgen.enabled():
+        lst.append(sfxgen.TOOL)
+    if videogen.enabled():
+        lst.append(videogen.TOOL)
+    return {t["function"]["name"]: t for t in lst}
+
+
 
 async def ask_model(conversation: list[dict], on_status=None, msg: discord.Message | None = None,
                     actions: list | None = None) -> str:
@@ -573,6 +600,11 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
         sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點；有個像樣的理由就可以給小數目（幾千～三萬以內），沒理由或亂討就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
     messages = [{"role": "system", "content": sys_text}, *conversation]
     tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL] if (msg is not None and msg.guild and MONEY_ANY_RE.search(recent_user_text(conversation))) or MONEY_RE.search(last_user_text(conversation)) or PAY_RE.search(last_user_text(conversation)) or LOG_RE.search(last_user_text(conversation)) or REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([announce.TOOL] if msg is not None and msg.guild and ANNOUNCE_RE.search(last_user_text(conversation)) else []) + ([mention.TOOL] if msg is not None and msg.guild and MENTION_RE.search(last_user_text(conversation)) else []) + ([pcbuild.TOOL] if PC_RE.search(recent_user_text(conversation, 6)) or (msg is not None and pcbuild.has_recent(msg.author.id)) else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    # 這個頻道有用 /頻道工具 限定工具：只給設定的工具，並換成對應的精簡提示（其他頻道完全不變）
+    ch_cfg = chantools.config_for_current()
+    if ch_cfg is not None:
+        messages[0] = {"role": "system", "content": chantools.system_prompt(ch_cfg)}
+        tools = chantools.pick_tools(ch_cfg)
     nudged = used_action = used_status = draw_nudged = False
     used_card = card_nudged = False   # 用了占卜／命盤工具：回覆要完整解讀，上限放寬
     play_calls = 0  # 這一輪實際呼叫了幾次 music play
