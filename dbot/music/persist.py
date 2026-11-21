@@ -18,7 +18,7 @@ def _snapshot() -> dict:
             return {"title": t.title, "url": t.url, "duration": t.duration, "requester": t.requester}
         tracks = ([{**tr(p.current), "pos": p.elapsed()}] if p.current else []) + [tr(t) for t in p.queue[:100]]
         out[str(gid)] = {"channel": p.vc.channel.id, "text": getattr(p.text_channel, "id", None), "radio": p.radio,
-                         "shuffle": p.shuffle_loop, "recent": p.recent[-10:], "saved": time.time(), "tracks": tracks}
+                         "recent": p.recent[-10:], "saved": time.time(), "tracks": tracks}
     return out
 
 
@@ -71,11 +71,11 @@ async def resume_all(client: discord.Client) -> None:
                         tracks.pop()
                     else:
                         p.resume_offset = pos
-            if not tracks and not e.get("radio") and not e.get("shuffle"):
+            if not tracks and not e.get("radio"):
                 continue
             await p.connect(ch)
             p.queue = tracks
-            p.radio, p.shuffle_loop = bool(e.get("radio")), bool(e.get("shuffle"))
+            p.radio = bool(e.get("radio"))
             p.recent = list(e.get("recent") or [])
             tc = guild.get_channel(int(e["text"])) if e.get("text") else None
             p.text_channel = tc if isinstance(tc, discord.abc.Messageable) else None

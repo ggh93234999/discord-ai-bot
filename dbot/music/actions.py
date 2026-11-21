@@ -1,12 +1,17 @@
-"""動作：點歌、插播、音量、移除、電台、隨機循環、控制。"""
+"""動作：點歌、插播、音量、移除、電台、控制。"""
 
 import asyncio
 import discord
 import random
 from .player import (get_player, players)
-from .tracks import (AVOID_RECENT, DEFAULT_VOLUME, MAX_QUEUE, MAX_VOLUME, REFILL_COUNT, Track, _resolve, fmt_dur, get_volume, history, history_text, pick_random, save_volume, short)
+from .tracks import (AVOID_RECENT, DEFAULT_VOLUME, MAX_QUEUE, MAX_VOLUME, REFILL_COUNT, Track, _resolve, fmt_dur, get_volume, history, history_text, save_volume, short)
 import logging
 log = logging.getLogger("discord-ai-bot.music")
+
+def is_auto(t: Track) -> bool:
+    """電台自己補進來的歌（不是有人點的；🎲 是舊版隨機循環留下的）。"""
+    return str(getattr(t, "requester", "")).startswith(("📻", "🎲"))
+
 
 async def do_play(member: discord.Member, text_channel, query: str, position: str = "end") -> str:
     """position：end＝排到最後；next＝插到下一首；now＝插隊並立刻播（現在這首被跳過）。"""
@@ -38,6 +43,26 @@ async def enqueue_tracks(member: discord.Member, text_channel, tracks: list[Trac
         log.exception("連語音頻道失敗")
         return f"進不了語音頻道（{e}），檢查一下我有沒有「連線」和「說話」權限。"
     player.text_channel = text_channel
+    # 電台自動補的歌：有人點歌就全部切掉，直接播點的歌
+    auto_cur = player.current is not None and is_auto(player.current)
+    dropped = sum(1 for t in player.queue if is_auto(t))
+    if dropped:
+        player.queue = [t for t in player.queue if not is_auto(t)]
+    if auto_cur or dropped:
+        room = tracks[: MAX_QUEUE - len(player.queue)]
+        player.queue[0:0] = room if auto_cur else []
+        if not auto_cur:
+            player.queue.extend(room)
+        if auto_cur:
+            player.last_action = f"🎵 {member.display_name} 點歌，切掉電台：{short(room[0].title, 30)}" if room else None
+            player.skip()
+        player.ensure_loop()
+        asyncio.create_task(player.refresh_panel())
+        t = tracks[0]
+        what = f"播放清單「{pl_title or ''}」共 {len(room)} 首" if (pl_title or len(tracks) > 1) else f"**{t.title}**（{fmt_dur(t.duration)}）"
+        if auto_cur:
+            return f"▶️ 切掉電台，直接播：{what}"
+        return f"➕ 已加入佇列：{what}（自動接的歌先清掉，你點的放完再繼續接）"
     was_idle = player.current is None and not player.queue
     room = tracks[: MAX_QUEUE - len(player.queue)]
     if position in ("next", "now") and not was_idle:
@@ -215,42 +240,11 @@ async def do_radio(member: discord.Member, text_channel, on: bool, seed: str | N
                     return msg
     player.text_channel = text_channel
     player.radio = True
-    player.shuffle_loop = False
     player.last_action = f"📻 {member.display_name} 開啟無限電台"
     player.ensure_loop()
     if player.current:
         asyncio.create_task(player.refresh_panel())
     return ((msg + "\n") if msg else "") + "📻 無限電台開啟：佇列空了會自動接相似的歌，一直放下去。要停就 `/停止` 或 `/電台 關`。"
-
-
-async def do_random(member: discord.Member, text_channel, on: bool) -> str:
-    if not on:
-        p = players.get(member.guild.id)
-        if not p or not p.shuffle_loop:
-            return "隨機循環本來就沒開。"
-        p.shuffle_loop = False
-        p.last_action = f"🎲 {member.display_name} 關閉隨機循環"
-        asyncio.create_task(p.refresh_panel())
-        return "🎲 關閉隨機循環，現有佇列放完就結束。"
-    if not isinstance(member, discord.Member) or not member.voice or not member.voice.channel:
-        return "要先進一個語音頻道，我才知道要去哪裡放。"
-    if not history.get(str(member.guild.id)):
-        return "還沒有播放紀錄可以隨機，先點幾首歌吧。"
-    player = get_player(member.guild)
-    try:
-        await player.connect(member.voice.channel)
-    except Exception as e:
-        log.exception("連語音頻道失敗")
-        return f"進不了語音頻道（{e}），檢查一下我有沒有「連線」和「說話」權限。"
-    player.text_channel = text_channel
-    player.shuffle_loop = True
-    player.last_action = f"🎲 {member.display_name} 開啟隨機循環"
-    if not player.queue and player.current is None:
-        player.queue.extend(pick_random(member.guild.id, REFILL_COUNT, player.recent[-AVOID_RECENT:]))
-    player.ensure_loop()
-    if player.current:
-        asyncio.create_task(player.refresh_panel())
-    return "🎲 開啟隨機循環：會從播放紀錄隨機挑歌一直放，佇列空了自動補。要停就 `/停止` 或 `/隨機循環 關`。"
 
 
 async def do_control(member: discord.Member, action: str) -> str:

@@ -4,7 +4,7 @@
 - 播放面板：一則會自己更新的訊息，顯示正在播放（進度條）、接下來的歌、播完了沒，附控制按鈕
 - 語音頻道狀態：播歌時自動把語音頻道狀態改成「🎶 歌名」，播完／離開時還原
 - 斜線指令：/播放 /插播 /跳過 /暫停 /繼續 /停止 /佇列 /隨機 /移除 /清空佇列
-- 播放紀錄：每首播過的歌記在 play_history.json；/歷史 看紀錄、/隨機循環 從紀錄隨機一直放
+- 播放紀錄：每首播過的歌記在 play_history.json；/歷史 看紀錄
 - AI 工具：music（讓 @機器人 放某某歌 也能用）
 
 需要：伺服器裝 ffmpeg、node；Python 套件 discord.py[voice]、yt-dlp[default]
@@ -72,7 +72,6 @@ from .tracks import (
     history,
     history_text,
     measure_gain,
-    pick_random,
     progress_bar,
     radio_tracks,
     record_history,
@@ -102,7 +101,6 @@ from .actions import (
     do_control,
     do_play,
     do_radio,
-    do_random,
     do_remove,
     do_volume,
     enqueue_tracks,
@@ -212,15 +210,6 @@ def setup(client: discord.Client, tree: app_commands.CommandTree):
         await interaction.response.defer(thinking=True)
         on = (開關.value if 開關 else "on") == "on"
         await interaction.followup.send(await do_radio(interaction.user, interaction.channel, on, 起點))
-
-    @tree.command(name="隨機循環", description="懶得選歌？從播放紀錄隨機一直放，佇列空了自動補")
-    @app_commands.describe(開關="開 或 關")
-    @app_commands.choices(開關=[app_commands.Choice(name="開", value="on"), app_commands.Choice(name="關", value="off")])
-    @app_commands.guild_only()
-    async def cmd_random(interaction: discord.Interaction, 開關: app_commands.Choice[str] = None):
-        await interaction.response.defer(thinking=True)
-        on = (開關.value if 開關 else "on") == "on"
-        await interaction.followup.send(await do_random(interaction.user, interaction.channel, on))
 
     @tree.command(name="移除", description="從佇列移除某一首歌（編號看播放面板）")
     @app_commands.describe(歌曲="佇列編號（例如 3）或歌名關鍵字")

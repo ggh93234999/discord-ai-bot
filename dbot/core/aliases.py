@@ -36,8 +36,6 @@ TABLE: dict[str, tuple[str, str, dict[str, tuple[str, str]]]] = {
     "歷史": ("history", "Show the play history (recently played songs)", {}),
     "電台": ("radio", "Endless autoplay: keeps queueing similar songs, no need to pick (optional starting song)",
            {"開關": ("mode", "on or off"), "起點": ("seed", "Starting song (default: continue from the current one)")}),
-    "隨機循環": ("randomloop", "Too lazy to pick? Play random songs from the history on repeat",
-             {"開關": ("mode", "on or off")}),
     "開頻道": ("newchannel", "Create a new text or voice channel",
             {"名稱": ("name", "Channel name"),
              "類型": ("kind", "Text or voice"),

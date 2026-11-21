@@ -1,7 +1,7 @@
 """給 AI 呼叫的音樂工具定義與執行。"""
 
 import discord
-from .actions import (do_control, do_play, do_radio, do_random, do_remove, do_volume)
+from .actions import (do_control, do_play, do_radio, do_remove, do_volume)
 from .player import (players)
 
 TOOL = {
@@ -19,11 +19,11 @@ TOOL = {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["play", "skip", "pause", "resume", "stop", "queue", "shuffle", "remove", "clear", "history", "random_on", "random_off", "volume", "radio_on", "radio_off"],
+                    "enum": ["play", "skip", "pause", "resume", "stop", "queue", "shuffle", "remove", "clear", "history", "volume", "radio_on", "radio_off"],
                     "description": ("play=點歌加入佇列；skip=跳過現在這首；pause=暫停；resume=繼續；stop=停止並離開；"
                                     "queue=看正在放什麼、接下來的歌、播完了沒；shuffle=打亂佇列；"
                                     "remove=從佇列移除某一首（用 index 或 query 指定）；clear=清空佇列（現在這首放完）；"
-                                    "history=看播放紀錄；random_on=使用者懶得選歌／說『隨便放』『從紀錄隨機循環』時，開啟從播放紀錄隨機一直放；random_off=關閉隨機循環；radio_on=使用者要『無限放歌』『一直隨便放』『電台』『自動接歌』時，開啟無限電台（可用 query 給起點歌，不給就接目前這首），不限於播放紀錄、會自動接相似的新歌；radio_off=關閉電台；volume=調音量（用 level，1~150 的百分比，100 是正常；不給 level 就是查現在音量）"),
+                                    "history=看播放紀錄；radio_on=（電台預設就是開的，一般點歌不用另外開；使用者之前關掉才需要）使用者要『隨便放』『無限放歌』『一直隨便放』『電台』『自動接歌』時，開啟無限電台（可用 query 給起點歌，不給就接目前這首），不限於播放紀錄、會自動接相似的新歌；radio_off=關閉電台；volume=調音量（用 level，1~150 的百分比，100 是正常；不給 level 就是查現在音量）"),
                 },
                 "position": {"type": "string", "enum": ["end", "next", "now"], "description": "action=play 時：end=排到最後（預設）；next=插到下一首（使用者說『插歌』『下一首放』『插隊』）；now=立刻播、跳過現在這首（使用者說『現在就放』『馬上播』）"},
                 "level": {"type": "integer", "description": "action=volume 時：音量百分比，1~150，100 是正常大小。使用者說『大聲一點』就比現在大一些，『小聲一點』就小一些（先用 music_status 或 volume 不帶 level 查現在多少）"},
@@ -80,8 +80,6 @@ async def run_tool(msg: discord.Message, args: dict) -> str:
         return await do_volume(member, int(lv) if lv is not None else None)
     if action in ("radio_on", "radio_off"):
         return await do_radio(member, msg.channel, action == "radio_on", (args.get("query") or "").strip() or None)
-    if action in ("random_on", "random_off"):
-        return await do_random(member, msg.channel, action == "random_on")
     if action == "remove":
         target = args.get("index") if args.get("index") is not None else args.get("query")
         return await do_remove(member, target)

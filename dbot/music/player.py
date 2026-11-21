@@ -4,7 +4,7 @@ from dbot.core import vstatus
 import asyncio
 import discord
 import time
-from .tracks import (AVOID_RECENT, COLOR_DONE, COLOR_LEFT, COLOR_PAUSED, COLOR_PLAYING, DEFAULT_VOLUME, FFMPEG_BEFORE, IDLE_LEAVE_SECONDS, MAX_VOLUME, PANEL_REFRESH_SECONDS, REFILL_COUNT, Track, _stream_info, fmt_dur, fmt_pos, get_volume, measure_gain, pick_random, progress_bar, radio_tracks, record_history, save_volume, short)
+from .tracks import (AVOID_RECENT, COLOR_DONE, COLOR_LEFT, COLOR_PAUSED, COLOR_PLAYING, DEFAULT_VOLUME, FFMPEG_BEFORE, IDLE_LEAVE_SECONDS, MAX_VOLUME, PANEL_REFRESH_SECONDS, REFILL_COUNT, Track, _stream_info, fmt_dur, fmt_pos, get_volume, measure_gain, progress_bar, radio_tracks, record_history, save_volume, short)
 import logging
 log = logging.getLogger("discord-ai-bot.music")
 
@@ -21,8 +21,8 @@ class GuildPlayer:
         self.view = PanelView(self)
         self.last_action: str | None = None
         self.finished_at: float | None = None
-        self.radio = False  # 無限電台：佇列空了就用最後一首當種子，從 YouTube 推薦補歌
-        self.shuffle_loop = False  # 隨機循環：佇列空了就從播放紀錄補歌
+        self.radio = True   # 無限電台（預設開）：佇列空了就用最後一首當種子，從 YouTube 推薦補歌；/電台 關 才關
+        self._skip_loading = False
         self.recent: list[str] = []
         self.resume_offset = 0   # 重啟後接回去時，第一首要從第幾秒開始
         self._next = asyncio.Event()
@@ -84,6 +84,7 @@ class GuildPlayer:
                 except Exception:
                     log.exception("清殘留語音連線失敗")
             await channel.connect(self_deaf=False)   # 不自己拒聽：被當成閒置而移到不活躍頻道的機率較低
+            self.radio = True   # 每次新進語音頻道都回到預設：電台開著（上一輪關掉的不延續）
 
     def ensure_loop(self):
         if self._task is None or self._task.done():
@@ -160,8 +161,6 @@ class GuildPlayer:
         foot = self.last_action or "⏯️ 暫停/繼續　⏭️ 跳過　🔀 隨機　⏹️ 停止"
         if self.radio:
             foot = "📻 無限電台中（/電台 關 可關閉）· " + foot
-        if self.shuffle_loop:
-            foot = "🎲 隨機循環中（/隨機循環 關 可關閉）· " + foot
         if self.volume != DEFAULT_VOLUME:
             foot = f"🔊 {self.volume}% · " + foot
         e.set_footer(text=foot)
@@ -236,12 +235,6 @@ class GuildPlayer:
                                 await self.text_channel.send("📻 電台找不到可接的歌，已關閉無限播放。")
                             except discord.HTTPException:
                                 pass
-                if not self.queue and self.shuffle_loop and self.connected:
-                    picks = pick_random(self.guild.id, REFILL_COUNT, self.recent[-AVOID_RECENT:])
-                    if picks:
-                        self.queue.extend(picks)
-                    else:
-                        self.shuffle_loop = False
                 if not self.queue:
                     # 播完了：還原狀態、面板顯示「播完了」，等一陣子沒人點歌就離開
                     self.current = None
@@ -265,6 +258,7 @@ class GuildPlayer:
 
                 track = self.queue.pop(0)
                 self.current = track
+                self._skip_loading = False
                 try:
                     info = await asyncio.to_thread(_stream_info, track.url)
                     headers = "".join(f"{k}: {v}\r\n" for k, v in (info.get("http_headers") or {}).items())
@@ -280,9 +274,14 @@ class GuildPlayer:
                     self.current = None
                     continue
 
-                if not self.connected:
+                if not self.connected or self._skip_loading:   # 載入中就被跳過（例如有人點歌切掉電台）：這首不放
+                    self._skip_loading = False
+                    try:
+                        source.cleanup()
+                    except Exception:
+                        pass
                     self.current = None
-                    continue  # 回到上面，會走「離開」流程
+                    continue  # 沒連線的話回到上面會走「離開」流程
                 self._next.clear()
                 loop = asyncio.get_running_loop()
 
@@ -309,6 +308,9 @@ class GuildPlayer:
         if self.vc and (self.vc.is_playing() or self.vc.is_paused()):
             self.vc.stop()  # 觸發 after → 下一首
             return True
+        if self.current is not None:   # 還在抓音訊、沒開始放：記下來，抓好就直接丟掉換下一首
+            self._skip_loading = True
+            return True
         return False
 
     def pause(self) -> bool:
@@ -327,7 +329,6 @@ class GuildPlayer:
         return False
 
     async def stop(self):
-        self.shuffle_loop = False
         self.radio = False
         self.queue.clear()
         await self.restore_status()
@@ -371,8 +372,6 @@ class GuildPlayer:
         lines = [f"🔊 音量 {self.volume}%"]
         if self.radio:
             lines.append("📻 無限電台開啟中（佇列空了會自動接相似的歌）。")
-        if self.shuffle_loop:
-            lines.append("🎲 隨機循環開啟中（佇列空了會自動從播放紀錄補歌）。")
         if self.current:
             state = "⏸️ 暫停中" if self.vc.is_paused() else "▶️ 正在播放"
             lines.append(f"{state}：{self.current.title}（{fmt_pos(self.elapsed())} / {fmt_dur(self.current.duration)}）"

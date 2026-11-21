@@ -31,7 +31,7 @@ DEFAULT_VOLUME = 100       # 百分比
 MAX_VOLUME = 150           # 超過 100 可能破音
 VOLUME_STEP = 10           # 面板 🔉🔊 按鈕每次調多少
 MAX_HISTORY = 300          # 每個伺服器最多記幾首
-REFILL_COUNT = 5           # 隨機循環時，佇列空了一次補幾首
+REFILL_COUNT = 5           # 電台：佇列空了一次補幾首
 AVOID_RECENT = 10          # 隨機時避開最近播過的幾首
 
 COLOR_PLAYING = 0x57F287
@@ -90,12 +90,7 @@ def record_history(guild_id: int, t: "Track") -> None:
         log.warning("存播放紀錄失敗：%r", e)
 
 
-def pick_random(guild_id: int, n: int, avoid: list[str]) -> list["Track"]:
-    """從播放紀錄隨機挑 n 首（避開最近播過的）。"""
-    lst = history.get(str(guild_id), [])
-    pool = [h for h in lst if h["url"] not in avoid] or lst
-    picks = random.sample(pool, min(n, len(pool)))
-    return [Track(h["title"], h["url"], h.get("duration"), "🎲 歷史隨機") for h in picks]
+
 
 
 def _video_id(url: str) -> str | None:
