@@ -1,0 +1,618 @@
+{
+ "a_archer_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 238,
+  "mode": "once",
+  "w": 171
+ },
+ "a_archer_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 201,
+  "mode": "ping",
+  "w": 168
+ },
+ "a_archer_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 204,
+  "mode": "loop",
+  "w": 183
+ },
+ "a_arena_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 201,
+  "mode": "ping",
+  "w": 88
+ },
+ "a_assassin_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 129,
+  "mode": "ping",
+  "w": 174
+ },
+ "a_bamboo_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 332,
+  "mode": "once",
+  "w": 357
+ },
+ "a_bamboo_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 300,
+  "mode": "ping",
+  "w": 236
+ },
+ "a_bandit_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 163,
+  "mode": "ping",
+  "w": 176
+ },
+ "a_bank_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 115
+ },
+ "a_bat_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 167,
+  "mode": "ping",
+  "w": 202
+ },
+ "a_bd_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 241,
+  "mode": "once",
+  "w": 330
+ },
+ "a_bd_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 207,
+  "mode": "ping",
+  "w": 213
+ },
+ "a_bd_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 225,
+  "mode": "loop",
+  "w": 204
+ },
+ "a_bird_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 170,
+  "mode": "ping",
+  "w": 175
+ },
+ "a_corpse_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 337,
+  "mode": "once",
+  "w": 430
+ },
+ "a_corpse_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 309,
+  "mode": "ping",
+  "w": 239
+ },
+ "a_cultist_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 177,
+  "mode": "ping",
+  "w": 161
+ },
+ "a_fcat_idle": {
+  "base": 120,
+  "f": 12,
+  "fps": 9,
+  "h": 132,
+  "mode": "ping",
+  "w": 112
+ },
+ "a_fcat_walk": {
+  "base": 120,
+  "f": 12,
+  "fps": 11,
+  "h": 99,
+  "mode": "loop",
+  "w": 127
+ },
+ "a_fchick_idle": {
+  "base": 120,
+  "f": 12,
+  "fps": 9,
+  "h": 117,
+  "mode": "ping",
+  "w": 129
+ },
+ "a_fchick_walk": {
+  "base": 120,
+  "f": 12,
+  "fps": 11,
+  "h": 123,
+  "mode": "loop",
+  "w": 122
+ },
+ "a_fdog_idle": {
+  "base": 120,
+  "f": 12,
+  "fps": 9,
+  "h": 116,
+  "mode": "ping",
+  "w": 134
+ },
+ "a_fdog_walk": {
+  "base": 120,
+  "f": 12,
+  "fps": 11,
+  "h": 97,
+  "mode": "loop",
+  "w": 124
+ },
+ "a_firecrow_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 170,
+  "mode": "ping",
+  "w": 180
+ },
+ "a_fireimp_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 205,
+  "mode": "ping",
+  "w": 199
+ },
+ "a_fox_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 311,
+  "mode": "once",
+  "w": 501
+ },
+ "a_fox_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 300,
+  "mode": "ping",
+  "w": 298
+ },
+ "a_foxspirit_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 170,
+  "mode": "ping",
+  "w": 121
+ },
+ "a_ft_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 202,
+  "mode": "once",
+  "w": 224
+ },
+ "a_ft_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 205,
+  "mode": "ping",
+  "w": 204
+ },
+ "a_ft_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 201,
+  "mode": "loop",
+  "w": 200
+ },
+ "a_general_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 154,
+  "mode": "ping",
+  "w": 173
+ },
+ "a_golem_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 172,
+  "mode": "ping",
+  "w": 143
+ },
+ "a_guide_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 205,
+  "mode": "ping",
+  "w": 135
+ },
+ "a_hare_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 172,
+  "mode": "ping",
+  "w": 147
+ },
+ "a_herb_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 96
+ },
+ "a_iceghost_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 172,
+  "mode": "ping",
+  "w": 128
+ },
+ "a_jx_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 233,
+  "mode": "once",
+  "w": 375
+ },
+ "a_jx_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 207
+ },
+ "a_jx_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 201,
+  "mode": "loop",
+  "w": 212
+ },
+ "a_lavagolem_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 176,
+  "mode": "ping",
+  "w": 131
+ },
+ "a_lord_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 300,
+  "mode": "once",
+  "w": 353
+ },
+ "a_lord_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 300,
+  "mode": "ping",
+  "w": 298
+ },
+ "a_ly_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 231,
+  "mode": "once",
+  "w": 214
+ },
+ "a_ly_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 155
+ },
+ "a_ly_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 202,
+  "mode": "loop",
+  "w": 171
+ },
+ "a_mage_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 236,
+  "mode": "once",
+  "w": 302
+ },
+ "a_mage_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 284
+ },
+ "a_mage_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 200,
+  "mode": "loop",
+  "w": 285
+ },
+ "a_monkey_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 189,
+  "mode": "ping",
+  "w": 183
+ },
+ "a_post_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 182
+ },
+ "a_qilin_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 301,
+  "mode": "once",
+  "w": 623
+ },
+ "a_qilin_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 313,
+  "mode": "ping",
+  "w": 328
+ },
+ "a_rat_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 133,
+  "mode": "ping",
+  "w": 180
+ },
+ "a_salamander_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 108,
+  "mode": "ping",
+  "w": 185
+ },
+ "a_scorp_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 137,
+  "mode": "ping",
+  "w": 170
+ },
+ "a_shadow_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 154,
+  "mode": "ping",
+  "w": 187
+ },
+ "a_smith_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 128
+ },
+ "a_snake_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 161,
+  "mode": "ping",
+  "w": 184
+ },
+ "a_snow_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 419,
+  "mode": "once",
+  "w": 681
+ },
+ "a_snow_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 302,
+  "mode": "ping",
+  "w": 236
+ },
+ "a_snowfox_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 133,
+  "mode": "ping",
+  "w": 170
+ },
+ "a_ss_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 229,
+  "mode": "once",
+  "w": 281
+ },
+ "a_ss_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 163
+ },
+ "a_ss_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 200,
+  "mode": "loop",
+  "w": 170
+ },
+ "a_sword_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 237,
+  "mode": "once",
+  "w": 291
+ },
+ "a_sword_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 200,
+  "mode": "ping",
+  "w": 190
+ },
+ "a_sword_walk": {
+  "base": 200,
+  "f": 12,
+  "fps": 11,
+  "h": 206,
+  "mode": "loop",
+  "w": 191
+ },
+ "a_terra_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 163,
+  "mode": "ping",
+  "w": 170
+ },
+ "a_tiger_atk": {
+  "base": 300,
+  "f": 12,
+  "fps": 16,
+  "h": 326,
+  "mode": "once",
+  "w": 491
+ },
+ "a_tiger_idle": {
+  "base": 300,
+  "f": 12,
+  "fps": 9,
+  "h": 300,
+  "mode": "ping",
+  "w": 356
+ },
+ "a_ts_atk": {
+  "base": 200,
+  "f": 12,
+  "fps": 16,
+  "h": 203,
+  "mode": "once",
+  "w": 215
+ },
+ "a_ts_idle": {
+  "base": 200,
+  "f": 12,
+  "fps": 9,
+  "h": 210,
+  "mode": "ping",
+  "w": 141
+ },
+ "a_wisp_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 171,
+  "mode": "ping",
+  "w": 107
+ },
+ "a_wolf_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 192,
+  "mode": "ping",
+  "w": 245
+ },
+ "a_yeti_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 171,
+  "mode": "ping",
+  "w": 170
+ },
+ "a_zombie_idle": {
+  "base": 170,
+  "f": 12,
+  "fps": 9,
+  "h": 180,
+  "mode": "ping",
+  "w": 157
+ }
+}

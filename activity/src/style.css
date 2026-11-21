@@ -412,7 +412,8 @@ body.pk-myturn .game.poker{background:#16296b}
 .card.wide[data-g="pcbuild"], .card.wide[data-g="pcbuild"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/pcbuild.jpg") right center/cover no-repeat; }
 .card.wide[data-g="pcmoves"], .card.wide[data-g="pcmoves"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/pcmoves.jpg") right center/cover no-repeat; }
 .card.wide[data-g="airflow"], .card.wide[data-g="airflow"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 38%, rgba(236,230,211,.32) 60%, rgba(236,230,211,0) 80%), #e9e2cf url("./menu-art/airflow.jpg") right center/cover no-repeat; }
-.card.wide[data-g="farm"]:hover, .card.wide[data-g="forge"]:hover { border-color:#b5342a; }
+.card.wide[data-g="mmo"], .card.wide[data-g="mmo"]:hover { background:linear-gradient(90deg, rgba(236,230,211,.95) 0%, rgba(236,230,211,.84) 36%, rgba(236,230,211,.25) 58%, rgba(236,230,211,0) 76%), #e9e2cf url("./menu-art/mmo.jpg") right center/cover no-repeat; }
+.card.wide[data-g="farm"]:hover, .card.wide[data-g="forge"]:hover, .card.wide[data-g="mmo"]:hover { border-color:#b5342a; }
 .card.wide[data-g="theater"], .card.wide[data-g="theater"]:hover { background:#e9e2cf url("./theater-ink.svg") right center/cover no-repeat; }
 .card.wide[data-g="gachacards"], .card.wide[data-g="gachacards"]:hover { background:#ece6d3 url("./gacha-ui/menu-bg.jpg") right center/cover no-repeat; }
 .card.wide[data-g="gachacards"]:hover { border-color:#b5342a; }

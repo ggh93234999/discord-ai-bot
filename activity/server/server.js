@@ -10,6 +10,7 @@ import { createVb, stepVb, snapshotVb, WIN } from "./games/action/vb.js";
 import { WAGERS, wagerView, makeOffer, clearOffer, acceptOffer, settleWager, onPlayerLeft, reclaimSeat, seatReserved, recoverEscrow } from "./wager.js";
 import { MULTI_GAMES, joinMulti, handleMulti, leaveMulti, tickMulti } from "./games/action/multi.js";
 import { handleFarm, recoverFarmPending } from "./games/life/farm.js";
+import { handleMmo, mmoClose, mmoSave, recoverMmoPending } from "./games/mmo/world.js";
 import { handleGacha, handleGachaBoard } from "./games/life/gacha.js";
 import { handleGallery, serveGallery } from "./media/gallery.js";
 import { handlePc, startPc } from "./pcbuild/pcbuild.js";
@@ -281,6 +282,7 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer, path: "/ws", maxPayload: 4096 });
 recoverEscrow().catch((e) => console.log("escrow 還原失敗", e.message));
 recoverFarmPending().catch((e) => console.log("農場補發失敗", e.message));
+recoverMmoPending().catch((e) => console.log("江湖補發失敗", e.message));
 recoverCasinoEscrow().catch((e) => console.log("賭場 escrow 還原失敗", e.message));
 httpServer.listen(PORT, "127.0.0.1");
 startPc();
@@ -350,6 +352,7 @@ wss.on("connection", (ws, req) => {
     if (m.t === "gl") { handleGallery(ws, m).catch((e) => console.log("圖創區錯誤", e && e.message)); return; }
     if (m.t === "gboard") { handleGachaBoard(ws, m); return; }
     if (m.t === "gc") { handleGacha(ws, m).catch((e) => console.log("卡冊錯誤", e && e.message)); return; }
+    if (m.t === "mo") { handleMmo(ws, m).catch((e) => console.log("江湖錯誤", e && e.stack)); return; }
     if (m.t === "fm") { handleFarm(ws, m).catch((e) => console.log("農場錯誤", e && e.message)); return; }
     if (m.t === "clist") { send(ws, { t: "clist", rooms: [...listRooms(), ...listBoardRooms()] }); return; }     // 旁觀大廳：賭場／牌桌＋棋類
     if (typeof m.t === "string" && /^(cjoin|cmode|creset|cplay|cbj|cstone|chorse|clist|clogq|fget|fforge|fsell|fboard)$/.test(m.t)) { handleCasino(ws, m); return; }
@@ -468,6 +471,7 @@ wss.on("connection", (ws, req) => {
     avalonClose(ws);
     tetrisClose(ws);
     theaterClose(ws);
+    mmoClose(ws);
     if (ws.multi) { leaveMulti(ws); return; }
     const room = ws.room;
     if (!room) return;

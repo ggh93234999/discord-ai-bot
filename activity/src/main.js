@@ -10,6 +10,7 @@ import { mountCasino } from "./casino.js";
 import { mountBoard } from "./chessui.js";
 import { mountPinball } from "./pinball.js";
 import { mountFactory } from "./factory.js";
+import { mountMmo } from "./mmo/mmo.js";
 import { mountPoker } from "./poker.js";
 import { mountMahjong } from "./mahjong.js";
 import { mountBridge } from "./bridge.js";
@@ -91,7 +92,7 @@ setInterval(() => presSend(), 60000);
 
 // cat：選單分類；players：人數標籤
 const CATS = [
-  { id: "life", icon: "🌱", name: "經營", note: "獨立玩法：種菜、鍛造、卡冊" },
+  { id: "life", icon: "🌱", name: "經營", note: "獨立玩法：水墨江湖、卡冊、種菜、鍛造" },
   { id: "casino", icon: "🎰", name: "賭場", note: "1 人對莊，練習幣或真代幣，每個遊戲裡都有 📖 規則" },
   { id: "table", icon: "🀄", name: "牌桌", note: "多人牌類與桌遊，可加電腦補位" },
   { id: "board", icon: "♟️", name: "棋類", note: "雙人對戰，可以對賭代幣" },
@@ -126,6 +127,7 @@ const GAMES = [
   { id: "airflow", cat: "tool", wide: true, icon: "🌬️", name: "機箱風道熱像", players: "不限（個人實驗）", desc: "3D 即時模擬機殼裡的氣流與溫度：點風扇切換進排風、換散熱器與側板，看 CPU／GPU 溫度怎麼變", mount: mountAirflow },
   { id: "theater", cat: "media", wide: true, icon: "📺", name: "一起看影片", players: "不限", desc: "貼 YouTube 連結或打關鍵字，房間裡的人同步播放、暫停、拖進度", mount: mountTheater() },
   { id: "gallery", cat: "media", wide: true, icon: "🎨", name: "圖創區", players: "不限（每個伺服器一份）", desc: "用 AI 畫圖、分類收藏，也能請大笨bot畫；圖只放在這個頁面，不會傳到 Discord", mount: mountGallery },
+  { id: "mmo", cat: "life", wide: true, icon: "⚔️", name: "水墨江湖", players: "多人連線（全服同一個世界）", desc: "水墨風 MMORPG：七張地圖打怪升級、三職業六種轉職、組隊打王、鎖妖塔副本、擂台切磋、鍛造強化，銀兩可以在錢莊跟代幣互換", mount: mountMmo },
   { id: "gachacards", cat: "life", wide: true, icon: "🎴", name: "水墨卡冊", players: "1 人（個人收藏）", desc: "300 張水墨風卡牌：東方 100、西方 100、原創虛構 50、異想天開 50（幻獸、人物、器物、風景），可以抽卡、收集、升星，也能派卡片出去探險賺墨點", mount: mountGachaCards },
   { id: "farm", cat: "life", wide: true, icon: "🌱", name: "種菜", players: "1 人（可拜訪）", desc: "作物照真實時間長大，收成賣代幣；成熟的菜 5 分鐘後朋友可以來偷", mount: mountFarm },
   { id: "forge", cat: "life", wide: true, icon: "⚒️", name: "鍛造", players: "1 人", desc: "每階付鍛造費，可能劍碎；賣劍拿錢，共 100 階", mount: mountCasino("forge") },
