@@ -58,14 +58,19 @@ export const MOB_ART = {
   salamander: ["m_salamander", 1.7, 0.9], firecrow: ["m_firecrow", 1.5, 1.2], lavagolem: ["m_lavagolem", 2.0, 2.2], fireimp: ["m_fireimp", 1.2, 1.5],
   cultist: ["m_cultist", 1.4, 1.9], bat: ["m_bat", 1.6, 1.1], shadow: ["m_shadow", 1.5, 1.9], general: ["m_general", 1.8, 2.3], foxspirit: ["m_foxspirit", 1.4, 1.9],
   snow: ["b_snow", 3.6, 4.4], qilin: ["b_qilin", 4.4, 3.4], lord: ["b_lord", 3.0, 4.4], fox: ["b_fox", 4.6, 3.6],
+  shrimp: ["m_shrimp", 1.4, 1.8], crab: ["m_crab", 1.9, 1.5], merman: ["m_merman", 1.5, 1.95], yaksha: ["m_yaksha", 1.5, 1.95], dragon: ["b_dragon", 3.6, 4.6],
+  crane: ["m_crane", 1.7, 1.8], ape: ["m_ape", 1.6, 1.9], jadegolem: ["m_jadegolem", 1.9, 2.2], daoist: ["m_daoist", 1.4, 1.95], kaiming: ["b_kaiming", 4.6, 3.6],
+  ghostsoldier: ["m_ghostsoldier", 1.4, 1.95], oxhead: ["m_oxhead", 1.6, 2.15], horseface: ["m_horseface", 1.6, 2.15], wraith: ["m_wraith", 1.4, 1.9], yama: ["b_yama", 3.2, 4.4],
+  soldier: ["m_soldier", 1.4, 1.95], leigong: ["m_leigong", 1.7, 1.95], tianjiang: ["m_tianjiang", 1.6, 2.15], jinjia: ["m_jinjia", 2.0, 2.45], erlang: ["b_erlang", 3.6, 4.4],
 };
-export const FLOAT = { bird: 0.55, wisp: 0.45, iceghost: 0.4, firecrow: 0.55, bat: 0.55 };
-export const NPC_ART = { smith: "n_smith", herb: "n_herb", bank: "n_bank", guide: "n_guide", post: "n_post", stone: "e_stone", tower: "n_tower", arena: "n_arena", store: "n_store", bounty: "n_bounty", inn: "n_inn", temple: "n_temple", casino: "n_casino", rank: "d_stele" };
-export const SKILL_ART = Object.fromEntries("sweep thrust guard qi cleave whirl roar leap fire ice heal thunder dragon seal shield inferno triple pierce gale rain spread swallow poison net yujian guanghan wanjian zhanyue mingwang bawang zhenyao taiji wulei sanmei fenghuang huohai chuanyun yingyan liuxing lianhuan yingbu duwu".split(" ").map((k) => [k, "s_" + k]));
+export const FLOAT = { bird: 0.55, wisp: 0.45, iceghost: 0.4, firecrow: 0.55, bat: 0.55, crane: 0.45, wraith: 0.4, leigong: 0.4 };
+export const NPC_ART = { smith: "n_smith", herb: "n_herb", bank: "n_bank", guide: "n_guide", post: "n_post", stone: "e_stone", tower: "n_tower", arena: "n_arena", store: "n_store", bounty: "n_bounty", inn: "n_inn", temple: "n_temple", casino: "n_casino", rank: "d_stele", dungeon: "e_portal", exit: "e_portal" };
+export const SKILL_ART = Object.fromEntries("sweep thrust guard qi cleave whirl roar leap fire ice heal thunder dragon seal shield inferno triple pierce gale rain spread swallow poison net yujian guanghan wanjian zhanyue mingwang bawang zhenyao taiji wulei sanmei fenghuang huohai chuanyun yingyan liuxing lianhuan yingbu duwu jianyi wuwo qianzhan feijian jianzhen zhuxie kaitian bati duanyue xuewu shura tulu shenlei jiejie leiyu shenjiang quxie wanling yanlong baoyan fencheng guihuo zuzhou huangquan guanri shenyan luori baolie huoyu pojun yingdun jueying qianying paotai dilei qianji".split(" ").map((k) => [k, "s_" + k]));
 export function itemArt(it) {
   if (!it) return "";
   if (it.p) return it.p.startsWith("hp") ? "i_hp" : it.p.startsWith("mp") ? "i_mp" : it.p === "tp" ? "i_tp" : "i_" + it.p;
   if (it.s === "weapon") return it.c === "mage" ? "i_staff" : it.c === "archer" ? "i_bow" : "i_sword";
+  if (["helm", "belt", "boots", "ring"].includes(it.s)) return "i_" + it.s;
   return it.s === "armor" ? "i_armor" : "i_acc";
 }
 // 等素材都載好（最多等 ms 毫秒），避免一進場景樹石還是空的

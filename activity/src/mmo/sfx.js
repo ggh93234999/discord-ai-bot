@@ -105,6 +105,10 @@ const AMB = {
   demon: { bed: { f: 240, q: 0.7, v: 0.07, lfo: 0.05 }, drone: [49, 73.5], deco: "drum", every: [4000, 9000] },
   tower: { bed: { f: 360, q: 0.9, v: 0.07, lfo: 0.04 }, drone: [58, 87], deco: "eerie", every: [5000, 10000] },
   arena: { bed: { f: 800, q: 0.4, v: 0.06, lfo: 0.2 }, deco: "drum", every: [2500, 5000] },
+  sea: { bed: { f: 420, q: 0.5, v: 0.12, lfo: 0.07 }, drone: [36, 54], deco: "chime", every: [6000, 12000] },
+  kunlun: { bed: { f: 1200, q: 1.2, v: 0.09, lfo: 0.1, type: "bandpass" }, deco: "hawk", every: [7000, 15000] },
+  hell: { bed: { f: 220, q: 0.8, v: 0.08, lfo: 0.04 }, drone: [45, 67.5], deco: "eerie", every: [4000, 9000] },
+  heaven: { bed: { f: 900, q: 0.5, v: 0.06, lfo: 0.12 }, drone: [110, 165], deco: "chime", every: [5000, 10000] },
 };
 let curTheme = "", amb = null;
 function stopAmb() {

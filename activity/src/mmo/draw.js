@@ -16,6 +16,10 @@ const THEME = {
   demon: { base: "#d8ccbc", wash: "rgba(96,20,20,.12)", grass: "rgba(48,30,28,.34)" },
   tower: { base: "#d9d3c6", wash: "rgba(80,60,110,.12)", grass: "rgba(50,44,60,.32)" },
   arena: { base: "#e9e1cb", wash: "rgba(140,110,70,.08)", grass: "rgba(60,72,48,.30)" },
+  sea: { base: "#dfe4de", wash: "rgba(40,96,120,.13)", grass: "rgba(40,80,88,.30)" },
+  kunlun: { base: "#e6e8de", wash: "rgba(70,110,96,.10)", grass: "rgba(56,84,64,.34)" },
+  hell: { base: "#cfc7bd", wash: "rgba(60,30,60,.15)", grass: "rgba(60,36,44,.34)" },
+  heaven: { base: "#f1ede2", wash: "rgba(190,160,80,.10)", grass: "rgba(140,120,70,.22)" },
 };
 const NPC_GLYPH = { smith: "鐵", herb: "藥", bank: "錢", guide: "書", post: "驛", tower: "塔", arena: "擂" };
 
@@ -56,7 +60,7 @@ export function renderMap(map, A = {}) {
     const n = Math.ceil(cv.width * cv.height / (SZ * SZ * 0.32)), G = rng(w * 7 + h * 3 + 1);
     for (let i = 0; i < n; i++) {
       const x = G() * cv.width, y = G() * cv.height, k = 0.75 + G() * 0.6;
-      g.globalAlpha = ({ bamboo: 0.26, mount: 0.3, tomb: 0.36, snow: 0.32, fire: 0.36, demon: 0.36, tower: 0.32 }[theme] || 0.25) * (0.6 + G() * 0.4);
+      g.globalAlpha = ({ bamboo: 0.26, mount: 0.3, tomb: 0.36, snow: 0.32, fire: 0.36, demon: 0.36, tower: 0.32, sea: 0.32, kunlun: 0.28, hell: 0.38, heaven: 0.22 }[theme] || 0.25) * (0.6 + G() * 0.4);
       g.save(); g.translate(x, y); g.rotate(G() * Math.PI * 2); g.drawImage(st, -SZ * k / 2, -SZ * k / 2, SZ * k, SZ * k); g.restore();
     }
     g.restore();
@@ -82,6 +86,8 @@ export function renderMap(map, A = {}) {
     if (theme === "fire" && R() < 0.05) crack(g, px + R() * TS, py + R() * TS, R, "rgba(190,70,30,.45)");
     if ((theme === "demon" || theme === "tower") && R() < 0.12) blot(g, px + R() * TS, py + R() * TS, 5 + R() * 12, 0.1);
     if (theme === "demon" && R() < 0.02) bones(g, px + R() * TS, py + R() * TS, R);
+    if (theme === "hell" && R() < 0.1) blot(g, px + R() * TS, py + R() * TS, 5 + R() * 12, 0.09);
+    if (theme === "hell" && R() < 0.03) crack(g, px + R() * TS, py + R() * TS, R, "rgba(120,40,90,.35)");
     if (theme === "tower" && R() < 0.03) talisman(g, px + R() * TS, py + R() * TS, R);
   }
   // 小路：一團一團淡淡的亮色疊起來，邊緣不會有格子線；城裡的路鋪石板
@@ -104,7 +110,7 @@ export function renderMap(map, A = {}) {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (isPath(x, y)) { smg.beginPath(); smg.arc((x + 0.5) * TS / D, (y + 0.5) * TS / D, TS * 0.62 / D, 0, 7); smg.fill(); }
     const big = document.createElement("canvas"); big.width = cv.width; big.height = cv.height; const bg2 = big.getContext("2d");
     bg2.imageSmoothingEnabled = true; bg2.imageSmoothingQuality = "high"; bg2.drawImage(sm, 0, 0, cv.width, cv.height);
-    const pc = theme === "town" ? (map.layout ? "236,226,202" : "246,240,224") : theme === "tomb" ? "214,204,180" : theme === "snow" ? "250,251,252" : theme === "fire" ? "214,190,160" : theme === "demon" || theme === "tower" ? "206,196,180" : "238,228,200";
+    const pc = theme === "town" ? (map.layout ? "236,226,202" : "246,240,224") : theme === "tomb" ? "214,204,180" : theme === "snow" ? "250,251,252" : theme === "fire" ? "214,190,160" : theme === "demon" || theme === "tower" ? "206,196,180" : theme === "sea" ? "226,224,206" : theme === "hell" ? "196,186,176" : theme === "heaven" ? "250,246,234" : "238,228,200";
     bg2.globalCompositeOperation = "source-in"; bg2.fillStyle = `rgba(${pc},${theme === "town" ? (map.layout ? 0.6 : 0.75) : theme === "tomb" ? 0.55 : 0.68})`; bg2.fillRect(0, 0, cv.width, cv.height);
     g.drawImage(big, 0, 0);
   }
@@ -136,10 +142,7 @@ export function renderMap(map, A = {}) {
     }
     else { g.fillStyle = "rgba(150,110,70,.35)"; g.fillRect(x0, y0, sw, shh); }
   }
-  if (theme === "arena") {       // 擂台：中間鋪一座木台
-    if (ok(A.stage)) { const sw = (w - 4) * TS, sh = sw * A.stage.naturalHeight / A.stage.naturalWidth; g.save(); g.globalAlpha = 0.92; g.drawImage(A.stage, (w * TS - sw) / 2, (h * TS - sh) / 2 + TS * 0.5, sw, sh); g.restore(); }
-    else { g.fillStyle = "rgba(150,110,70,.35)"; g.fillRect(2 * TS, 2 * TS, (w - 4) * TS, (h - 4) * TS); g.strokeStyle = "rgba(181,52,42,.8)"; g.lineWidth = 4; g.strokeRect(2 * TS, 2 * TS, (w - 4) * TS, (h - 4) * TS); }
-  }
+  if (theme === "arena") arenaFloor(g, w, h, R);      // 擂台：照實際能走的範圍畫一座俯視的木台（大小跟著地圖變）
   // 水：用等高線（marching squares）畫出圓潤的池塘外形，再沿岸描一筆墨線
   water(g, map, at, R, theme);
   // 房子：同一棟的格子合起來畫成一整棟（有屋簷、門、燈籠）；碰到地圖邊緣的是城牆
@@ -158,10 +161,13 @@ export function renderMap(map, A = {}) {
     }
   }
   // 擋路的東西：依地圖主題畫；先畫陰影，再從上往下畫本體
-  if (!(map.layout && props)) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (at(x, y) === 1) { g.fillStyle = "rgba(22,20,15,.10)"; g.beginPath(); g.ellipse(x * TS + TS / 2, y * TS + TS * 0.85, TS * 0.55, TS * 0.22, 0, 0, 7); g.fill(); }
+  const rail = (x, y) => theme === "arena" && (x === 0 || y === 0 || x === w - 1 || y === h - 1);      // 擂台外圈是欄杆，不另外放東西
+  const railKeep = (x, y) => (x === 0 || x === w - 1) && (y === 0 || y === h - 1);                     // 只在四個角插旗
+  if (!(map.layout && props)) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (at(x, y) === 1 && !rail(x, y)) { g.fillStyle = "rgba(22,20,15,.10)"; g.beginPath(); g.ellipse(x * TS + TS / 2, y * TS + TS * 0.85, TS * 0.55, TS * 0.22, 0, 0, 7); g.fill(); }
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     if (at(x, y) !== 1) continue;
-    if (map.layout && props) continue;          // 主城的擋路物（樹、井、獅子…）在裝飾清單裡畫
+    if (map.layout && props) continue;
+    if (rail(x, y) && !railKeep(x, y)) continue;          // 主城的擋路物（樹、井、獅子…）在裝飾清單裡畫
     const px = x * TS, py = y * TS;
     if (props) {
       const cx = px + TS / 2 + (P() - 0.5) * 12, by = py + TS - 2 + (P() - 0.5) * 6, r = P();
@@ -171,7 +177,11 @@ export function renderMap(map, A = {}) {
       else if (theme === "snow") r < 0.55 ? prop("e_snowpine" + (1 + Math.floor(P() * 2)), cx, by, TS * 2.5, TS * (3 + P() * 0.6)) : prop("e_icerock" + (1 + Math.floor(P() * 2)), cx, by, TS * (1.3 + P() * 0.4), TS * 1.5);
       else if (theme === "fire") r < 0.6 ? prop("e_lavarock" + (1 + Math.floor(P() * 2)), cx, by, TS * (1.3 + P() * 0.4), TS * 1.4) : prop("e_burnt" + (1 + Math.floor(P() * 2)), cx, by, TS * 2.3, TS * (2.5 + P() * 0.5));
       else if (theme === "demon") r < 0.35 ? prop("e_pillar", cx, by, TS * 1.1, TS * 2.4) : r < 0.5 ? prop("e_brazier", cx, by, TS * 1.2, TS * 1.6) : r < 0.7 ? prop("e_banner", cx, by, TS * 1.2, TS * 2.6) : prop("e_bones", cx, by, TS * 1.3, TS * 1.0);
-      else if (theme === "arena") prop(r < 0.5 ? "e_brazier" : "e_banner", cx, by, TS * 1.2, TS * 2.2, 1);
+      else if (theme === "sea") r < 0.4 ? prop("e_coral" + (1 + Math.floor(P() * 2)), cx, by, TS * (1.6 + P() * 0.5), TS * (r < 0.2 ? 1.6 : 2.6)) : prop("e_kelp", cx, by, TS * 1.6, TS * (2.6 + P() * 0.8));
+      else if (theme === "kunlun") r < 0.55 ? prop("e_cloudpine", cx, by, TS * 2.6, TS * (3 + P() * 0.6)) : prop("e_jaderock", cx, by, TS * (1.3 + P() * 0.4), TS * 1.8);
+      else if (theme === "hell") r < 0.4 ? prop("e_spiderlily", cx, by, TS * 1.3, TS * 1.1) : r < 0.7 ? prop("e_soulstone", cx, by, TS * 1.2, TS * 1.6) : prop("e_ghostlamp", cx, by, TS * 1.0, TS * 1.7);
+      else if (theme === "heaven") r < 0.45 ? prop("e_cloudpillar", cx, by, TS * 1.4, TS * 3) : r < 0.75 ? prop("e_cloud", cx, by, TS * 1.9, TS * 1.2) : prop("e_goldlamp", cx, by, TS * 1.0, TS * 1.9);
+      else if (theme === "arena") rail(x, y) ? prop("e_banner", cx, by, TS * 1.3, TS * 2.6, 1) : prop("e_brazier", cx, by, TS * 1.2, TS * 2.0, 1);
       else if (theme === "tower") r < 0.6 ? prop("e_chain", cx, by, TS * 1.2, TS * 2.4) : r < 0.8 ? prop("e_lantern", cx, by, TS * 0.9, TS * 1.6) : prop("e_bones", cx, by, TS * 1.3, TS * 1.0);
       else prop("e_plum" + (1 + Math.floor(P() * 2)), cx, by, TS * 2.5, TS * (2.7 + P() * 0.5));
       continue;
@@ -219,6 +229,21 @@ export function renderMap(map, A = {}) {
 }
 
 // ---------------------------------------------------------------- 池塘
+// 水面／熔岩的配色：base 底色、deep 中間、edge 岸邊往內一圈、rim／line 岸線、ripple 漣漪；lava 是熔岩（有亮流、裂殼、會冒泡）
+export function liquidStyle(theme) {
+  const W = (base, deep, extra = {}) => ({ base, deep, edge: "rgba(250,248,236,.38)", rim: "rgba(255,252,240,.5)", line: "rgba(24,30,32,.62)", ripple: "rgba(246,244,232,.6)", ...extra });
+  return {
+    fire: { base: "rgba(178,58,20,.92)", deep: "rgba(250,150,50,.55)", edge: "rgba(36,16,8,.85)", rim: "rgba(60,30,16,.45)", line: "rgba(30,14,8,.85)", lava: true, glow: "255,170,60" },
+    hell: { base: "rgba(70,20,46,.85)", deep: "rgba(150,40,90,.35)", edge: "rgba(20,6,14,.7)", rim: "rgba(120,60,90,.35)", line: "rgba(20,8,16,.8)", lava: true, glow: "200,70,140" },
+    snow: W("rgba(176,206,224,.62)", "rgba(110,160,200,.30)", { ripple: "rgba(255,255,255,.75)" }),
+    sea: W("rgba(34,92,124,.62)", "rgba(16,56,92,.40)"),
+    tomb: W("rgba(62,78,82,.5)", "rgba(30,44,50,.35)"),
+    demon: W("rgba(112,22,22,.55)", "rgba(60,8,8,.4)", { ripple: "rgba(240,190,180,.45)" }),
+    tower: W("rgba(64,52,86,.5)", "rgba(36,26,56,.35)"),
+    kunlun: W("rgba(80,140,126,.52)", "rgba(40,100,96,.35)"),
+    heaven: W("rgba(150,190,220,.5)", "rgba(110,150,200,.3)"),
+  }[theme] || W("rgba(84,112,122,.48)", "rgba(36,62,74,.34)");
+}
 function water(g, map, at, R, theme) {
   const { w, h } = map, wt = [];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (at(x, y) === 2) wt.push([x + 0.5, y + 0.5]);
@@ -228,6 +253,19 @@ function water(g, map, at, R, theme) {
     const x0 = Math.max(0, Math.floor((cx - 2) / step)), x1 = Math.min(sw - 1, Math.ceil((cx + 2) / step));
     const y0 = Math.max(0, Math.floor((cy - 2) / step)), y1 = Math.min(sh - 1, Math.ceil((cy + 2) / step));
     for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const d = Math.hypot(i * step - cx, j * step - cy) / rr; F[j * sw + i] += Math.exp(-d * d); }
+  }
+  {   // 岸邊不要是整齊的圓角方塊：疊一點低頻雜訊，讓池子、熔岩湖的邊緣歪歪扭扭像自然形成的
+    const hsh = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7 + w * 3.3) * 43758.5453; return n - Math.floor(n); };
+    const vn = (x, y) => { const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      return (hsh(x0, y0) * (1 - u) + hsh(x0 + 1, y0) * u) * (1 - v) + (hsh(x0, y0 + 1) * (1 - u) + hsh(x0 + 1, y0 + 1) * u) * v; };
+    // 座標扭曲（domain warp）：每個取樣點往旁邊挪一點再讀，岸線最多歪約 0.7 格；再疊一點細的雜訊讓邊緣毛一點
+    const F0 = F.slice(), at0 = (x, y) => { x = Math.max(0, Math.min(sw - 1.001, x)); y = Math.max(0, Math.min(sh - 1.001, y)); const i0 = Math.floor(x), j0 = Math.floor(y), u = x - i0, v = y - j0;
+      return (F0[j0 * sw + i0] * (1 - u) + F0[j0 * sw + i0 + 1] * u) * (1 - v) + (F0[(j0 + 1) * sw + i0] * (1 - u) + F0[(j0 + 1) * sw + i0 + 1] * u) * v; };
+    const WARP = 0.7 / step;
+    for (let j = 0; j < sh; j++) for (let i = 0; i < sw; i++) {
+      const X = i * step, Y = j * step, dx = (vn(X * 0.33, Y * 0.33) - 0.5) * 2 * WARP, dy = (vn(X * 0.33 + 17, Y * 0.33 + 5) - 0.5) * 2 * WARP;
+      F[j * sw + i] = at0(i + dx, j + dy) + (vn(X * 1.6 + 9, Y * 1.6) - 0.5) * 0.25;
+    }
   }
   const T = 0.55, S = TS * step, f = (i, j) => F[j * sw + i];
   const lerp = (a, b) => (T - a) / (b - a);
@@ -249,16 +287,36 @@ function water(g, map, at, R, theme) {
     const segs = { 1: [[left, bot]], 2: [[bot, right]], 3: [[left, right]], 4: [[top, right]], 5: [[left, top], [bot, right]], 6: [[top, bot]], 7: [[left, top]], 8: [[top, left]], 9: [[top, bot]], 10: [[top, right], [bot, left]], 11: [[top, right]], 12: [[left, right]], 13: [[right, bot]], 14: [[bot, left]] }[k];
     for (const [p1, p2] of segs) { shore.moveTo(p1[0], p1[1]); shore.lineTo(p2[0], p2[1]); }
   }
+  const LQ = liquidStyle(theme);
   g.save();
-  g.fillStyle = { tomb: "rgba(62,78,82,.42)", snow: "rgba(176,206,224,.55)", fire: "rgba(206,84,30,.55)", demon: "rgba(112,22,22,.45)", tower: "rgba(64,52,86,.42)" }[theme] || "rgba(92,116,124,.38)"; g.fill(fillPath);
+  g.fillStyle = LQ.base; g.fill(fillPath);
   g.clip(fillPath);
-  for (const [cx, cy] of wt) { const x = cx * TS, y = cy * TS, r = TS * 1.1; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "rgba(40,60,68,.10)"); gr.addColorStop(1, "rgba(40,60,68,0)"); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
-  g.strokeStyle = "rgba(244,240,228,.55)"; g.lineWidth = 1.1; g.lineCap = "round";
-  for (const [cx, cy] of wt) if (R() < 0.45) { const x = (cx - 0.5 + R()) * TS, y = (cy - 0.5 + R()) * TS; g.beginPath(); g.ellipse(x, y, 6 + R() * 7, 1.8 + R() * 1.5, 0, Math.PI * 1.08, Math.PI * 1.92); g.stroke(); }
+  // 深處：中間顏色比較深（熔岩是比較亮）
+  for (const [cx, cy] of wt) { const x = cx * TS, y = cy * TS, r = TS * 1.3; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, LQ.deep); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  // 岸邊往內一圈：水是淺灘（淡）、熔岩是冷掉的黑殼
+  try { g.filter = `blur(${Math.round(TS * 0.16)}px)`; } catch {}
+  g.strokeStyle = LQ.edge; g.lineWidth = TS * 0.75; g.stroke(shore);
+  g.filter = "none";
+  if (LQ.lava) {
+    // 熔岩：亮的熔流＋黑色裂殼
+    for (const [cx, cy] of wt) if (R() < 0.35) { const x = (cx - 0.5 + R()) * TS, y = (cy - 0.5 + R()) * TS, r = TS * (0.5 + R() * 0.7); const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "rgba(255,214,110,.75)"); gr.addColorStop(0.5, "rgba(250,140,40,.35)"); gr.addColorStop(1, "rgba(250,120,30,0)"); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+    // 冷掉的岩殼：一塊塊黑色不規則板，板和板之間透出亮橘色的熔縫
+    for (const [cx, cy] of wt) if (R() < 0.42) {
+      const x = (cx - 0.5 + R()) * TS, y = (cy - 0.5 + R()) * TS, rx = TS * (0.28 + R() * 0.3), ry = rx * (0.6 + R() * 0.4), rot = R() * 3.14, n = 7;
+      g.beginPath(); for (let k = 0; k < n; k++) { const a = k / n * 6.283, rk = 0.72 + R() * 0.36; g.lineTo(x + Math.cos(a + rot) * rx * rk, y + Math.sin(a + rot) * ry * rk); } g.closePath();
+      g.fillStyle = "rgba(58,24,12,.62)"; g.fill();
+      g.strokeStyle = "rgba(255,176,70,.55)"; g.lineWidth = 1.6; g.stroke();
+    }
+  } else {
+    // 水：一筆一筆的淡色漣漪（長短不一，像毛筆輕掃）
+    g.strokeStyle = LQ.ripple; g.lineCap = "round";
+    for (const [cx, cy] of wt) if (R() < 0.5) { const x = (cx - 0.5 + R()) * TS, y = (cy - 0.5 + R()) * TS, L = 8 + R() * 14; g.lineWidth = 0.8 + R() * 1.2; g.beginPath(); g.moveTo(x - L, y); g.quadraticCurveTo(x, y - 2.5 - R() * 2, x + L, y); g.stroke(); }
+    for (const [cx, cy] of wt) if (R() < 0.12) { const x = (cx - 0.5 + R()) * TS, y = (cy - 0.5 + R()) * TS; g.fillStyle = LQ.ripple; g.beginPath(); g.ellipse(x, y, 2 + R() * 2, 1, 0, 0, 7); g.fill(); }
+  }
   g.restore();
   g.save(); g.lineCap = "round"; g.lineJoin = "round";
-  g.strokeStyle = "rgba(255,252,240,.5)"; g.lineWidth = 4; g.translate(0, 2); g.stroke(shore); g.translate(0, -2);
-  g.strokeStyle = "rgba(24,30,32,.62)"; g.lineWidth = 1.8; g.stroke(shore);
+  g.strokeStyle = LQ.rim; g.lineWidth = 4; g.translate(0, 2); g.stroke(shore); g.translate(0, -2);
+  g.strokeStyle = LQ.line; g.lineWidth = LQ.lava ? 2.6 : 1.8; g.stroke(shore);
   g.restore();
   if (theme === "bamboo" || theme === "town") for (const [cx, cy] of wt) if (R() < 0.18) lotus(g, (cx - 0.3 + R() * 0.6) * TS, (cy - 0.3 + R() * 0.6) * TS, R);
   if (theme === "bamboo" || theme === "mount") for (const [cx, cy] of wt) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (at(Math.floor(cx) + dx, Math.floor(cy) + dy) === 0 && R() < 0.25) reeds(g, (cx + dx * 0.62) * TS, (cy + dy * 0.62) * TS + 6, R);
@@ -292,10 +350,42 @@ function flagstones(g, px, py, R) {
     g.fillStyle = `rgba(${R() < 0.5 ? "120,105,80" : "150,140,120"},${0.03 + R() * 0.07})`; g.fill(); g.stroke();
   }
 }
+// 廣場：一圈圈扇形石板（每塊深淺不一）＋外圈石緣＋中間八卦石刻與太極
 function plaza(g, cx, cy, noDing) {
-  g.strokeStyle = "rgba(90,78,58,.25)"; g.lineWidth = 1.2;
-  for (const r of [TS * 1.2, TS * 2.4, TS * 3.6]) { g.beginPath(); g.ellipse(cx, cy, r, r, 0, 0, 7); g.stroke(); }
-  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * TS * 1.2, cy + Math.sin(a) * TS * 1.2); g.lineTo(cx + Math.cos(a) * TS * 3.6, cy + Math.sin(a) * TS * 3.6); g.stroke(); }
+  let sd = 11; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  const R0 = TS * 1.15, R3 = TS * 3.55, bands = [[R0, TS * 1.85, 12], [TS * 1.85, TS * 2.7, 18], [TS * 2.7, R3, 26]];
+  g.save();
+  g.fillStyle = "rgba(40,32,22,.10)"; g.beginPath(); g.arc(cx, cy + 4, R3 + TS * 0.32, 0, 7); g.fill();          // 外緣的影子
+  g.fillStyle = "#b9ad93"; g.beginPath(); g.arc(cx, cy, R3 + TS * 0.28, 0, 7); g.fill();                       // 石緣
+  g.strokeStyle = "rgba(70,58,40,.45)"; g.lineWidth = 1.4; g.stroke();
+  for (const [r1, r2, n] of bands) {
+    const off = rnd() * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+      const a1 = off + i / n * Math.PI * 2, a2 = off + (i + 1) / n * Math.PI * 2, v = 200 + Math.round(rnd() * 26);
+      g.fillStyle = `rgb(${v},${v - 8},${v - 26})`;
+      g.beginPath(); g.arc(cx, cy, r2 - 1, a1 + 0.006, a2 - 0.006); g.arc(cx, cy, r1 + 1, a2 - 0.006, a1 + 0.006, true); g.closePath(); g.fill();
+      if (rnd() < 0.35) { g.fillStyle = "rgba(90,78,58,.10)"; const am = (a1 + a2) / 2, rm = (r1 + r2) / 2; g.beginPath(); g.ellipse(cx + Math.cos(am) * rm, cy + Math.sin(am) * rm, 6 + rnd() * 8, 3 + rnd() * 4, am, 0, 7); g.fill(); }
+    }
+    g.strokeStyle = "rgba(96,82,60,.42)"; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, r2, 0, 7); g.stroke();
+  }
+  // 八卦石刻：八角形＋八組卦爻
+  g.fillStyle = "#c7bca4"; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; g.lineTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0); } g.closePath(); g.fill();
+  g.strokeStyle = "rgba(70,58,40,.55)"; g.lineWidth = 1.6; g.stroke();
+  const TRI = ["111", "011", "101", "001", "110", "010", "100", "000"];
+  g.strokeStyle = "rgba(48,40,30,.62)"; g.lineCap = "butt";
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2 - Math.PI / 2; g.save(); g.translate(cx, cy); g.rotate(a + Math.PI / 2);
+    for (let k = 0; k < 3; k++) { const yy = -R0 * 0.86 + k * 5.2, hw = R0 * 0.26; g.lineWidth = 3; g.beginPath();
+      if (TRI[i][k] === "1") { g.moveTo(-hw, yy); g.lineTo(hw, yy); } else { g.moveTo(-hw, yy); g.lineTo(-hw * 0.22, yy); g.moveTo(hw * 0.22, yy); g.lineTo(hw, yy); } g.stroke(); }
+    g.restore();
+  }
+  // 太極（淡淡的石刻，不要搶戲）
+  const tr = R0 * 0.42; g.globalAlpha = 0.55;
+  g.fillStyle = "#f1eadb"; g.beginPath(); g.arc(cx, cy, tr, 0, 7); g.fill();
+  g.fillStyle = "#3a332a"; g.beginPath(); g.arc(cx, cy, tr, -Math.PI / 2, Math.PI / 2); g.arc(cx, cy + tr / 2, tr / 2, Math.PI / 2, -Math.PI / 2, true); g.arc(cx, cy - tr / 2, tr / 2, Math.PI / 2, -Math.PI / 2); g.closePath(); g.fill();
+  g.beginPath(); g.arc(cx, cy - tr / 2, tr * 0.14, 0, 7); g.fill(); g.fillStyle = "#f1eadb"; g.beginPath(); g.arc(cx, cy + tr / 2, tr * 0.14, 0, 7); g.fill();
+  g.globalAlpha = 1; g.strokeStyle = "rgba(48,40,30,.6)"; g.lineWidth = 1.4; g.beginPath(); g.arc(cx, cy, tr, 0, 7); g.stroke();
+  g.restore();
   if (noDing) return;
   // 廣場北邊的大香爐（鼎）
   const x = cx, y = cy - TS * 2.2;
@@ -539,6 +629,40 @@ export function hpBar(g, x, y, w, pct, col) {
   g.fillStyle = "rgba(240,232,212,.9)"; g.beginPath(); g.roundRect(x - w / 2, y, w, 4, 2); g.fill();
   const p = Math.max(0, Math.min(1, pct / 100));
   if (p > 0) { g.fillStyle = col; g.beginPath(); g.roundRect(x - w / 2, y, Math.max(2, w * p), 4, 2); g.fill(); }
+}
+// 擂台木台：木板地＋紅漆欄杆＋角柱＋中間淡淡的「擂」字；欄杆就壓在地圖最外一圈（不能走的那圈）上
+function arenaFloor(g, w, h, R) {
+  const x0 = TS * 0.55, y0 = TS * 0.55, x1 = (w - 0.55) * TS, y1 = (h - 0.55) * TS, W = x1 - x0, H = y1 - y0;
+  g.save();
+  g.fillStyle = "rgba(40,28,16,.22)"; g.fillRect(x0 + TS * 0.3, y0 + TS * 0.45, W, H);          // 台子的影子
+  g.fillStyle = "#d9c296"; g.fillRect(x0, y0, W, H);
+  const ph = TS * 0.8;                                                                        // 一條條木板，接縫錯開
+  for (let y = y0, row = 0; y < y1; y += ph, row++) {
+    const hh = Math.min(ph, y1 - y);
+    g.fillStyle = row % 2 ? "rgba(122,84,44,.07)" : "rgba(255,248,226,.12)"; g.fillRect(x0, y, W, hh);
+    g.strokeStyle = "rgba(92,62,32,.30)"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
+    g.strokeStyle = "rgba(92,62,32,.22)";
+    for (let sx = x0 + TS * (0.8 + (row * 1.7) % 3); sx < x1 - TS * 0.5; sx += TS * (3.2 + (row * 7) % 3)) { g.beginPath(); g.moveTo(sx, y + 1); g.lineTo(sx, y + hh - 1); g.stroke(); }
+    for (let k = 0; k < W / TS * 0.6; k++) { g.fillStyle = "rgba(92,62,32,.10)"; g.fillRect(x0 + R() * W, y + R() * hh, TS * (0.4 + R() * 0.9), 1); }      // 木紋
+  }
+  for (let k = 0; k < 9; k++) {                                                               // 墨染的舊漬
+    const cx = x0 + R() * W, cy = y0 + R() * H, r = TS * (1.5 + R() * 3), gr = g.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, "rgba(110,76,40,.10)"); gr.addColorStop(1, "rgba(110,76,40,0)"); g.fillStyle = gr; g.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  const cx = w * TS / 2, cy = h * TS / 2, rr = Math.min(W, H) * 0.2;                          // 中央：紅圈＋擂字
+  g.strokeStyle = "rgba(158,47,38,.30)"; g.lineWidth = TS * 0.14; g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = TS * 0.05; g.beginPath(); g.arc(cx, cy, rr * 0.86, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = "rgba(158,47,38,.13)"; g.font = `700 ${Math.round(rr * 1.05)}px ${KAI}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("擂", cx, cy + rr * 0.04); g.textBaseline = "alphabetic";
+  for (const x of [x0 + TS * 2.2, x1 - TS * 2.2]) { g.strokeStyle = "rgba(158,47,38,.22)"; g.lineWidth = 2; g.setLineDash([TS * 0.3, TS * 0.22]); g.beginPath(); g.moveTo(x, cy - TS * 1.4); g.lineTo(x, cy + TS * 1.4); g.stroke(); }     // 兩邊的開打線
+  g.setLineDash([]);
+  g.strokeStyle = "#8f2a22"; g.lineWidth = TS * 0.3; g.strokeRect(x0, y0, W, H);               // 紅漆欄杆
+  g.strokeStyle = "rgba(255,222,190,.45)"; g.lineWidth = TS * 0.06; g.strokeRect(x0 - TS * 0.06, y0 - TS * 0.06, W, H);
+  g.strokeStyle = "rgba(30,18,10,.55)"; g.lineWidth = TS * 0.05; g.strokeRect(x0 + TS * 0.17, y0 + TS * 0.17, W - TS * 0.34, H - TS * 0.34);
+  const post = (px, py, big) => { const r = TS * (big ? 0.34 : 0.2); g.fillStyle = "#2a1d14"; g.beginPath(); g.arc(px, py + r * 0.25, r * 1.05, 0, 7); g.fill(); g.fillStyle = big ? "#7d241d" : "#9e3328"; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill(); g.fillStyle = "rgba(255,226,196,.5)"; g.beginPath(); g.arc(px - r * 0.3, py - r * 0.3, r * 0.3, 0, 7); g.fill(); };
+  for (let x = x0 + TS * 3; x < x1 - TS * 1.5; x += TS * 3) { post(x, y0); post(x, y1); }
+  for (let y = y0 + TS * 3; y < y1 - TS * 1.5; y += TS * 3) { post(x0, y); post(x1, y); }
+  for (const [px, py] of [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]) post(px, py, true);
+  g.restore();
 }
 export function label(g, x, y, text, col = INK, size = 12, bold = false, font = `"LXGW WenKai TC","Noto Serif TC",serif`) {
   g.font = `${bold ? "700 " : ""}${size}px ${font}`; g.textAlign = "center"; g.textBaseline = "alphabetic";

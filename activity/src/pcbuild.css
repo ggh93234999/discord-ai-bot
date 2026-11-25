@@ -163,3 +163,11 @@
 .pcb .acts .save { background:#1f4a35 !important; border-color:#2f7a55 !important; }
 .pcb .acts .save.done { background:#2a2d36 !important; border-color:#3a3d46 !important; color:#9be8bb; }
 .pcb .savemsg { color:#9be8bb; }
+/* 零件圖示（pcicons.js：水墨淡彩圖墊一枚宣紙圓底），跟著文字大小 */
+.pcico { display:inline-grid; place-items:center; width:1.75em; height:1.75em; border-radius:50%; vertical-align:-0.5em; flex:none;
+  background:radial-gradient(circle at 40% 35%,#fbf7ec,#e7dcc3); box-shadow:inset 0 0 0 1px rgba(0,0,0,.14),0 1px 2px rgba(0,0,0,.25); }
+.pcico img { width:88%; height:88%; object-fit:contain; pointer-events:none; }
+.pcm-chips button .pcico { width:1.9em; height:1.9em; margin:-3px 4px -3px -6px; }
+.slot .si .pcico { width:32px; height:32px; vertical-align:middle; }
+.orow .oi .pcico { width:28px; height:28px; }
+.pcm-it .nm .cat .pcico { width:1.5em; height:1.5em; vertical-align:-0.42em; }

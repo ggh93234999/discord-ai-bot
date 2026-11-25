@@ -4,7 +4,7 @@ import "./pcbuild.css";
 import { pim, wirePim } from "./pcimg.js";
 import { CAT_LIST, SLOT_LIST, EXTRA_SSD, slotCat, CAT_NAME, USE_NAME, priceOf, cheaper, check, fits, needWatts, estWatts, recommend, totals } from "../shared/pcrules.js";
 
-const ICON = { cpu: "🧠", mb: "🔌", gpu: "🎮", ram: "💾", ssd: "💿", ssd2: "💿", ssd3: "💿", ssd4: "💿", psu: "⚡", case: "🗄️", cooler: "❄️" };
+import { pcIcon, PC_TXT } from "./pcicons.js";
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const money = (n) => (n == null ? "—" : "$" + Math.round(n).toLocaleString("en-US"));
 const ls = {
@@ -93,9 +93,9 @@ export function mountPcBuild(root, { env, back }) {
     const addSsd = sel.ssd ? EXTRA_SSD.find((k) => !sel[k]) : null;       // 還能再加一顆硬碟
     const slots = slotKeys.map((cat) => {
       const p = sel[cat];
-      if (!p) return `<div class="slot empty" data-cat="${cat}"><span class="si">${ICON[cat]}</span><span class="sn">${CAT_NAME[cat]}</span><button class="pick" data-cat="${cat}">選擇</button></div>`;
+      if (!p) return `<div class="slot empty" data-cat="${cat}"><span class="si">${pcIcon(cat)}</span><span class="sn">${CAT_NAME[cat]}</span><button class="pick" data-cat="${cat}">選擇</button></div>`;
       const w = p.c && p.s && p.c.p !== p.s.p ? `（差 ${money(Math.abs(p.c.p - p.s.p))}）` : "";
-      return `<div class="slot" data-cat="${cat}"><span class="si">${ICON[cat]}</span>${partImg(p, "sl")}
+      return `<div class="slot" data-cat="${cat}"><span class="si">${pcIcon(cat)}</span>${partImg(p, "sl")}
         <div class="sb"><div class="sc">${CAT_NAME[cat]}${auto.has(cat) ? "<em class=\"auto\">自動配</em>" : ""}${p.c && p.s ? `<em class="both">兩家都有${w}</em>` : p.c ? "<em>只有原價屋</em>" : "<em>只有欣亞</em>"}</div>
         <div class="sname">${esc(p.name)}</div><div class="prices">${priceCell(p)}</div></div>
         <div class="sact"><button class="pick" data-cat="${cat}">換</button><button class="trend" data-id="${p.id}" data-cat="${cat}" title="價格走勢">📈</button><button class="del" data-cat="${cat}" title="移除">✕</button></div></div>`;
@@ -134,7 +134,7 @@ export function mountPcBuild(root, { env, back }) {
     const cat = slotCat(slot);
     pk = { slot, cat, q: "", compat: true, both: false, sort: "asc", shown: 60, brand: "" };
     pickEl.hidden = false;
-    pickEl.innerHTML = `<div class="ph"><button class="pclose">✕</button><b>${ICON[slot]} 選${CAT_NAME[slot]}</b><span class="pcount"></span></div>
+    pickEl.innerHTML = `<div class="ph"><button class="pclose">✕</button><b>${pcIcon(slot)} 選${CAT_NAME[slot]}</b><span class="pcount"></span></div>
       <div class="pf"><input class="pq" type="search" placeholder="搜尋型號、品牌…"><select class="pbrand"></select><select class="psort"><option value="asc">價格低→高</option><option value="desc">價格高→低</option></select></div>
       <div class="pf2"><label><input type="checkbox" class="pcompat" checked> 只顯示相容</label><label><input type="checkbox" class="pboth"> 只看兩家都有</label></div>
       <div class="plist"></div>`;
@@ -333,7 +333,7 @@ export function mountPcBuild(root, { env, back }) {
     for (const st of ["c", "s"]) {
       if (!o.g[st].length) continue;
       out.push("", `**${SN[st]}　${money(o.sub[st])}**`);
-      for (const r of o.g[st]) out.push(`${ICON[r.cat]} ${CAT_NAME[r.cat]}｜${short(r.p.name, 34)}｜${money(r.price)}`);
+      for (const r of o.g[st]) out.push(`${PC_TXT[r.cat]} ${CAT_NAME[r.cat]}｜${short(r.p.name, 34)}｜${money(r.price)}`);
     }
     const miss = CAT_LIST.filter((c) => !sel[c]).map((c) => CAT_NAME[c]);
     if (miss.length) out.push("", `還沒選：${miss.join("、")}`);
@@ -346,7 +346,7 @@ export function mountPcBuild(root, { env, back }) {
     if (!Object.keys(sel).length) return;
     const o = orderData(), box = document.createElement("div");
     box.className = "pcb-trend";
-    const rows = (st) => o.g[st].map((r) => `<div class="orow"><span class="oi">${ICON[r.cat]}</span><div class="on"><small>${CAT_NAME[r.cat]}</small>${esc(r.p.name)}</div><b>${money(r.price)}</b>${r.other ? `<em>另一家 ${money(r.other.p)}</em>` : `<em class="only">只有這家有</em>`}</div>`).join("");
+    const rows = (st) => o.g[st].map((r) => `<div class="orow"><span class="oi">${pcIcon(r.cat)}</span><div class="on"><small>${CAT_NAME[r.cat]}</small>${esc(r.p.name)}</div><b>${money(r.price)}</b>${r.other ? `<em>另一家 ${money(r.other.p)}</em>` : `<em class="only">只有這家有</em>`}</div>`).join("");
     const blocks = ["c", "s"].filter((st) => o.g[st].length).map((st) => `<div class="ostore"><div class="oh"><b>${SN[st]}</b><span>${o.g[st].length} 項　${money(o.sub[st])}</span></div>${rows(st)}</div>`).join("");
     const issues = check(sel).filter((x) => x.lv !== "ok");
     box.innerHTML = `<div class="tbox order"><button class="tclose">✕</button><div class="otitle">估價單<small>${MODES[mode]}</small></div>${blocks}

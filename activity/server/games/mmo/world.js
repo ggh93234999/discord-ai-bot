@@ -4,8 +4,28 @@
 import fs from "node:fs";
 import { randomInt } from "node:crypto";
 import { botSettle, botPay, botInfo } from "../../bet.js";
-import { arec } from "../../paths.js";
+import { arec, DATA_ROOT } from "../../paths.js";
 import * as D from "./data.js";
+import { STORY_NPCS, STORY, storyReward } from "./story.js";
+// ---- 錢莊：歷史存入額度
+// 帳號記 bankIn（歷史上用代幣換進多少兩）、bankUsed（銀兩換代幣時超過每天額度、從這裡扣掉多少）。
+// 舊帳號第一次用錢莊時，從機器人的帳本（logs/transfers.json，「水墨江湖：代幣換銀兩」）補算以前換進的總額。
+let ledgerCache = null;
+function ledgerIn(uid) {
+  try {
+    if (!ledgerCache) {
+      ledgerCache = {};
+      const L = JSON.parse(fs.readFileSync(DATA_ROOT + "/logs/transfers.json", "utf8")).items || [];
+      for (const it of L) if (String(it.note || "").includes("水墨江湖：代幣換銀兩") && it.from) ledgerCache[String(it.from[0])] = (ledgerCache[String(it.from[0])] || 0) + (Number(it.amount) || 0);
+    }
+    return ledgerCache[String(uid)] || 0;
+  } catch { return 0; }
+}
+function bankAcc(A, key) {
+  if (A.bankIn == null) { A.bankIn = key.startsWith("r:") ? ledgerIn(key.slice(2)) : 0; A.bankUsed = 0; }
+  return A;
+}
+const bankPool = (A) => Math.max(0, (A.bankIn || 0) - (A.bankUsed || 0));
 
 const TICK = 100;                              // 毫秒
 const now = () => Date.now();
@@ -65,9 +85,17 @@ function genMap(id, def = D.MAPS[id]) {
   const { w, h } = def, R = mulberry(def.seed), t = new Uint8Array(w * h);
   const at = (x, y) => t[y * w + x], set = (x, y, v) => { if (x >= 0 && y >= 0 && x < w && y < h) t[y * w + x] = v; };
   const inner = (x, y) => x > 0 && y > 0 && x < w - 1 && y < h - 1;
-  if (def.open) {          // 擂台：一整片空地，四周圍起來
+  if (def.corridor) {      // 副本走廊：長長一條，中間零星柱子
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) t[y * w + x] = inner(x, y) && y > 1 && y < h - 2 ? 0 : 1;
+    for (let k = 0; k < w * 0.35; k++) { const x = 6 + Math.floor(R() * (w - 12)), y = 3 + Math.floor(R() * (h - 6)); set(x, y, 1); }
+    for (const q of def.portals) { set(q.x, q.y, 4); set(q.x, q.y + 1, 4); set(q.x === 0 ? 1 : w - 2, q.y, 0); set(q.x === 0 ? 1 : w - 2, q.y + 1, 0); }
+    def.bossAt = { x: w - 6 + 0.5, y: Math.floor(h / 2) + 0.5 };
+  } else if (def.open) {          // 擂台：一整片空地，四周圍起來
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) t[y * w + x] = inner(x, y) ? 0 : 1;
     for (const [x, y] of [[3, 3], [w - 4, 3], [3, h - 4], [w - 4, h - 4]]) set(x, y, 1);
+    if (def.pvp && w >= 30) for (const [x, y] of [[w / 2 - 6, h / 2 - 5], [w / 2 + 5, h / 2 - 5], [w / 2 - 6, h / 2 + 4], [w / 2 + 5, h / 2 + 4]]) set(Math.floor(x), Math.floor(y), 1);     // 大擂台中間四根柱子可以繞
+    for (const q of def.portals || []) { set(q.x, q.y, 4); set(q.x, q.y + 1, 4); }
+    def.bossAt = { x: w / 2, y: h / 2 };
   } else if (def.layout) {   // 主城：照 D.TOWN 的格局蓋
     const T = D.TOWN;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) t[y * w + x] = inner(x, y) ? 0 : 5;
@@ -97,7 +125,7 @@ function genMap(id, def = D.MAPS[id]) {
       t.set(n);
     }
     // 池塘
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0, np = Math.max(3, Math.round(w * h / 700)); i < np; i++) {
       const cx = 6 + Math.floor(R() * (w - 12)), cy = 6 + Math.floor(R() * (h - 12)), r = 1.5 + R() * 2;
       for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if (inner(x, y) && Math.hypot(x - cx, y - cy) <= r) set(x, y, 2);
     }
@@ -144,8 +172,21 @@ function genMap(id, def = D.MAPS[id]) {
     }
     def.stone = best;
   }
+  // 小王的巢穴：挑空曠的地方，離傳送點、傳送石、大王、彼此越遠越好
+  if (def.elites && def.elites.length && !def.inst) {
+    const avoid = [...def.portals.map((q) => ({ x: q.x, y: q.y })), def.bossAt, def.stone].filter(Boolean);
+    const openAt = (x, y, need) => { let n = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (WALK.has(at(x + dx, y + dy))) n++; return n >= need; };
+    let cand = [];
+    for (const need of [44, 38, 30]) { cand = spots.filter((s2) => { const x = Math.floor(s2.x), y = Math.floor(s2.y); return x > 6 && y > 6 && x < w - 7 && y < h - 7 && openAt(x, y, need); }); if (cand.length >= 30) break; }
+    def.lairs = [];
+    for (let i = 0; i < def.elites.length; i++) {
+      let best = null, bd = -1;
+      for (const c of cand) { let d = 1e9; for (const a of avoid.concat(def.lairs)) d = Math.min(d, Math.hypot(a.x - c.x, a.y - c.y)); if (d > bd) { bd = d; best = c; } }
+      if (best) def.lairs.push(best);
+    }
+  }
   const tiles = Array.from(t).join("");
-  return { id, def, w, h, t, tiles, spots, mobs: [], fx: [], R };
+  return { id, def, w, h, t, tiles, spots, mobs: [], fx: [], R, loot: [], lootDirty: false };
 }
 const walk = (m, x, y) => { x = Math.floor(x); y = Math.floor(y); return x >= 0 && y >= 0 && x < m.w && y < m.h && WALK.has(m.t[y * m.w + x]); };
 
@@ -219,12 +260,53 @@ function initMaps() {
     const m = maps[id] = genMap(id);
     for (const [k, n] of m.def.spawns) for (let i = 0; i < n; i++) spawnMob(m, k);
     if (m.def.boss) m.boss = spawnMob(m, m.def.boss, m.def.bossAt);
+    (m.def.lairs || []).forEach((at, i) => { const mob = spawnMob(m, m.def.elites[i], at); mob.lair = at; mob.hx = at.x; mob.hy = at.y; });
   }
 }
 initMaps();
 
 // 每張地圖上的 NPC：城裡是固定那幾位，野外只有一塊驛站傳送石
-const npcsOf = (id) => (maps[id] && maps[id].def.town ? D.NPCS : maps[id] && maps[id].def.stone ? [{ id: "st_" + id, name: "驛站傳送石", kind: "stone", x: maps[id].def.stone.x, y: maps[id].def.stone.y, say: "伸手摸一下石碑，就能傳到去過的地方。" }] : []);
+const npcsOf = (id) => {
+  const m = maps[id]; if (!m) return [];
+  if (m.xnpc) return m.xnpc;
+  if (m.def.town) return [...D.NPCS, ...storyNpcs(id)];
+  if (m.def.stone) return [{ id: "st_" + id, name: "驛站傳送石", kind: "stone", x: m.def.stone.x, y: m.def.stone.y, say: "伸手摸一下石碑，就能傳到去過的地方。" }, ...dgGates(id), ...storyNpcs(id)];
+  return [];
+};
+// ---- 主線故事：說故事的 NPC 擺在長安城指定位置、野外傳送石旁、副本入口旁；找一格能走、不擋到別的 NPC 的地方
+function freeSpot(m, x, y, others) {
+  for (let r = 0; r < 9; r += 0.5) for (let k = 0; k < 16; k++) {
+    const px = Math.floor(x + Math.cos(k / 16 * 6.283) * r) + 0.5, py = Math.floor(y + Math.sin(k / 16 * 6.283) * r) + 0.5;
+    if (walk(m, px, py) && walk(m, px, py + 1) && others.every((o) => Math.hypot(o.x - px, o.y - py) > 2.2)) return { x: px, y: py };
+  }
+  return { x, y };
+}
+function storyNpcs(id) {
+  const m = maps[id]; if (!m || m.inst) return [];
+  if (m._story) return m._story;
+  const taken = m.def.town ? [...D.NPCS] : [{ x: m.def.stone.x, y: m.def.stone.y }, ...dgGates(id)], out = [];
+  for (const s of STORY_NPCS) {
+    if (s.map !== id) continue;
+    let ax, ay;
+    if (s.at === "stone") { if (!m.def.stone) continue; ax = m.def.stone.x + 2.5; ay = m.def.stone.y + 1; }
+    else if (s.at === "gate") { const g = dgGates(id).find((x) => x.dg === s.dg); if (!g) continue; ax = g.x - 2.5; ay = g.y + 1; }
+    else { ax = s.at.x; ay = s.at.y; }
+    const sp = freeSpot(m, ax, ay, [...taken, ...out]);
+    out.push({ id: s.id, name: s.name, kind: "story", x: sp.x, y: sp.y, art: s.art, anim: s.anim, say: "" });
+  }
+  return (m._story = out);
+}
+// 這個 NPC 有哪些章：聽過的（可以重聽）、現在輪到的、還沒輪到的；順便告訴玩家下一章要去找誰
+function storyView(c, npcId) {
+  const at = c.story || 0, list = [];
+  STORY.forEach((ch, i) => {
+    if (ch.npc !== npcId) return;
+    const rw = storyReward(ch, D.expNeed(ch.lv)), st = i < at ? "done" : i > at ? "locked" : c.lv < ch.lv ? "lv" : "ok";
+    list.push({ i, title: ch.title, lv: ch.lv, st, pages: st === "ok" || st === "done" ? ch.pages : null, exp: rw.exp, gold: rw.gold });
+  });
+  const nx = STORY[at], N = nx && STORY_NPCS.find((s) => s.id === nx.npc);
+  return { at, total: STORY.length, list, next: nx ? { i: at, lv: nx.lv, title: nx.title, npc: N.name, map: D.MAPS[N.map].name, here: nx.npc === npcId } : null };
+}
 const mapName = (id) => (maps[id] ? maps[id].def.name : D.MAPS[id] ? D.MAPS[id].name : "長安城");
 const isInst = (id) => !!(maps[id] && maps[id].inst);
 // 客棧酒菜（角色自己的）、城隍廟祈福（整個帳號）
@@ -234,28 +316,41 @@ function bonus(p, kind) { let v = 0; const f = foodOf(p.ch), b = blessOf(p); if 
 // ======================================================================== 角色數值
 function statsOf(p) {
   const c = p.ch, C = D.CLASSES[c.cls], L = c.lv;
-  const s = { hp: C.hp[0] + C.hp[1] * (L - 1), mp: C.mp[0] + C.mp[1] * (L - 1), atk: C.atk[0] + C.atk[1] * (L - 1), def: C.def[0] + C.def[1] * (L - 1), crit: 5, aspdP: 0, range: C.range, spd: C.spd, aspd: C.aspd };
+  const s = { hp: C.hp[0] + C.hp[1] * (L - 1), mp: C.mp[0] + C.mp[1] * (L - 1), atk: C.atk[0] + C.atk[1] * (L - 1), def: C.def[0] + C.def[1] * (L - 1), crit: 5, aspdP: 0, range: C.range, spd: C.spd, aspd: C.aspd, ls: 0, thorn: 0, cdmg: 0, dodge: 0, ms: 0, pen: 0, cdr: 0 };
   for (const it of Object.values(c.eq)) if (it) for (const st of [it.st, it.eb]) if (st) for (const [k, v] of Object.entries(st)) { if (k === "aspd") s.aspdP += v; else s[k] = (s[k] || 0) + v; }
   s.hp = Math.round(s.hp); s.mp = Math.round(s.mp); s.atk = Math.round(s.atk); s.def = Math.round(s.def);
+  {   // 套裝加成
+    const cnt = {}; for (const it of Object.values(c.eq)) if (it && it.set) cnt[it.set] = (cnt[it.set] || 0) + 1;
+    for (const [k, n] of Object.entries(cnt)) { const S = D.SETS[k]; if (!S) continue; for (const B of [n >= 2 && S.b2, n >= 3 && S.b3, n >= 5 && S.b5]) if (B) for (const [kk, v] of Object.entries(B)) { if (kk === "aspd") s.aspdP += v; else if (D.ADD_STAT[kk]) s[kk] += v; else s[kk] = s[kk] * (1 + v); } }
+    s.hp = Math.round(s.hp); s.mp = Math.round(s.mp); s.atk = Math.round(s.atk); s.def = Math.round(s.def);
+  }
+  s.over = {};      // 超過上限的數值：記下實際合計，介面上標「已達上限」
+  for (const k of ["ls", "thorn", "cdmg", "dodge", "ms", "pen", "cdr"]) { if (s[k] > D.ADD_STAT[k]) s.over[k] = [Math.round(s[k]), D.ADD_STAT[k]]; s[k] = Math.min(D.ADD_STAT[k], s[k]); }
   s.aspd = C.aspd / (1 + s.aspdP / 100);
+  s.spd *= 1 + s.ms / 100;
+  if (p.slowT > now()) s.spd *= 0.55;
   const A = c.adv && D.ADV[c.adv];
-  if (A) { const M = A.mod; for (const k of ["hp", "mp", "atk", "def"]) if (M[k]) s[k] = Math.round(s[k] * M[k]); if (M.spd) s.spd *= M.spd; if (M.aspd) s.aspd *= M.aspd; s.crit += M.crit || 0; s.range += M.range || 0; }
+  for (const AA of [A, c.adv2 && D.ADV2[c.adv2]]) if (AA) { const M = AA.mod; for (const k of ["hp", "mp", "atk", "def"]) if (M[k]) s[k] = Math.round(s[k] * M[k]); if (M.spd) s.spd *= M.spd; if (M.aspd) s.aspd *= M.aspd; s.crit += M.crit || 0; s.range += M.range || 0; for (const k of ["ls", "cdmg", "pen", "dodge", "ms", "thorn"]) if (M[k]) s[k] += M[k]; if (M.ms) s.spd *= 1 + M.ms / 100; }
+  if (p.buff.berserk > now()) { s.atk = Math.round(s.atk * 1.4); s.aspd /= 1.2; s.ls += 10; }
+  if (p.buff.hawk > now()) { s.crit += 40; s.cdmg += 50; }
   if (p.buff.gale > now()) { s.spd *= 1.4; s.aspd /= 1.4; }
   if (p.buff.rage > now()) s.atk = Math.round(s.atk * 1.3);
   if (p.buff.eagle > now()) { s.atk = Math.round(s.atk * 1.25); s.crit += 25; }
   const fa = bonus(p, "atk"); if (fa) s.atk = Math.round(s.atk * (1 + fa));
-  s.crit = Math.min(60, s.crit);
+  const cc = p.buff.hawk > now() ? 95 : D.ADD_STAT.crit; if (s.crit > cc) s.over.crit = [Math.round(s.crit), cc]; s.crit = Math.min(cc, s.crit);
   return s;
 }
-const allSkills = (c) => c.adv ? [...D.SKILLS[c.cls], ...D.ADV_SKILLS[c.adv]] : D.SKILLS[c.cls];
-const slotN = (c) => (c.adv ? D.SLOT_N + 1 : D.SLOT_N);        // 轉職後多一格技能欄（F）
+const allSkills = (c) => [...D.SKILLS[c.cls], ...(c.adv ? D.ADV_SKILLS[c.adv] : []), ...(c.adv2 ? D.ADV2_SKILLS[c.adv2] : [])];
+const slotN = (c) => D.SLOT_N + (c.adv ? 1 : 0) + (c.adv2 ? 1 : 0);   // 一轉多一格（F）、二轉再多一格（D）
+const advName = (c) => (c.adv2 ? D.ADV2[c.adv2].name : c.adv ? D.ADV[c.adv].name : "");
 
 // ======================================================================== 物品
 let itemSeq = now() % 1e6;
-function makeEquip(slot, tier, r, cls) {
+// who：撿到的角色（決定單一技能冷卻詞條從哪些招裡抽）；沒給就用職業全部的招
+function makeEquip(slot, tier, r, cls, who) {
   const b = D.baseItem(slot, tier, cls);
   const it = { u: (itemSeq++).toString(36), s: slot, t: tier, r, c: slot === "weapon" ? cls : undefined, n: b.name, st: {}, v: 0 };
-  it.af = rollAff(tier, D.RAR[r].aff); rebuild(it);
+  it.af = rollAff(tier, D.RAR[r].aff, r, who || cls); rebuild(it);
   return it;
 }
 // 裝備數值 = 基礎（照品質放大）＋詞條（af）；強化加成另外放在 eb
@@ -265,24 +360,46 @@ function affOf(it) {       // 舊裝備沒有分開存詞條：用「總數值 �
   const b = baseOf(it), af = {}; for (const [k, v] of Object.entries(it.st)) { const d = v - (b[k] || 0); if (d > 0) af[k] = d; }
   return (it.af = af);
 }
-function rollAff(tier, n) {
-  const keys = Object.keys(D.AFFIX), picked = new Set(), af = {};
-  while (picked.size < n) picked.add(keys[randomInt(keys.length)]);
+// 抽單一技能冷卻詞條的招式池：二轉了就只抽自己的招；一轉了抽一轉＋兩種二轉；還沒轉職抽整個職業
+function skPool(who) {
+  if (!who) return []; if (typeof who === "string") return D.classSkills(who);
+  if (who.adv2) return allSkills(who);
+  if (who.adv) return [...D.SKILLS[who.cls], ...D.ADV_SKILLS[who.adv], ...Object.entries(D.ADV2).filter(([, b]) => b.base === who.adv).flatMap(([k]) => D.ADV2_SKILLS[k])];
+  return D.classSkills(who.cls);
+}
+function rollAff(tier, n, r = 0, cls) {
+  const norm = Object.keys(D.AFFIX).filter((k) => !D.AFFIX[k].sp), sp = Object.keys(D.AFFIX).filter((k) => D.AFFIX[k].sp), picked = new Set(), af = {};
+  const spP = r >= 3 ? 0.45 : r === 2 ? 0.3 : r === 1 ? 0.15 : 0;
+  while (picked.size < n) { const pool = Math.random() < spP ? sp : norm; picked.add(pool[randomInt(pool.length)]); }
   for (const k of picked) af[k] = Math.max(1, Math.round(D.AFFIX[k].v(tier) * rnd(0.7, 1.3)));
+  if (cls && Math.random() < (D.SKCD.p[r] || 0)) {        // 額外一行：某一招的冷卻縮短
+    const pool = skPool(cls).filter((s) => s.cd >= 6 && s.lv <= tier + 10);
+    if (pool.length) { const sk = pool[randomInt(pool.length)]; af["cd_" + sk.id] = Math.max(5, Math.round(D.SKCD.v(tier) * rnd(0.8, 1.2))); }
+  }
   return af;
 }
 function rebuild(it) {
   const st = baseOf(it); for (const [k, v] of Object.entries(affOf(it))) st[k] = (st[k] || 0) + v; it.st = st;
-  if (it.e) { const eb = {}; for (const [k, v] of Object.entries(D.baseItem(it.s, it.t, it.c || "sword").st)) if (k !== "crit") eb[k] = Math.max(1, Math.round(v * D.ENH.bonus * it.e)); it.eb = eb; } else delete it.eb;
+  if (it.e) { const eb = {}; for (const [k, v] of Object.entries(D.baseItem(it.s, it.t, it.c || "sword").st)) if (k !== "crit" && k !== "ms") eb[k] = Math.max(1, Math.round(v * D.ENH.bonus * it.e)); it.eb = eb; } else delete it.eb;
   it.v = Math.round(D.itemValue(it.t, it.r) * (1 + 0.15 * (it.e || 0)));
 }
 const matCount = (c, k) => c.inv.filter((x) => x.p === k).reduce((s, x) => s + x.q, 0);
 function takeMat(c, k, n) { const it = c.inv.find((x) => x.p === k && x.q >= n); if (!it) return false; it.q -= n; if (it.q <= 0) c.inv.splice(c.inv.indexOf(it), 1); return true; }
 const isPot = (it) => it && it.p;
+const invMax = (c) => c.bag || D.INV_MAX;
+const bagCost = (c) => { const i = Math.round((invMax(c) - D.INV_MAX) / D.BAG_UP.step); return invMax(c) >= D.BAG_UP.max ? 0 : D.BAG_UP.cost[i] || 0; };
+// 一鍵整理：裝備依部位、品質、等級、強化排；藥品照商店順序；材料放最後；同種的藥和材料併成一疊
+function sortInv(c) {
+  const SO = Object.keys(D.SLOTS), PO = Object.keys(D.POTIONS), stack = {}, eq = [], pots = [];
+  for (const it of c.inv) { if (it.p) { if (stack[it.p]) stack[it.p].q += it.q; else { stack[it.p] = it; pots.push(it); } } else eq.push(it); }
+  eq.sort((a, b) => SO.indexOf(a.s) - SO.indexOf(b.s) || b.r - a.r || b.t - a.t || (b.e || 0) - (a.e || 0) || (b.lock ? 1 : 0) - (a.lock ? 1 : 0));
+  pots.sort((a, b) => (D.POTIONS[a.p] && D.POTIONS[a.p].mat ? 1 : 0) - (D.POTIONS[b.p] && D.POTIONS[b.p].mat ? 1 : 0) || PO.indexOf(a.p) - PO.indexOf(b.p));
+  c.inv = [...eq, ...pots.filter((x) => !(D.POTIONS[x.p] && D.POTIONS[x.p].mat)), ...pots.filter((x) => D.POTIONS[x.p] && D.POTIONS[x.p].mat)];
+}
 function addItem(p, it) {
   const inv = p.ch.inv;
   if (isPot(it)) { const ex = inv.find((x) => x.p === it.p); if (ex) { ex.q += it.q; return true; } }
-  if (inv.length >= D.INV_MAX) return false;
+  if (inv.length >= invMax(p.ch)) return false;
   inv.push(it); return true;
 }
 function invChanged(p) { p.dirty = true; p.invDirty = true; if (p.trade) cancelTrade(p.trade, "背包有變動，交易取消"); }
@@ -293,14 +410,15 @@ function rollRarity(boss) {
   if (boss) return r < 18 ? 3 : r < 70 ? 2 : 1;
   return r < 1 ? 3 : r < 8 ? 2 : r < 30 ? 1 : 0;
 }
+function pickSlot() { const E = Object.entries(D.SLOT_W), tot = E.reduce((a, [, w]) => a + w, 0); let r = Math.random() * tot; for (const [k, w] of E) if ((r -= w) < 0) return k; return "weapon"; }
 function randomDrop(p, lv, boss) {
-  const slot = ["weapon", "armor", "acc"][randomInt(3)];
-  return makeEquip(slot, tierFor(lv), rollRarity(boss), p.ch.cls);   // 武器掉自己職業的
+  const slot = pickSlot();
+  return makeEquip(slot, tierFor(lv), rollRarity(boss), p.ch.cls, p.ch);   // 武器掉自己職業的
 }
 
 // ======================================================================== 新角色
 function newChar(name, cls, lv = 1) {
-  const c = { name, cls, lv, exp: 0, visited: ["town"], map: "town", x: D.TOWN_SPAWN.x, y: D.TOWN_SPAWN.y, hp: 9999, mp: 9999, inv: [], eq: { weapon: null, armor: null, acc: null }, made: now() };
+  const c = { name, cls, lv, exp: 0, visited: ["town"], map: "town", x: D.TOWN_SPAWN.x, y: D.TOWN_SPAWN.y, hp: 9999, mp: 9999, inv: [], eq: Object.fromEntries(Object.keys(D.SLOTS).map((k) => [k, null])), made: now() };
   const t = tierFor(lv - 1);           // 帳號已經練高了：新角色直接拿那個等級的白裝
   c.eq.weapon = makeEquip("weapon", t, 0, cls); c.eq.armor = makeEquip("armor", t, 0, cls);
   if (lv > 1) c.visited = ["town", ...Object.entries(D.MAPS).filter(([, v]) => !v.town && (parseInt(v.lvl, 10) || 99) <= lv).map(([k]) => k)];
@@ -313,7 +431,7 @@ const out = (ws, o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o
 const sys = (p, text) => out(p.ws, { t: "mo", a: "sys", text });
 function sysAll(text) { for (const p of players.values()) sys(p, text); }
 
-function charList(A) { return A.chars.map((c, i) => ({ i, n: c.name, c: c.cls, lv: c.lv, adv: c.adv || "", advN: c.adv ? D.ADV[c.adv].name : "", map: D.MAPS[c.map] ? D.MAPS[c.map].name : "長安城", w: c.eq.weapon ? c.eq.weapon.n : "" })); }
+function charList(A) { return A.chars.map((c, i) => ({ i, n: c.name, c: c.cls, lv: c.lv, adv: c.adv2 || c.adv || "", advN: advName(c), map: D.MAPS[c.map] ? D.MAPS[c.map].name : "長安城", w: c.eq.weapon ? c.eq.weapon.n : "" })); }
 function classList() { return Object.entries(D.CLASSES).map(([k, v]) => ({ k, n: v.name, d: v.desc, skills: D.SKILLS[k].map((s) => s.name) })); }
 function sendChars(ws) {
   const A = db.acc[ws.mmoKey];
@@ -336,7 +454,7 @@ function enter(ws, key, ch, real) {
 function placeIn(p, mapId, x, y) {
   const m = maps[mapId];
   if (!walk(m, x, y)) { const s = m.def.town ? D.TOWN_SPAWN : m.spots[0]; x = s.x; y = s.y; }
-  p.map = mapId; p.x = x; p.y = y; p.path = null; p.tgt = null; p.queued = null; p.known = new Set();
+  p.map = mapId; p.x = x; p.y = y; p.path = null; p.tgt = null; p.queued = null; p.known = new Set(); p.pickT = 0; m.lootDirty = true;
   for (const q of players.values()) if (q !== p && q.map === mapId) q.known.delete(p.id);
   out(p.ws, { t: "mo", a: "map", you: p.id, map: { id: mapId, name: m.def.name, lvl: m.def.lvl || "", w: m.w, h: m.h, theme: m.def.theme, town: !!m.def.town, tiles: m.tiles, portals: m.def.portals.map((q) => ({ x: q.x, y: q.y, label: q.label })), npcs: npcsOf(mapId), inst: m.inst ? m.inst.kind : "", pvp: !!m.pvp, layout: m.def.layout ? { buildings: D.TOWN.buildings, deco: D.TOWN.deco, stage: D.TOWN.stage, folk: D.TOWN.folk } : undefined } });
   if (m.inst) { p.dirty = true; p.invDirty = true; if (p.trade) cancelTrade(p.trade, "離開了，交易取消"); return; }
@@ -359,30 +477,41 @@ function leave(ws, kicked) {
 }
 
 // ======================================================================== 戰鬥
-function hitMob(p, mob, mult, fxKind) {
+function hitMob(p, mob, mult, fxKind, sid) {
   if (mob.pvp) return hitPvp(p, mob.pvp, mult, fxKind);
   if (mob.dead) return 0;
   const st = statsOf(p), crit = Math.random() * 100 < st.crit;
-  let d = st.atk * mult * rnd(0.9, 1.1) * (crit ? 1.6 : 1) - mob.st.def * 0.5;
-  d = Math.max(1, Math.round(d));
+  let crit2 = crit;
+  if (p.buff.stealth > now()) { p.buff.stealth = 0; crit2 = true; mult *= 2.5; for (const q of players.values()) q.known.delete(p.id); }     // 影遁：出手就現形，這一擊必暴、2.5 倍
+  let d = st.atk * mult * rnd(0.9, 1.1) * (crit2 ? 1.6 + st.cdmg / 100 : 1) - mob.st.def * 0.5 * (1 - st.pen / 100);
+  if (mob.curseT > now()) d *= 1 + (mob.curseP || 0);
+  d = Math.max(1, Math.round(d * (mob.dmgMul ?? 1)));
+  if (st.ls && d > 1) { const hl = Math.round(d * st.ls / 100); if (hl > 0 && p.hp < st.hp) { p.hp = Math.min(st.hp, p.hp + hl); p.dirty = true; } }
   mob.hp -= d; mob.dmg.set(p.key, (mob.dmg.get(p.key) || 0) + d);
   if (!mob.tgt) mob.tgt = p.key;
   mob.calmT = now();
   p.lastHit = now();
-  maps[p.map].fx.push({ k: fxKind || "h", a: p.id, b: mob.id, d, c: crit ? 1 : 0 });
+  maps[p.map].fx.push({ k: fxKind || "h", a: p.id, b: mob.id, d, c: crit2 ? 1 : 0, ...(sid ? { s: sid } : {}) });
   if (mob.hp <= 0) killMob(maps[p.map], mob);
   return d;
 }
 function hurtPlayer(m, mob, p, mult = 1) {
   if (p.dead) return;
   const st = statsOf(p);
+  if (mult === 1 && st.dodge && Math.random() * 100 < st.dodge) { m.fx.push({ k: "miss", b: p.id }); return; }
   let d = mob.st.atk * mult * rnd(0.85, 1.15) - st.def * 0.5;
   if (p.buff.guard > now()) d *= 0.5;
   if (p.buff.shield > now()) d *= 0.6;
   if (p.buff.mingwang > now()) d *= 0.4;
+  if (p.buff.bati > now()) d *= 0.5;
+  if (p.buff.barrier > now()) d *= 0.5;
   d = Math.max(1, Math.round(d));
   p.hp -= d; p.lastHit = now(); p.dirty = true;
   m.fx.push({ k: "m", a: mob.id, b: p.id, d });
+  if (mult === 1 && st.thorn && !mob.dead && !mob.pvp) {        // 反傷：一般攻擊打回去
+    const r = Math.max(1, Math.round(d * st.thorn / 100)); mob.hp -= r; mob.dmg.set(p.key, (mob.dmg.get(p.key) || 0) + r);
+    m.fx.push({ k: "s", a: p.id, b: mob.id, d: r, c: 0, s: "thorn" }); if (mob.hp <= 0) killMob(m, mob);
+  }
   if (p.hp <= 0) die(p);
 }
 function die(p) {
@@ -414,13 +543,14 @@ function giveExp(p, n, raw) {
 }
 function killMob(m, mob) {
   mob.dead = true; mob.hp = 0; mob.tgt = null; mob.path = null;
-  mob.respawnAt = now() + (mob.def.boss ? mob.def.respawn * 1000 : rnd(12000, 22000));
+  mob.respawnAt = now() + (mob.def.boss || mob.def.elite ? mob.def.respawn * 1000 : rnd(12000, 22000));
   m.fx.push({ k: "kill", b: mob.id });
   const dmg = [...mob.dmg.entries()].filter(([k]) => { const q = players.get(k); return q && q.map === m.id; });
   mob.dmg = new Map();
   if (!dmg.length) return;
   const total = dmg.reduce((s, [, v]) => s + v, 0);
-  if (m.inst && mob.def.boss) { towerClear(m, mob, dmg); return; }
+  if (m.inst && m.inst.kind === "dg" && mob === m.inst.boss) { dgBossKilled(m, mob); return; }
+  if (m.inst && mob.def.boss) return;          // 爬塔的王：獎勵在上樓時給
   if (mob.def.boss) {
     const names = [];
     for (const [k, v] of dmg) {
@@ -428,15 +558,14 @@ function killMob(m, mob) {
       if (share < 0.03) continue;
       giveExp(q, Math.round(mob.st.exp * Math.max(0.25, share)));
       const gold = Math.round(mob.st.gold * Math.max(0.15, share)); q.ch.gold += gold;
-      const it = randomDrop(q, mob.def.lv, true);
-      const got = addItem(q, it); if (!got) q.ch.gold += it.v;
-      const ore = 2 + randomInt(3); addItem(q, { p: "ore", q: ore });
-      const extra = [`玄鐵 ×${ore}`];
-      if (Math.random() < 0.5) { addItem(q, { p: "jade", q: 1 }); extra.push("靈玉"); }
-      if (Math.random() < 0.25) { addItem(q, { p: "recast", q: 1 }); extra.push("重鑄石"); }
-      sys(q, `另外拿到 ${extra.join("、")}。`);
-      invChanged(q);
-      sys(q, `擊敗${mob.def.name}！分到 ${gold} 兩${got ? `、${D.RAR[it.r].name}「${it.n}」` : `（背包滿了，戰利品換成 ${it.v} 兩）`}。`);
+      const it = randomDrop(q, mob.def.lv, true), own = [q.key];
+      dropLoot(m, it, mob.x, mob.y, own);
+      const bs = D.BOSS_SET[mob.k]; if (bs && Math.random() * 100 < D.BOSS_SET_P) { const si = makeSetItem(bs, pickSlot(), tierFor(mob.def.lv), Math.max(2, rollRarity(true)), q.ch.cls, q.ch); dropLoot(m, si, mob.x, mob.y, own); sysAll(`【套裝】${q.ch.name} 從${mob.def.name}身上拿到「${si.n}」！`); }
+      dropLoot(m, { p: "ore", q: 2 + randomInt(3) }, mob.x, mob.y, own);
+      if (Math.random() < 0.5) dropLoot(m, { p: "jade", q: 1 }, mob.x, mob.y, own);
+      if (Math.random() < 0.25) dropLoot(m, { p: "recast", q: 1 }, mob.x, mob.y, own);
+      q.dirty = true;
+      sys(q, `擊敗${mob.def.name}！分到 ${gold} 兩，你的戰利品掉在地上（名字是你的顏色），${D.LOOT_OWN} 秒內只有你撿得到。`);
       names.push(q.ch.name);
       bountyHit(q, "boss"); { const A = db.acc[q.key]; if (A) A.bk = (A.bk || 0) + 1; }
       if (it.r === 3) sysAll(`【傳說】${q.ch.name} 從${mob.def.name}身上得到傳說裝備「${it.n}」！`);
@@ -461,16 +590,51 @@ function killMob(m, mob) {
   const r = Math.random();
   let it = null;
   if (r < 0.09 * (1 + bonus(top, "drop"))) it = randomDrop(top, mob.def.lv, false);
-  else if (r < 0.21) { const lv = mob.def.lv; it = { p: Math.random() < 0.6 ? (lv >= 30 ? "hp4" : lv >= 18 ? "hp3" : lv >= 10 ? "hp2" : "hp1") : (lv >= 30 ? "mp3" : lv >= 10 ? "mp2" : "mp1"), q: 1 }; }
+  else if (r < 0.21) { const lv = mob.def.lv; it = { p: Math.random() < 0.6 ? (lv >= 80 ? "hp6" : lv >= 60 ? "hp5" : lv >= 30 ? "hp4" : lv >= 18 ? "hp3" : lv >= 10 ? "hp2" : "hp1") : (lv >= 80 ? "mp5" : lv >= 60 ? "mp4" : lv >= 30 ? "mp3" : lv >= 10 ? "mp2" : "mp1"), q: 1 }; }
   // 強化材料：一般怪偶爾掉玄鐵、很少掉靈玉
   const mr = Math.random();
-  if (mr < 0.05 || (mr < 0.062 && mob.def.lv >= 10)) { const k = mr < 0.05 ? "ore" : "jade"; if (addItem(top, { p: k, q: 1 })) { invChanged(top); m.fx.push({ k: "loot", a: top.id, b: mob.id, n: D.POTIONS[k].name, r: k === "jade" ? 2 : 1 }); } }
+  const own = top.party ? [...parties.get(top.party).members] : [top.key];
+  if (mr < 0.05 || (mr < 0.062 && mob.def.lv >= 10)) dropLoot(m, { p: mr < 0.05 ? "ore" : "jade", q: 1 }, mob.x, mob.y, own);
+  if (mob.def.elite) {      // 小王：必掉一件裝備（三成機會是王級品質），外加玄鐵、偶爾靈玉／重鑄石
+    it = randomDrop(top, mob.def.lv, Math.random() < 0.3);
+    dropLoot(m, { p: "ore", q: 1 + randomInt(2) }, mob.x, mob.y, own);
+    if (Math.random() < 0.35) dropLoot(m, { p: "jade", q: 1 }, mob.x, mob.y, own);
+    if (Math.random() < 0.08) dropLoot(m, { p: "recast", q: 1 }, mob.x, mob.y, own);
+    for (const q of mates) sys(q, `打倒小王「${mob.def.name}」！戰利品掉在地上，${Math.round(mob.def.respawn / 60)} 分鐘後牠會再出現。`);
+  }
   if (it) {
-    const got = addItem(top, it);
-    if (got) { invChanged(top); m.fx.push({ k: "loot", a: top.id, b: mob.id, n: it.p ? D.POTIONS[it.p].name : it.n, r: it.p ? 0 : it.r }); }
-    else sys(top, "背包滿了，撿不到東西。");
+    dropLoot(m, it, mob.x, mob.y, own);
     if (!it.p && it.r === 3) sysAll(`【傳說】${top.ch.name} 打倒${mob.def.name}，掉出傳說裝備「${it.n}」！`);
   }
+}
+
+// ======================================================================== 地上的掉落物
+// 打怪掉的東西先掉在地上，點了才撿；前 LOOT_OWN 秒只有打倒的人（和隊友）撿得到，LOOT_TTL 秒後消失
+let lootSeq = 1;
+function dropLoot(m, it, x, y, own) {
+  for (let k = 0; k < 10; k++) {          // 散開一點，找一格走得到的地
+    const a = Math.random() * Math.PI * 2, r = 0.3 + Math.random() * 1.1, nx = x + Math.cos(a) * r, ny = y + Math.sin(a) * r;
+    if (walk(m, nx, ny)) { x = nx; y = ny; break; }
+  }
+  const t = now();
+  m.loot.push({ id: lootSeq++, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, it, own: own || null, ownUntil: t + D.LOOT_OWN * 1000, until: t + D.LOOT_TTL * 1000 });
+  m.lootDirty = true;
+}
+const lootView = (m, key) => m.loot.map((l) => { const it = l.it, mine = !l.own || l.ownUntil < now() || l.own.includes(key); return { id: l.id, x: l.x, y: l.y, n: it.p ? `${D.POTIONS[it.p].name}${it.q > 1 ? " ×" + it.q : ""}` : (it.e ? `+${it.e} ` : "") + it.n, r: it.p ? (it.p === "recast" ? 3 : it.p === "jade" ? 2 : it.p === "ore" ? 1 : 0) : it.r, s: it.s || "", c: it.c || "", p: it.p || "", set: it.set || "", mine: mine ? 1 : 0 }; });
+function tryPick(p, l) {
+  const m = maps[p.map], t = now();
+  if (l.own && l.ownUntil > t && !l.own.includes(p.key)) return `這是別人打到的，再等 ${Math.ceil((l.ownUntil - t) / 1000)} 秒才能撿`;
+  if (!addItem(p, l.it.p ? { p: l.it.p, q: l.it.q } : l.it)) return "背包滿了";
+  m.loot.splice(m.loot.indexOf(l), 1); m.lootDirty = true; invChanged(p);
+  const it = l.it;
+  m.fx.push({ k: "loot", a: p.id, b: p.id, n: it.p ? `${D.POTIONS[it.p].name}${it.q > 1 ? " ×" + it.q : ""}` : it.n, r: it.p ? 0 : it.r });
+  return null;
+}
+function tickLoot(m) {
+  const t = now(), n0 = m.loot.length;
+  m.loot = m.loot.filter((l) => l.until > t);
+  if (m.loot.length !== n0) m.lootDirty = true;
+  for (const l of m.loot) if (l.own && !l.freed && l.ownUntil <= t) { l.freed = true; m.lootDirty = true; }      // 保護時間到了：大家都能撿（顏色要更新）
 }
 
 // ======================================================================== 技能
@@ -490,7 +654,7 @@ function mobsOnLine(m, x, y, dx, dy, len, w, list = m.mobs) {
   for (const mob of list) {
     if (mob.dead) continue;
     const vx = mob.x - x, vy = mob.y - y, along = vx * dx + vy * dy, side = Math.abs(vx * dy - vy * dx);
-    if (along >= -0.3 && along <= len + 0.4 && side <= w / 2 + (mob.def.boss ? 1.0 : 0.45)) out.push({ mob, along });
+    if (along >= -0.3 && along <= len + 0.4 && side <= w / 2 + (mob.def.boss ? 1.0 : mob.def.elite ? 0.7 : 0.45)) out.push({ mob, along });
   }
   return out.sort((a, b) => a.along - b.along);
 }
@@ -498,20 +662,32 @@ function applyFx(p, mob, sk) {      // 附帶效果：暈眩、緩速、中毒
   if (mob.dead) return;
   if (mob.pvp) { if (sk.dot) for (let k = 1; k <= sk.dot[1]; k++) later(k * 1000, () => hitPvp(p, mob.pvp, sk.dot[0], "dot")); return; }
   const t = now();
-  if (sk.stun) mob.stunT = Math.max(mob.stunT || 0, t + sk.stun * 1000 * (mob.def.boss ? 0.4 : 1));
+  if (sk.stun) mob.stunT = Math.max(mob.stunT || 0, t + sk.stun * 1000 * (mob.def.boss ? 0.4 : mob.def.elite ? 0.7 : 1));
   if (sk.slow) { mob.slowT = t + sk.slow[1] * 1000; mob.slowP = sk.slow[0] * (mob.def.boss ? 0.5 : 1); }
-  if (sk.dot) for (let k = 1; k <= sk.dot[1]; k++) later(k * 1000, () => { if (!mob.dead && players.get(p.key) === p && p.map === mob.mapId) hitMob(p, mob, sk.dot[0], "dot"); });
+  if (sk.curse) { mob.curseT = t + sk.curse[1] * 1000; mob.curseP = sk.curse[0]; }
+  if (sk.dot) for (let k = 1; k <= sk.dot[1]; k++) later(k * 1000, () => { if (!mob.dead && players.get(p.key) === p && p.map === mob.mapId) hitMob(p, mob, sk.dot[0], "dot", sk.id); });
 }
-function strike(p, mob, sk, mult = sk.mult) { if (mult > 0) hitMob(p, mob, mult, "s"); applyFx(p, mob, sk); }
+function strike(p, mob, sk, mult = sk.mult) {
+  if (mult > 0) {
+    if (sk.exec && !mob.pvp && mob.hp / mob.max < sk.exec[0]) mult *= sk.exec[1];         // 斬殺：殘血的敵人傷害加倍
+    const d = hitMob(p, mob, mult, "s", sk.id);
+    if (sk.drain && d > 0) { const st = statsOf(p), h = Math.round(d * sk.drain / 100); if (p.hp < st.hp) { p.hp = Math.min(st.hp, p.hp + h); p.dirty = true; maps[p.map].fx.push({ k: "heal", b: p.id, d: h }); } }
+  }
+  applyFx(p, mob, sk);
+}
 const nearestMob = (m, x, y, r, list = m.mobs) => { let best = null, bd = r; for (const mob of list) if (!mob.dead) { const d = Math.hypot(mob.x - x, mob.y - y); if (d < bd) { bd = d; best = mob; } } return best; };
 
+// 實際冷卻：冷卻縮減（全部招）× 單一技能冷卻詞條（只算那一招，最多 SKCD.max%）
+function effCd(st, sk) { return sk.cd * (1 - Math.min(D.ADD_STAT.cdr, st.cdr || 0) / 100) * (1 - Math.min(D.SKCD.max, st["cd_" + sk.id] || 0) / 100); }
 function castSkill(p, sk, aim) {
   const m = maps[p.map], t = now();
-  p.mp -= sk.mp; p.cd[sk.id] = t + sk.cd * 1000; p.lastHit = Math.max(p.lastHit, t - 4000); p.dirty = true;
+  p.mp -= sk.mp; p.cd[sk.id] = t + effCd(statsOf(p), sk) * 1000; p.lastHit = Math.max(p.lastHit, t - 4000); p.dirty = true;
   const base = { k: "sk", a: p.id, s: sk.id, type: sk.type };
   if (sk.type === "self") {
-    m.fx.push({ ...base, x: p.x, y: p.y, r: sk.r || 0 });
+    m.fx.push({ ...base, x: p.x, y: p.y, r: sk.r || 0, ...(sk.pet ? { dur: sk.pet.dur, follow: sk.pet.follow ? 1 : 0 } : {}), ...(sk.buff ? { bt: sk.buff[1] } : {}) });
     if (sk.buff) p.buff[sk.buff[0]] = t + sk.buff[1] * 1000;
+    if (sk.buff && sk.buff[0] === "stealth") { for (const mob of m.mobs) if (mob.tgt === p.key) { mob.tgt = null; mob.path = null; } for (const q of players.values()) q.known.delete(p.id); }
+    if (sk.pet) { p.pets = (p.pets || []).filter((x) => x.sid !== sk.id); p.pets.push({ sid: sk.id, ...sk.pet, sk, x: p.x, y: p.y, map: p.map, until: t + sk.pet.dur * 1000, next: t + 300 }); }
     if (sk.taunt) for (const mob of m.mobs) if (!mob.dead && dist(mob, p) <= sk.r) { mob.tgt = p.key; mob.path = null; }
     if (sk.heal) {
       const who = [p];
@@ -525,6 +701,11 @@ function castSkill(p, sk, aim) {
   }
   if (sk.type === "target") {
     const mob = aim.mob;
+    if (sk.blink && !mob.pvp) {        // 瞬移到目標身後
+      const d = Math.hypot(mob.x - p.x, mob.y - p.y) || 1, bx = mob.x + (mob.x - p.x) / d * 0.9, by = mob.y + (mob.y - p.y) / d * 0.9;
+      const to = walk(m, bx, by) ? { x: bx, y: by } : walk(m, mob.x - (mob.x - p.x) / d * 0.9, mob.y - (mob.y - p.y) / d * 0.9) ? { x: mob.x - (mob.x - p.x) / d * 0.9, y: mob.y - (mob.y - p.y) / d * 0.9 } : null;
+      if (to) { m.fx.push({ ...base, x: p.x, y: p.y, dx: to.x - p.x, dy: to.y - p.y, len: 1, dash: 1, blinkTo: 1 }); p.x = to.x; p.y = to.y; p.path = null; p.face = mob.x >= p.x ? 1 : -1; }
+    }
     m.fx.push({ ...base, b: mob.id, x: mob.x, y: mob.y });
     const hits = sk.hits || 1;
     for (let h = 0; h < hits; h++) later(h * 140 + 120, () => { if (players.get(p.key) === p && p.map === m.id) strike(p, mob, sk); });
@@ -569,7 +750,7 @@ function castSkill(p, sk, aim) {
     const ticks = sk.ticks || 1;
     for (let k = 0; k < ticks; k++) later((sk.delay || 0) * 1000 + k * 600, () => {
       if (players.get(p.key) !== p || p.map !== m.id) return;
-      for (const mob of foes(m, p)) if (!mob.dead && Math.hypot(mob.x - cx, mob.y - cy) <= sk.r + (mob.def.boss ? 0.8 : 0)) strike(p, mob, sk);
+      for (const mob of foes(m, p)) if (!mob.dead && Math.hypot(mob.x - cx, mob.y - cy) <= sk.r + (mob.def.boss ? 0.8 : mob.def.elite ? 0.4 : 0)) strike(p, mob, sk);
       if (k > 0) m.fx.push({ k: "tick", s: sk.id, x: cx, y: cy, r: sk.r });
     });
   }
@@ -577,6 +758,7 @@ function castSkill(p, sk, aim) {
 // aim：{ x, y, id }（滑鼠的世界座標、滑鼠下的怪）
 function tryCast(p, sk, aim) {
   if (p.dead) return null;
+  if (p.stunT > now()) return "暈眩中，不能放招";
   if (p.ch.lv < sk.lv) return `${sk.lv} 級才能用`;
   if (!p.ch.slots.includes(sk.id)) return "這招沒有放在技能欄";
   if ((p.cd[sk.id] || 0) > now()) return null;
@@ -616,8 +798,20 @@ function foes(m, p) { if (!m.pvp) return m.mobs; const l = m.mobs.slice(); for (
 function hitPvp(p, q, mult, fxKind) {
   const m = maps[p.map]; if (!m || !m.inst || !m.inst.fight || q.dead || q.map !== p.map) return 0;
   const st = statsOf(p), sq = statsOf(q), crit = Math.random() * 100 < st.crit;
-  let d = (st.atk * mult * rnd(0.9, 1.1) * (crit ? 1.6 : 1) - sq.def * 0.5) * D.ARENA.dmg;
+  const A = D.ARENA;
+  let d = (st.atk * mult * rnd(0.9, 1.1) * (crit ? A.crit + st.cdmg / 200 : 1) - sq.def * 0.5 * (1 - st.pen / 100)) * A.dmg;
+  d = Math.min(d, sq.hp * (mult > 1 || (fxKind && fxKind !== "h") ? A.cap : A.capAtk));       // 單下上限：至少要打好幾下才分得出勝負
   if (q.buff.guard > now()) d *= 0.5; if (q.buff.shield > now()) d *= 0.6; if (q.buff.mingwang > now()) d *= 0.4;
+  if (q.buff.barrier > now()) d *= 0.7;
+  if (sq.dodge && Math.random() * 100 < sq.dodge) { m.fx.push({ k: "miss", a: p.id, b: q.id }); return 0; }
+  {   // 爆發上限：最近 win 毫秒內已經吃了多少，超過 burst 的部分打折
+    const t = now(), lim = sq.hp * A.burst;
+    q.pvpHits = (q.pvpHits || []).filter((h) => t - h[0] < A.win);
+    const got = q.pvpHits.reduce((a, h) => a + h[1], 0);
+    d = got >= lim ? d * A.over : got + d > lim ? (lim - got) + (got + d - lim) * A.over : d;
+    q.pvpHits.push([t, d]);
+  }
+  if (st.ls) p.hp = Math.min(st.hp, p.hp + Math.max(0, d) * st.ls / 100 * 0.5);
   d = Math.max(1, Math.round(d));
   q.hp -= d; q.lastHit = p.lastHit = now(); q.dirty = true;
   m.fx.push({ k: fxKind || "h", a: p.id, b: q.id, d, c: crit ? 1 : 0 });
@@ -637,6 +831,16 @@ function tickPlayer(p, dt) {
   p.hp = Math.min(st.hp, p.hp + st.hp * (calm ? 0.04 : 0.005) * dt);
   p.mp = Math.min(st.mp, p.mp + st.mp * (calm ? 0.04 : 0.012) * dt);
   if ((p.hp | 0) !== (hp0 | 0) || (p.mp | 0) !== (mp0 | 0)) p.dirty = true;
+  if (p.pets && p.pets.length) {
+    p.pets = p.pets.filter((x) => x.until > t && x.map === p.map);
+    for (const pe of p.pets) {
+      if (pe.follow) { pe.x = p.x; pe.y = p.y; }
+      if (t < pe.next) continue; pe.next = t + pe.every;
+      const list = foes(m, p).filter((mob) => !mob.dead && Math.hypot(mob.x - pe.x, mob.y - pe.y) <= pe.r).sort((a, b) => Math.hypot(a.x - pe.x, a.y - pe.y) - Math.hypot(b.x - pe.x, b.y - pe.y)).slice(0, pe.n || 1);
+      for (const mob of list) { m.fx.push({ k: "petshot", a: p.id, s: pe.sid, x: pe.x, y: pe.y, b: mob.id }); hitMob(p, mob, pe.mult, "s", pe.sid); if (pe.slow && !mob.pvp) { mob.slowT = t + pe.slow[1] * 1000; mob.slowP = pe.slow[0]; } }
+    }
+  }
+  if (p.stunT > t) return;                        // 被王暈住：這段時間不能動也不能打
   // 鍵盤（WASD）移動：照方向一直走，撞牆時沿著牆滑；這時不會自動追怪，但目標在射程內照樣普攻
   const keyMove = p.dir && t - p.dirT < 1200;
   if (keyMove) {
@@ -668,43 +872,324 @@ function tickPlayer(p, dt) {
       }
     }
   } else if (p.path && p.path.length) stepPath(p, st.spd, dt);
+  if (p.pickT) {
+    const l = m.loot.find((x) => x.id === p.pickT);
+    if (!l) p.pickT = 0;
+    else if (Math.hypot(l.x - p.x, l.y - p.y) <= 1.3) { p.pickT = 0; p.path = null; const e = tryPick(p, l); if (e) out(p.ws, { t: "mo", a: "err", text: e }); }
+    else if (!p.path || !p.path.length) p.pickT = 0;
+  }
   // 傳送點
   const tile = m.t[Math.floor(p.y) * m.w + Math.floor(p.x)];
   if (tile === 4) {
     const pt = m.def.portals.find((q) => Math.abs(q.x - Math.floor(p.x)) <= 0 && (Math.floor(p.y) === q.y || Math.floor(p.y) === q.y + 1));
+    if (pt && pt.escape && m.inst && m.inst.guard && !m.inst.guard.dead) {
+      p.x = Math.min(p.x, pt.x - 0.6); p.path = null;
+      if (!p.guardMsgT || now() - p.guardMsgT > 3000) { p.guardMsgT = now(); sys(p, "出口被熔岩封住了！先打倒「熔岩守將」才能出去。"); }
+      return;
+    }
+    if (pt && pt.escape && m.inst && m.inst.kind === "dg") dgEscape(m, p);
     if (pt) placeIn(p, pt.to, pt.tx + 0.5, pt.ty + 0.5 + (Math.floor(p.y) - pt.y));
   }
 }
+// ======================================================================== 王的專屬技能
+// 每隻王一套招式輪流放：先出預警（圓、直線、扇形、環形），預警結束才判定；放招時王站著不動（busyT）
+const BOSS_SK = {
+  b_bamboo: ["spikes", "leaves"],       // 竹妖：竹刺穿地、竹葉風暴
+  b_tiger: ["pounce", "roar"],          // 白額虎王：猛虎撲擊、虎嘯山林（暈眩）
+  b_corpse: ["pools", "raise"],         // 屍王：屍毒池（地上持續毒）、屍變（叫殭屍）
+  b_snow: ["icicles", "breath"],        // 冰魄雪妖：冰錐雨、寒冰吐息（緩速）
+  b_qilin: ["charge", "nova"],          // 火麒麟：烈焰衝鋒（留火）、麒麟踏火（三圈火環往外擴）
+  b_lord: ["palm", "pull"],             // 魔教教主：天魔掌（打最遠的人）、吸星大法（拉過來再砸）
+  b_fox: ["foxfire", "illusion"],       // 九尾妖狐：九尾狐火（九道放射）、幻狐分身（瞬移＋分身）
+};
+const foesNear = (m, x, y, r) => [...players.values()].filter((q) => q.map === m.id && !q.dead && Math.hypot(q.x - x, q.y - y) <= r);
+const onLine = (q, x, y, dx, dy, len, w) => { const ax = q.x - x, ay = q.y - y, al = ax * dx + ay * dy; return al >= -0.4 && al <= len + 0.4 && Math.abs(ax * dy - ay * dx) <= w / 2 + 0.3; };
+const inCone = (q, x, y, a, arc, r) => { const d = Math.hypot(q.x - x, q.y - y); if (d > r) return false; if (d < 0.6) return true; let da = Math.atan2(q.y - y, q.x - x) - a; da = Math.atan2(Math.sin(da), Math.cos(da)); return Math.abs(da) <= arc / 2; };
+// 王技能的傷害（倍數 × 王的攻擊），附帶緩速／暈眩
+function bossHit(m, mob, q, mult, o = {}) {
+  if (q.dead || q.map !== m.id) return;
+  hurtPlayer(m, mob, q, mult);
+  const t = now();
+  if (o.slow) q.slowT = Math.max(q.slowT || 0, t + o.slow * 1000);
+  if (o.stun && !(q.buff.bati > t)) { q.stunT = Math.max(q.stunT || 0, t + o.stun * 1000); q.path = null; q.dirty = true; }
+}
+// 地面危險區：毒池、火痕；每 0.5 秒判定一次
+function addHaz(m, h) { (m.haz || (m.haz = [])).push({ last: 0, ...h }); }
+function tickHaz(m) {
+  const t = now();
+  m.haz = m.haz.filter((h) => h.until > t);
+  for (const h of m.haz) {
+    if (t < (h.on || 0) || t - h.last < 500) continue;
+    h.last = t;
+    for (const q of foesNear(m, h.x, h.y, h.r)) bossHit(m, h.mob, q, h.mult, { slow: h.slow });
+  }
+}
+// 王的招式。回傳這招要站著不動多久（毫秒）
+const BS = {
+  // ---- 竹妖
+  spikes(m, b, p) {
+    const pts = foesNear(m, b.x, b.y, 12).slice(0, 4).map((q) => [q.x, q.y]);
+    for (let i = 0; i < 2; i++) { const s = m.spots[randomInt(m.spots.length)]; if (Math.hypot(s.x - b.x, s.y - b.y) < 7) pts.push([s.x, s.y]); else pts.push([b.x + rnd(-3, 3), b.y + rnd(-3, 3)]); }
+    for (const [x, y] of pts) m.fx.push({ k: "warn", x, y, r: 1.3, t: 1100, c: "g" });
+    later(1100, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "spikes", a: b.id, pts: pts.map(([x, y]) => [r2(x) / 100, r2(y) / 100]) }); for (const [x, y] of pts) for (const q of foesNear(m, x, y, 1.3)) bossHit(m, b, q, 2.0); });
+    return 1100;
+  },
+  leaves(m, b, p) {
+    const a = Math.atan2(p.y - b.y, p.x - b.x), arc = 1.25, r = 5.5;
+    m.fx.push({ k: "wcone", x: b.x, y: b.y, a, arc, r, t: 900, c: "g" });
+    later(900, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "leaves", a: b.id, x: b.x, y: b.y, ang: a, arc, r }); for (const q of foesNear(m, b.x, b.y, r)) if (inCone(q, b.x, b.y, a, arc, r)) bossHit(m, b, q, 1.6, { slow: 2 }); });
+    return 950;
+  },
+  // ---- 白額虎王
+  pounce(m, b, p) {
+    let dx = p.x - b.x, dy = p.y - b.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const len = rayLen(m, b.x, b.y, dx, dy, Math.min(9, l + 2), 0.4), x0 = b.x, y0 = b.y;
+    m.fx.push({ k: "wline", x: x0, y: y0, dx, dy, len, w: 1.8, t: 800 });
+    later(800, () => {
+      if (b.dead) return;
+      b.x = x0 + dx * len; b.y = y0 + dy * len; b.path = null;
+      m.fx.push({ k: "bsk", s: "pounce", a: b.id, x: x0, y: y0, dx, dy, len });
+      for (const q of foesNear(m, x0, y0, len + 1)) if (onLine(q, x0, y0, dx, dy, len, 1.8)) bossHit(m, b, q, 2.4);
+    });
+    return 1050;
+  },
+  roar(m, b) {
+    const r = 4;
+    m.fx.push({ k: "warn", x: b.x, y: b.y, r, t: 1200 });
+    later(1200, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "roar", a: b.id, x: b.x, y: b.y, r }); for (const q of foesNear(m, b.x, b.y, r)) bossHit(m, b, q, 1.2, { stun: 1.3 }); });
+    return 1300;
+  },
+  // ---- 屍王
+  pools(m, b) {
+    const pts = foesNear(m, b.x, b.y, 12).slice(0, 3).map((q) => [q.x, q.y]);
+    while (pts.length < 3) pts.push([b.x + rnd(-4, 4), b.y + rnd(-3, 3)]);
+    for (const [x, y] of pts) m.fx.push({ k: "warn", x, y, r: 1.7, t: 1000, c: "g" });
+    later(1000, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "pools", a: b.id, pts: pts.map(([x, y]) => [r2(x) / 100, r2(y) / 100]), r: 1.7, dur: 6000 }); for (const [x, y] of pts) addHaz(m, { x, y, r: 1.7, until: now() + 6000, mob: b, mult: 0.55, slow: 0 }); });
+    return 800;
+  },
+  raise(m, b) {
+    const alive = m.mobs.filter((x) => x.summon === b.id && !x.dead).length;
+    if (alive >= 6) return BS.pools(m, b);
+    const pts = [0, 1, 2].map((i) => { const a = i * 2.1 + Math.random(); return [b.x + Math.cos(a) * 2.5, b.y + Math.sin(a) * 2]; }).filter(([x, y]) => walk(m, x, y));
+    for (const [x, y] of pts) m.fx.push({ k: "warn", x, y, r: 0.9, t: 1100, c: "g" });
+    later(1100, () => {
+      if (b.dead) return;
+      m.fx.push({ k: "bsk", s: "raise", a: b.id, pts: pts.map(([x, y]) => [r2(x) / 100, r2(y) / 100]) });
+      for (const [x, y] of pts) { const z = spawnMob(m, "zombie", { x, y }, { ...D.MONS.zombie, name: "屍兵", lv: Math.max(1, b.def.lv - 4), agg: 12, hpm: 1.1 }); z.noRe = true; z.summon = b.id; z.dmgMul = 1; }
+      for (const q of foesNear(m, b.x, b.y, 14)) sys(q, `${b.def.name}：「起來吧，我的屍兵！」`);
+    });
+    return 1200;
+  },
+  // ---- 冰魄雪妖
+  icicles(m, b) {
+    const pts = foesNear(m, b.x, b.y, 12).map((q) => [q.x, q.y]);
+    for (let i = 0; i < 9; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * 6; pts.push([b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.8]); }
+    pts.forEach(([x, y], i) => {
+      const wait = 900 + i * 70;
+      m.fx.push({ k: "warn", x, y, r: 1.1, t: wait, c: "b" });
+      later(wait, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "icicle", a: b.id, x, y }); for (const q of foesNear(m, x, y, 1.1)) bossHit(m, b, q, 1.4, { slow: 1.5 }); });
+    });
+    return 1000;
+  },
+  breath(m, b, p) {
+    const a = Math.atan2(p.y - b.y, p.x - b.x), arc = 1.05, r = 6.5;
+    m.fx.push({ k: "wcone", x: b.x, y: b.y, a, arc, r, t: 1000, c: "b" });
+    later(1000, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "breath", a: b.id, x: b.x, y: b.y, ang: a, arc, r }); for (const q of foesNear(m, b.x, b.y, r)) if (inCone(q, b.x, b.y, a, arc, r)) bossHit(m, b, q, 1.8, { slow: 3 }); });
+    return 1200;
+  },
+  // ---- 火麒麟
+  charge(m, b, p) {
+    let dx = p.x - b.x, dy = p.y - b.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const len = rayLen(m, b.x, b.y, dx, dy, 9, 0.4), x0 = b.x, y0 = b.y;
+    m.fx.push({ k: "wline", x: x0, y: y0, dx, dy, len, w: 2, t: 900 });
+    later(900, () => {
+      if (b.dead) return;
+      b.x = x0 + dx * len; b.y = y0 + dy * len; b.path = null;
+      m.fx.push({ k: "bsk", s: "charge", a: b.id, x: x0, y: y0, dx, dy, len, dur: 4000 });
+      for (const q of foesNear(m, x0, y0, len + 1)) if (onLine(q, x0, y0, dx, dy, len, 2)) bossHit(m, b, q, 2.2);
+      for (let i = 0.5; i < len; i += 1.4) addHaz(m, { x: x0 + dx * i, y: y0 + dy * i, r: 1.0, until: now() + 4000, mob: b, mult: 0.45 });
+    });
+    return 1150;
+  },
+  nova(m, b) {
+    const x = b.x, y = b.y, rings = [[0, 2.4, 900], [2.4, 4.4, 1500], [4.4, 6.4, 2100]];
+    for (const [r0, r1, w] of rings) {
+      m.fx.push({ k: "wring", x, y, r0, r1, t: w });
+      later(w, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "nova", a: b.id, x, y, r0, r1 }); for (const q of foesNear(m, x, y, r1)) if (Math.hypot(q.x - x, q.y - y) >= r0) bossHit(m, b, q, 2.0); });
+    }
+    return 2150;
+  },
+  // ---- 魔教教主
+  palm(m, b, p) {
+    const all = foesNear(m, b.x, b.y, 14), q0 = all.sort((a, c) => Math.hypot(c.x - b.x, c.y - b.y) - Math.hypot(a.x - b.x, a.y - b.y))[0] || p;
+    const x = q0.x, y = q0.y, r = 2.6;
+    m.fx.push({ k: "warn", x, y, r, t: 1300 });
+    for (const q of foesNear(m, b.x, b.y, 16)) if (q === q0) sys(q, "教主的天魔掌鎖定了你！快跑出紅圈！");
+    later(1300, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "palm", a: b.id, x, y, r }); for (const q of foesNear(m, x, y, r)) bossHit(m, b, q, 3.0); });
+    return 600;
+  },
+  pull(m, b) {
+    const x = b.x, y = b.y, R = 7;
+    m.fx.push({ k: "wring", x, y, r0: 2.6, r1: R, t: 500, c: "p" });
+    later(500, () => {
+      if (b.dead) return;
+      m.fx.push({ k: "bsk", s: "pull", a: b.id, x, y, r: R });
+      const who = foesNear(m, x, y, R);
+      for (let i = 0; i < 6; i++) later(i * 160, () => { for (const q of who) { if (q.dead || q.map !== m.id) continue; const d = Math.hypot(q.x - x, q.y - y); if (d < 1.4) continue; const nx = q.x + (x - q.x) / d * 0.7, ny = q.y + (y - q.y) / d * 0.7; if (walk(m, nx, ny)) { q.x = nx; q.y = ny; q.path = null; } } });
+      m.fx.push({ k: "warn", x, y, r: 2.6, t: 1100 });
+      later(1100, () => { if (b.dead) return; m.fx.push({ k: "slam", x, y, r: 2.6 }); for (const q of foesNear(m, x, y, 2.6)) bossHit(m, b, q, 2.6); });
+    });
+    return 1700;
+  },
+  // ---- 九尾妖狐
+  foxfire(m, b) {
+    const x = b.x, y = b.y, a0 = Math.random() * 6.28, len = 8, dirs = [];
+    for (let i = 0; i < 9; i++) { const a = a0 + i * (Math.PI * 2 / 9); dirs.push([Math.cos(a), Math.sin(a)]); }
+    for (const [dx, dy] of dirs) m.fx.push({ k: "wline", x, y, dx, dy, len, w: 1.0, t: 900, c: "p" });
+    later(900, () => {
+      if (b.dead) return;
+      m.fx.push({ k: "bsk", s: "foxfire", a: b.id, x, y, dirs: dirs.map(([dx, dy]) => [Math.round(dx * 1000) / 1000, Math.round(dy * 1000) / 1000]), len });
+      for (const q of foesNear(m, x, y, len + 1)) if (dirs.some(([dx, dy]) => onLine(q, x, y, dx, dy, len, 1.0))) bossHit(m, b, q, 1.7);
+    });
+    return 950;
+  },
+  illusion(m, b, p) {
+    const x0 = b.x, y0 = b.y;
+    let to = null; for (let i = 0; i < 12 && !to; i++) { const a = Math.random() * 6.28, d = rnd(2.5, 4); const tx = p.x + Math.cos(a) * d, ty = p.y + Math.sin(a) * d; if (walk(m, tx, ty)) to = { x: tx, y: ty }; }
+    if (!to) return BS.foxfire(m, b);
+    b.x = to.x; b.y = to.y; b.path = null;
+    m.fx.push({ k: "bsk", s: "blink", a: b.id, x: x0, y: y0, tx: to.x, ty: to.y });
+    if (m.mobs.filter((x) => x.summon === b.id && !x.dead).length < 4) for (const [ax, ay] of [[x0, y0], [x0 + rnd(-2, 2), y0 + rnd(-2, 2)]]) if (walk(m, ax, ay)) { const z = spawnMob(m, "foxspirit", { x: ax, y: ay }, { ...D.MONS.foxspirit, name: "狐影分身", lv: Math.max(1, b.def.lv - 3), agg: 12, hpm: 0.8 }); z.noRe = true; z.summon = b.id; z.dmgMul = 1; }
+    for (const q of foesNear(m, b.x, b.y, 14)) sys(q, "九尾妖狐化成狐影，分身出來了！");
+    return 500;
+  },
+};
+// ---- 60～100 級的四隻大王
+Object.assign(BOSS_SK, {
+  b_dragon: ["tide", "whirl"],              // 東海龍王：怒海狂濤（寬直線＋緩速）、漩渦水柱（腳下留水渦）
+  b_kaiming: ["bite", "seal"],              // 開明獸：九首噬咬（大扇形）、鎮山印（貼在牠身邊才安全的環）
+  b_yama: ["chain", "judge"],               // 閻羅王：勾魂鎖（把最遠的人拉過來）、生死簿（滿地判決圈）
+  b_erlang: ["trident", "eye", "quake"],    // 二郎神：三尖兩刃、天眼神光、震天三圈
+});
+Object.assign(BS, {
+  tide(m, b, p) {
+    let dx = p.x - b.x, dy = p.y - b.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const x0 = b.x - dx, y0 = b.y - dy, len = 11, w = 4;
+    m.fx.push({ k: "wline", x: x0, y: y0, dx, dy, len, w, t: 1100, c: "b" });
+    later(1100, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "tide", a: b.id, x: x0, y: y0, dx, dy, len, w }); for (const q of foesNear(m, x0, y0, len + 2)) if (onLine(q, x0, y0, dx, dy, len, w)) bossHit(m, b, q, 2.2, { slow: 2.5 }); });
+    return 1200;
+  },
+  whirl(m, b) {
+    const pts = foesNear(m, b.x, b.y, 13).slice(0, 4).map((q) => [q.x, q.y]);
+    while (pts.length < 3) pts.push([b.x + rnd(-4, 4), b.y + rnd(-3, 3)]);
+    for (const [x, y] of pts) m.fx.push({ k: "warn", x, y, r: 1.8, t: 1000, c: "b" });
+    later(1000, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "whirl", a: b.id, pts: pts.map(([x, y]) => [r2(x) / 100, r2(y) / 100]), r: 1.8, dur: 5000 }); for (const [x, y] of pts) { for (const q of foesNear(m, x, y, 1.8)) bossHit(m, b, q, 1.6); addHaz(m, { x, y, r: 1.8, until: now() + 5000, mob: b, mult: 0.5, slow: 1 }); } });
+    return 900;
+  },
+  bite(m, b, p) {
+    const a = Math.atan2(p.y - b.y, p.x - b.x), arc = 2.6, r = 4.8;
+    m.fx.push({ k: "wcone", x: b.x, y: b.y, a, arc, r, t: 900 });
+    later(900, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "bite", a: b.id, x: b.x, y: b.y, ang: a, arc, r }); for (const q of foesNear(m, b.x, b.y, r)) if (inCone(q, b.x, b.y, a, arc, r)) bossHit(m, b, q, 2.8); });
+    return 1000;
+  },
+  seal(m, b) {
+    const x = b.x, y = b.y;
+    m.fx.push({ k: "wring", x, y, r0: 2.4, r1: 7.5, t: 1500 });
+    for (const q of foesNear(m, x, y, 14)) sys(q, "開明獸要放鎮山印了——貼到牠身邊的圈裡才安全！");
+    later(1500, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "seal", a: b.id, x, y, r0: 2.4, r1: 7.5 }); for (const q of foesNear(m, x, y, 7.5)) if (Math.hypot(q.x - x, q.y - y) >= 2.4) bossHit(m, b, q, 2.4, { stun: 1 }); });
+    return 1600;
+  },
+  chain(m, b, p) {
+    const all = foesNear(m, b.x, b.y, 14), q0 = all.sort((u, v) => Math.hypot(v.x - b.x, v.y - b.y) - Math.hypot(u.x - b.x, u.y - b.y))[0] || p;
+    let dx = q0.x - b.x, dy = q0.y - b.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    m.fx.push({ k: "wline", x: b.x, y: b.y, dx, dy, len: l + 0.5, w: 0.9, t: 900, c: "p" });
+    sys(q0, "閻羅王的勾魂鎖瞄準了你！");
+    later(900, () => {
+      if (b.dead || q0.dead || q0.map !== m.id) return;
+      m.fx.push({ k: "bsk", s: "chain", a: b.id, b: q0.id, x: b.x, y: b.y, tx: q0.x, ty: q0.y });
+      if (onLine(q0, b.x, b.y, dx, dy, l + 0.5, 1.4)) {
+        const nx = b.x + dx * 1.3, ny = b.y + dy * 1.3; if (walk(m, nx, ny)) { q0.x = nx; q0.y = ny; q0.path = null; }
+        bossHit(m, b, q0, 1.5, { stun: 0.8 });
+      }
+    });
+    return 1000;
+  },
+  judge(m, b) {
+    const pts = foesNear(m, b.x, b.y, 13).map((q) => [q.x, q.y]);
+    for (let i = 0; i < 6; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * 6; pts.push([b.x + Math.cos(a) * d, b.y + Math.sin(a) * d]); }
+    pts.forEach(([x, y], i) => {
+      const w = 1500 + i * 60;
+      m.fx.push({ k: "warn", x, y, r: 1.6, t: w });
+      later(w, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "judge", a: b.id, x, y, r: 1.6 }); for (const q of foesNear(m, x, y, 1.6)) bossHit(m, b, q, 2.4); });
+    });
+    for (const q of foesNear(m, b.x, b.y, 14)) sys(q, "閻羅王翻開生死簿——快離開紅圈！");
+    return 900;
+  },
+  trident(m, b, p) {
+    const a0 = Math.atan2(p.y - b.y, p.x - b.x), len = 9, dirs = [-0.42, 0, 0.42].map((o) => [Math.cos(a0 + o), Math.sin(a0 + o)]);
+    for (const [dx, dy] of dirs) m.fx.push({ k: "wline", x: b.x, y: b.y, dx, dy, len, w: 1.3, t: 850 });
+    later(850, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "trident", a: b.id, x: b.x, y: b.y, dirs: dirs.map(([dx, dy]) => [Math.round(dx * 1000) / 1000, Math.round(dy * 1000) / 1000]), len }); for (const q of foesNear(m, b.x, b.y, len + 1)) if (dirs.some(([dx, dy]) => onLine(q, b.x, b.y, dx, dy, len, 1.3))) bossHit(m, b, q, 2.3); });
+    return 950;
+  },
+  eye(m, b, p) {
+    let dx = p.x - b.x, dy = p.y - b.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const len = 15, x = b.x, y = b.y;
+    m.fx.push({ k: "wline", x, y, dx, dy, len, w: 1.8, t: 1300, c: "p" });
+    for (const q of foesNear(m, b.x, b.y, 16)) sys(q, "二郎神睜開天眼——快閃開那道光！");
+    later(1300, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "eye", a: b.id, x, y, dx, dy, len }); for (const q of foesNear(m, x, y, len + 1)) if (onLine(q, x, y, dx, dy, len, 1.8)) bossHit(m, b, q, 3.2); });
+    return 1400;
+  },
+  quake(m, b) {
+    const x = b.x, y = b.y, rings = [[0, 2.2, 800], [2.2, 4.2, 1300], [4.2, 6.2, 1800], [6.2, 8.2, 2300]];
+    for (const [r0, r1, w] of rings) {
+      m.fx.push({ k: "wring", x, y, r0, r1, t: w });
+      later(w, () => { if (b.dead) return; m.fx.push({ k: "bsk", s: "quake", a: b.id, x, y, r0, r1 }); for (const q of foesNear(m, x, y, r1)) if (Math.hypot(q.x - x, q.y - y) >= r0) bossHit(m, b, q, 2.0); });
+    }
+    return 2350;
+  },
+});
+function bossCast(m, b, p) {
+  const list = BOSS_SK[b.k]; b.bsi = ((b.bsi ?? -1) + 1) % list.length;
+  b.busyT = now() + BS[list[b.bsi]](m, b, p);
+}
+
 function tickMob(m, mob, dt) {
   const t = now();
   if (mob.dead) {
     if (mob.noRe) return;
     if (t >= mob.respawnAt) {
-      const at = mob.def.boss ? m.def.bossAt : m.spots[Math.floor(Math.random() * m.spots.length)];
-      Object.assign(mob, { dead: false, hp: mob.max, x: at.x, y: at.y, hx: at.x, hy: at.y, tgt: null, path: null, dmg: new Map(), slamAt: 0 });
+      const at = mob.def.boss ? m.def.bossAt : mob.lair || m.spots[Math.floor(Math.random() * m.spots.length)];
+      Object.assign(mob, { dead: false, hp: mob.max, x: at.x, y: at.y, hx: at.x, hy: at.y, tgt: null, path: null, dmg: new Map(), slamAt: 0, busyT: 0, bsT: undefined, bsi: -1 });
       if (mob.def.boss) sysAll(`【${m.def.name}】${mob.def.name}出現了！`);
+      else if (mob.def.elite) for (const q of players.values()) if (q.map === m.id) sys(q, `【小王】${mob.def.name}又出現在${m.def.name}了。`);
     }
     return;
   }
   if (mob.stunT > t) return;                      // 暈眩：不動、不打
   const sp = mob.st.spd * (mob.slowT > t ? 1 - (mob.slowP || 0) : 1);
-  const leash = mob.def.boss ? 16 : 12;
+  const leash = mob.def.boss ? 16 : mob.def.elite ? 14 : 12;
   let p = mob.tgt ? players.get(mob.tgt) : null;
   if (p && (p.map !== m.id || p.dead || Math.hypot(mob.x - mob.hx, mob.y - mob.hy) > leash)) { mob.tgt = null; p = null; mob.path = astar(m, mob.x, mob.y, mob.hx, mob.hy); mob.returning = true; }
   if (!p && mob.def.agg && !mob.returning) {
     let best = null, bd = mob.def.agg;
-    for (const q of players.values()) if (q.map === m.id && !q.dead) { const d = dist(q, mob); if (d < bd) { bd = d; best = q; } }
+    for (const q of players.values()) if (q.map === m.id && !q.dead && !(q.buff.stealth > t)) { const d = dist(q, mob); if (d < bd) { bd = d; best = q; } }
     if (best) { mob.tgt = best.key; p = best; }
   }
   if (p) {
     mob.returning = false;
-    const range = mob.def.boss ? 1.9 : 1.2, d = dist(mob, p);
-    // 王的範圍重擊：先出警示圈，1.2 秒後打圈內所有人
-    if (mob.def.boss) {
-      if (!mob.slamAt && t - mob.slamT > 7000) { mob.slamAt = t + 1200; mob.slamX = mob.x; mob.slamY = mob.y; m.fx.push({ k: "warn", x: mob.x, y: mob.y, r: 2.8, t: 1200 }); }
+    const range = mob.def.boss ? 1.9 : mob.def.elite ? 1.5 : 1.2, d = dist(mob, p);
+    // 王（和小王）的範圍重擊：先出警示圈，1.2 秒後打圈內所有人
+    if (mob.def.boss && BOSS_SK[mob.k]) {
+      if (mob.busyT > t) return;                       // 放招中：站著不動
+      const I = m.inst, gap = (mob.enrage ? 3200 : 5600) * (I && I.kind === "dg" && I.boss === mob && D.DUNGEONS[I.key].kind !== "trap" ? 1.5 : 1);
+      if (mob.bsT === undefined) mob.bsT = t - gap + 2200;   // 剛發現人：2 秒多後出第一招
+      if (t - mob.bsT > gap && d < 10) { mob.bsT = t; bossCast(m, mob, p); return; }
+    } else if (mob.def.boss || mob.def.elite) {
+      const SR = mob.def.boss ? 2.8 : 2.1;
+      if (!mob.slamAt && t - mob.slamT > (mob.enrage ? 3500 : mob.def.boss ? 7000 : 9000) && d < 4) { mob.slamAt = t + 1200; mob.slamX = mob.x; mob.slamY = mob.y; m.fx.push({ k: "warn", x: mob.x, y: mob.y, r: SR, t: 1200 }); }
       if (mob.slamAt && t >= mob.slamAt) {
-        mob.slamAt = 0; mob.slamT = t; m.fx.push({ k: "slam", x: mob.slamX, y: mob.slamY, r: 2.8 });
-        for (const q of players.values()) if (q.map === m.id && !q.dead && Math.hypot(q.x - mob.slamX, q.y - mob.slamY) <= 2.8) hurtPlayer(m, mob, q, 2.2);
+        mob.slamAt = 0; mob.slamT = t; m.fx.push({ k: "slam", x: mob.slamX, y: mob.slamY, r: SR });
+        for (const q of players.values()) if (q.map === m.id && !q.dead && Math.hypot(q.x - mob.slamX, q.y - mob.slamY) <= SR) hurtPlayer(m, mob, q, mob.def.boss ? 2.2 : 1.8);
       }
       if (mob.slamAt) return;   // 蓄力中不動
     }
@@ -729,24 +1214,26 @@ function tickMob(m, mob, dt) {
 const r2 = (v) => Math.round(v * 100);
 function broadcast(m) {
   const here = [...players.values()].filter((p) => p.map === m.id);
+  m.lootSend = m.lootDirty; m.lootDirty = false;
   if (!here.length) { m.fx = []; return; }
   const ents = [];
   for (const p of here) {
     const st = statsOf(p);
-    ents.push([p.id, r2(p.x), r2(p.y), Math.max(0, Math.round(p.hp / st.hp * 100)), (p.dead ? 1 : 0) | (p.buff.guard > now() ? 2 : 0) | (p.buff.gale > now() ? 4 : 0), Math.max(0, Math.round(p.mp / st.mp * 100))]);
+    ents.push([p.id, r2(p.x), r2(p.y), Math.max(0, Math.round(p.hp / st.hp * 100)), (p.dead ? 1 : 0) | (p.buff.guard > now() ? 2 : 0) | (p.buff.gale > now() ? 4 : 0) | (p.stunT > now() ? 32 : 0) | (p.slowT > now() ? 64 : 0) | (p.buff.stealth > now() ? 8 : 0), Math.max(0, Math.round(p.mp / st.mp * 100))]);
   }
   const tn = now();
-  for (const mob of m.mobs) if (!mob.dead) ents.push([mob.id, r2(mob.x), r2(mob.y), Math.max(0, Math.round(mob.hp / mob.max * 100)), (mob.tgt ? 8 : 0) | (mob.slamAt ? 16 : 0) | (mob.stunT > tn ? 32 : 0) | (mob.slowT > tn ? 64 : 0)]);
+  for (const mob of m.mobs) if (!mob.dead) ents.push([mob.id, r2(mob.x), r2(mob.y), Math.max(0, Math.round(mob.hp / mob.max * 100)), (mob.tgt ? 8 : 0) | (mob.slamAt || mob.busyT > tn ? 16 : 0) | (mob.stunT > tn ? 32 : 0) | (mob.slowT > tn ? 64 : 0)]);
   const fx = m.fx; m.fx = [];
   for (const p of here) {
     const meta = {};
     for (const e of ents) if (!p.known.has(e[0])) {
       p.known.add(e[0]);
       const q = byId.get(e[0]);
-      if (q) meta[e[0]] = { k: "p", n: q.ch.name, lv: q.ch.lv, c: q.ch.cls, ad: q.ch.adv || "", pt: q.party || 0 };
-      else { const mob = m.mobs.find((x) => x.id === e[0]); if (mob) meta[e[0]] = { k: "m", n: mob.def.name, lv: mob.def.lv, s: mob.def.shape, boss: mob.def.boss ? 1 : 0 }; }
+      if (q) meta[e[0]] = { k: "p", n: q.ch.name, lv: q.ch.lv, c: q.ch.cls, ad: q.ch.adv2 || q.ch.adv || "", pt: q.party || 0 };
+      else { const mob = m.mobs.find((x) => x.id === e[0]); if (mob) meta[e[0]] = { k: "m", n: mob.def.name, lv: mob.def.lv, s: mob.def.shape, boss: mob.def.boss ? 1 : 0, el: mob.def.elite ? 1 : 0 }; }
     }
     const msg = { t: "mo", a: "s", e: ents, fx };
+    if (m.lootSend) msg.loot = lootView(m, p.key);
     if (Object.keys(meta).length) msg.meta = meta;
     out(p.ws, msg);
     if (p.dirty && now() - p.meSent > 200) sendMe(p);
@@ -758,10 +1245,10 @@ function sendMe(p) {
   const cd = {}; for (const [k, v] of Object.entries(p.cd)) if (v > t) cd[k] = v - t;
   out(p.ws, {
     t: "mo", a: "me", id: p.id, real: p.real, name: c.name, cls: c.cls, lv: c.lv, exp: c.exp, need: D.expNeed(c.lv), gold: c.gold,
-    hp: Math.round(p.hp), mp: Math.round(p.mp), st: { hp: st.hp, mp: st.mp, atk: st.atk, def: st.def, crit: st.crit, aspd: Math.round(st.aspd * 100) / 100, range: st.range },
-    ...(full ? { inv: c.inv, eq: c.eq, adv: c.adv || "", advOk: !c.adv && c.lv >= D.ADV_LV, skills: allSkills(c).map((s) => ({ id: s.id, name: s.name, lv: s.lv, mp: s.mp, cd: s.cd, desc: s.desc, type: s.type, range: s.range || 0, r: s.r || 0, w: s.w || 0, arrows: s.arrows || 1, spread: s.spread || 0, dash: !!s.dash, leap: !!s.leap })), slots: c.slots } : {}), cd, buff: Object.fromEntries(["guard", "gale", "rage", "shield", "eagle", "mingwang"].map((k) => [k, Math.max(0, (p.buff[k] || 0) - t)])),
+    hp: Math.round(p.hp), mp: Math.round(p.mp), st: { hp: st.hp, mp: st.mp, atk: st.atk, def: st.def, crit: st.crit, aspd: Math.round(st.aspd * 100) / 100, range: st.range, ls: st.ls, thorn: st.thorn, cdmg: st.cdmg, dodge: st.dodge, ms: st.ms, pen: st.pen, cdr: st.cdr, over: st.over, skcd: Object.fromEntries(Object.entries(st).filter(([k, v]) => k.startsWith("cd_") && v)) },
+    ...(full ? { inv: c.inv, eq: c.eq, bag: invMax(c), bagCost: bagCost(c), adv: c.adv || "", adv2: c.adv2 || "", advOk: (!c.adv && c.lv >= D.ADV_LV) || (c.adv && !c.adv2 && c.lv >= D.ADV2_LV), skills: allSkills(c).map((s) => ({ id: s.id, name: s.name, lv: s.lv, mp: s.mp, cd: Math.round(effCd(st, s) * 10) / 10, cd0: s.cd, desc: s.desc, type: s.type, range: s.range || 0, r: s.r || 0, w: s.w || 0, arrows: s.arrows || 1, spread: s.spread || 0, dash: !!s.dash, leap: !!s.leap })), slots: c.slots } : {}), cd, buff: Object.fromEntries(["guard", "gale", "rage", "shield", "eagle", "mingwang", "bati", "berserk", "barrier", "hawk", "stealth"].map((k) => [k, Math.max(0, (p.buff[k] || 0) - t)])),
     tgt: p.tgt || 0, dead: p.dead,
-    bankOut: c.day.d === today() ? c.day.out : 0, bankCap: D.BANK_DAILY_OUT, recall: c.recall && D.MAPS[c.recall.map] ? D.MAPS[c.recall.map].name : "", inTown: p.map === "town",
+    story: c.story || 0, bankOut: c.day.d === today() ? c.day.out : 0, bankCap: D.BANK_DAILY_OUT, recall: c.recall && D.MAPS[c.recall.map] ? D.MAPS[c.recall.map].name : "", inTown: p.map === "town",
     buffs: buffList(p),
   });
 }
@@ -771,7 +1258,7 @@ setInterval(() => {
   try {
     runPending();
     for (const p of players.values()) tickPlayer(p, dt);
-    for (const m of Object.values(maps)) { for (const mob of m.mobs) tickMob(m, mob, dt); broadcast(m); if (m.inst) instTick(m); }
+    for (const m of Object.values(maps)) { for (const mob of m.mobs) tickMob(m, mob, dt); if (m.loot.length) tickLoot(m); if (m.haz && m.haz.length) tickHaz(m); broadcast(m); if (m.inst) instTick(m); }
     if (now() - partyT > 1000) { partyT = now(); for (const pt of parties.values()) sendParty(pt); }
   } catch (e) { console.log("江湖 tick 錯誤", e && e.stack); }
 }, TICK);
@@ -794,16 +1281,8 @@ function instTick(m) {
   if (!here.length) { if (t > I.graceT) closeInst(m); return; }
   I.graceT = t + 20000;
   const left = Math.max(0, Math.ceil((I.endAt - t) / 1000)), clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
-  if (I.kind === "tower") {
-    if (I.done) { if (t > I.closeAt) for (const q of here) placeIn(q, "town", D.TOWN_SPAWN.x, D.TOWN_SPAWN.y); else if (t - I.infoT > 1000) { I.infoT = t; instInfo(m, `通關！${Math.ceil((I.closeAt - t) / 1000)} 秒後回長安城`); } return; }
-    if (t > I.endAt) { for (const q of here) { sys(q, "時間到了，被守塔人拉出了鎖妖塔。"); placeIn(q, "town", D.TOWN_SPAWN.x, D.TOWN_SPAWN.y); } I.done = true; I.closeAt = 0; return; }
-    if (t >= I.nextT && (I.wave === 0 || m.mobs.every((x) => x.dead))) {
-      if (I.wave > 0 && !I.nextSet) { I.nextSet = true; I.nextT = t + 2500; }       // 清完一波：喘口氣再出下一波
-      else { I.nextSet = false; towerWave(m); }
-    }
-    if (t - I.infoT > 1000) { I.infoT = t; const alive = m.mobs.filter((x) => !x.dead).length; instInfo(m, `${I.wave === 0 ? "準備中" : I.wave > D.TOWER.waves.length ? "塔頂・九尾妖狐" : `第 ${I.wave}/${D.TOWER.waves.length} 波・剩 ${alive} 隻`}・${clock}`); }
-    return;
-  }
+  if (I.kind === "dg") return dgTick(m, here);
+  if (I.kind === "climb") return climbTick(m, here);
   if (I.kind === "arena") {
     if (I.over) { if (t > I.closeAt) for (const q of here) placeIn(q, "town", D.TOWN_SPAWN.x, D.TOWN_SPAWN.y); return; }
     const a = players.get(I.a), b = players.get(I.b);
@@ -814,79 +1293,321 @@ function instTick(m) {
     if (t - I.infoT > 500) { I.infoT = t; instInfo(m, I.fight ? `擂台・${clock}` : `${Math.ceil((I.startAt - t) / 1000)}…`); }
   }
 }
-// ---- 鎖妖塔
-function towerWave(m) {
-  const I = m.inst, T = D.TOWER; I.wave++;
-  m.mobs = m.mobs.filter((x) => !x.dead);
-  const mk = (k, lv, hpm, extra = {}) => { const b = D.MONS[k]; const mob = spawnMob(m, k, extra.at, { ...b, lv, agg: 14, hpm: (b.hpm || 1) * hpm, respawn: 0, ...(extra.def || {}) }); mob.noRe = true; return mob; };
-  if (I.wave <= T.waves.length) {
-    const n = T.waves[I.wave - 1] + Math.max(0, I.n - 1) * 2;
-    for (let i = 0; i < n; i++) {
-      const elite = I.wave === T.waves.length && i < T.elites;
-      const k = T.pool[randomInt(T.pool.length)];
-      mk(k, I.lv + (elite ? 2 : 0), elite ? T.eliteHpm : T.hpm, { def: elite ? { name: "精英・" + D.MONS[k].name, atkm: (D.MONS[k].atkm || 1) * 1.3 } : {} });
+// ---- 副本共用
+const diffOf = (k) => D.DIFF.find((x) => x.k === k) || D.DIFF[0];
+function dgLeft(A, key, daily) { if (!daily) return 99; const g = A.dg && A.dg.d === today() ? A.dg : { d: today() }; return daily - (g[key] || 0); }
+function dgUse(A, key) { if (!A.dg || A.dg.d !== today()) A.dg = { d: today() }; A.dg[key] = (A.dg[key] || 0) + 1; }
+// 傷害：照最大生命的百分比（陷阱、岩漿、大招），一樣吃減傷
+function hurtPct(m, p, pct) {
+  if (p.dead) return;
+  const st = statsOf(p); let d = st.hp * pct;
+  if (p.buff.guard > now()) d *= 0.5; if (p.buff.shield > now()) d *= 0.6; if (p.buff.mingwang > now()) d *= 0.4;
+  d = Math.max(1, Math.round(d)); p.hp -= d; p.lastHit = now(); p.dirty = true;
+  m.fx.push({ k: "m", b: p.id, d });
+  if (p.hp <= 0) die(p);
+}
+// 套裝裝備：一般裝備加上套裝標記，基礎數值多 10%
+function makeSetItem(setKey, slot, tier, r, cls, who) {
+  const it = makeEquip(slot, tier, r, cls, who);
+  it.set = setKey; it.n = D.SETS[setKey].name + "・" + it.n;
+  for (const k of Object.keys(it.st)) it.st[k] = Math.round(it.st[k] * 1.1);
+  it.v = Math.round(it.v * 1.5);
+  return it;
+}
+// 通關獎勵（每人一份，掉在 at 附近、只有自己撿得到）
+function dgReward(m, p, setKey, lv, dif, mult, at) {
+  const own = [p.key], slot = pickSlot();
+  const rr = Math.random() * 100, r = Math.max(dif.rarMin, rr < dif.legend ? 3 : rr < 45 ? 2 : 1);
+  const isSet = Math.random() * 100 < dif.setP * mult;
+  const it = isSet ? makeSetItem(setKey, slot, tierFor(lv), r, p.ch.cls, p.ch) : makeEquip(slot, tierFor(lv), r, p.ch.cls, p.ch);
+  dropLoot(m, it, at.x, at.y, own);
+  dropLoot(m, { p: "ore", q: 3 * dif.mats }, at.x, at.y, own);
+  dropLoot(m, { p: "jade", q: dif.mats }, at.x, at.y, own);
+  if (dif.mats >= 2 || Math.random() < 0.4) dropLoot(m, { p: "recast", q: Math.max(1, dif.mats - 1) }, at.x, at.y, own);
+  const dm = [1, 1.5, 2.2][D.DIFF.indexOf(dif)] * mult;
+  giveExp(p, Math.round(D.expNeed(Math.min(lv, D.LV_CAP)) * 0.5 * dm)); const gold = Math.round(40 * lv * dm); p.ch.gold += gold; p.dirty = true;
+  bountyHit(p, "boss"); { const A = db.acc[p.key]; if (A) A.bk = (A.bk || 0) + 1; }
+  if (it.r === 3) sysAll(`【傳說】${p.ch.name} 在副本得到傳說裝備「${it.n}」！`);
+  else if (isSet) sys(p, `掉出了套裝「${it.n}」！`);
+  return gold;
+}
+// 副本入口（在各副本所在的野外地圖上，驛站傳送石旁邊）
+function dgGates(mapId) {
+  const m = maps[mapId]; if (!m || !m.def.stone) return [];
+  if (!m.dgates) {
+    m.dgates = [];
+    for (const [k, d] of Object.entries(D.DUNGEONS)) if (d.map === mapId) {
+      let best = m.def.stone, bd = 1e9;
+      for (const s2 of m.spots) { const dd = Math.hypot(s2.x - (m.def.stone.x + 3), s2.y - m.def.stone.y); if (dd < bd && dd > 0.5) { bd = dd; best = s2; } }
+      m.dgates.push({ id: "dg_" + k, name: `副本・${d.name}`, kind: "dungeon", dg: k, x: best.x, y: best.y, say: d.say || d.desc });
     }
-    for (const q of instHere(m)) sys(q, I.wave === T.waves.length ? `第 ${I.wave} 波：有精英怪，小心！` : `第 ${I.wave} 波妖魔出現了！`);
-    return;
   }
-  if (I.wave === T.waves.length + 1) {
-    m.boss = mk("b_fox", I.lv + 3, D.MONS.b_fox.hpm * (1 + 0.5 * (I.n - 1)), { at: m.def.bossAt });
-    for (const q of instHere(m)) sys(q, "塔頂傳來一陣狐鳴……九尾妖狐現身了！");
-  }
+  return m.dgates;
 }
-function towerClear(m, mob) {
-  const I = m.inst; I.done = true; I.closeAt = now() + 45000;
-  const names = [];
-  for (const q of instHere(m)) {
-    giveExp(q, Math.round(mob.st.exp * 0.6));
-    const gold = Math.round(mob.st.gold * 1.5); q.ch.gold += gold;
-    const r = Math.random() * 100 < D.TOWER.legend ? 3 : 2;
-    const it = makeEquip(["weapon", "armor", "acc"][randomInt(3)], tierFor(I.lv), r, q.ch.cls);
-    const got = addItem(q, it); if (!got) q.ch.gold += it.v;
-    addItem(q, { p: "ore", q: 5 }); addItem(q, { p: "jade", q: 2 }); addItem(q, { p: "recast", q: 1 });
-    invChanged(q);
-    sys(q, `鎖妖塔通關！拿到 ${gold} 兩、${D.RAR[it.r].name}「${it.n}」${got ? "" : "（背包滿了，換成銀兩）"}、玄鐵 ×5、靈玉 ×2、重鑄石 ×1。`);
-    if (it.r === 3) sysAll(`【傳說】${q.ch.name} 在鎖妖塔得到傳說裝備「${it.n}」！`);
-    names.push(q.ch.name);
-    bountyHit(q, "tower"); bountyHit(q, "boss"); { const A = db.acc[q.key]; if (A) { A.tc = (A.tc || 0) + 1; A.bk = (A.bk || 0) + 1; } }
-  }
-  sysAll(`【鎖妖塔】${names.join("、")} 打倒了九尾妖狐！`);
-  mmoSave();
-}
-function towerEnter(p) {
-  const c = p.ch, T = D.TOWER;
-  if (c.lv < T.minLv) return `${T.minLv} 級才能進鎖妖塔`;
-  if (p.party && parties.get(p.party).leader !== p.key) return "要由隊長帶隊進塔";
-  const team = p.party ? [...parties.get(p.party).members].map((k) => players.get(k)).filter(Boolean) : [p];
+function teamOf(p) { return p.party ? [...parties.get(p.party).members].map((k) => players.get(k)).filter(Boolean) : [p]; }
+// 進副本：隊長帶隊，隊員要在同一張地圖、在入口附近
+function dgEnter(p, key, dk) {
+  const d = D.DUNGEONS[key], dif = diffOf(dk); if (!d) return "沒有這個副本";
+  const need = d.lv + dif.lv;
+  if (p.party && parties.get(p.party).leader !== p.key) return "要由隊長帶隊進副本";
   const ok = [], skip = [];
-  for (const q of team) {
-    const A = db.acc[q.key], tw = A && A.tw && A.tw.d === today() ? A.tw : { d: today(), n: 0 };
-    if (q.map !== "town" || q.dead) skip.push(`${q.ch.name}（不在長安城）`);
-    else if (q.ch.lv < T.minLv) skip.push(`${q.ch.name}（未滿 ${T.minLv} 級）`);
-    else if (tw.n >= T.daily) skip.push(`${q.ch.name}（今天的次數用完了）`);
+  for (const q of teamOf(p)) {
+    const A = db.acc[q.key];
+    if (q.map !== p.map || q.dead || Math.hypot(q.x - p.x, q.y - p.y) > 12) skip.push(`${q.ch.name}（不在入口附近）`);
+    else if (q.ch.lv < need) skip.push(`${q.ch.name}（未滿 ${need} 級）`);
+    else if (dgLeft(A, key, d.daily) <= 0) skip.push(`${q.ch.name}（今天的次數用完了）`);
     else ok.push(q);
   }
-  if (!ok.includes(p)) return `你今天的次數用完了（每天 ${T.daily} 次）`;
-  const lv = Math.round(ok.reduce((s2, q) => s2 + q.ch.lv, 0) / ok.length);
-  const m = makeInst({ name: "鎖妖塔", w: 34, h: 26, theme: "tower", lvl: `${lv} 級`, boss: "b_fox", portals: [{ x: 0, y: 13, to: "town", tx: 6, ty: 11, label: "← 離開" }] },
-    { kind: "tower", lv, n: ok.length, wave: 0, nextT: now() + 4000, endAt: now() + T.time * 1000 });
+  if (!ok.includes(p)) return p.ch.lv < need ? `${dif.name}難度要 ${need} 級` : "你今天的次數用完了";
+  const mlv = Math.min(D.LV_CAP, d.lv + 3 + dif.lv), n = ok.length;
+  const back = maps[d.map].def.stone || { x: 4, y: 10 };
+  const def = { name: `${d.name}・${dif.name}`, w: d.w, h: d.h, theme: d.theme, lvl: `${mlv} 級`, inst: true };
+  if (d.kind === "trap" || d.kind === "race") def.corridor = true; else def.open = true;
+  def.portals = [{ x: 0, y: Math.floor(d.h / 2) - 1, to: d.map, tx: Math.floor(back.x), ty: Math.floor(back.y), label: "← 離開" }];
+  if (d.kind === "race") def.portals.push({ x: d.w - 1, y: Math.floor(d.h / 2) - 1, to: d.map, tx: Math.floor(back.x), ty: Math.floor(back.y), label: "出口 →", escape: true });
+  const m = makeInst(def, { kind: "dg", key, dk, mlv, n, start: now() + 3000, endAt: now() + (d.time || 15 * 60) * 1000, phase: 1, got: new Set() });
+  dgSetup(m);
   for (const q of ok) {
-    const A = db.acc[q.key]; A.tw = A.tw && A.tw.d === today() ? A.tw : { d: today(), n: 0 }; A.tw.n++;
-    if (q.trade) cancelTrade(q.trade, "進了鎖妖塔，交易取消");
-    placeIn(q, m.id, 3.5, 13.5);
-    sys(q, `進入鎖妖塔（${lv} 級）。打完三波妖魔，九尾妖狐就會出現。限時 ${T.time / 60} 分鐘，今天還能再進 ${T.daily - A.tw.n} 次。走左邊的門可以離開。`);
+    dgUse(db.acc[q.key], key);
+    if (q.trade) cancelTrade(q.trade, "進了副本，交易取消");
+    placeIn(q, m.id, 2.5, Math.floor(d.h / 2) + 0.5);
+    sys(q, `進入${d.name}（${dif.name}，怪物 ${mlv} 級）。${d.desc}`);
   }
   if (skip.length) sys(p, `沒有跟進來：${skip.join("、")}`);
-  mmoSave();
-  return null;
+  mmoSave(); return null;
 }
+// 怪：照副本難度放大
+function dgMob(m, k, at, extra = {}) {
+  const I = m.inst, dif = diffOf(I.dk), b = D.MONS[k];
+  const mob = spawnMob(m, k, at, { ...b, lv: I.mlv + (b.boss ? 2 : 0), agg: extra.agg || 7, hpm: (b.hpm || 1) * dif.hp * (extra.hpm || 1) * (1 + 0.45 * (I.n - 1)) * (b.boss ? 1 : 0.8), atkm: (b.atkm || 1) * dif.atk * (extra.atkm || 1), respawn: 0, ...(extra.def || {}) });
+  mob.noRe = true; mob.dmgMul = 1; return mob;
+}
+function dgSetup(m) {
+  const I = m.inst, d = D.DUNGEONS[I.key], W = m.w, H = m.h, R = () => Math.random();
+  const spot = (x, y) => { let best = null, bd = 1e9; for (const s2 of m.spots) { const dd = Math.hypot(s2.x - x, s2.y - y); if (dd < bd) { bd = dd; best = s2; } } return best || { x, y }; };
+  if (d.kind === "trap") {
+    for (const gx of [13, 25, 37, 49, 60]) for (let i = 0; i < 3 + randomInt(2); i++) dgMob(m, d.mobs[randomInt(d.mobs.length)], spot(gx + R() * 3, 3 + R() * (H - 6)));
+    I.boss = dgMob(m, d.boss, spot(W - 6, H / 2), { agg: 9, def: { name: d.bossName } });
+    I.traps = [];
+    for (let x = 8; x < W - 12; x += 5 + randomInt(4)) {
+      const ty = randomInt(3);
+      if (ty === 0) I.traps.push({ type: "arrow", x: x + 0.5, w: 1.4, per: 3200 + randomInt(1200), next: now() + 2000 + randomInt(2000) });
+      else if (ty === 1) { const y = 3 + randomInt(H - 6) + 0.5, dir = R() < 0.5 ? 1 : -1; I.traps.push({ type: "boulder", y, x0: dir > 0 ? x - 2 : x + 8, x1: dir > 0 ? x + 8 : x - 2, per: 4500 + randomInt(1500), dur: 1500, next: now() + 2500 + randomInt(2500) }); }
+      else I.traps.push({ type: "poison", x: x + 1 + R() * 2, y: 3 + R() * (H - 6), r: 1.9, per: 6000, next: now() + 1500 + randomInt(3000) });
+    }
+  } else if (d.kind === "phase") {
+    I.boss = dgMob(m, d.boss, spot(W / 2, H / 2), { agg: 14, def: { name: d.bossName } });
+    for (let i = 0; i < 4; i++) dgMob(m, d.mobs[randomInt(d.mobs.length)], spot(W / 2 + (R() - 0.5) * 10, H / 2 + (R() - 0.5) * 8), { agg: 10 });
+    I.zones = [];
+  } else if (d.kind === "race") {
+    for (let x = 12; x < W - 6; x += 4) if (R() < 0.8) dgMob(m, d.mobs[randomInt(d.mobs.length)], spot(x + R() * 3, 2 + R() * (H - 4)), { agg: 5 });
+    I.lavaX = -3; I.lavaV = 0.42 + 0.06 * D.DIFF.findIndex((x) => x.k === I.dk); I.escaped = new Set();
+    I.guard = dgMob(m, "lavagolem", spot(W - 5, H / 2), { agg: 6, hpm: 6, atkm: 1.4, def: { name: "熔岩守將" } });
+  } else if (d.kind === "tide") {         // 龍宮：龍王在中間，四個角有珊瑚台
+    I.boss = dgMob(m, d.boss, spot(W / 2, H / 2), { agg: 16, def: { name: d.bossName } });
+    for (let i = 0; i < 4; i++) dgMob(m, d.mobs[randomInt(d.mobs.length)], spot(W / 2 + (R() - 0.5) * 12, H / 2 + (R() - 0.5) * 8), { agg: 10 });
+    I.plats = [[0.2, 0.25], [0.8, 0.25], [0.2, 0.75], [0.8, 0.75]].map(([fx, fy]) => { const s2 = spot(W * fx, H * fy); return [s2.x, s2.y]; });
+    I.tideAt = now() + 14000; I.tide = null;
+  } else if (d.kind === "waves") {       // 瑤池：一波一波，最後開明獸
+    I.wave = 0; I.waveAt = now() + 4000; I.waveMobs = [];
+  } else if (d.kind === "raid") {
+    I.boss = dgMob(m, d.boss, spot(W / 2, H / 2 - 2), { agg: 16, def: { name: d.bossName } });
+    for (let i = 0; i < 4; i++) dgMob(m, d.mobs[randomInt(d.mobs.length)], spot(W / 2 + (R() - 0.5) * 12, H / 2 + (R() - 0.5) * 8), { agg: 10 });
+    I.clones = []; I.ultT = 0;
+  }
+}
+function dgTick(m, here) {
+  const I = m.inst, d = D.DUNGEONS[I.key], t = now(), tick = !I.lastHalf || t - I.lastHalf >= 500;
+  if (tick) I.lastHalf = t;
+  const left = Math.max(0, Math.ceil((I.endAt - t) / 1000)), clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  if (I.done) { if (t > I.closeAt) for (const q of here) placeIn(q, d.map, maps[d.map].def.stone.x, maps[d.map].def.stone.y + 1); else if (t - I.infoT > 1000) { I.infoT = t; const left = Math.ceil((I.closeAt - t) / 1000); instInfo(m, `通關！走進出口傳送門離開・${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`); } return; }
+  if (t > I.endAt) { for (const q of here) { sys(q, "時間到了，副本關閉。"); placeIn(q, d.map, maps[d.map].def.stone.x, maps[d.map].def.stone.y + 1); } I.done = true; I.closeAt = 0; return; }
+  const alive = here.filter((q) => !q.dead);
+  if (d.kind === "trap") {
+    for (const tr of I.traps) {
+      if (t < tr.next) continue;
+      if (tr.type === "arrow") {
+        if (!tr.armed) { tr.armed = true; tr.fireAt = t + 1000; m.fx.push({ k: "wcol", x: tr.x, w: tr.w, t: 1000 }); }
+        else if (t >= tr.fireAt) { tr.armed = false; tr.next = t + tr.per; m.fx.push({ k: "arrows", x: tr.x, w: tr.w }); for (const q of alive) if (Math.abs(q.x - tr.x) <= tr.w / 2 + 0.3) hurtPct(m, q, 0.22); }
+      } else if (tr.type === "boulder") {
+        if (!tr.armed) { tr.armed = true; tr.goAt = t + 800; m.fx.push({ k: "wrow", y: tr.y, x0: tr.x0, x1: tr.x1, t: 800 }); }
+        else if (!tr.rolling && t >= tr.goAt) { tr.rolling = true; tr.t0 = t; tr.hit = new Set(); m.fx.push({ k: "boulder", y: tr.y, x0: tr.x0, x1: tr.x1, dur: tr.dur }); }
+        else if (tr.rolling) {
+          const k = (t - tr.t0) / tr.dur, bx = tr.x0 + (tr.x1 - tr.x0) * Math.min(1, k);
+          for (const q of alive) if (!tr.hit.has(q.key) && Math.hypot(q.x - bx, q.y - tr.y) < 0.9) { tr.hit.add(q.key); hurtPct(m, q, 0.35); }
+          if (k >= 1) { tr.rolling = false; tr.armed = false; tr.next = t + tr.per; }
+        }
+      } else if (tr.type === "poison") {
+        if (!tr.armed) { tr.armed = true; tr.onAt = t + 1000; tr.offAt = t + 4000; m.fx.push({ k: "warn", x: tr.x, y: tr.y, r: tr.r, t: 1000, c: "g" }); }
+        else if (t >= tr.onAt && !tr.on) { tr.on = true; m.fx.push({ k: "pzone", x: tr.x, y: tr.y, r: tr.r, dur: 3000 }); }
+        if (tr.on && tick) for (const q of alive) if (Math.hypot(q.x - tr.x, q.y - tr.y) <= tr.r) hurtPct(m, q, 0.06);
+        if (tr.on && t >= tr.offAt) { tr.on = false; tr.armed = false; tr.next = t + tr.per; }
+      }
+    }
+    if (t - I.infoT > 1000) { I.infoT = t; const far = Math.max(0, ...alive.map((q) => q.x)); instInfo(m, `${I.boss.dead ? "通關" : `往深處前進 ${Math.round(far / (m.w - 6) * 100)}%`}・${clock}`); }
+  } else if (d.kind === "phase") {
+    const B = I.boss, hp = B.hp / B.max;
+    if (I.phase === 1 && hp <= 0.7) { I.phase = 2; I.addT = 0; I.zoneT = 0; for (const q of here) sys(q, `${B.def.name}：「冰封萬里！」（召喚冰魄、地上會冒出冰封區）`); }
+    if (I.phase === 2 && hp <= 0.35) { I.phase = 3; B.st = { ...B.st, atk: Math.round(B.st.atk * 1.4) }; B.enrage = true; for (const q of here) sys(q, `${B.def.name}狂暴了！重擊又快又痛，快拉開距離。`); }
+    if (I.phase >= 2 && !B.dead) {
+      if (t - I.addT > 12000) { I.addT = t; for (let i = 0; i < 3; i++) dgMob(m, "iceghost", { x: B.x + (Math.random() - 0.5) * 5, y: B.y + (Math.random() - 0.5) * 4 }, { agg: 14, hpm: 0.6 }); }
+      if (t - I.zoneT > 5500) { I.zoneT = t; for (const q of alive.slice(0, 2 + (I.phase === 3 ? 1 : 0))) { const z = { x: q.x, y: q.y, r: 1.8, on: t + 1200, until: t + 7200 }; I.zones.push(z); m.fx.push({ k: "warn", x: z.x, y: z.y, r: z.r, t: 1200, c: "b" }); setTimeout(() => m.fx.push({ k: "izone", x: z.x, y: z.y, r: z.r, dur: 6000 }), 1200); } }
+    }
+    I.zones = I.zones.filter((z) => z.until > t);
+    if (tick) for (const z of I.zones) if (t >= z.on) for (const q of alive) if (Math.hypot(q.x - z.x, q.y - z.y) <= z.r) { hurtPct(m, q, 0.04); q.slowT = t + 900; }
+    if (t - I.infoT > 1000) { I.infoT = t; instInfo(m, `${B.def.name}・第 ${I.phase} 階段・${Math.max(0, Math.round(hp * 100))}%・${clock}`); }
+  } else if (d.kind === "race") {
+    if (t > I.start + 4000) I.lavaX += I.lavaV * 0.1;
+    if (tick) for (const q of alive) if (q.x < I.lavaX) hurtPct(m, q, 0.1);
+    if (I.guard && I.guard.dead && !I.gateOpen) { I.gateOpen = true; for (const q of here) sys(q, "熔岩守將倒下了，出口打開！快衝出去！"); }
+    if (t - I.infoT > 400) { I.infoT = t; for (const q of here) out(q.ws, { t: "mo", a: "inst", text: `${I.gateOpen ? "出口開了！快衝出去" : "岩漿追上來了！打倒出口的熔岩守將"}・${clock}`, lava: { x: I.lavaX, v: t > I.start + 4000 ? I.lavaV : 0 } }); }
+  } else if (d.kind === "tide") {
+    const B = I.boss, hp = B.hp / B.max, R2 = 2.4;
+    if (!I.tide && t >= I.tideAt) {
+      I.tide = { at: t + 3500 }; m.fx.push({ k: "safe", pts: I.plats, r: R2, t: 3500 });
+      for (const q of here) sys(q, "大潮要來了！快跑上金色的珊瑚台！");
+      for (let i = 0; i < 2 + I.n; i++) dgMob(m, d.mobs[randomInt(d.mobs.length)], { x: B.x + (Math.random() - 0.5) * 6, y: B.y + (Math.random() - 0.5) * 4 }, { agg: 14, hpm: 0.7 });
+    }
+    if (I.tide && t >= I.tide.at) {
+      I.tide = null; I.tideAt = t + (hp < 0.4 ? 10000 : 16000);
+      m.fx.push({ k: "tidewave", x: m.w / 2, y: m.h / 2 });
+      for (const q of alive) if (!I.plats.some(([x, y]) => Math.hypot(q.x - x, q.y - y) <= R2)) { hurtPct(m, q, 0.32); q.slowT = t + 3000; }
+    }
+    if (t - I.infoT > 1000) { I.infoT = t; instInfo(m, `${B.def.name}・${Math.max(0, Math.round(hp * 100))}%・${I.tide ? "大潮來了！" : `下一波潮 ${Math.max(0, Math.ceil((I.tideAt - t) / 1000))} 秒`}・${clock}`); }
+  } else if (d.kind === "waves") {
+    I.waveMobs = I.waveMobs.filter((x) => !x.dead);
+    if (I.wave <= d.waves && t >= I.waveAt && (I.wave === 0 || !I.waveMobs.length || t > I.waveAt + 45000)) {
+      I.wave++;
+      const edge = () => { const side = randomInt(4), u = Math.random(); return side === 0 ? { x: 2 + u * (m.w - 4), y: 2 } : side === 1 ? { x: 2 + u * (m.w - 4), y: m.h - 3 } : side === 2 ? { x: 2, y: 2 + u * (m.h - 4) } : { x: m.w - 3, y: 2 + u * (m.h - 4) }; };
+      const near = (p0) => { let best = null, bd = 1e9; for (const s2 of m.spots) { const dd = Math.hypot(s2.x - p0.x, s2.y - p0.y); if (dd < bd) { bd = dd; best = s2; } } return best || p0; };
+      if (I.wave <= d.waves) {
+        for (let i = 0; i < 4 + I.wave * 2 + I.n; i++) { const mob = dgMob(m, d.mobs[randomInt(d.mobs.length)], near(edge()), { agg: 40, hpm: 0.8 + I.wave * 0.1 }); mob.hx = m.w / 2; mob.hy = m.h / 2; I.waveMobs.push(mob); }
+        for (const q of here) sys(q, `第 ${I.wave} 波妖獸衝進瑤池了！`);
+      } else {
+        I.boss = dgMob(m, d.boss, near({ x: m.w / 2, y: m.h / 2 }), { agg: 20, def: { name: d.bossName } }); I.boss.hx = m.w / 2; I.boss.hy = m.h / 2;
+        m.fx.push({ k: "slam", x: I.boss.x, y: I.boss.y, r: 3 });
+        for (const q of here) sys(q, `${d.bossName}現身了！`);
+      }
+      I.waveAt = t + 2500;
+    }
+    if (t - I.infoT > 1000) { I.infoT = t; instInfo(m, `${I.wave > d.waves ? `${d.bossName}・${I.boss && !I.boss.dead ? Math.round(I.boss.hp / I.boss.max * 100) : 0}%` : I.wave === 0 ? "準備……" : `第 ${I.wave}/${d.waves} 波・剩 ${I.waveMobs.length} 隻`}・${clock}`); }
+  } else if (d.kind === "raid") {
+    const B = I.boss, hp = B.hp / B.max;
+    I.clones = I.clones.filter((c2) => !c2.dead);
+    B.dmgMul = I.clones.length ? 0.15 : 1;
+    if (I.phase === 1 && hp <= 0.66) {
+      I.phase = 2;
+      for (const dx of [-4, 4]) I.clones.push(dgMob(m, d.boss, { x: B.x + dx, y: B.y + 1 }, { agg: 16, hpm: 0.14, atkm: 0.6, def: { name: d.cloneName || "教主分身", boss: false } }));
+      for (const q of here) sys(q, d.msg2 || "教主：「分身化影！」——先打掉兩個分身，分身活著時教主幾乎打不動。");
+    }
+    if (I.phase === 2 && hp <= 0.33) { I.phase = 3; I.ultT = t + 4000; for (const q of here) sys(q, d.msg3 || "教主：「天魔解體！」——看到金色安全圈就躲進去！"); }
+    if (I.phase === 3 && !B.dead) {
+      if (!I.ult && t >= I.ultT) {
+        const pts = []; for (let i = 0; i < 3; i++) { const s2 = m.spots[randomInt(m.spots.length)]; pts.push([s2.x, s2.y]); }
+        I.ult = { pts, at: t + 3200, r: 2.3 }; m.fx.push({ k: "safe", pts, r: 2.3, t: 3200 });
+      }
+      if (I.ult && t >= I.ult.at) { const U = I.ult; I.ult = null; I.ultT = t + 14000; m.fx.push({ k: "slam", x: m.w / 2, y: m.h / 2, r: Math.max(m.w, m.h) }); for (const q of alive) if (!U.pts.some(([x, y]) => Math.hypot(q.x - x, q.y - y) <= U.r)) hurtPct(m, q, 0.75); }
+    }
+    if (t - I.infoT > 1000) { I.infoT = t; instInfo(m, `${B.def.name}・第 ${I.phase} 階段・${Math.max(0, Math.round(hp * 100))}%${I.clones.length ? `・分身 ${I.clones.length}` : ""}・${clock}`); }
+  }
+}
+// 王倒下（古墓、冰宮、秘境）：每個還在副本裡的人一份獎勵
+function dgBossKilled(m, mob) {
+  const I = m.inst, d = D.DUNGEONS[I.key], dif = diffOf(I.dk);
+  if (mob !== I.boss) return;
+  I.done = true; I.closeAt = now() + 180000;
+  // 王倒下的地方開一道出口傳送門：撿完東西走進去就回到外面
+  let ex = null; for (const [dx, dy] of [[0, 2.6], [2.6, 0], [-2.6, 0], [0, -2.6], [0, 0]]) if (!ex && walk(m, mob.x + dx, mob.y + dy) && walk(m, mob.x + dx, mob.y + dy + 1)) ex = { x: mob.x + dx, y: mob.y + dy };
+  ex = ex || m.spots[0];        // 跟掉落物錯開，免得點到寶物變成點傳送門
+  m.xnpc = [{ id: "exit", name: "出口傳送門", kind: "exit", x: ex.x, y: ex.y, say: "穿過傳送門就回到外面。" }];
+  const names = [];
+  for (const q of instHere(m)) { const g = dgReward(m, q, d.set, I.mlv, dif, 1, mob); sys(q, `通關${d.name}（${dif.name}）！拿到 ${g} 兩，戰利品掉在地上。撿完走進「出口傳送門」就能出去（3 分鐘後也會自動送你出去）。`); names.push(q.ch.name); out(q.ws, { t: "mo", a: "npcs", npcs: npcsOf(m.id) }); }
+  sysAll(`【副本】${names.join("、")} 通關了${d.name}（${dif.name}）！`);
+  mmoSave();
+}
+// 熔洞：跑到出口的人拿獎勵（越快越多）
+function dgEscape(m, p) {
+  const I = m.inst, d = D.DUNGEONS[I.key], dif = diffOf(I.dk);
+  if (I.escaped.has(p.key)) return;
+  I.escaped.add(p.key);
+  const used = (now() - I.start) / 1000, mult = Math.max(0.5, Math.min(1.4, 0.5 + 0.9 * (1 - used / d.time)));
+  const g = dgReward(maps[d.map], p, d.set, I.mlv, dif, mult, { x: maps[d.map].def.stone.x + 1, y: maps[d.map].def.stone.y + 1 });
+  sys(p, `逃出${d.name}！花了 ${Math.round(used)} 秒，獎勵 ×${mult.toFixed(2)}：${g} 兩，戰利品掉在傳送石旁邊。`);
+  sysAll(`【副本】${p.ch.name} 在 ${Math.round(used)} 秒內逃出了${d.name}（${dif.name}）！`);
+}
+
+// ---- 鎖妖塔（爬塔）
+function climbEnter(p) {
+  const C = D.CLIMB;
+  if (p.ch.lv < C.minLv) return `${C.minLv} 級才能進鎖妖塔`;
+  if (p.party && parties.get(p.party).leader !== p.key) return "要由隊長帶隊進塔";
+  const ok = [], skip = [];
+  for (const q of teamOf(p)) {
+    const A = db.acc[q.key];
+    if (q.map !== "town" || q.dead) skip.push(`${q.ch.name}（不在長安城）`);
+    else if (q.ch.lv < C.minLv) skip.push(`${q.ch.name}（未滿 ${C.minLv} 級）`);
+    else if (dgLeft(A, "climb", C.daily) <= 0) skip.push(`${q.ch.name}（今天的次數用完了）`);
+    else ok.push(q);
+  }
+  if (!ok.includes(p)) return `你今天的次數用完了（每天 ${C.daily} 次）`;
+  const lv = Math.round(ok.reduce((s2, q) => s2 + q.ch.lv, 0) / ok.length);
+  const m = makeInst({ name: "鎖妖塔", w: 26, h: 20, theme: "tower", lvl: `${lv} 級`, open: true, portals: [{ x: 0, y: 9, to: "town", tx: 6, ty: 22, label: "← 離開" }] },
+    { kind: "climb", lv, n: ok.length, floor: 0, nextT: now() + 3500, endAt: now() + C.time * 1000 });
+  for (const q of ok) {
+    dgUse(db.acc[q.key], "climb");
+    if (q.trade) cancelTrade(q.trade, "進了鎖妖塔，交易取消");
+    placeIn(q, m.id, 3.5, 10.5);
+    sys(q, `進入鎖妖塔。一層一層往上爬，每 5 層一隻王，越高越強。限時 ${C.time / 60} 分鐘，看能爬到第幾層！`);
+  }
+  if (skip.length) sys(p, `沒有跟進來：${skip.join("、")}`);
+  mmoSave(); return null;
+}
+function climbFloor(m) {
+  const I = m.inst, C = D.CLIMB; I.floor++;
+  m.mobs = m.mobs.filter((x) => !x.dead);
+  const f = I.floor, mult = 1 + C.perFloor * (f - 1), lv = Math.min(D.LV_CAP, I.lv + Math.floor(f / 2));
+  const mk = (k, extra = {}) => { const b = D.MONS[k]; const mob = spawnMob(m, k, extra.at, { ...b, lv, agg: 14, hpm: (b.hpm || 1) * mult * (1 + 0.45 * (I.n - 1)) * (extra.hpm || 1), atkm: (b.atkm || 1) * (1 + 0.05 * (f - 1)), respawn: 0, ...(extra.def || {}) }); mob.noRe = true; mob.dmgMul = 1; return mob; };
+  if (f % 5 === 0) {
+    const bk = C.bosses[(f / 5 - 1) % C.bosses.length];
+    I.boss = mk(bk, { at: { x: m.w / 2, y: m.h / 2 }, hpm: 0.6, def: { name: `第 ${f} 層・${D.MONS[bk].name}` } });
+    for (const q of instHere(m)) sys(q, `第 ${f} 層：${D.MONS[bk].name}鎮守此層！`);
+  } else {
+    I.boss = null;
+    const n = C.mobs + Math.floor(f / 3) + Math.max(0, I.n - 1) * 2;
+    for (let i = 0; i < n; i++) mk(D.TOWER.pool[randomInt(D.TOWER.pool.length)]);
+    for (const q of instHere(m)) sys(q, `第 ${f} 層。`);
+  }
+  for (const q of instHere(m)) { const st = statsOf(q); q.hp = Math.min(st.hp, q.hp + st.hp * 0.25); q.mp = Math.min(st.mp, q.mp + st.mp * 0.25); q.dirty = true; }
+}
+function climbTick(m, here) {
+  const I = m.inst, t = now(), C = D.CLIMB;
+  const left = Math.max(0, Math.ceil((I.endAt - t) / 1000)), clock = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+  const best = I.floor - (m.mobs.some((x) => !x.dead) ? 1 : 0);
+  for (const q of here) { const A = db.acc[q.key]; if (A && best > (A.tb || 0)) A.tb = best; }
+  if (t > I.endAt) { for (const q of here) { sys(q, `時間到了！這次爬到第 ${best} 層。`); placeIn(q, "town", D.TOWN_SPAWN.x, D.TOWN_SPAWN.y); } return; }
+  if (t >= I.nextT && m.mobs.every((x) => x.dead)) {
+    if (I.floor > 0 && !I.nextSet) {        // 清完一層：Boss 層掉寶，給點經驗，3 秒後上樓
+      I.nextSet = true; I.nextT = t + 3000;
+      const lv = Math.min(D.LV_CAP, I.lv + Math.floor(I.floor / 2));
+      for (const q of here) {
+        giveExp(q, Math.round(D.expNeed(Math.min(lv, D.LV_CAP)) * 0.05 * (1 + I.floor * 0.08)));
+        if (I.floor === 5) { bountyHit(q, "tower"); const A = db.acc[q.key]; if (A) A.tc = (A.tc || 0) + 1; }
+        if (I.floor % 5 === 0) { const dif = I.floor >= 15 ? D.DIFF[2] : I.floor >= 10 ? D.DIFF[1] : D.DIFF[0]; dgReward(m, q, "tower", lv, dif, 1 + I.floor * 0.03, I.boss || { x: m.w / 2, y: m.h / 2 }); }
+      }
+      instInfo(m, `第 ${I.floor} 層清空！3 秒後上樓`);
+    } else { I.nextSet = false; climbFloor(m); }
+  }
+  if (t - I.infoT > 1000) { I.infoT = t; const alive = m.mobs.filter((x) => !x.dead).length; instInfo(m, `${I.floor === 0 ? "準備中" : `第 ${I.floor} 層${alive ? `・剩 ${alive} 隻` : ""}`}・${clock}`); }
+}
+
 // ---- 擂台
 function arenaStart(a, b) {
-  const m = makeInst({ name: "擂台", w: 20, h: 14, theme: "arena", open: true, pvp: true, lvl: "切磋" }, { kind: "arena", a: a.key, b: b.key, fight: false, startAt: now() + D.ARENA.countdown * 1000, endAt: now() + (D.ARENA.countdown + D.ARENA.time) * 1000 });
-  for (const [q, x] of [[a, 5.5], [b, 14.5]]) {
+  const m = makeInst({ name: "擂台", w: D.ARENA.w, h: D.ARENA.h, theme: "arena", open: true, pvp: true, lvl: "切磋" }, { kind: "arena", a: a.key, b: b.key, fight: false, startAt: now() + D.ARENA.countdown * 1000, endAt: now() + (D.ARENA.countdown + D.ARENA.time) * 1000 });
+  const W = D.ARENA.w, H = D.ARENA.h;
+  for (const [q, x] of [[a, 7.5], [b, W - 7.5]]) {
     if (q.trade) cancelTrade(q.trade, "上擂台了，交易取消");
-    const st = statsOf(q); q.hp = st.hp; q.mp = st.mp; q.cd = {}; q.buff = {}; q.tgt = null; q.queued = null;
-    placeIn(q, m.id, x, 7.5); q.face = x < 10 ? 1 : -1;
+    const st = statsOf(q); q.hp = st.hp; q.mp = st.mp; q.cd = {}; q.buff = {}; q.tgt = null; q.queued = null; q.pvpHits = [];
+    placeIn(q, m.id, x, H / 2 + 0.5); q.face = x < W / 2 ? 1 : -1;
   }
   for (const q of [a, b]) sys(q, `擂台切磋：${a.ch.name} 對 ${b.ch.name}。${D.ARENA.countdown} 秒後開打，打到對方剩 0 就贏（不掉東西、不扣經驗）。`);
 }
@@ -926,7 +1647,7 @@ function bountyList(A) {
     { kind: "sell", name: "賣掉 8 件裝備", need: 8 },
     { kind: "potion", name: "吃 15 顆藥", need: 15 },
   ];
-  if (L >= D.TOWER.minLv) pool.push({ kind: "tower", name: "通關鎖妖塔 1 次", need: 1, jade: 1 });
+  if (L >= D.TOWER.minLv) pool.push({ kind: "tower", name: "鎖妖塔爬到第 5 層", need: 1, jade: 1 });
   const pick = [];
   while (pick.length < D.BOUNTY_N - 1 && pool.length) pick.push(pool.splice(randomInt(pool.length), 1)[0]);
   const list = [{ kind: "kill", target: f.k, name: `清剿${f.name}：打倒 40 隻怪`, need: 40 }, ...pick].map((q, i) => ({ ...q, i, have: 0, done: false, got: false }));
@@ -948,14 +1669,14 @@ function rankTables() {
   const rows = Object.values(db.acc).filter((A) => A.chars && A.chars.length).map((A) => {
     const c = A.chars.reduce((b, x) => ((x.lv || 1) > (b.lv || 1) || ((x.lv || 1) === (b.lv || 1) && (x.exp || 0) > (b.exp || 0)) ? x : b), A.chars[0]);      // 用帳號裡最高等級的角色上榜
     let enh = 0; for (const ch of A.chars) for (const it of [...Object.values(ch.eq), ...ch.inv]) if (it && it.e > enh) enh = it.e;
-    return { n: c.name, lv: c.lv || 1, exp: c.exp || 0, gold: A.gold, bk: A.bk || 0, tc: A.tc || 0, pw: (A.pvp && A.pvp.w) || 0, enh };
+    return { n: c.name, lv: c.lv || 1, exp: c.exp || 0, gold: A.gold, bk: A.bk || 0, tc: A.tc || 0, tb: A.tb || 0, pw: (A.pvp && A.pvp.w) || 0, enh };
   });
   const top = (key, fmt, tie) => rows.filter((r) => r[key] > 0).sort((a, b) => b[key] - a[key] || (tie ? b[tie] - a[tie] : 0)).slice(0, 10).map((r) => ({ n: r.n, v: fmt(r) }));
   return [
     { k: "lv", name: "等級", list: top("lv", (r) => `${r.lv} 級`, "exp") },
     { k: "gold", name: "財富", list: top("gold", (r) => `${r.gold.toLocaleString()} 兩`) },
     { k: "bk", name: "打王", list: top("bk", (r) => `${r.bk} 次`) },
-    { k: "tc", name: "鎖妖塔", list: top("tc", (r) => `${r.tc} 次`) },
+    { k: "tb", name: "鎖妖塔", list: top("tb", (r) => `第 ${r.tb} 層`) },
     { k: "pw", name: "擂台", list: top("pw", (r) => `${r.pw} 勝`) },
     { k: "enh", name: "強化", list: top("enh", (r) => `+${r.enh}`) },
   ];
@@ -1066,7 +1787,7 @@ function finishTrade(tr) {
   const take = (q, us) => us.map((u) => q.ch.inv.find((x) => (x.u || x.p) === u)).filter(Boolean);
   const ia = take(A, tr.items[tr.a]), ib = take(B, tr.items[tr.b]);
   if (ia.length !== tr.items[tr.a].length || ib.length !== tr.items[tr.b].length || A.ch.gold < tr.gold[tr.a] || B.ch.gold < tr.gold[tr.b]) return cancelTrade(tr, "交易內容有變，取消了");
-  const room = (q, give, get) => q.ch.inv.length - give.length + get.filter((it) => !(it.p && q.ch.inv.some((x) => x.p === it.p && !give.includes(x)))).length <= D.INV_MAX;
+  const room = (q, give, get) => q.ch.inv.length - give.length + get.filter((it) => !(it.p && q.ch.inv.some((x) => x.p === it.p && !give.includes(x)))).length <= invMax(q.ch);
   if (!room(A, ia, ib) || !room(B, ib, ia)) return cancelTrade(tr, "背包放不下，交易取消");
   A.ch.inv = A.ch.inv.filter((x) => !ia.includes(x)); B.ch.inv = B.ch.inv.filter((x) => !ib.includes(x));
   for (const it of ib) addItem(A, it); for (const it of ia) addItem(B, it);
@@ -1092,7 +1813,8 @@ function shopOf(p, kind) {
   if (kind === "herb") return Object.entries(D.POTIONS).filter(([, v]) => !v.mat).map(([k, v]) => ({ k, n: v.name, price: v.price, lv: v.lv || 1, d: v.hp ? `回 ${v.hp} 生命` : v.mp ? `回 ${v.mp} 法力` : "立刻回長安城" }));
   if (kind === "smith") {
     const list = [];
-    for (const t of D.TIERS) for (const s of Object.keys(D.SLOTS)) { const b = D.baseItem(s, t, c.cls); list.push({ k: `${s}:${t}`, n: b.name, s, t, st: b.st, price: D.itemValue(t, 0), lv: t }); }
+    const near = D.TIERS.filter((t) => t <= c.lv + 5 && t >= c.lv - 10);        // 只列跟自己等級差不多的
+    for (const t of near.length ? near : [1]) for (const s of Object.keys(D.SLOTS)) { const b = D.baseItem(s, t, c.cls); list.push({ k: `${s}:${t}`, n: b.name, s, t, st: b.st, price: D.itemValue(t, 0), lv: t }); }
     return list;
   }
   return [];
@@ -1146,7 +1868,7 @@ export async function handleMmo(ws, m) {
   const c = p.ch, mp = maps[p.map];
   const err = (text) => out(ws, { t: "mo", a: "err", text });
   switch (a) {
-    case "move": {
+    case "move": { p.pickT = 0;
       if (p.dead) return;
       const x = Number(m.x), y = Number(m.y);
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -1161,11 +1883,27 @@ export async function handleMmo(ws, m) {
       x /= l; y /= l; p.dir = { x, y }; p.dirT = t; p.path = null; p.queued = null; if (Math.abs(x) > 0.1) p.face = x > 0 ? 1 : -1; return;
     }
     case "atk": { const mob = findMob(mp, Number(m.id)); if (mob && !mob.dead && !p.dead && mob.pvp !== p) { p.tgt = mob.id; p.queued = null; } return; }
-    case "stop": p.tgt = null; p.queued = null; p.path = null; return;
+    case "stop": p.tgt = null; p.queued = null; p.path = null; p.pickT = 0; return;
+    case "loot": {        // 撿地上的東西（選角色的指令叫 pick，這裡不能撞名）：太遠就先走過去，到了自動撿
+      const l = mp.loot.find((x) => x.id === Number(m.id)); if (!l || p.dead) return;
+      if (Math.hypot(l.x - p.x, l.y - p.y) <= 1.3) { const e = tryPick(p, l); if (e) err(e); return; }
+      p.tgt = null; p.queued = null; p.pickT = l.id; p.dir = null; p.path = astar(mp, p.x, p.y, l.x, l.y, 15000); if (!p.path) { p.pickT = 0; err("走不過去"); } return;
+    }
     case "skill": {
       const sk = skillDef(c, m.s); if (!sk) return;
       const x = Number(m.x), y = Number(m.y);
       const e = tryCast(p, sk, { x: m.x == null ? NaN : x, y: m.y == null ? NaN : y, id: Number(m.id) || 0 }); if (e) err(e); return;
+    }
+    case "story": {     // 聽完一章：要照順序、等級夠、站在說故事的人旁邊；第一次聽完給經驗和銀兩
+      const i = Number(m.i), ch = STORY[i]; if (!ch) return;
+      if ((c.story || 0) !== i) return err("這段故事不是現在聽的");
+      if (c.lv < ch.lv) return err(`${ch.lv} 級才能聽這段故事`);
+      const n = npcsOf(p.map).find((x) => x.id === ch.npc); if (!n || Math.hypot(n.x - p.x, n.y - p.y) > 5) return err("要站在說故事的人旁邊");
+      const rw = storyReward(ch, D.expNeed(ch.lv));
+      c.story = i + 1; c.gold += rw.gold; giveExp(p, rw.exp); p.dirty = true; mmoSave(true);
+      sys(p, `聽完第 ${i + 1} 回「${ch.title}」，得到 ${rw.exp.toLocaleString()} 經驗、${rw.gold.toLocaleString()} 兩。`);
+      if (i + 1 === STORY.length) sysAll(`【江湖傳聞】${c.name} 聽完了「乾坤筆」的全部故事！`);
+      out(ws, { t: "mo", a: "storyok", i, exp: rw.exp, gold: rw.gold, story: storyView(c, ch.npc) }); return;
     }
     case "slot": {      // 換技能欄：把第 i 格換成某招（已經在別格的話兩格互換）
       const i = Math.floor(Number(m.i)); if (!(i >= 0 && i < slotN(c))) return;
@@ -1187,9 +1925,16 @@ export async function handleMmo(ws, m) {
       const it = c.inv.find((x) => (x.u || x.p) === m.u); if (!it) return m.u === "tp" ? err("身上沒有回城符") : undefined;
       if (it.p) return usePotion(p, it); return equip(p, it);
     }
+    case "sortinv": { sortInv(c); invChanged(p); return; }
+    case "bagup": {       // 行囊擴充 +10 格
+      const cost = bagCost(c); if (!cost) return err(`行囊已經是最大的 ${D.BAG_UP.max} 格了`);
+      if (c.gold < cost) return err(`擴充要 ${cost} 兩`);
+      c.gold -= cost; c.bag = invMax(c) + D.BAG_UP.step; invChanged(p);
+      sys(p, `行囊擴充到 ${c.bag} 格（花了 ${cost} 兩）。`); return;
+    }
     case "sellall": {     // 一鍵賣裝：把某個品質以下的裝備全部賣掉（鎖住的、強化過的不賣，傳說永遠不會一鍵賣）
       const r = Math.max(0, Math.min(2, Math.floor(Number(m.r) || 0)));
-      const list = c.inv.filter((x) => !x.p && x.r <= r && !x.lock && !(x.e > 0));
+      const list = c.inv.filter((x) => !x.p && x.r <= r && !x.lock && !(x.e > 0) && !x.set);
       if (!list.length) return err("沒有可以一鍵賣的裝備");
       const gold = list.reduce((s2, x) => s2 + Math.max(1, Math.floor(x.v * D.SELL_RATE)), 0);
       c.inv = c.inv.filter((x) => !list.includes(x)); c.gold += gold; invChanged(p); bountyHit(p, "sell", null, list.length);
@@ -1221,7 +1966,7 @@ export async function handleMmo(ws, m) {
       if (m.op === "aff") {
         const n = D.RAR[it.r].aff; if (!n) return err("普通裝備沒有詞條，先用重鑄把品質提上去");
         const gold = D.REROLL.gold(it.t); if (c.gold < gold) return err(`要 ${gold} 兩`); if (!takeMat(c, "jade", D.REROLL.jade)) return err("要靈玉 ×1");
-        c.gold -= gold; it.af = rollAff(it.t, n); rebuild(it); if (worn) clampHp(p); invChanged(p);
+        c.gold -= gold; it.af = rollAff(it.t, n, it.r, c); rebuild(it); if (worn) clampHp(p); invChanged(p);
         out(ws, { t: "mo", a: "forged", u: it.u, ok: true, op: "aff" });
         sys(p, `「${it.n}」的詞條重抽了。`); return;
       }
@@ -1230,7 +1975,7 @@ export async function handleMmo(ws, m) {
         const gold = D.RECAST.gold(it.t); if (c.gold < gold) return err(`要 ${gold} 兩`); if (!takeMat(c, "recast", D.RECAST.stone)) return err("要重鑄石 ×1");
         c.gold -= gold;
         const ok = Math.random() * 100 < D.RECAST.up[it.r];
-        if (ok) { it.r++; it.af = rollAff(it.t, D.RAR[it.r].aff); }
+        if (ok) { it.r++; it.af = rollAff(it.t, D.RAR[it.r].aff, it.r, c); }
         rebuild(it); if (worn) clampHp(p); invChanged(p);
         out(ws, { t: "mo", a: "forged", u: it.u, ok, op: "recast" });
         sys(p, ok ? `重鑄成功！「${it.n}」升為${D.RAR[it.r].name}。` : `重鑄失敗，「${it.n}」品質沒變（重鑄石用掉了）。`);
@@ -1239,9 +1984,14 @@ export async function handleMmo(ws, m) {
       }
       return;
     }
+    case "dungeon": {
+      const g = npcsOf(p.map).find((x) => x.kind === "dungeon" && x.dg === m.key);
+      if (!g || Math.hypot(g.x - p.x, g.y - p.y) > 4.5) return err("要在副本入口旁邊");
+      const e = dgEnter(p, m.key, m.diff); if (e) err(e); return;
+    }
     case "tower": {
       if (!nearNpc(p, "tower")) return err("要在守塔人旁邊");
-      const e = towerEnter(p); if (e) err(e); return;
+      const e = climbEnter(p); if (e) err(e); return;
     }
     case "duelreq": {     // 擂台切磋邀請：雙方都要在長安城
       const q = byId.get(Number(m.id)); if (!q || q === p) return;
@@ -1261,6 +2011,18 @@ export async function handleMmo(ws, m) {
       if (!nearNpc(p, need)) return err("要在城裡那位 NPC 旁邊才能做");
       const e = townAction(p, a, m); if (e) err(e); return;
     }
+    case "advance2": {    // 二轉：60 級以後，一轉再二選一
+      if (!nearNpc(p, "guide")) return err("要在長安城說書人旁邊才能二轉");
+      const A2 = D.ADV2[m.k]; if (!A2 || A2.base !== c.adv) return;
+      if (c.adv2) return err("已經二轉過了");
+      if (c.lv < D.ADV2_LV) return err(`${D.ADV2_LV} 級才能二轉`);
+      c.adv2 = m.k; fixSlots(c); clampHp(p); p.invDirty = true; p.dirty = true;
+      for (const q of players.values()) q.known.delete(p.id);
+      maps[p.map].fx.push({ k: "lvl", b: p.id });
+      sysAll(`【二轉】${c.name} 二轉成為「${A2.name}」！`);
+      sys(p, `技能欄多了一格（D），新招式按 K 可以看。`);
+      mmoSave(); return;
+    }
     case "advance": {     // 轉職：25 級以後在說書人那裡選一條路，選了就不能換
       if (!nearNpc(p, "guide")) return err("要在長安城說書人旁邊才能轉職");
       const A = D.ADV[m.k]; if (!A || A.base !== c.cls) return;
@@ -1275,7 +2037,7 @@ export async function handleMmo(ws, m) {
     }
     case "unequip": {
       const s = m.s; if (!D.SLOTS[s] || !c.eq[s]) return;
-      if (c.inv.length >= D.INV_MAX) return err("背包滿了");
+      if (c.inv.length >= invMax(c)) return err("背包滿了");
       c.inv.push(c.eq[s]); c.eq[s] = null; clampHp(p); invChanged(p); return;
     }
     case "sell": {        // 行囊裡隨時可以賣（不用跑回城）
@@ -1290,18 +2052,23 @@ export async function handleMmo(ws, m) {
     case "npc": {
       const n = npcsOf(p.map).find((x) => x.id === m.id); if (!n) return;
       if (Math.hypot(n.x - p.x, n.y - p.y) > 4.5) { p.tgt = null; p.path = astar(mp, p.x, p.y, n.x, n.y + 1); out(ws, { t: "mo", a: "walkto", id: n.id }); return; }
+      if (n.kind === "exit") { const I = mp.inst, d = I && D.DUNGEONS[I.key]; if (d) placeIn(p, d.map, maps[d.map].def.stone.x, maps[d.map].def.stone.y + 1); return; }
       const o = { t: "mo", a: "npc", id: n.id, kind: n.kind, name: n.name, say: n.say, shop: shopOf(p, n.kind) };
-      if (n.kind === "guide") { o.adv = Object.entries(D.ADV).filter(([, v]) => v.base === c.cls).map(([k, v]) => ({ k, n: v.name, d: v.desc, mod: v.mod, skills: D.ADV_SKILLS[k].map((s) => ({ name: s.name, lv: s.lv, desc: s.desc, id: s.id })) })); o.advLv = D.ADV_LV; o.myAdv = c.adv || ""; }
+      if (n.kind === "guide") { o.adv = Object.entries(D.ADV).filter(([, v]) => v.base === c.cls).map(([k, v]) => ({ k, n: v.name, d: v.desc, mod: v.mod, skills: D.ADV_SKILLS[k].map((s) => ({ name: s.name, lv: s.lv, desc: s.desc, id: s.id })) })); o.advLv = D.ADV_LV; o.myAdv = c.adv || "";
+        if (c.adv) { o.adv2 = Object.entries(D.ADV2).filter(([, v]) => v.base === c.adv).map(([k, v]) => ({ k, n: v.name, d: v.desc, mod: v.mod, skills: D.ADV2_SKILLS[k].map((s) => ({ name: s.name, lv: s.lv, desc: s.desc, id: s.id })) })); o.adv2Lv = D.ADV2_LV; o.myAdv2 = c.adv2 || ""; } }
       if (n.kind === "tower") { const A = db.acc[p.key], tw = A && A.tw && A.tw.d === today() ? A.tw.n : 0; o.tower = { left: D.TOWER.daily - tw, daily: D.TOWER.daily, minLv: D.TOWER.minLv, time: D.TOWER.time / 60, lead: !p.party || parties.get(p.party).leader === p.key, team: p.party ? parties.get(p.party).members.size : 1 }; }
       if (n.kind === "arena") { const A = db.acc[p.key]; o.arena = { top: arenaTop(), me: (A && A.pvp) || { w: 0, l: 0 } }; }
+      if (n.kind === "story") { o.story = storyView(c, n.id); o.art = n.art; }
       Object.assign(o, npcExtra(p, n.kind));
+      if (n.kind === "dungeon") { const d = D.DUNGEONS[n.dg], A = db.acc[p.key]; o.dg = { key: n.dg, name: d.name, desc: d.desc, lv: d.lv, left: dgLeft(A, n.dg, d.daily), daily: d.daily, set: { ...D.SETS[d.set], b2: undefined, b3: undefined }, diffs: D.DIFF.map((x) => ({ k: x.k, n: x.name, lv: d.lv + x.lv, setP: x.setP, legend: x.legend })), lead: !p.party || parties.get(p.party).leader === p.key, team: p.party ? parties.get(p.party).members.size : 1 }; }
+      if (n.kind === "tower") { const A = db.acc[p.key]; o.climb = { left: dgLeft(A, "climb", D.CLIMB.daily), daily: D.CLIMB.daily, best: A.tb || 0, minLv: D.CLIMB.minLv, time: D.CLIMB.time / 60 }; }
       if (n.kind === "smith") o.mats = Object.entries(D.POTIONS).filter(([, v]) => v.mat).map(([k, v]) => ({ k, n: v.name, price: v.price, d: v.d }));
       if (n.kind === "post" || n.kind === "stone") {
         const vis = c.visited || ["town"];
         o.warps = Object.entries(D.MAPS).filter(([k]) => k !== p.map).map(([k, v]) => ({ k, n: v.name, lvl: v.lvl || (v.town ? "安全區" : ""), cost: D.WARP_COST[k] || 0, ok: vis.includes(k) }));
         o.recall = n.kind === "post" && c.recall && D.MAPS[c.recall.map] ? D.MAPS[c.recall.map].name : "";
       }
-      if (n.kind === "bank") { o.real = p.real; o.cap = D.BANK_DAILY_OUT; o.used = c.day.d === today() ? c.day.out : 0; if (p.real) { try { const r = await botInfo(ws.user.uid); o.tokens = r && typeof r.balance === "number" ? r.balance : null; } catch { o.tokens = null; } } }
+      if (n.kind === "bank") { const BA = bankAcc(db.acc[p.key], p.key); o.real = p.real; o.cap = D.BANK_DAILY_OUT; o.used = c.day.d === today() ? c.day.out : 0; o.pool = bankPool(BA); o.poolIn = BA.bankIn || 0; o.maxIn = D.BANK_MAX_IN; if (p.real) { try { const r = await botInfo(ws.user.uid); o.tokens = r && typeof r.balance === "number" ? r.balance : null; } catch { o.tokens = null; } } }
       out(ws, o); return;
     }
     case "warp": {      // 驛站傳送：要站在車夫或傳送石旁邊、目的地去過、付得起車資
@@ -1332,7 +2099,7 @@ export async function handleMmo(ws, m) {
       if (tier > c.lv) return err(`${tier} 級才能買`);
       const price = D.itemValue(tier, 0);
       if (c.gold < price) return err("銀兩不夠");
-      if (c.inv.length >= D.INV_MAX) return err("背包滿了");
+      if (c.inv.length >= invMax(c)) return err("背包滿了");
       c.gold -= price; const it = makeEquip(s, tier, 0, c.cls); c.inv.push(it); invChanged(p); sys(p, `買了「${it.n}」，花 ${price} 兩。`); return;
     }
     case "bank": {
@@ -1344,24 +2111,27 @@ export async function handleMmo(ws, m) {
       p.banking = true;
       try {
         if (m.op === "in") {
-          if (amt > D.BANK_MAX_IN) return err(`一次最多存 ${D.BANK_MAX_IN.toLocaleString()}`);
+          if (amt > D.BANK_MAX_IN) return err(`一次最多換 ${D.BANK_MAX_IN.toLocaleString()}`);
+          const BA = bankAcc(db.acc[p.key], p.key);
           const r = await botSettle(ws.user.uid, ws.user.name, amt, 0, "水墨江湖：代幣換銀兩");
           if (!r || !r.ok) return err(r && r.error === "insufficient" ? "代幣不夠" : "機器人暫時連不上，稍後再試");
-          c.gold += amt; p.dirty = true; mmoSave(true);
-          out(ws, { t: "mo", a: "bank", tokens: r.balance, used: c.day.d === today() ? c.day.out : 0, cap: D.BANK_DAILY_OUT });
+          c.gold += amt; BA.bankIn = (BA.bankIn || 0) + amt; p.dirty = true; mmoSave(true);
+          out(ws, { t: "mo", a: "bank", tokens: r.balance, used: c.day.d === today() ? c.day.out : 0, cap: D.BANK_DAILY_OUT, pool: bankPool(BA), poolIn: BA.bankIn });
           sys(p, `用 ${amt} 代幣換了 ${amt} 兩。`); return;
         }
         if (m.op === "out") {
           if (c.day.d !== today()) c.day = { d: today(), out: 0 };
-          const left = D.BANK_DAILY_OUT - c.day.out;
+          const BA = bankAcc(db.acc[p.key], p.key);
+          const dayLeft = Math.max(0, D.BANK_DAILY_OUT - c.day.out), pool = bankPool(BA), left = dayLeft + pool;
           if (left <= 0) return err("今天的兌換額度用完了，明天再來");
-          if (amt > left) return err(`今天最多還能換 ${left} 兩`);
+          if (amt > left) return err(`現在最多還能換 ${left.toLocaleString()} 兩（今天額度 ${dayLeft.toLocaleString()}＋歷史存入額度 ${pool.toLocaleString()}）`);
           if (c.gold < amt) return err("銀兩不夠");
-          c.gold -= amt; c.day.out += amt; p.dirty = true; mmoSave(true);     // 先扣，再付；付失敗就記下來之後補發
+          const useDay = Math.min(amt, dayLeft), usePool = amt - useDay;      // 先扣每天的額度，不夠再扣歷史存入
+          c.gold -= amt; c.day.out += useDay; BA.bankUsed = (BA.bankUsed || 0) + usePool; p.dirty = true; mmoSave(true);     // 先扣，再付；付失敗就記下來之後補發
           let r = null; try { r = await botPay(ws.user.uid, ws.user.name, amt, "水墨江湖：銀兩換代幣"); } catch {}
           if (!r || !r.ok) { db.pend[p.key + ":" + now()] = { uid: ws.user.uid, name: ws.user.name, amount: amt }; mmoSave(true); sys(p, `已扣 ${amt} 兩，代幣稍後補發（機器人暫時連不上）。`); return; }
-          out(ws, { t: "mo", a: "bank", tokens: r.balance, used: c.day.out, cap: D.BANK_DAILY_OUT });
-          sys(p, `用 ${amt} 兩換了 ${amt} 代幣。`); return;
+          out(ws, { t: "mo", a: "bank", tokens: r.balance, used: c.day.out, cap: D.BANK_DAILY_OUT, pool: bankPool(BA), poolIn: BA.bankIn });
+          sys(p, `用 ${amt.toLocaleString()} 兩換了 ${amt.toLocaleString()} 代幣${usePool ? `（其中 ${usePool.toLocaleString()} 用歷史存入額度）` : ""}。`); return;
         }
       } finally { p.banking = false; }
       return;

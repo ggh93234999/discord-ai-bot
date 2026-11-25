@@ -48,7 +48,8 @@
 .mo-mini{display:block;width:132px;height:96px;margin:0 auto;border:3px solid #3b2d22;outline:1px solid rgba(59,45,34,.4);outline-offset:2px;background:var(--paper)}
 .mo-mapname{margin-top:7px}.mo-mapname b{font-family:var(--kai);font-size:20px;letter-spacing:.25em;padding-left:.25em}.mo-mapname span{display:block;font-size:11px;color:var(--ink3)}
 .mo-gold{color:var(--gold);font-weight:700;font-variant-numeric:tabular-nums}
-.mo-btns{display:flex;gap:4px;justify-content:center;margin-top:5px}
+.mo-btns{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:5px}
+.mo-help-set{margin:0 0 8px;font-size:13px;opacity:.8}
 .mmo .mo-btns button{padding:3px 7px;font-size:13px;white-space:nowrap}
 
 .mo-target{position:absolute;left:50%;top:10px;transform:translateX(-50%);min-width:180px;padding:4px 12px;text-align:center}
@@ -367,3 +368,160 @@
 .mo-snd input[type=range]:disabled{opacity:.4}
 .mo-volv{width:28px;text-align:right;font-weight:400;font-size:13px;color:var(--ink2)}
 .mo-snd small{color:var(--ink3);font-size:11px}
+
+/* 副本 */
+.mo-setn{color:var(--sc,#a8832a) !important}
+.mo-setbox{position:relative;background:color-mix(in srgb,var(--sc,#a8832a) 8%,transparent);border-left:3px solid var(--sc,#a8832a);padding:5px 8px 5px 34px;font-size:13px}
+.mo-setbox>.mo-seal{position:absolute;left:7px;top:6px}
+.mo-setbox small{color:var(--ink3)}
+.mo-setbox small.on{color:#7a5a12;font-weight:700}
+.mo-diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+.mmo .mo-diff{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px}
+.mo-diff b{font-family:var(--kai);font-size:18px}
+.mo-diff small{font-size:11px;color:var(--ink3)}
+.mmo .mo-diff.d-h b{color:#3a4f86}
+.mmo .mo-diff.d-x b{color:var(--seal)}
+/* 特效品質：三顆按鈕連在一起 */
+.mo-snd .mo-sndrow>span.mo-vfxq{width:auto;display:flex;gap:0}
+.mmo .mo-snd .mo-vfxq button{border-radius:0;margin-left:-1px}
+.mmo .mo-snd .mo-vfxq button:first-child{border-radius:3px 0 0 3px;margin-left:0}
+.mmo .mo-snd .mo-vfxq button:last-child{border-radius:0 3px 3px 0}
+.mo-snd .mo-sndrow small{flex:1;min-width:0}
+/* 行囊：分頁、格數、整理／擴充 */
+.mo-bagbar{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:8px 0 6px;flex-wrap:wrap}
+.mo-tabs{display:flex}
+.mmo .mo-tabs button{border-radius:0;margin-left:-1px;padding:3px 9px;font-family:var(--kai);font-size:14px;white-space:nowrap}
+.mmo .mo-tabs button:first-child{border-radius:3px 0 0 3px;margin-left:0}
+.mmo .mo-tabs button:last-child{border-radius:0 3px 3px 0}
+.mmo .mo-tabs button.on{background:var(--ink);color:#f4efe2}
+.mo-tabs small{margin-left:3px;font-size:10px;opacity:.7}
+.mo-bagops{display:flex;align-items:center;gap:5px}
+.mo-bagn{font-size:12px;color:var(--ink3);font-weight:400}
+.mo-bagn.full{color:#b5342a;font-weight:700}
+.mmo .mo-bagops button{padding:3px 9px}
+.mo-bagops small{font-size:10px;color:#a8832a}
+.mo-bag .mo-inv{max-height:min(46vh,320px);overflow:auto;padding-right:2px}
+/* 七個裝備格、特效詞條 */
+.mo-eq{grid-template-columns:repeat(4,1fr);gap:5px}
+.mo-sp,.mo-sp b{color:#a8832a}
+b.mo-sp{font-weight:600}
+/* ---- 行囊：圖示方塊 ---- */
+.mo-bag{overflow-x:hidden}
+.mmo .mo-inv.tiles{grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:5px}
+.mmo .mo-tile{position:relative;aspect-ratio:1/1;min-width:0;padding:0;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--r);border-radius:5px;
+  background:radial-gradient(circle at 50% 42%,#fdfbf4 0,#f1ead8 78%);box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--r) 55%,transparent),0 1px 2px rgba(22,20,15,.12);cursor:pointer;transition:transform .08s}
+.mmo .mo-tile:hover{transform:translateY(-1px);box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--r) 70%,transparent),0 3px 6px rgba(22,20,15,.18)}
+.mmo .mo-tile.r1{background:radial-gradient(circle at 50% 42%,#fbfdf6 0,#e6eedb 80%)}
+.mmo .mo-tile.r2{background:radial-gradient(circle at 50% 42%,#f8fbff 0,#dfe7f3 80%)}
+.mmo .mo-tile.r3{background:radial-gradient(circle at 50% 42%,#fff9ef 0,#f3dfd2 80%);box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--r) 70%,transparent),0 0 6px rgba(181,52,42,.25)}
+.mmo .mo-tile.on{outline:2px solid var(--ink);outline-offset:1px}
+.mo-tile img{width:72%;height:72%;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(22,20,15,.25));pointer-events:none}
+.mo-tile .g{font-family:var(--kai);font-size:20px;color:var(--ink2)}
+.mo-tile .e{position:absolute;left:3px;top:1px;font-style:normal;font-size:11px;font-weight:800;color:#a8832a;text-shadow:0 0 2px #fff,0 0 2px #fff}
+.mo-tile .q{position:absolute;right:3px;bottom:2px;font-style:normal;font-size:11px;font-weight:700;color:var(--ink);text-shadow:0 0 2px #fff,0 0 3px #fff}
+.mo-tile .lk{position:absolute;right:1px;top:0;font-style:normal;font-size:9px}
+/* 套裝：左下角蓋該地區的印章字，底部淡淡染上套裝色 */
+.mo-tile .st{position:absolute;left:2px;bottom:2px;z-index:2;width:15px;height:15px;display:grid;place-items:center;font-style:normal;font-family:var(--kai);font-size:11px;line-height:1;color:#fff;background:var(--sc,#b8902e);border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.75)}
+.mmo .mo-tile.set::before{content:"";position:absolute;inset:0;border-radius:4px;background:linear-gradient(to top,color-mix(in srgb,var(--sc) 26%,transparent),transparent 58%);pointer-events:none}
+.mo-tile .x{position:absolute;right:3px;top:1px;font-style:normal;font-size:10px;color:#b5342a}
+.mmo span.mo-tile.nil{border:1px solid rgba(22,20,15,.07);background:rgba(22,20,15,.03);box-shadow:none;cursor:default}
+.mo-bag .mo-inv{max-height:min(40vh,300px)}
+/* 裝備：一排七格，下面寫名字 */
+.mmo .mo-eq.dolls{grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:6px;margin:10px 0 4px}
+.mo-eqs{display:flex;flex-direction:column;align-items:stretch;min-width:0;text-align:center}
+.mo-eqs em{font-style:normal;font-size:11px;color:var(--ink3);margin-bottom:2px;font-family:var(--kai)}
+.mo-eqs small{font-size:10px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mo-eqs .mo-tile{width:100%}
+/* 屬性列 */
+.mo-bag .mo-stats{display:flex;flex-wrap:wrap;gap:2px 12px;padding:6px 8px;background:rgba(22,20,15,.04);border-radius:4px;font-size:13px}
+/* 鐵匠：部位分類 */
+.mo-chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 8px}
+.mmo .mo-chips button{padding:2px 9px;font-size:13px;font-family:var(--kai);border-radius:12px}
+.mmo .mo-chips button.on{background:var(--ink);color:#f4efe2}
+.mo-grp{margin:10px 0 4px;font-family:var(--kai);font-size:14px;color:var(--ink2);border-bottom:1px solid rgba(22,20,15,.15);padding-bottom:2px}
+.mo-sin{display:flex;align-items:center;gap:6px;min-width:0}
+.mo-sin > span{display:flex;flex-direction:column;min-width:0}
+.mo-flist{max-height:170px}
+/* 方塊固定正方形：圖示絕對定位，不會被長的圖撐開 */
+.mmo .mo-tile{min-height:0;overflow:hidden}
+.mo-tile img{position:absolute;left:14%;top:12%;width:72%;height:72%}
+.mmo .mo-eq.dolls{grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+@media (max-width:420px){.mmo .mo-eq.dolls{gap:4px}.mo-eqs small{font-size:9px}}
+
+/* 行囊分組：部位小標題、套裝地區標題（跨整排） */
+.mo-igrp{grid-column:1/-1;margin:6px 0 0;font-family:var(--kai);font-size:13px;font-weight:400;color:var(--ink2);border-bottom:1px solid rgba(22,20,15,.12);padding-bottom:2px}
+.mo-igrp:first-child{margin-top:0}
+.mo-igrp small{margin-left:5px;font-size:10px;color:var(--ink3)}
+.mo-iempty{grid-column:1/-1;margin:8px 0}
+.mo-setgrp{grid-column:1/-1;display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:4px 7px;border-left:3px solid var(--sc);background:color-mix(in srgb,var(--sc) 9%,transparent);border-radius:0 3px 3px 0}
+.mo-setgrp:first-child{margin-top:0}
+.mo-setgrp b{font-family:var(--kai);font-size:15px;font-weight:400;color:var(--sc)}
+.mo-setgrp small{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mo-seal{display:inline-grid;place-items:center;flex:none;width:20px;height:20px;font-style:normal;font-family:var(--kai);font-size:13px;line-height:1;color:#fff;background:var(--sc,#a8832a);border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.6),0 1px 2px rgba(22,20,15,.25)}
+.mo-bag .mo-chips button small{margin-left:3px;font-size:10px;opacity:.65}
+.mo-bag .mo-chips button:disabled{opacity:.35}
+
+/* 技能列：按鍵＝鈕上緣的墨色鍵帽；冷卻＝整顆變暗＋掃描＋大字秒數；轉好閃一圈；魔不夠變藍灰 */
+.mmo .mo-sk:not(.pot) kbd{position:absolute;left:50%;top:2px;right:auto;transform:translateX(-50%);z-index:3;min-width:20px;height:18px;padding:0 5px;display:grid;place-items:center;
+  font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:12px;font-weight:800;line-height:1;color:#f6efe0;background:#16140f;border:1.5px solid #f2ecdc;border-radius:5px;box-shadow:0 1px 3px rgba(0,0,0,.45);text-shadow:none}
+.mmo .mo-sk.none kbd{background:var(--ink2)}
+.mo-sk .cd{z-index:2;font-family:var(--kai)}
+.mo-sk.oncd .cd{background:conic-gradient(rgba(12,11,8,.74) calc(var(--p) * 360deg),rgba(12,11,8,.30) 0) !important;font-size:24px;font-weight:800;color:#fff !important;padding-top:6px;
+  text-shadow:0 0 3px #000,0 0 2px #000,0 2px 3px rgba(0,0,0,.8) !important;font-variant-numeric:tabular-nums}
+.mo-sk.oncd small{opacity:.55}
+.mmo .mo-sk.nomp:not(.oncd){filter:saturate(.35) brightness(.85)}
+.mmo .mo-sk.nomp::after{content:"缺魔";position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:3;padding:0 4px;font-size:10px;line-height:14px;color:#fff;background:#3a4f86;border-radius:3px;white-space:nowrap}
+.mmo .mo-sk.ready{animation:moReady .45s ease-out}
+@keyframes moReady{0%{box-shadow:0 0 0 0 rgba(255,236,170,.95),0 0 0 0 rgba(255,236,170,.6)}100%{box-shadow:0 0 0 10px rgba(255,236,170,0),0 0 18px 6px rgba(255,236,170,0)}}
+.mmo .mo-sk.pot kbd{left:3px;top:1px;right:auto;font-size:11px;font-weight:800;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.mmo .mo-sk.ready{animation:none}}
+@media (max-width:640px){.mmo .mo-sk:not(.pot) kbd{display:none}.mo-sk.oncd .cd{font-size:20px}.mmo .mo-sk.pot kbd{display:none}}
+.mo-capped b{color:#b5342a !important}
+.mo-capped em{margin-left:4px;font-style:normal;font-size:10px;padding:0 4px;border-radius:2px;background:rgba(181,52,42,.12);color:#9e2f26;white-space:nowrap}
+
+/* 選角畫面：整張水墨山水當背景（蓋住後面還沒載好的介面），上方大字標題，角色卡片浮起來 */
+.mo-start{flex-direction:column;gap:14px;background:linear-gradient(rgba(244,238,222,.18),rgba(244,238,222,.5)),var(--titlebg,none) center/cover no-repeat,#e8e1cf}
+.mo-logo{font-family:var(--kai);font-size:clamp(34px,6vw,54px);letter-spacing:.32em;color:#16140f;text-shadow:0 2px 0 rgba(244,238,222,.9),0 0 18px rgba(244,238,222,.9);text-align:center;line-height:1.1;padding-left:.32em}
+.mo-logo small{display:block;margin-top:6px;font-size:14px;letter-spacing:.4em;color:#5c5648;text-shadow:0 0 8px rgba(244,238,222,1)}
+.mo-start .mo-sheet{background:rgba(251,248,239,.9);box-shadow:0 10px 30px rgba(22,20,15,.25)}
+.mo-ch{border-radius:4px;background:linear-gradient(#fdfbf4,#f0e9d6);transition:transform .15s ease,box-shadow .15s ease}
+.mo-ch:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(22,20,15,.18)}
+.mo-chpick img{height:116px;filter:drop-shadow(0 3px 4px rgba(22,20,15,.28))}
+.mmo .mo-chpick{position:relative}
+.mo-chpick::before{content:"";position:absolute;left:50%;top:14px;width:104px;height:104px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--c) 22%,transparent),transparent 70%);pointer-events:none}
+.mo-chpick b{margin-top:2px}
+@media (prefers-reduced-motion:reduce){.mo-ch{transition:none}.mo-ch:hover{transform:none}}
+/* 手機：右上角的面板不要蓋到左上角的血條 */
+@media (max-width:640px){
+  .mo-right{max-width:min(158px,40vw)}
+  .mmo .mo-btns button{padding:2px 6px;font-size:12px}
+  .mo-btns kbd{display:none}
+  .mo-mini{width:100%;height:auto;aspect-ratio:132/96;max-width:132px}
+  .mo-logo{font-size:34px}
+}
+.mo-bar.xp{height:11px;margin-top:3px}.mo-bar.xp i{background:linear-gradient(#e2bd5c,#b38a2a)}
+.mo-bar.xp span{font-size:9px;line-height:10px;color:#3d3221;text-shadow:0 0 2px rgba(255,250,235,.9);letter-spacing:.04em}
+/* 冷卻詞條：冷卻縮減（特效金色）之外，單一技能冷卻用青藍色，一眼分得出來 */
+.mo-skcd{color:#24688a !important}
+b.mo-skcd{font-weight:700}
+.mo-stats .mo-skcd b{color:#24688a}
+.mo-cdfast{color:#24688a}
+.mo-bankq{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.mo-bankq>div{background:#fbf8ef;border:1px solid rgba(22,20,15,.25);padding:6px 8px;display:flex;flex-direction:column}
+.mo-bankq span{font-size:12px;color:var(--ink3)}.mo-bankq b{font-family:var(--kai);font-size:20px;color:var(--gold)}.mo-bankq small{font-size:11px;color:var(--ink3)}
+
+/* 主線故事：讀故事時左邊立繪、右邊一頁楷書；目錄一列一回 */
+.mo-story-read{display:flex;gap:12px;align-items:flex-end;min-height:180px;padding:6px 2px 2px;background:linear-gradient(rgba(251,248,239,.0),rgba(240,232,212,.65));border-bottom:1px solid rgba(22,20,15,.18)}
+.mo-story-pic{width:120px;max-height:200px;object-fit:contain;flex:none;filter:drop-shadow(0 3px 4px rgba(22,20,15,.25))}
+.mo-story-text{flex:1;min-width:0;padding-bottom:10px}
+.mo-story-text h4{margin:0 0 8px;font-family:var(--kai);font-size:15px;font-weight:400;color:#2c5d6b;letter-spacing:.08em}
+.mo-story-text p{margin:0;font-family:var(--kai);font-size:18px;line-height:1.9;color:var(--ink);animation:moStoryIn .35s ease-out}
+@keyframes moStoryIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.mo-story-text p{animation:none}}
+.mo-story-foot{display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:10px}
+.mo-story-foot small{margin-right:auto;color:var(--ink3)}
+.mo-story-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin:6px 0;background:#fbf8ef;border:1px solid rgba(22,20,15,.18);border-left:3px solid #2c5d6b}
+.mo-story-row span{display:flex;flex-direction:column;min-width:0}.mo-story-row b{font-family:var(--kai);font-size:16px;font-weight:400}.mo-story-row small{font-size:12px;color:var(--ink3)}
+.mo-story-row.ok{border-left-color:#c9962a;background:#fff8e6}.mo-story-row.ok small{color:#8a6414}
+.mo-story-row.locked,.mo-story-row.lv{opacity:.6}
+@media (max-width:560px){.mo-story-pic{width:84px}.mo-story-text p{font-size:16px}}

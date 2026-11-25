@@ -1,25 +1,33 @@
 {
  "a_archer_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
+  "f": 24,
+  "fps": 32.0,
   "h": 238,
   "mode": "once",
-  "w": 171
+  "w": 172
+ },
+ "a_archer_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 238,
+  "mode": "once",
+  "w": 258
  },
  "a_archer_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 24,
+  "fps": 18.0,
   "h": 201,
   "mode": "ping",
   "w": 168
  },
  "a_archer_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
-  "h": 204,
+  "f": 24,
+  "fps": 22.0,
+  "h": 205,
   "mode": "loop",
   "w": 183
  },
@@ -81,24 +89,32 @@
  },
  "a_bd_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
+  "f": 24,
+  "fps": 32.0,
   "h": 241,
   "mode": "once",
-  "w": 330
+  "w": 355
+ },
+ "a_bd_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 235,
+  "mode": "once",
+  "w": 317
  },
  "a_bd_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 24,
+  "fps": 18.0,
   "h": 207,
   "mode": "ping",
   "w": 213
  },
  "a_bd_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 24,
+  "fps": 22.0,
   "h": 225,
   "mode": "loop",
   "w": 204
@@ -134,6 +150,38 @@
   "h": 177,
   "mode": "ping",
   "w": 161
+ },
+ "a_dh_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 236,
+  "mode": "once",
+  "w": 342
+ },
+ "a_dh_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 241,
+  "mode": "once",
+  "w": 272
+ },
+ "a_dh_idle": {
+  "base": 200,
+  "f": 17,
+  "fps": 12.75,
+  "h": 201,
+  "mode": "ping",
+  "w": 204
+ },
+ "a_dh_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 200,
+  "mode": "loop",
+  "w": 210
  },
  "a_fcat_idle": {
   "base": 120,
@@ -225,27 +273,35 @@
  },
  "a_ft_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
+  "f": 24,
+  "fps": 32.0,
   "h": 202,
   "mode": "once",
   "w": 224
  },
+ "a_ft_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 234,
+  "mode": "once",
+  "w": 312
+ },
  "a_ft_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
-  "h": 205,
+  "f": 24,
+  "fps": 18.0,
+  "h": 206,
   "mode": "ping",
   "w": 204
  },
  "a_ft_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 18,
+  "fps": 16.5,
   "h": 201,
   "mode": "loop",
-  "w": 200
+  "w": 201
  },
  "a_general_idle": {
   "base": 170,
@@ -295,29 +351,133 @@
   "mode": "ping",
   "w": 128
  },
+ "a_jg_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 207,
+  "mode": "once",
+  "w": 191
+ },
+ "a_jg_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 224,
+  "mode": "once",
+  "w": 303
+ },
+ "a_jg_idle": {
+  "base": 200,
+  "f": 20,
+  "fps": 15.0,
+  "h": 206,
+  "mode": "ping",
+  "w": 193
+ },
+ "a_jg_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 201,
+  "mode": "loop",
+  "w": 187
+ },
+ "a_jn_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 204,
+  "mode": "once",
+  "w": 225
+ },
+ "a_jn_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 229,
+  "mode": "once",
+  "w": 211
+ },
+ "a_jn_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 145
+ },
+ "a_jn_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 200,
+  "mode": "loop",
+  "w": 141
+ },
  "a_jx_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
+  "f": 24,
+  "fps": 32.0,
   "h": 233,
   "mode": "once",
   "w": 375
  },
+ "a_jx_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 245,
+  "mode": "once",
+  "w": 376
+ },
  "a_jx_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 11,
+  "fps": 8.25,
   "h": 200,
   "mode": "ping",
   "w": 207
  },
  "a_jx_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 18,
+  "fps": 16.5,
   "h": 201,
   "mode": "loop",
   "w": 212
+ },
+ "a_jy_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 202,
+  "mode": "once",
+  "w": 220
+ },
+ "a_jy_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 240,
+  "mode": "once",
+  "w": 190
+ },
+ "a_jy_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 166
+ },
+ "a_jy_walk": {
+  "base": 200,
+  "f": 18,
+  "fps": 16.5,
+  "h": 209,
+  "mode": "loop",
+  "w": 188
  },
  "a_lavagolem_idle": {
   "base": 170,
@@ -345,48 +505,64 @@
  },
  "a_ly_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
-  "h": 231,
+  "f": 24,
+  "fps": 32.0,
+  "h": 230,
   "mode": "once",
-  "w": 214
+  "w": 310
+ },
+ "a_ly_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 201,
+  "mode": "once",
+  "w": 221
  },
  "a_ly_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 24,
+  "fps": 18.0,
   "h": 200,
   "mode": "ping",
   "w": 155
  },
  "a_ly_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 24,
+  "fps": 22.0,
   "h": 202,
   "mode": "loop",
-  "w": 171
+  "w": 172
  },
  "a_mage_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
-  "h": 236,
+  "f": 24,
+  "fps": 32.0,
+  "h": 237,
   "mode": "once",
-  "w": 302
+  "w": 303
+ },
+ "a_mage_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 242,
+  "mode": "once",
+  "w": 340
  },
  "a_mage_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 11,
+  "fps": 8.25,
   "h": 200,
   "mode": "ping",
   "w": 284
  },
  "a_mage_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 24,
+  "fps": 22.0,
   "h": 200,
   "mode": "loop",
   "w": 285
@@ -398,6 +574,38 @@
   "h": 189,
   "mode": "ping",
   "w": 183
+ },
+ "a_pj_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 226,
+  "mode": "once",
+  "w": 263
+ },
+ "a_pj_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 231,
+  "mode": "once",
+  "w": 227
+ },
+ "a_pj_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 188
+ },
+ "a_pj_walk": {
+  "base": 200,
+  "f": 18,
+  "fps": 16.5,
+  "h": 202,
+  "mode": "loop",
+  "w": 222
  },
  "a_post_idle": {
   "base": 200,
@@ -455,6 +663,38 @@
   "mode": "ping",
   "w": 187
  },
+ "a_sj_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 200,
+  "mode": "once",
+  "w": 288
+ },
+ "a_sj_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 241,
+  "mode": "once",
+  "w": 228
+ },
+ "a_sj_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 221
+ },
+ "a_sj_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 200,
+  "mode": "loop",
+  "w": 213
+ },
  "a_smith_idle": {
   "base": 200,
   "f": 12,
@@ -470,6 +710,134 @@
   "h": 161,
   "mode": "ping",
   "w": 184
+ },
+ "a_snbamboo_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 201,
+  "mode": "ping",
+  "w": 157
+ },
+ "a_sncatcher_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 270
+ },
+ "a_sncrypt_idle": {
+  "base": 200,
+  "f": 21,
+  "fps": 15.75,
+  "h": 200,
+  "mode": "ping",
+  "w": 128
+ },
+ "a_sncrystal_idle": {
+  "base": 200,
+  "f": 21,
+  "fps": 15.75,
+  "h": 200,
+  "mode": "ping",
+  "w": 196
+ },
+ "a_sndemon_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 207,
+  "mode": "ping",
+  "w": 135
+ },
+ "a_snfire_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 200,
+  "mode": "ping",
+  "w": 125
+ },
+ "a_snfortune_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 152
+ },
+ "a_snheaven_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 203,
+  "mode": "ping",
+  "w": 205
+ },
+ "a_snhell18_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 206,
+  "mode": "ping",
+  "w": 140
+ },
+ "a_snhell_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 208,
+  "mode": "ping",
+  "w": 119
+ },
+ "a_snicepal_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 107
+ },
+ "a_snkunlun_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 127
+ },
+ "a_snlavacave_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 195
+ },
+ "a_snlingxiao_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 167
+ },
+ "a_snmobai_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 107
+ },
+ "a_snmount_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 104
  },
  "a_snow_atk": {
   "base": 300,
@@ -495,50 +863,106 @@
   "mode": "ping",
   "w": 170
  },
+ "a_snsanctum_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 115
+ },
+ "a_snsea_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 112
+ },
+ "a_snsnow_idle": {
+  "base": 200,
+  "f": 16,
+  "fps": 12.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 118
+ },
+ "a_sntomb_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 206,
+  "mode": "ping",
+  "w": 127
+ },
+ "a_snyaochi_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 159
+ },
  "a_ss_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
+  "f": 24,
+  "fps": 32.0,
   "h": 229,
   "mode": "once",
-  "w": 281
+  "w": 288
+ },
+ "a_ss_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 223,
+  "mode": "once",
+  "w": 178
  },
  "a_ss_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 24,
+  "fps": 18.0,
   "h": 200,
   "mode": "ping",
-  "w": 163
+  "w": 164
  },
  "a_ss_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 24,
+  "fps": 22.0,
   "h": 200,
   "mode": "loop",
   "w": 170
  },
  "a_sword_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
+  "f": 24,
+  "fps": 32.0,
   "h": 237,
   "mode": "once",
-  "w": 291
+  "w": 292
+ },
+ "a_sword_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 239,
+  "mode": "once",
+  "w": 388
  },
  "a_sword_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 24,
+  "fps": 18.0,
   "h": 200,
   "mode": "ping",
-  "w": 190
+  "w": 189
  },
  "a_sword_walk": {
   "base": 200,
-  "f": 12,
-  "fps": 11,
+  "f": 24,
+  "fps": 22.0,
   "h": 206,
   "mode": "loop",
   "w": 191
@@ -567,21 +991,101 @@
   "mode": "ping",
   "w": 356
  },
+ "a_tj_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 200,
+  "mode": "once",
+  "w": 252
+ },
+ "a_tj_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 215,
+  "mode": "once",
+  "w": 268
+ },
+ "a_tj_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 200,
+  "mode": "ping",
+  "w": 192
+ },
+ "a_tj_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 201,
+  "mode": "loop",
+  "w": 192
+ },
+ "a_tl_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 202,
+  "mode": "once",
+  "w": 143
+ },
+ "a_tl_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 238,
+  "mode": "once",
+  "w": 204
+ },
+ "a_tl_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 201,
+  "mode": "ping",
+  "w": 144
+ },
+ "a_tl_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 200,
+  "mode": "loop",
+  "w": 143
+ },
  "a_ts_atk": {
   "base": 200,
-  "f": 12,
-  "fps": 16,
-  "h": 203,
+  "f": 24,
+  "fps": 32.0,
+  "h": 207,
   "mode": "once",
-  "w": 215
+  "w": 224
+ },
+ "a_ts_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 238,
+  "mode": "once",
+  "w": 206
  },
  "a_ts_idle": {
   "base": 200,
-  "f": 12,
-  "fps": 9,
+  "f": 24,
+  "fps": 18.0,
   "h": 210,
   "mode": "ping",
   "w": 141
+ },
+ "a_ts_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 207,
+  "mode": "loop",
+  "w": 163
  },
  "a_wisp_idle": {
   "base": 170,
@@ -599,6 +1103,70 @@
   "mode": "ping",
   "w": 245
  },
+ "a_xl_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 233,
+  "mode": "once",
+  "w": 283
+ },
+ "a_xl_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 235,
+  "mode": "once",
+  "w": 258
+ },
+ "a_xl_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 208,
+  "mode": "ping",
+  "w": 228
+ },
+ "a_xl_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 201,
+  "mode": "loop",
+  "w": 219
+ },
+ "a_yd_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 203,
+  "mode": "once",
+  "w": 278
+ },
+ "a_yd_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 234,
+  "mode": "once",
+  "w": 299
+ },
+ "a_yd_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 203,
+  "mode": "ping",
+  "w": 189
+ },
+ "a_yd_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 202,
+  "mode": "loop",
+  "w": 193
+ },
  "a_yeti_idle": {
   "base": 170,
   "f": 12,
@@ -607,6 +1175,38 @@
   "mode": "ping",
   "w": 170
  },
+ "a_ys_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 217,
+  "mode": "once",
+  "w": 226
+ },
+ "a_ys_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 248,
+  "mode": "once",
+  "w": 267
+ },
+ "a_ys_idle": {
+  "base": 200,
+  "f": 11,
+  "fps": 8.25,
+  "h": 223,
+  "mode": "ping",
+  "w": 167
+ },
+ "a_ys_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 201,
+  "mode": "loop",
+  "w": 148
+ },
  "a_zombie_idle": {
   "base": 170,
   "f": 12,
@@ -614,5 +1214,37 @@
   "h": 180,
   "mode": "ping",
   "w": 157
+ },
+ "a_zr_atk": {
+  "base": 200,
+  "f": 24,
+  "fps": 32.0,
+  "h": 218,
+  "mode": "once",
+  "w": 204
+ },
+ "a_zr_cast": {
+  "base": 200,
+  "f": 24,
+  "fps": 25.26,
+  "h": 200,
+  "mode": "once",
+  "w": 303
+ },
+ "a_zr_idle": {
+  "base": 200,
+  "f": 24,
+  "fps": 18.0,
+  "h": 204,
+  "mode": "ping",
+  "w": 192
+ },
+ "a_zr_walk": {
+  "base": 200,
+  "f": 24,
+  "fps": 22.0,
+  "h": 207,
+  "mode": "loop",
+  "w": 192
  }
 }

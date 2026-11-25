@@ -4,7 +4,7 @@ import "./pcbuild.css";
 import { pim, wirePim } from "./pcimg.js";
 import { CAT_NAME } from "../shared/pcrules.js";
 
-const ICON = { cpu: "🧠", mb: "🔌", gpu: "🎮", ram: "💾", ssd: "💿", psu: "⚡", case: "🗄️", cooler: "❄️" };
+import { pcIcon, PC_TXT } from "./pcicons.js";
 const CATS = ["cpu", "mb", "gpu", "ram", "ssd", "psu", "case", "cooler"];
 const PERIODS = [[1, "1 天"], [3, "3 天"], [7, "7 天"], [30, "30 天"], [0, "全部"]];
 const STORES = [["", "兩家"], ["c", "原價屋"], ["s", "欣亞"]];
@@ -67,7 +67,7 @@ export function mountPcMoves(root, { env, back }) {
     seg($('[data-k="days"]'), PERIODS, days, (v) => { days = Number(v); ls.set("pcm_days", days); load(); });
     seg($('[data-k="store"]'), STORES, store, (v) => { store = v; ls.set("pcm_store", store); shown = { up: 20, down: 20 }; render(); });
     seg($('[data-k="sort"]'), SORTS, sort, (v) => { sort = v; ls.set("pcm_sort", sort); render(); });
-    $(".pcm-chips").innerHTML = [["", "全部"], ...CATS.map((c) => [c, `${ICON[c]} ${CAT_NAME[c] || c}`])].map(([v, n]) => `<button class="${v === cat ? "on" : ""}" data-v="${v}">${n}</button>`).join("");
+    $(".pcm-chips").innerHTML = [["", "全部"], ...CATS.map((c) => [c, `${pcIcon(c)} ${CAT_NAME[c] || c}`])].map(([v, n]) => `<button class="${v === cat ? "on" : ""}" data-v="${v}">${n}</button>`).join("");
     $(".pcm-chips").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { cat = b.dataset.v; shown = { up: 20, down: 20 }; render(); }));
 
     // 價格一次變成 2.5 倍以上或 4 成以下，幾乎都是店家標錯價或抓到別的商品，不放進榜單
@@ -93,13 +93,13 @@ export function mountPcMoves(root, { env, back }) {
         <div class="t up"><b>${ups.length}</b><span>漲價</span><em>${ups.length ? "平均 +" + avg(ups).toFixed(1) + "%" : "—"}</em></div>
         <div class="t"><b>${same == null ? "—" : same}</b><span>沒變</span><em>${trackedN == null ? "" : "共追蹤 " + trackedN}</em></div>
       </div>
-      <div class="pcm-bars">${byCat.map((x) => `<div class="pcm-bar"><span class="l">${ICON[x.c]} ${CAT_NAME[x.c] || x.c}</span>
+      <div class="pcm-bars">${byCat.map((x) => `<div class="pcm-bar"><span class="l">${pcIcon(x.c)} ${CAT_NAME[x.c] || x.c}</span>
         <span class="half left"><i style="width:${(x.down / mx) * 100}%"></i><em>${x.down || ""}</em></span>
         <span class="half right"><i style="width:${(x.up / mx) * 100}%"></i><em>${x.up || ""}</em></span></div>`).join("")}
         <div class="pcm-bleg"><span>← 降價件數</span><span>漲價件數 →</span></div></div>`;
 
     const row = (m) => `<div class="pcm-it ${m.d > 0 ? "up" : "down"}" data-id="${esc(m.id)}" tabindex="0" role="button">
-      <div class="nm"><span class="st ${m.st}">${m.st === "c" ? "原價屋" : "欣亞"}</span><span class="cat">${ICON[m.cat] || ""}</span>${esc(m.name)}</div>
+      <div class="nm"><span class="st ${m.st}">${m.st === "c" ? "原價屋" : "欣亞"}</span><span class="cat">${pcIcon(m.cat)}</span>${esc(m.name)}</div>
       <div class="pr"><s>${money(m.from)}</s> → <b>${money(m.to)}</b></div>
       <div class="dl"><b>${m.d > 0 ? "▲" : "▼"} ${money(Math.abs(m.d))}</b><span>${m.d > 0 ? "+" : ""}${m.pct.toFixed(1)}%</span></div>
       <div class="ds">${dt(m.at)} → ${dt(m.to_at)}${m.n > 1 ? `　變動 ${m.n} 次` : ""}</div></div>`;
@@ -126,7 +126,7 @@ export function mountPcMoves(root, { env, back }) {
     dlg.className = "pcm-dlg";
     dlg.innerHTML = `<div class="pcm-card" role="dialog">
       <button class="x" aria-label="關閉">✕</button>
-      <div class="hd">${pim(url, [m.id], m.name)}<div><span class="st ${m.st}">${m.st === "c" ? "原價屋" : "欣亞"}</span> ${ICON[m.cat] || ""} ${esc(m.name)}</div></div>
+      <div class="hd">${pim(url, [m.id], m.name)}<div><span class="st ${m.st}">${m.st === "c" ? "原價屋" : "欣亞"}</span> ${pcIcon(m.cat)} ${esc(m.name)}</div></div>
       <div class="bd">載入中…</div></div>`;
     root.querySelector(".pcm").appendChild(dlg);
     const close = () => dlg.remove();
