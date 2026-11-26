@@ -525,3 +525,15 @@ b.mo-skcd{font-weight:700}
 .mo-story-row.ok{border-left-color:#c9962a;background:#fff8e6}.mo-story-row.ok small{color:#8a6414}
 .mo-story-row.locked,.mo-story-row.lv{opacity:.6}
 @media (max-width:560px){.mo-story-pic{width:84px}.mo-story-text p{font-size:16px}}
+
+/* 靠近傳送口時的「前往」按鈕：畫面中下方、技能列上面 */
+.mmo .mo-goport{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);z-index:30;padding:9px 20px 9px 18px;font-family:var(--kai);font-size:17px;color:#f6efe0;
+  background:linear-gradient(#2b2822,#16140f);border:1.5px solid #c9a85a;border-radius:24px;box-shadow:0 4px 14px rgba(22,20,15,.4);display:flex;align-items:center;gap:8px;cursor:pointer;animation:moPortIn .2s ease-out}
+.mmo .mo-goport[hidden]{display:none}
+.mo-goport b{font-weight:400;color:#f0d68a}
+.mo-goport kbd{font-size:11px;padding:1px 6px;border:1px solid rgba(246,239,224,.5);border-radius:4px;color:rgba(246,239,224,.8)}
+.mmo .mo-goport:hover{border-color:#f0d68a}
+@keyframes moPortIn{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
+@media (max-width:640px){.mmo .mo-goport{bottom:78px;font-size:15px}.mo-goport kbd{display:none}}
+@media (prefers-reduced-motion:reduce){.mmo .mo-goport{animation:none}}
+.mo-diff small.mo-under{color:#b5342a;font-weight:700}

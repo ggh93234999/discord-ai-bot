@@ -878,18 +878,17 @@ function tickPlayer(p, dt) {
     else if (Math.hypot(l.x - p.x, l.y - p.y) <= 1.3) { p.pickT = 0; p.path = null; const e = tryPick(p, l); if (e) out(p.ws, { t: "mo", a: "err", text: e }); }
     else if (!p.path || !p.path.length) p.pickT = 0;
   }
-  // 傳送點
-  const tile = m.t[Math.floor(p.y) * m.w + Math.floor(p.x)];
-  if (tile === 4) {
-    const pt = m.def.portals.find((q) => Math.abs(q.x - Math.floor(p.x)) <= 0 && (Math.floor(p.y) === q.y || Math.floor(p.y) === q.y + 1));
-    if (pt && pt.escape && m.inst && m.inst.guard && !m.inst.guard.dead) {
-      p.x = Math.min(p.x, pt.x - 0.6); p.path = null;
-      if (!p.guardMsgT || now() - p.guardMsgT > 3000) { p.guardMsgT = now(); sys(p, "出口被熔岩封住了！先打倒「熔岩守將」才能出去。"); }
-      return;
-    }
-    if (pt && pt.escape && m.inst && m.inst.kind === "dg") dgEscape(m, p);
-    if (pt) placeIn(p, pt.to, pt.tx + 0.5, pt.ty + 0.5 + (Math.floor(p.y) - pt.y));
-  }
+  // 傳送點：走到旁邊不會自動換圖，由玩家按「前往」（usePortal）
+}
+// 用傳送口：要在傳送口 2.8 格內；副本「出口」要先打倒守將
+function usePortal(p, i) {
+  const m = maps[p.map]; if (!m || p.dead) return;
+  const pt = m.def.portals[i]; if (!pt) return;
+  if (Math.hypot(pt.x + 0.5 - p.x, pt.y + 1 - p.y) > 2.8) return out(p.ws, { t: "mo", a: "err", text: "離傳送口太遠了" });
+  if (pt.escape && m.inst && m.inst.guard && !m.inst.guard.dead) { sys(p, "出口被熔岩封住了！先打倒「熔岩守將」才能出去。"); return; }
+  if (pt.escape && m.inst && m.inst.kind === "dg") dgEscape(m, p);
+  const dy = Math.max(0, Math.min(1, Math.floor(p.y) - pt.y));
+  placeIn(p, pt.to, pt.tx + 0.5, pt.ty + 0.5 + dy);
 }
 // ======================================================================== 王的專屬技能
 // 每隻王一套招式輪流放：先出預警（圓、直線、扇形、環形），預警結束才判定；放招時王站著不動（busyT）
@@ -1354,11 +1353,10 @@ function dgEnter(p, key, dk) {
   for (const q of teamOf(p)) {
     const A = db.acc[q.key];
     if (q.map !== p.map || q.dead || Math.hypot(q.x - p.x, q.y - p.y) > 12) skip.push(`${q.ch.name}（不在入口附近）`);
-    else if (q.ch.lv < need) skip.push(`${q.ch.name}（未滿 ${need} 級）`);
     else if (dgLeft(A, key, d.daily) <= 0) skip.push(`${q.ch.name}（今天的次數用完了）`);
     else ok.push(q);
   }
-  if (!ok.includes(p)) return p.ch.lv < need ? `${dif.name}難度要 ${need} 級` : "你今天的次數用完了";
+  if (!ok.includes(p)) return "你今天的次數用完了";          // 等級不限制，只顯示建議等級
   const mlv = Math.min(D.LV_CAP, d.lv + 3 + dif.lv), n = ok.length;
   const back = maps[d.map].def.stone || { x: 4, y: 10 };
   const def = { name: `${d.name}・${dif.name}`, w: d.w, h: d.h, theme: d.theme, lvl: `${mlv} 級`, inst: true };
@@ -1894,6 +1892,7 @@ export async function handleMmo(ws, m) {
       const x = Number(m.x), y = Number(m.y);
       const e = tryCast(p, sk, { x: m.x == null ? NaN : x, y: m.y == null ? NaN : y, id: Number(m.id) || 0 }); if (e) err(e); return;
     }
+    case "portal": usePortal(p, Number(m.i)); return;
     case "story": {     // 聽完一章：要照順序、等級夠、站在說故事的人旁邊；第一次聽完給經驗和銀兩
       const i = Number(m.i), ch = STORY[i]; if (!ch) return;
       if ((c.story || 0) !== i) return err("這段故事不是現在聽的");
@@ -2060,7 +2059,7 @@ export async function handleMmo(ws, m) {
       if (n.kind === "arena") { const A = db.acc[p.key]; o.arena = { top: arenaTop(), me: (A && A.pvp) || { w: 0, l: 0 } }; }
       if (n.kind === "story") { o.story = storyView(c, n.id); o.art = n.art; }
       Object.assign(o, npcExtra(p, n.kind));
-      if (n.kind === "dungeon") { const d = D.DUNGEONS[n.dg], A = db.acc[p.key]; o.dg = { key: n.dg, name: d.name, desc: d.desc, lv: d.lv, left: dgLeft(A, n.dg, d.daily), daily: d.daily, set: { ...D.SETS[d.set], b2: undefined, b3: undefined }, diffs: D.DIFF.map((x) => ({ k: x.k, n: x.name, lv: d.lv + x.lv, setP: x.setP, legend: x.legend })), lead: !p.party || parties.get(p.party).leader === p.key, team: p.party ? parties.get(p.party).members.size : 1 }; }
+      if (n.kind === "dungeon") { const d = D.DUNGEONS[n.dg], A = db.acc[p.key]; o.dg = { key: n.dg, name: d.name, desc: d.desc, lv: d.lv, left: dgLeft(A, n.dg, d.daily), daily: d.daily, set: { ...D.SETS[d.set], b2: undefined, b3: undefined }, diffs: D.DIFF.map((x) => ({ k: x.k, n: x.name, lv: Math.min(D.LV_CAP, d.lv + x.lv), setP: x.setP, legend: x.legend })), lead: !p.party || parties.get(p.party).leader === p.key, team: p.party ? parties.get(p.party).members.size : 1 }; }
       if (n.kind === "tower") { const A = db.acc[p.key]; o.climb = { left: dgLeft(A, "climb", D.CLIMB.daily), daily: D.CLIMB.daily, best: A.tb || 0, minLv: D.CLIMB.minLv, time: D.CLIMB.time / 60 }; }
       if (n.kind === "smith") o.mats = Object.entries(D.POTIONS).filter(([, v]) => v.mat).map(([k, v]) => ({ k, n: v.name, price: v.price, d: v.d }));
       if (n.kind === "post" || n.kind === "stone") {

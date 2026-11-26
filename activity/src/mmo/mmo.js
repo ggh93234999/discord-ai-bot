@@ -78,6 +78,7 @@ export function mountMmo(root, { env, back }) {
       <div class="mo-chat"><div class="mo-log"></div><form class="mo-say"><input maxlength="80" placeholder="說點什麼…（開頭打 /p 只給隊友看）" enterkeyhint="send"></form></div>
       <div class="mo-skills"></div>
       <div class="mo-toast"></div>
+      <button class="mo-goport" hidden></button>
       <div class="mo-tip" hidden></div>
       <div class="mo-area" hidden><img alt=""><div><b></b><span></span></div></div>
       <div class="mo-dead" hidden>你倒下了……<small>5 秒後在長安城醒來</small></div>
@@ -966,7 +967,21 @@ export function mountMmo(root, { env, back }) {
     const tp = $(".mo-sk.pot.tp");
     if (tp) { const back = me && me.inTown && me.recall; tp.classList.toggle("back", !!back); tp.title = back ? `回到上次的地點：${me.recall}（3，不扣回城符）` : "回城符：立刻回長安城，之後可再回到原地（3）"; const nEl = tp.querySelector(".n"); if (back && nEl) nEl.textContent = "返"; }
   }
+  // 靠近傳送口：跳出「前往○○」按鈕（或按空白鍵），由玩家自己決定要不要過去
+  let portNear = null;
+  const goPortEl = $(".mo-goport");
+  function goPortal() { if (!portNear) return; send({ a: "portal", i: portNear.i }); portNear = null; goPortEl.hidden = true; }
+  goPortEl.addEventListener("click", (e) => { e.stopPropagation(); goPortal(); });
+  function checkPortal() {
+    const meE = ents.get(myId); let best = null, bd = 2.6;
+    if (meE && map && map.portals && !(me && me.dead)) map.portals.forEach((q, i) => { const d = Math.hypot(q.x + 0.5 - meE.x, q.y + 1 - meE.y); if (d < bd) { bd = d; best = { i, label: q.label }; } });
+    if ((best && best.i) !== (portNear && portNear.i) || !!best !== !!portNear) {
+      portNear = best; goPortEl.hidden = !best;
+      if (best) goPortEl.innerHTML = `前往 <b>${esc(String(best.label || "").replace(/[←→]/g, "").trim())}</b><kbd>空白鍵</kbd>`;
+    }
+  }
   function tickHud(t) {
+    checkPortal();
     if (!me || !me.skills) return;
     // 冷卻：整顆變暗＋順時針掃回來，中間大字剩幾秒（不到 1 秒顯示小數）；轉好的瞬間閃一圈；魔不夠時變藍灰
     for (const s of me.skills) {
@@ -1230,7 +1245,7 @@ export function mountMmo(root, { env, back }) {
         <div class="mo-row"><button class="mo-pri" data-tower="1"${C.left > 0 && T.lead && me && me.lv >= C.minLv ? "" : " disabled"}>${!T.lead ? "要由隊長帶隊" : me && me.lv < C.minLv ? `${C.minLv} 級才能進` : C.left > 0 ? "進入鎖妖塔" : "今天的次數用完了"}</button></div></div>`; }
     else if (n.kind === "dungeon") { const G = n.dg; body = `<div class="mo-tower"><p>${esc(G.desc)}</p>
         <p class="mo-setbox" style="--sc:${G.set.col}"><i class="mo-seal">${G.set.ch}</i><b class="mo-setn">${esc(G.set.area)}「${esc(G.set.name)}」套裝</b>（任何部位都可能掉）<br><small>2 件：${esc(G.set.d2)}　3 件：${esc(G.set.d3)}${G.set.d5 ? `　5 件：${esc(G.set.d5)}` : ""}</small></p>
-        <div class="mo-diffs">${G.diffs.map((x) => `<button class="mo-diff d-${x.k}" data-dg="${G.key}" data-diff="${x.k}"${G.left > 0 && G.lead && me && me.lv >= x.lv ? "" : " disabled"}><b>${x.n}</b><small>${x.lv} 級以上</small><small>套裝 ${x.setP}%・傳說 ${x.legend}%</small></button>`).join("")}</div>
+        <div class="mo-diffs">${G.diffs.map((x) => `<button class="mo-diff d-${x.k}" data-dg="${G.key}" data-diff="${x.k}"${G.left > 0 && G.lead ? "" : " disabled"}><b>${x.n}</b><small${me && me.lv < x.lv ? ' class="mo-under"' : ""}>建議 ${x.lv} 級${me && me.lv < x.lv ? "・偏難" : ""}</small><small>套裝 ${x.setP}%・傳說 ${x.legend}%</small></button>`).join("")}</div>
         <p>${G.daily ? `今天還能進 <b>${G.left}</b> / ${G.daily} 次` : "不限次數"}${G.team > 1 ? `・隊伍 ${G.team} 人（隊員要在入口附近）` : "・單人（建議組隊）"}${G.lead ? "" : "・<b>要由隊長帶隊</b>"}</p></div>`; }
     else if (n.kind === "arena") { const A = n.arena; body = `<p>在長安城點其他玩家選「擂台切磋」，對方同意就上擂台。打到對方剩 0 就贏，3 分鐘到了血量高的贏。不掉東西、不扣經驗。擂台上的傷害另外壓低（單下、短時間內都有上限），不會一招秒人。</p>
         <p>你的戰績：<b>${A.me.w}</b> 勝 <b>${A.me.l}</b> 敗</p>
@@ -1497,6 +1512,7 @@ export function mountMmo(root, { env, back }) {
       if (s.type === "self") return castAt(s, null);
       aiming = { s, key: k };
     }
+    else if (k === " ") { if (portNear) { e.preventDefault(); goPortal(); } }
     else if (k === "1") { if (potCount("hp")) snd.potion(); send({ a: "quaff", k: "hp" }); }
     else if (k === "2") { if (potCount("mp")) snd.potion(); send({ a: "quaff", k: "mp" }); }
     else if (k === "3") send({ a: "use", u: "tp" });
