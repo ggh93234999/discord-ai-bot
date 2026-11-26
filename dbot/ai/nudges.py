@@ -14,7 +14,7 @@ def strip_fake_media(text: str) -> str:
 
 
 ACTION_TOOLS = {"draw_image", "edit_image", "make_sound", "make_video", "web_image", "music", "create_channel", "archive_channel", "edit_channel", "set_voice_status"}
-CARD_TOOLS = {"divination", "fortune_chart"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
+CARD_TOOLS = {"divination", "fortune_chart", "stock_quote"}       # 結果卡由程式貼在回覆最上面（DIVIDER 前面那段），模型只解讀
 CARD_MAX_TOKENS = int(os.getenv("CARD_MAX_TOKENS", "4000"))   # 占卜、命盤的解讀比較長，回覆上限放寬
 FILE_RE = re.compile(r"\n?\[\[FILE:([^\]]+)\]\]")
 CLAIM_RE = re.compile(

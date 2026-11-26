@@ -27,7 +27,7 @@ TOOL = {
     "function": {
         "name": "announce",
         "description": (
-            "用大笨bot 的名義在某個文字頻道發公告（漂亮的卡片），可 @everyone／@here／@某身分組，也可以排程定時發。"
+            "用大笨bot 的名義在某個文字頻道發公告（漂亮的卡片），可 @某身分組／@某成員（不能 @everyone 或 @here，會被拒絕），也可以排程定時發。"
             "只有伺服器管理員能用，權限由程式檢查。"
             "action=send 發公告（預設；有 when 或 delay_minutes 就是排程）；action=list 列出還沒發的排程；action=cancel 用 id 取消排程。"
             "發之前如果使用者沒給標題或內容，先問清楚；內容照使用者的原意，不要自己加料或改寫。"
@@ -39,7 +39,7 @@ TOOL = {
                 "channel": {"type": "string", "description": "要發到哪個文字頻道（名稱）；省略就是目前這個頻道"},
                 "title": {"type": "string", "description": "公告標題（可省略）"},
                 "content": {"type": "string", "description": "公告內容，照使用者的原話"},
-                "mention": {"type": "string", "description": "要提及誰：none（預設）、everyone、here、身分組名稱、成員名稱（或使用者訊息裡的 <@ID>）；可以多個，用逗號隔開，例如「小明, 小華, 管理組」"},
+                "mention": {"type": "string", "description": "要提及誰：none（預設）、身分組名稱、成員名稱（或使用者訊息裡的 <@ID>）；可以多個，用逗號隔開，例如「小明, 小華, 管理組」"},
                 "when": {"type": "string", "description": "排程時間，台北時間，格式 YYYY-MM-DD HH:MM；不排程就省略"},
                 "delay_minutes": {"type": "integer", "description": "幾分鐘後發（和 when 擇一）"},
                 "id": {"type": "string", "description": "cancel 用：排程的 id"},
@@ -102,15 +102,13 @@ def _mention_parts(guild: discord.Guild, mention: str | None):
     if not items:
         return "", discord.AllowedMentions.none(), None
     texts, roles, users, every = [], [], [], False
-    need_everyone = "我沒有「提及 @everyone、@here 和所有身分組」權限，請到 伺服器設定 → 身分組 → 大笨bot 打開。"
     for it in items:
         low = it.lower().lstrip("@")
-        if low in ("everyone", "全體", "所有人", "here"):
-            if not guild.me.guild_permissions.mention_everyone:
-                return "", None, need_everyone
-            texts.append("@here" if low == "here" else "@everyone"); every = True
-            continue
+        if low in ("everyone", "全體", "所有人", "here", "全部", "大家"):
+            return "", None, "不能用 @everyone／@here 標記全體；要通知的話請指定成員或身分組。"
         r = _role(guild, it)
+        if r is not None and r.is_default():
+            return "", None, "不能用 @everyone／@here 標記全體；要通知的話請指定成員或身分組。"
         if r is not None:
             if not (r.mentionable or guild.me.guild_permissions.mention_everyone):
                 return "", None, f"身分組「{r.name}」不允許被提及，我也沒有「提及全部身分組」的權限。"
@@ -120,7 +118,7 @@ def _mention_parts(guild: discord.Guild, mention: str | None):
         if m is None:
             return "", None, f"找不到叫「{it}」的身分組或成員。"
         texts.append(m.mention); users.append(m)
-    return " ".join(texts), discord.AllowedMentions(everyone=every, roles=roles, users=users), None
+    return " ".join(texts), discord.AllowedMentions(everyone=False, roles=roles, users=users), None
 
 
 async def _post(guild: discord.Guild, ch, title: str, content: str, mention: str, by: str) -> str | None:

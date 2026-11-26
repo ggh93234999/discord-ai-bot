@@ -39,7 +39,9 @@ from dbot.ai import selfhelp
 from dbot.ai import announce
 from dbot.ai import mention
 from dbot.ai import pcbuild
+from dbot.ai import stock
 from dbot.core import gamelog
+STOCK_RE = re.compile(r"股價|股票|台股|美股|個股|股市|走勢|漲跌|漲了|跌了|大盤|加權|ETF|K線|行情|報價|比特幣|以太幣|標普|那斯達克|道瓊|費半|\b\d{4,5}\b|\bstocks?\b|ticker", re.I)
 PC_RE = re.compile(r"配單|改單|改一下單|SSD|Gen[345]|電源供應|機殼|散熱器|配電腦|配一台|組裝電腦|組電腦|裝機|電腦零件|顯示卡|顯卡|主機板|原價屋|欣亞|CPU|處理器|記憶體.*價|SSD.*價|預算.*(電腦|主機)|(電腦|主機).*預算|RTX|Ryzen", re.I)
 MENTION_RE = re.compile(r"標記|標一下|標他|標她|標你|艾特|@|tag|ping|點名|提及|叫.{0,8}(來|過來|出來)|喊.{0,8}(來|過來)|通知.{0,8}(他|她|你|一下)", re.I)
 ANNOUNCE_RE = re.compile(r"公告|announce|通知大家|排程", re.I)
@@ -579,7 +581,7 @@ def _gallery_draws(reply: dict, user_text: str) -> list[dict]:
 def all_tools() -> dict:
     """機器人目前實際可用的全部工具（名稱 → 定義），給 /頻道工具 挑。有些工具沒開（沒設定畫圖、關掉上網…）就不會出現。"""
     lst = ([*TOOLS, webimg.TOOL] if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL, actstatus.TOOL, almanac.TOOL,
-           botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL, announce.TOOL, mention.TOOL, pcbuild.TOOL,
+           botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL, announce.TOOL, mention.TOOL, pcbuild.TOOL, stock.TOOL,
            memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL]
     if imagegen.enabled():
         lst += [imagegen.TOOL, imagegen.EDIT_TOOL]
@@ -599,7 +601,7 @@ async def ask_model(conversation: list[dict], on_status=None, msg: discord.Messa
     if msg is not None and msg.guild and is_admin(msg.author) and (PAY_RE.search(last_user_text(conversation)) or MONEY_RE.search(last_user_text(conversation))):
         sys_text += "\n\n【這個人是伺服器管理員】他如果跟你要錢，態度可以客氣、軟一點；有個像樣的理由就可以給小數目（幾千～三萬以內），沒理由或亂討就婉拒（仍然要真的呼叫工具成功才算給，也受工具的上限）。"
     messages = [{"role": "system", "content": sys_text}, *conversation]
-    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL] if (msg is not None and msg.guild and MONEY_ANY_RE.search(recent_user_text(conversation))) or MONEY_RE.search(last_user_text(conversation)) or PAY_RE.search(last_user_text(conversation)) or LOG_RE.search(last_user_text(conversation)) or REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([announce.TOOL] if msg is not None and msg.guild and ANNOUNCE_RE.search(last_user_text(conversation)) else []) + ([mention.TOOL] if msg is not None and msg.guild and MENTION_RE.search(last_user_text(conversation)) else []) + ([pcbuild.TOOL] if PC_RE.search(recent_user_text(conversation, 6)) or (msg is not None and pcbuild.has_recent(msg.author.id)) else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
+    tools = (list(TOOLS) if WEB_TOOLS else []) + [extras.TOOL, divination.TOOL, fortune.TOOL, selfhelp.TOOL] + ([actstatus.TOOL] if ACT_RE.search(last_user_text(conversation)) else []) + ([almanac.TOOL] if ALMANAC_RE.search(last_user_text(conversation)) else []) + ([botwallet.TOOL, botwallet.PAY_TOOL, botwallet.LOG_TOOL, botwallet.REPAY_TOOL] if (msg is not None and msg.guild and MONEY_ANY_RE.search(recent_user_text(conversation))) or MONEY_RE.search(last_user_text(conversation)) or PAY_RE.search(last_user_text(conversation)) or LOG_RE.search(last_user_text(conversation)) or REPAY_RE.search(last_user_text(conversation)) else []) + ([imagegen.TOOL, imagegen.EDIT_TOOL] if imagegen.enabled() else []) + ([sfxgen.TOOL] if sfxgen.enabled() else []) + ([videogen.TOOL] if videogen.enabled() else []) + ([webimg.TOOL] if WEB_TOOLS else []) + ([announce.TOOL] if msg is not None and msg.guild and ANNOUNCE_RE.search(last_user_text(conversation)) else []) + ([mention.TOOL] if msg is not None and msg.guild and MENTION_RE.search(last_user_text(conversation)) else []) + ([stock.TOOL] if STOCK_RE.search(recent_user_text(conversation, 4)) else []) + ([pcbuild.TOOL] if PC_RE.search(recent_user_text(conversation, 6)) or (msg is not None and pcbuild.has_recent(msg.author.id)) else []) + ([memberstatus.TOOL, music.TOOL, music.STATUS_TOOL, channels.TOOL, channels.ARCHIVE_TOOL, channels.EDIT_TOOL, channels.VSTATUS_TOOL] if msg is not None and msg.guild else [])
     # 這個頻道有用 /頻道工具 限定工具：只給設定的工具，並換成對應的精簡提示（其他頻道完全不變）
     ch_cfg = chantools.config_for_current()
     if ch_cfg is not None:

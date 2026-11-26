@@ -52,7 +52,7 @@ SHORT = {
     "weather": "查天氣", "web_search": "搜尋網路", "fetch_url": "讀網頁內文", "web_image": "上網找圖／下載圖", "random_number": "隨機數字、骰子",
     "divination": "塔羅、擲筊、抽籤", "fortune_chart": "八字、星盤", "bot_help": "查bot功能與遊戲玩法", "activity_status": "誰在Activity玩什麼",
     "almanac": "擇日、農民曆", "bot_wallet": "查bot餘額", "bot_pay": "bot轉錢給成員", "transfer_log": "轉帳紀錄、欠款", "bot_collect": "收還款",
-    "announce": "發公告（可@everyone）", "mention_members": "標記成員", "pc_build": "配電腦、零件價格", "member_status": "成員線上／玩什麼",
+    "announce": "發公告（可標身分組，不能@everyone）", "mention_members": "標記成員", "pc_build": "配電腦、零件價格", "member_status": "成員線上／玩什麼",
     "music": "放歌、點歌", "music_status": "查播放狀態", "create_channel": "開頻道", "archive_channel": "封存頻道", "edit_channel": "改頻道名／搬分類",
     "set_voice_status": "語音頻道狀態", "draw_image": "畫新圖", "edit_image": "改圖", "make_sound": "生成音效", "make_video": "生成短影片",
 }

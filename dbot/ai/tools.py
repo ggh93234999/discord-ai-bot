@@ -10,6 +10,7 @@ from dbot.ai import announce
 from dbot.ai import mention
 from dbot.ai import pcbuild
 from dbot.ai import sfxgen
+from dbot.ai import stock
 from dbot.ai import videogen
 from dbot.ai import webimg
 from dbot.core import actstatus
@@ -197,6 +198,8 @@ async def run_tool(name: str, args_json: str, msg: discord.Message | None = None
             return botwallet.run(msg.guild.id if msg is not None and msg.guild else None)
         if name == "activity_status":
             return await actstatus.run(msg.guild.id if msg is not None and msg.guild else None)
+        if name == "stock_quote":
+            return await stock.run(args)
         if name == "fortune_chart":
             text, files = await fortune.run(runtime.client.http_session, args)
             return text + "".join(f"\n[[FILE:{f}]]" for f in files)
@@ -291,6 +294,8 @@ def tool_status(name: str, args_json: str) -> str:
         return f"👀 看成員狀態：{args.get('name') or '大家'}"[:80]
     if name == "random_number":
         return "🎲 抽數字"
+    if name == "stock_quote":
+        return stock.tool_status(args)
     if name == "fortune_chart":
         return "🧭 排命盤中…" if args.get("kind") == "bazi" else "🧭 排盤、畫星盤中…"
     if name == "almanac":
